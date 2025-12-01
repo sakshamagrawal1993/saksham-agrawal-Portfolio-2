@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -86,9 +87,9 @@ export const PROJECTS: Project[] = [
     longDescription: 'At Jivi.ai, I identified a gap where users struggled with fragmented medical history. I standardized parameters across biomarkers to allow integration with EHRs. I implemented the Health Assistant using Agentic RAG and Knowledge Graphs, providing accurate insights to users and doctors.',
     role: 'Senior Product Manager @ Jivi AI',
     category: 'Healthcare AI',
-    imageUrl: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&q=80&w=1000',
+    imageUrl: 'https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&q=80&w=1000',
     gallery: [
-      'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&q=80&w=1000',
+      'https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&q=80&w=1000',
       'https://images.unsplash.com/photo-1551076805-e1869033e561?auto=format&fit=crop&q=80&w=1000'
     ],
     techStack: ['Agentic RAG', 'Knowledge Graphs', 'EHR Integration', 'Healthcare Data'],
@@ -117,9 +118,9 @@ export const PROJECTS: Project[] = [
     longDescription: 'Co-led a cross-functional team to launch this product. We scaled to ~1000 cards monthly with an average transaction value of Rs. 20,000/card. I owned the product proposition and customer experience from concept to scale.',
     role: 'Senior Product Manager @ BharatPe',
     category: 'Fintech',
-    imageUrl: 'https://images.unsplash.com/photo-1556742049-0cfed4f7a07d?auto=format&fit=crop&q=80&w=1000',
+    imageUrl: 'https://images.unsplash.com/photo-1614212959648-8a2b535d496e?auto=format&fit=crop&q=80&w=1000',
     gallery: [
-        'https://images.unsplash.com/photo-1556742049-0cfed4f7a07d?auto=format&fit=crop&q=80&w=1000'
+        'https://images.unsplash.com/photo-1614212959648-8a2b535d496e?auto=format&fit=crop&q=80&w=1000'
     ],
     techStack: ['Banking Integration', 'Credit Risk', 'Go-To-Market', 'Stakeholder Mgmt'],
     demoUrl: '#'
@@ -132,9 +133,9 @@ export const PROJECTS: Project[] = [
     longDescription: 'Managed Postpe cards (AUM ~Rs 680 Cr). I pioneered the industry-first "EMI on QR" feature. For Personal Loans, I spearheaded the product from concept to launch with real-time disbursals, scaling to Rs 2.5 Cr/day.',
     role: 'Senior Product Manager @ BharatPe',
     category: 'Fintech',
-    imageUrl: 'https://images.unsplash.com/photo-1563013544-824ae1b704d3?auto=format&fit=crop&q=80&w=1000',
+    imageUrl: 'https://images.unsplash.com/photo-1556742502-ec7c0e9f34b1?auto=format&fit=crop&q=80&w=1000',
     gallery: [
-        'https://images.unsplash.com/photo-1563013544-824ae1b704d3?auto=format&fit=crop&q=80&w=1000'
+        'https://images.unsplash.com/photo-1556742502-ec7c0e9f34b1?auto=format&fit=crop&q=80&w=1000'
     ],
     techStack: ['Lending Lifecycle', 'Regulatory Compliance', 'E-Nach', 'Risk Modeling'],
     demoUrl: '#'
@@ -162,7 +163,7 @@ export const JOURNAL_ARTICLES: JournalArticle[] = [
         title: "Agentic AI in Healthcare",
         date: "December 2024",
         excerpt: "How Jivi AI is moving from chatbots to connected care.",
-        image: "https://images.unsplash.com/photo-1576091160550-217358c7db81?auto=format&fit=crop&q=80&w=1000",
+        image: "https://images.unsplash.com/photo-1531746790731-6c087fecd65a?auto=format&fit=crop&q=80&w=1000",
         content: React.createElement(React.Fragment, null,
             React.createElement("p", { className: "mb-6 text-[#5D5A53]" },
                 "At Jivi, we are not just building another chatbot. We are building 'Health Twin', a platform that understands a user's complete biomarker profile."
@@ -177,7 +178,7 @@ export const JOURNAL_ARTICLES: JournalArticle[] = [
         title: "Navigating Digital Lending Guidelines",
         date: "October 2023",
         excerpt: "Compliance as a product feature at BharatPe.",
-        image: "https://images.unsplash.com/photo-1620714223084-87bd6c26e117?auto=format&fit=crop&q=80&w=1000",
+        image: "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?auto=format&fit=crop&q=80&w=1000",
         content: React.createElement(React.Fragment, null,
             React.createElement("p", { className: "mb-6 text-[#5D5A53]" },
                 "When RBI released new Digital Lending Guidelines, many saw it as a hurdle. At BharatPe, I led the product roadmap to turn compliance into a trust-building feature."
@@ -192,7 +193,7 @@ export const JOURNAL_ARTICLES: JournalArticle[] = [
         title: "The Strategy of Device Financing",
         date: "May 2022",
         excerpt: "Unlocking growth for the underbanked at Xiaomi.",
-        image: "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&q=80&w=1000",
+        image: "https://images.unsplash.com/photo-1556742049-0cfed4f7a07d?auto=format&fit=crop&q=80&w=1000",
         content: React.createElement(React.Fragment, null,
             React.createElement("p", { className: "mb-6 text-[#5D5A53]" },
                 "Launching Mi Credit Lite required onboarding 800+ offline retail partners. The challenge wasn't just credit risk; it was operational scalability."

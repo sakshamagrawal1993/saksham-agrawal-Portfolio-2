@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -57,7 +58,7 @@ export const sendMessageToGemini = async (history: {role: string, text: string}[
     }
     
     if (!apiKey) {
-      return "I'm currently offline (Missing API Key). Feel free to email Saksham directly at sakshamagrawal1993@gmail.com!";
+      return "I'm currently offline (Missing API Key). Feel free to email Saksham directly at sakshamagrawal@gmail.com!";
     }
 
     const ai = new GoogleGenAI({ apiKey });

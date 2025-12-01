@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -21,12 +22,11 @@ const Features: React.FC = () => {
         <div className="order-1 lg:order-2 flex flex-col justify-center p-12 lg:p-24 bg-[#EBE7DE]">
            <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#A8A29E] mb-6">Our Philosophy</span>
            <h3 className="text-4xl md:text-5xl font-serif mb-8 text-[#2C2A26] leading-tight">
-             Materials that age <br/> with grace.
+             Strategy meets <br/> execution.
            </h3>
            <p className="text-lg text-[#5D5A53] font-light leading-relaxed mb-12 max-w-md">
-             We reject the disposable. Every Aura product is crafted from sandstone, unpolished aluminum, and organic fabrics that develop a unique patina over time.
+             We reject complexity for the sake of it. Every product I build is crafted from deep user insights, scalable architecture, and tangible business value.
            </p>
-           <a href="#" className="inline-block text-sm font-medium uppercase tracking-widest underline underline-offset-8 hover:text-[#8C8881] transition-colors">Read about our materials</a>
         </div>
       </div>
 
@@ -35,16 +35,16 @@ const Features: React.FC = () => {
         <div className="flex flex-col justify-center p-12 lg:p-24 bg-[#2C2A26] text-[#F5F2EB]">
            <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#A8A29E] mb-6">The Ecosystem</span>
            <h3 className="text-4xl md:text-5xl font-serif mb-8 text-[#F5F2EB] leading-tight">
-             Silence by default.
+             Data-driven decisions.
            </h3>
            <p className="text-lg text-[#A8A29E] font-light leading-relaxed mb-12 max-w-md">
-             Our devices respect your attention. No blinking lights, no intrusive notifications. Just calm utility when you need it, and a beautiful object when you don't.
+             Respect for the user's attention. No vanity metrics, no dark patterns. Just calm utility when you need it, and measurable impact on the P&L.
            </p>
         </div>
         <div className="relative h-[500px] lg:h-auto overflow-hidden">
            <img 
-             src="https://images.pexels.com/photos/6801917/pexels-photo-6801917.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1" 
-             alt="Woman sitting on wooden floor reading" 
+             src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&q=80&w=1200" 
+             alt="Data analytics dashboard abstract" 
              className="absolute inset-0 w-full h-full object-cover hover:scale-105 transition-transform duration-[1.5s] brightness-90"
            />
         </div>
