@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -21,7 +22,7 @@ const Footer: React.FC<FooterProps> = ({ onLinkClick }) => {
             Senior Product Manager specializing in building exceptional AI and Fintech experiences.
             Open for collaborations and opportunities.
           </p>
-          <a href="mailto:contact@saksham.dev" className="text-[#2C2A26] border-b border-[#2C2A26] pb-1 hover:opacity-60 transition-opacity">contact@saksham.dev</a>
+          <a href="mailto:sakshamagrawal@gmail.com" className="text-[#2C2A26] border-b border-[#2C2A26] pb-1 hover:opacity-60 transition-opacity">sakshamagrawal@gmail.com</a>
         </div>
 
         <div className="md:col-span-2">
