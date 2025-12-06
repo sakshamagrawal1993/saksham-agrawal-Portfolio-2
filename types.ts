@@ -26,7 +26,7 @@ export interface JournalArticle {
   date: string;
   excerpt: string;
   image: string;
-  content: React.ReactNode; 
+  content: React.ReactNode;
 }
 
 export interface ChatMessage {
@@ -35,10 +35,11 @@ export interface ChatMessage {
   timestamp: number;
 }
 
-export type ViewState = 
+export type ViewState =
   | { type: 'home' }
   | { type: 'project', project: Project }
-  | { type: 'journal', article: JournalArticle };
+  | { type: 'journal', article: JournalArticle }
+  | { type: 'ticketflow' };
 
 export interface Product {
   id: string;
