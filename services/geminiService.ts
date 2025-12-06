@@ -47,22 +47,22 @@ const getSystemInstruction = () => {
   - Keep responses concise.`;
 };
 
-export const sendMessageToGemini = async (history: {role: string, text: string}[], newMessage: string): Promise<string> => {
+export const sendMessageToGemini = async (history: { role: string, text: string }[], newMessage: string): Promise<string> => {
   try {
     let apiKey: string | undefined;
-    
+
     try {
-      apiKey = process.env.API_KEY;
+      apiKey = process.env.GEMINI_API_KEY;
     } catch (e) {
       console.warn("Accessing process.env failed");
     }
-    
+
     if (!apiKey) {
       return "I'm currently offline (Missing API Key). Feel free to email Saksham directly at sakshamagrawal@gmail.com!";
     }
 
     const ai = new GoogleGenAI({ apiKey });
-    
+
     const chat = ai.chats.create({
       model: 'gemini-2.5-flash',
       config: {
