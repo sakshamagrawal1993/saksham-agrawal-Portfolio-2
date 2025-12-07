@@ -1,4 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
+// Force refresh - fixing import error
+
 import { useFrame } from '@react-three/fiber';
 import { useRunnerStore } from './store';
 import * as THREE from 'three';
@@ -18,7 +20,7 @@ interface Obstacle {
 const SPAWN_DISTANCE = -60;
 const LANE_WIDTH = 2;
 
-const ObstacleManager = () => {
+const Obstacles = () => {
     // We use a mix of state (for spawning/React tree) and Refs (for movement)
     // Actually, simpler: State holds the list. Refs update their own transforms.
     // We pass a Mutable Callback to children?
@@ -197,4 +199,4 @@ const ObstacleMesh = ({ obs }: { obs: Obstacle }) => {
     );
 }
 
-export default ObstacleManager;
+export default Obstacles;
