@@ -5,6 +5,7 @@
 
 
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Project } from '../types';
 
 interface ProjectDetailProps {
@@ -13,6 +14,7 @@ interface ProjectDetailProps {
 }
 
 const ProductDetail: React.FC<ProjectDetailProps> = ({ project, onBack }) => {
+  const navigate = useNavigate();
 
   return (
     <div className="pt-24 min-h-screen bg-[#F5F2EB] animate-fade-in-up">
@@ -58,16 +60,9 @@ const ProductDetail: React.FC<ProjectDetailProps> = ({ project, onBack }) => {
                 <button
                   onClick={() => {
                     if (project.demoUrl?.startsWith('/')) {
-                      // Use React Router for internal paths to avoid page reload and validation issues
-                      // We need to access navigate from parent or use hack, but ProductDetail is a component
-                      // Better to pass a handler or use window.location.assign if reload is intended, 
-                      // but for SPA feel, we should use internal navigation.
-                      // Since we don't have navigate prop here, we can fallback to window.location 
-                      // or better, change the "Live Demo" button to be an anchor tag if external, or use Link if internal?
-                      // Actually, let's keep it simple. The 404 is server config.
-                      // But to be cleaner, let's try to use internal nav if possible.
-                      // Reverting to just window.location.href is fine IF server is configured.
-                      window.location.href = project.demoUrl;
+                      // Use client-side navigation for internal apps (SPA)
+                      // This avoids 404s from server-side routing on Vercel
+                      navigate(project.demoUrl);
                     } else {
                       window.open(project.demoUrl, '_blank');
                     }
