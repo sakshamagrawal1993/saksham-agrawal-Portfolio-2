@@ -72,10 +72,23 @@ const Player = () => {
     });
 
     return (
-        <mesh ref={mesh} position={[0, 0.5, 0]} castShadow>
-            <boxGeometry args={[1, 1, 1]} />
-            <meshStandardMaterial color="orange" />
-        </mesh>
+        <group ref={mesh} position={[0, 0.5, 0]}>
+            {/* Body */}
+            <mesh position={[0, 0, 0]} castShadow receiveShadow>
+                <boxGeometry args={[0.8, 0.8, 0.8]} />
+                <meshStandardMaterial color="#fbbf24" roughness={0.2} metalness={0.8} />
+            </mesh>
+            {/* Head */}
+            <mesh position={[0, 0.6, 0]} castShadow>
+                <boxGeometry args={[0.5, 0.5, 0.5]} />
+                <meshStandardMaterial color="#f59e0b" roughness={0.2} metalness={0.8} />
+            </mesh>
+            {/* Eyes (Visor) */}
+            <mesh position={[0, 0.65, 0.26]}>
+                <boxGeometry args={[0.3, 0.1, 0.05]} />
+                <meshStandardMaterial color="#00ffff" emissive="#00ffff" emissiveIntensity={2} />
+            </mesh>
+        </group>
     );
 };
 

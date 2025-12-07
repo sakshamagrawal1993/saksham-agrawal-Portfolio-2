@@ -172,19 +172,30 @@ const ObstacleMesh = ({ obs }: { obs: Obstacle }) => {
     return (
         <mesh
             ref={mesh}
-            position={[obs.lane * LANE_WIDTH, 0.5, obs.startZ]} // Initial pos, updated by useFrame
+            position={[obs.lane * LANE_WIDTH, 0.5, obs.startZ]}
             castShadow
         >
-            {obs.type === 'COIN' || obs.type === 'HEART' ? (
-                <sphereGeometry args={[0.3, 16, 16]} />
-            ) : (
-                obs.type === 'TREE' ? (
-                    <coneGeometry args={[0.5, 1.5, 8]} />
-                ) : (
-                    <dodecahedronGeometry args={[0.5]} />
-                )
+            {obs.type === 'COIN' && (
+                <mesh rotation={[Math.PI / 2, 0, 0]}>
+                    <cylinderGeometry args={[0.3, 0.3, 0.1, 32]} />
+                </mesh>
             )}
-            <meshStandardMaterial color={color} emissive={obs.type === 'COIN' ? '#fbbf24' : 'black'} emissiveIntensity={0.5} />
+            {obs.type === 'HEART' && (
+                <dodecahedronGeometry args={[0.3]} />
+            )}
+            {obs.type === 'TREE' && (
+                <coneGeometry args={[0.5, 1.5, 8]} />
+            )}
+            {obs.type === 'BOULDER' && (
+                <icosahedronGeometry args={[0.5, 0]} />
+            )}
+
+            <meshStandardMaterial
+                color={color}
+                emissive={obs.type === 'COIN' ? '#fbbf24' : (obs.type === 'HEART' ? '#ef4444' : '#000000')}
+                emissiveIntensity={0.8}
+                roughness={0.4}
+            />
         </mesh>
     );
 }
