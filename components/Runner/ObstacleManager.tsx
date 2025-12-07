@@ -150,53 +150,50 @@ const ObstacleManager = () => {
 };
 
 const ObstacleMesh = ({ obs }: { obs: Obstacle }) => {
-    const mesh = useRef<THREE.Mesh>(null);
-    // const { status } = useRunnerStore(); // Unused
+    const group = useRef<THREE.Group>(null);
 
     useFrame(() => {
-        if (mesh.current) {
+        if (group.current) {
             // Sync position with logic: Z = StartZ + Distance
             const dist = useRunnerStore.getState().distance;
-            mesh.current.position.z = obs.startZ + dist;
+            group.current.position.z = obs.startZ + dist;
 
             // Scale down if hit?
             if (obs.hit) {
-                mesh.current.visible = false;
+                group.current.visible = false;
             }
         }
     });
 
-    // Geometry & Material based on type
     const color = obs.type === 'COIN' ? '#fbbf24' : (obs.type === 'HEART' ? '#ef4444' : (obs.type === 'BOULDER' ? '#475569' : '#166534'));
 
     return (
-        <mesh
-            ref={mesh}
+        <group
+            ref={group}
             position={[obs.lane * LANE_WIDTH, 0.5, obs.startZ]}
-            castShadow
         >
-            {obs.type === 'COIN' && (
-                <mesh rotation={[Math.PI / 2, 0, 0]}>
+            {obs.type === 'COIN' ? (
+                // Coin needs rotation
+                <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
                     <cylinderGeometry args={[0.3, 0.3, 0.1, 32]} />
+                    <meshStandardMaterial color={color} emissive="#fbbf24" emissiveIntensity={0.8} roughness={0.4} />
+                </mesh>
+            ) : (
+                // Others are standard upright meshes
+                <mesh castShadow>
+                    {obs.type === 'HEART' && <dodecahedronGeometry args={[0.3]} />}
+                    {obs.type === 'TREE' && <coneGeometry args={[0.5, 1.5, 8]} />}
+                    {obs.type === 'BOULDER' && <icosahedronGeometry args={[0.5, 0]} />}
+
+                    <meshStandardMaterial
+                        color={color}
+                        emissive={obs.type === 'HEART' ? '#ef4444' : '#000000'}
+                        emissiveIntensity={0.8}
+                        roughness={0.4}
+                    />
                 </mesh>
             )}
-            {obs.type === 'HEART' && (
-                <dodecahedronGeometry args={[0.3]} />
-            )}
-            {obs.type === 'TREE' && (
-                <coneGeometry args={[0.5, 1.5, 8]} />
-            )}
-            {obs.type === 'BOULDER' && (
-                <icosahedronGeometry args={[0.5, 0]} />
-            )}
-
-            <meshStandardMaterial
-                color={color}
-                emissive={obs.type === 'COIN' ? '#fbbf24' : (obs.type === 'HEART' ? '#ef4444' : '#000000')}
-                emissiveIntensity={0.8}
-                roughness={0.4}
-            />
-        </mesh>
+        </group>
     );
 }
 

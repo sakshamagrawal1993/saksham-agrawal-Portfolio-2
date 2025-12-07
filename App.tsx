@@ -4,7 +4,7 @@
 */
 
 
-import React, { useEffect } from 'react';
+import React, { useEffect, Suspense, lazy } from 'react';
 import { Routes, Route, useNavigate, useLocation, useParams, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Analytics from './services/analytics';
@@ -19,8 +19,9 @@ import ProductDetail from './components/ProductDetail';
 import JournalDetail from './components/JournalDetail';
 import TicketflowApp from './components/Ticketflow/TicketflowApp';
 import InsightsLMApp from './components/InsightsLM/InsightsLMApp';
-import RunnerApp from './components/Runner/RunnerApp';
 import { PROJECTS, JOURNAL_ARTICLES } from './constants';
+
+const RunnerApp = lazy(() => import('./components/Runner/RunnerApp'));
 
 function HomePage() {
   const location = useLocation();
@@ -153,7 +154,11 @@ function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/ticketflow" element={<TicketflowApp onBack={() => navigate('/#work')} />} />
           <Route path="/insightslm" element={<InsightsLMApp onBack={() => navigate('/project/insightslm')} />} />
-          <Route path="/runner" element={<RunnerApp onBack={() => navigate('/project/runner')} />} />
+          <Route path="/runner" element={
+            <Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-black text-white">Loading Game...</div>}>
+              <RunnerApp onBack={() => navigate('/project/runner')} />
+            </Suspense>
+          } />
           <Route path="/project/:id" element={<ProjectPage />} />
           <Route path="/journal/:id" element={<JournalPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

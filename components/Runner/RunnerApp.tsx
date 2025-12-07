@@ -122,7 +122,9 @@ const GameContent = () => (
         <ambientLight intensity={0.5} />
         <directionalLight position={[5, 10, 5]} intensity={1} castShadow />
 
-        <Game />
+        <React.Suspense fallback={null}>
+            <Game />
+        </React.Suspense>
     </Canvas>
 );
 
