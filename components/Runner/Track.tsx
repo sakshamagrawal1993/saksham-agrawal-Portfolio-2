@@ -2,55 +2,43 @@ import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useRunnerStore } from './store';
 
+// Basic Infinite Floor
 const Track = () => {
-    const materialRef = useRef<any>();
-    const { speed, status } = useRunnerStore();
-
-    useFrame((_, delta) => {
-        if (status === 'playing' && materialRef.current) {
-            // Scrolls the texture to simulate movement
-            // Assuming UV mapping along Y axis or specific direction
-            // For a simple color track, we might not see movement unless we have a grid texture
-            // Let's use map offset if texture exists, or just move the object?
-            // Infinite runner usually moves floor backwards
-
-            materialRef.current.map.offset.y -= speed * delta * 0.1;
-        }
-    });
-
     return (
         <group>
-            {/* Floor */}
-            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, -20]} receiveShadow>
-                <planeGeometry args={[10, 100]} />
-                {/* Using a grid helper as texture for now or basic material */}
-                <meshStandardMaterial color="#1e293b" />
+            {/* Static floor plane */}
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, -50]} receiveShadow>
+                <planeGeometry args={[100, 200]} />
+                <meshStandardMaterial color="#0f172a" roughness={1} />
             </mesh>
 
-            {/* Grid Helper for visual speed */}
-            <gridHelper args={[10, 100, 0xffffff, 0x555555]} position={[0, 0.01, 0]} rotation={[0, 0, 0]} />
-
-            {/* Moving Floor Effect: We need multiple segments recycling */}
-            <MovingFloor />
+            {/* Moving Grid Effect */}
+            <MovingGrid />
         </group>
     );
 };
 
-const MovingFloor = () => {
-    const mesh = useRef<any>();
+const MovingGrid = () => {
+    const gridRef = useRef<any>();
     const { speed, status } = useRunnerStore();
 
     useFrame((_, delta) => {
-        if (status === 'playing' && mesh.current) {
-            mesh.current.position.z += speed * delta;
-            if (mesh.current.position.z > 10) {
-                mesh.current.position.z = -10;
+        if (status === 'playing' && gridRef.current) {
+            // Move grid towards camera
+            gridRef.current.position.z += speed * delta;
+            // Reset position to loop
+            if (gridRef.current.position.z > 10) {
+                gridRef.current.position.z = 0;
             }
         }
     });
 
     return (
-        <gridHelper ref={mesh} args={[20, 40, 0x475569, 0x334155]} position={[0, 0.01, -20]} />
+        <gridHelper
+            ref={gridRef}
+            args={[100, 100, 0x334155, 0x1e293b]}
+            position={[0, 0.01, -50]}
+        />
     )
 }
 
