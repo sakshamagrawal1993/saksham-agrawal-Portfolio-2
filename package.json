@@ -11,7 +11,7 @@
   "dependencies": {
     "@google/genai": "latest",
     "@react-three/drei": "^9.122.0",
-    "@react-three/fiber": "^9.4.2",
+    "@react-three/fiber": "^8.18.0",
     "@supabase/supabase-js": "^2.86.2",
     "@types/three": "^0.181.0",
     "mixpanel-browser": "^2.72.0",
