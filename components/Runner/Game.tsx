@@ -1,4 +1,3 @@
-import React, { useRef, useState, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useRunnerStore } from './store';
 import Player from './Player';

@@ -1,7 +1,6 @@
-import React, { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useRunnerStore } from './store';
-import { Vector3 } from 'three';
 
 const LANE_WIDTH = 2;
 const JUMP_FORCE = 5;

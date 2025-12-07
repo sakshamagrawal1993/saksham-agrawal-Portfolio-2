@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useRunnerStore } from './store';
 
@@ -6,7 +6,7 @@ const Track = () => {
     const materialRef = useRef<any>();
     const { speed, status } = useRunnerStore();
 
-    useFrame((state, delta) => {
+    useFrame((_, delta) => {
         if (status === 'playing' && materialRef.current) {
             // Scrolls the texture to simulate movement
             // Assuming UV mapping along Y axis or specific direction
@@ -40,7 +40,7 @@ const MovingFloor = () => {
     const mesh = useRef<any>();
     const { speed, status } = useRunnerStore();
 
-    useFrame((state, delta) => {
+    useFrame((_, delta) => {
         if (status === 'playing' && mesh.current) {
             mesh.current.position.z += speed * delta;
             if (mesh.current.position.z > 10) {
