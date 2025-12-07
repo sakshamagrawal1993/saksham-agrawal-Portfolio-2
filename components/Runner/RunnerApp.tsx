@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { useRunnerStore } from './store';
 import { Canvas } from '@react-three/fiber';
 // Game Component
-import Game from './Game';
+import RunnerScene from './RunnerScene';
 
 interface RunnerAppProps {
     onBack: () => void;
@@ -124,7 +124,7 @@ const GameContent = () => (
         <directionalLight position={[5, 10, 5]} intensity={1} castShadow />
 
         <React.Suspense fallback={null}>
-            <Game />
+            <RunnerScene />
         </React.Suspense>
     </Canvas>
 );

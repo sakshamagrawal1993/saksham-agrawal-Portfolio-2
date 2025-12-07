@@ -7,7 +7,7 @@ import Track from './Track';
 import Obstacles from './Obstacles';
 
 // Main 3D Scene Component
-const Game = () => {
+const RunnerScene = () => {
     const { speed, incrementDistance, addScore } = useRunnerStore();
 
     // Game loop updates
@@ -35,4 +35,4 @@ const Game = () => {
     );
 };
 
-export default Game;
+export default RunnerScene;
