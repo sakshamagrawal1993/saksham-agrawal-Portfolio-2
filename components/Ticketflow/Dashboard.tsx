@@ -110,7 +110,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onBack }) => {
 
     const selectedTicket = tickets.find(t => t.id === selectedTicketId);
 
-    const handleCreateTicket = async (title: string, description: string) => {
+    const handleCreateTicket = async (title: string, description: string, customerName: string) => {
         const newId = crypto.randomUUID();
         const now = Date.now();
 
@@ -122,7 +122,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onBack }) => {
                 title,
                 description,
                 status: 'Open',
-                customer_name: 'Unknown', // Default or add input later
+                customer_name: customerName,
                 created_at: now,
                 updated_at: now
             }]);
@@ -132,10 +132,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onBack }) => {
             return;
         }
 
-        // 2. Log Action (Creation) - User requested 'Status_change' for status changes, 
-        // but creation is also an action. Let's use 'Status_change' with text "Created Ticket" 
-        // or just 'Status_change' to match the pattern, although "Created Ticket" isn't strictly a status change.
-        // However, to keep it simple and visible in the activity log which filters by Status_change:
+        // 2. Log Action (Creation)
         const { error: actionError } = await supabase
             .from('remarks')
             .insert([{

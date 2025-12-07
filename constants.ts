@@ -80,6 +80,19 @@ export const EXPERIENCE = [
 
 export const PROJECTS: Project[] = [
   {
+    id: 'insightslm',
+    name: 'InsightsLM',
+    tagline: 'AI Notebook for Research',
+    description: 'An AI-powered research assistant that turns documents into audio overviews and interactive Q&A.',
+    longDescription: 'InsightsLM is a clone of NotebookLM, designed to help researchers and students synthesize information faster. Users can upload PDFs, generate audio podcasts summarizing the content, and ask complex questions grounded in their documents.',
+    role: 'Full Stack Developer',
+    category: 'AI / SaaS',
+    imageUrl: 'https://images.unsplash.com/photo-1518186285589-2f7649de83e0?auto=format&fit=crop&q=80&w=1000',
+    gallery: [],
+    techStack: ['React', 'Supabase', 'N8N', 'RAG'],
+    demoUrl: '/insightslm'
+  },
+  {
     id: 'ticketflow',
     name: 'Ticketflow',
     tagline: 'Streamlined support ticket management.',
@@ -90,7 +103,7 @@ export const PROJECTS: Project[] = [
     imageUrl: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&q=80&w=1000', // Placeholder or use a specific one
     gallery: [],
     techStack: ['React', 'TypeScript', 'Tailwind CSS', 'Analytics'],
-    demoUrl: '#' // This will be intercepted in App.tsx
+    demoUrl: '/ticketflow'
   },
   {
     id: 'p1',
