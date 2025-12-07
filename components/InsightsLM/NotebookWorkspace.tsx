@@ -8,7 +8,7 @@ interface NotebookWorkspaceProps {
     onLogout: () => void;
 }
 
-const NotebookWorkspace: React.FC<NotebookWorkspaceProps> = ({ notebookId, notebookTitle, onClose, onLogout }) => {
+const NotebookWorkspace: React.FC<NotebookWorkspaceProps> = ({ notebookTitle, onClose, onLogout }) => {
     return (
         <NotebookLayout
             notebookTitle={notebookTitle}

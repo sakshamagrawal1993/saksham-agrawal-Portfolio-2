@@ -8,7 +8,7 @@ const Game = () => {
     const { speed, incrementDistance, addScore } = useRunnerStore();
 
     // Game loop updates
-    useFrame((state, delta) => {
+    useFrame((_, delta) => {
         // Increment distance traveled based on speed and time
         incrementDistance(speed * delta);
         // Add score passively for survival/distance

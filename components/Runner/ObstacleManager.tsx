@@ -151,7 +151,7 @@ const ObstacleManager = () => {
 
 const ObstacleMesh = ({ obs }: { obs: Obstacle }) => {
     const mesh = useRef<THREE.Mesh>(null);
-    const { status } = useRunnerStore();
+    // const { status } = useRunnerStore(); // Unused
 
     useFrame(() => {
         if (mesh.current) {
