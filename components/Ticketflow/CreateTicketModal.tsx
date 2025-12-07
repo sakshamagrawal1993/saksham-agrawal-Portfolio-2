@@ -2,17 +2,18 @@ import React, { useState } from 'react';
 
 interface CreateTicketModalProps {
     onClose: () => void;
-    onCreate: (title: string, description: string) => void;
+    onCreate: (title: string, description: string, customerName: string) => void;
 }
 
 const CreateTicketModal: React.FC<CreateTicketModalProps> = ({ onClose, onCreate }) => {
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
+    const [customerName, setCustomerName] = useState('');
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (title && description) {
-            onCreate(title, description);
+        if (title && description && customerName) {
+            onCreate(title, description, customerName);
         }
     };
 
@@ -31,6 +32,17 @@ const CreateTicketModal: React.FC<CreateTicketModalProps> = ({ onClose, onCreate
                             placeholder="Brief summary..."
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
+                            required
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="block text-[#2C2A26] text-xs font-bold uppercase tracking-widest">Customer Name</label>
+                        <input
+                            type="text"
+                            className="w-full bg-white border border-[#D6D1C7] p-3 text-[#2C2A26] placeholder-[#2C2A26]/30 focus:outline-none focus:border-[#2C2A26] transition-colors font-serif"
+                            placeholder="Customer's full name"
+                            value={customerName}
+                            onChange={(e) => setCustomerName(e.target.value)}
                             required
                         />
                     </div>

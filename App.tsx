@@ -7,6 +7,7 @@
 import React, { useEffect } from 'react';
 import { Routes, Route, useNavigate, useLocation, useParams, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
+import Analytics from './services/analytics';
 import Hero from './components/Hero';
 import ProductGrid from './components/ProductGrid';
 import About from './components/About';
@@ -17,6 +18,7 @@ import Footer from './components/Footer';
 import ProductDetail from './components/ProductDetail';
 import JournalDetail from './components/JournalDetail';
 import TicketflowApp from './components/Ticketflow/TicketflowApp';
+import InsightsLMApp from './components/InsightsLM/InsightsLMApp';
 import { PROJECTS, JOURNAL_ARTICLES } from './constants';
 
 function HomePage() {
@@ -58,11 +60,7 @@ function HomePage() {
       <About />
       <Experience />
       <ProductGrid onProductClick={(p) => {
-        if (p.id === 'ticketflow') {
-          navigate('/ticketflow');
-        } else {
-          navigate(`/project/${p.id}`);
-        }
+        navigate(`/project/${p.id}`);
       }} />
       <Journal onArticleClick={(a) => {
         navigate(`/journal/${a.id}`);
@@ -80,10 +78,7 @@ function ProjectPage() {
     return <Navigate to="/" replace />;
   }
 
-  // Double check if it's ticketflow redirect (redundant if using /ticketflow route but safe)
-  if (project.id === 'ticketflow') {
-    return <Navigate to="/ticketflow" replace />;
-  }
+  // Removed direct redirects to allow ProjectPage to render Ticketflow and InsightsLM details first
 
   return (
     <ProductDetail
@@ -144,23 +139,26 @@ function App() {
     if (!location.hash) {
       window.scrollTo(0, 0);
     }
-  }, [location.pathname]);
+    // Track Page View
+    Analytics.trackPageView(location.pathname + location.hash + location.search);
+  }, [location.pathname, location.hash, location.search]);
 
   return (
     <div className="min-h-screen bg-[#F5F2EB] font-sans text-[#2C2A26] selection:bg-[#D6D1C7] selection:text-[#2C2A26]">
-      <Navbar onNavClick={handleNavClick} />
+      {!['/ticketflow', '/insightslm'].includes(location.pathname) && <Navbar onNavClick={handleNavClick} />}
 
       <main>
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/ticketflow" element={<TicketflowApp onBack={() => navigate('/#work')} />} />
+          <Route path="/insightslm" element={<InsightsLMApp onBack={() => navigate('/project/insightslm')} />} />
           <Route path="/project/:id" element={<ProjectPage />} />
           <Route path="/journal/:id" element={<JournalPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
 
-      <Footer onLinkClick={handleNavClick} />
+      {!['/ticketflow', '/insightslm'].includes(location.pathname) && <Footer onLinkClick={handleNavClick} />}
       <Assistant />
     </div>
   );
