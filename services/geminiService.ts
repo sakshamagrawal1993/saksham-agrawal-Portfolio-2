@@ -75,7 +75,7 @@ export const sendMessageToGemini = async (history: { role: string, text: string 
     });
 
     const result = await chat.sendMessage({ message: newMessage });
-    return result.text;
+    return result.text || '';
 
   } catch (error) {
     console.error("Gemini API Error:", error);

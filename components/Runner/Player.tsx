@@ -13,7 +13,7 @@ const Player = () => {
     // Actually, let's read lane FROM store.
 
     // Note: changing store causes re-render of this component, which is fine for lane change (rare event).
-    const { status, loseLife, speed, playerLane, setPlayerLane } = useRunnerStore();
+    const { status, playerLane, setPlayerLane } = useRunnerStore();
 
     const [yVelocity, setYVelocity] = useState(0);
     const [isJumping, setIsJumping] = useState(false);
@@ -43,7 +43,7 @@ const Player = () => {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [status, isJumping, playerLane, setPlayerLane]); // Added playerLane and setPlayerLane to dependencies
 
-    useFrame((state, delta) => {
+    useFrame((_, delta) => {
         if (!mesh.current || status !== 'playing') return;
 
         // Horizontal movement (Lerp for smoothness)
