@@ -3,13 +3,18 @@ import mixpanel from 'mixpanel-browser';
 const MIXPANEL_TOKEN = import.meta.env.VITE_MIXPANEL_TOKEN || 'YOUR_MIXPANEL_TOKEN';
 
 // Initialize Mixpanel
-mixpanel.init(MIXPANEL_TOKEN, {
-    debug: true,
-    track_pageview: true,
-    persistence: 'localStorage',
-    autocapture: true, // @ts-ignore - autocapture might not be in the type definition yet or needs explicit enable
-    record_sessions_percent: 100,
-});
+// Initialize Mixpanel safely
+if (MIXPANEL_TOKEN && MIXPANEL_TOKEN !== 'YOUR_MIXPANEL_TOKEN' && MIXPANEL_TOKEN !== 'INSERT_MIXPANEL_TOKEN_HERE') {
+    mixpanel.init(MIXPANEL_TOKEN, {
+        debug: true,
+        track_pageview: true,
+        persistence: 'localStorage',
+        autocapture: true, // @ts-ignore
+        record_sessions_percent: 100,
+    });
+} else {
+    console.warn('Mixpanel Token missing or invalid. Analytics disabled.');
+}
 
 export const Analytics = {
     identify: (id: string, email?: string) => {

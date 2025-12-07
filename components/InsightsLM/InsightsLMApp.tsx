@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import Login from './Login';
 import Dashboard from './Dashboard';
 import { supabase } from './supabaseClient';
+import Analytics from './Analytics'; // Assuming Analytics is imported from here
 
 const InsightsLMApp: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const [session, setSession] = useState<any>(null);
@@ -10,16 +11,23 @@ const InsightsLMApp: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
     useEffect(() => {
         // Check active session
-        supabase.auth.getSession().then(({ data: { session } }) => {
+        supabase.auth.getSession().then(({ data: { session } }: { data: { session: any } }) => {
             setSession(session);
+            // If logged in, track user
+            if (session?.user?.id) {
+                Analytics.identify(session.user.id, session.user.email);
+            }
             setLoading(false);
         });
 
         // Listen for auth changes
         const {
             data: { subscription },
-        } = supabase.auth.onAuthStateChange((_event, session) => {
+        } = supabase.auth.onAuthStateChange((_event: string, session: any) => {
             setSession(session);
+            if (session?.user?.id) {
+                Analytics.identify(session.user.id, session.user.email);
+            }
         });
 
         return () => subscription.unsubscribe();
