@@ -10,11 +10,16 @@
   },
   "dependencies": {
     "@google/genai": "latest",
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.4.2",
     "@supabase/supabase-js": "^2.86.2",
+    "@types/three": "^0.181.0",
     "mixpanel-browser": "^2.72.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^7.10.1"
+    "react-router-dom": "^7.10.1",
+    "three": "^0.181.2",
+    "zustand": "^5.0.9"
   },
   "devDependencies": {
     "@types/react": "^18.2.66",

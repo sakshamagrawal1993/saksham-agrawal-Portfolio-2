@@ -19,6 +19,7 @@ import ProductDetail from './components/ProductDetail';
 import JournalDetail from './components/JournalDetail';
 import TicketflowApp from './components/Ticketflow/TicketflowApp';
 import InsightsLMApp from './components/InsightsLM/InsightsLMApp';
+import RunnerApp from './components/Runner/RunnerApp';
 import { PROJECTS, JOURNAL_ARTICLES } from './constants';
 
 function HomePage() {
@@ -152,6 +153,7 @@ function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/ticketflow" element={<TicketflowApp onBack={() => navigate('/#work')} />} />
           <Route path="/insightslm" element={<InsightsLMApp onBack={() => navigate('/project/insightslm')} />} />
+          <Route path="/runner" element={<RunnerApp onBack={() => navigate('/project/runner')} />} />
           <Route path="/project/:id" element={<ProjectPage />} />
           <Route path="/journal/:id" element={<JournalPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

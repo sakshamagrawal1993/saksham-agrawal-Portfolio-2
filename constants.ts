@@ -106,6 +106,19 @@ export const PROJECTS: Project[] = [
     demoUrl: '/ticketflow'
   },
   {
+    id: 'runner',
+    name: 'Runner',
+    tagline: 'Endless 3D Runner.',
+    description: 'A 3D endless runner game built with React Three Fiber.',
+    longDescription: 'Test your reflexes in this endless 3D runner. Dodge boulders, avoid trees, and collect coins to set the high score. Built using React Three Fiber and Zustand for high-performance state management.',
+    role: 'Game Developer',
+    category: 'Game / 3D',
+    imageUrl: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=1000',
+    gallery: [],
+    techStack: ['React Three Fiber', 'Three.js', 'Zustand', 'WebGL'],
+    demoUrl: '/runner'
+  },
+  {
     id: 'p1',
     name: 'Health Twin Platform',
     tagline: 'Connected care via Knowledge Graphs.',
