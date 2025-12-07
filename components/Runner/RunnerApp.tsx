@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useRunnerStore } from './store';
 import { Canvas } from '@react-three/fiber';
+// Game Component
 import Game from './Game';
 
 interface RunnerAppProps {

@@ -1,9 +1,10 @@
+// Force refresh - fixing import error
 import { useFrame } from '@react-three/fiber';
 import { Environment, Stars, ContactShadows } from '@react-three/drei';
 import { useRunnerStore } from './store';
 import Player from './Player';
 import Track from './Track';
-import ObstacleManager from './ObstacleManager';
+import Obstacles from './Obstacles';
 
 // Main 3D Scene Component
 const Game = () => {
@@ -27,7 +28,7 @@ const Game = () => {
 
             <Player />
             <Track />
-            <ObstacleManager />
+            <Obstacles />
 
             <ContactShadows resolution={1024} scale={50} blur={2} opacity={0.25} far={10} color="#000000" />
         </>
