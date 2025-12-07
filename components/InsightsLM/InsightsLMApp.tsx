@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import Login from './Login';
 import Dashboard from './Dashboard';
 import { supabase } from './supabaseClient';
-import Analytics from './Analytics'; // Assuming Analytics is imported from here
+import Analytics from '../../services/analytics';
 
 const InsightsLMApp: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const [session, setSession] = useState<any>(null);
