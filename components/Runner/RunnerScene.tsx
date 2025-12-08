@@ -18,11 +18,11 @@ const RunnerScene = () => {
         if (aspect < 1) {
             // Mobile/Portrait: High angle, looking ahead
             camera.position.set(0, 6, 8);
-            camera.lookAt(0, 0, -15);
+            camera.lookAt(0, -4, -15); // Look lower to bring runner UP
         } else {
             // Desktop/Landscape: Elevated view for better reaction time
             camera.position.set(0, 4, 6);
-            camera.lookAt(0, 1, -20);
+            camera.lookAt(0, -3, -20); // Look lower to bring runner UP
         }
         camera.updateProjectionMatrix();
     }, [size, camera]);
