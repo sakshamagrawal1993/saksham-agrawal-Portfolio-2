@@ -166,7 +166,7 @@ function App() {
       </main>
 
       {!['/ticketflow', '/insightslm'].includes(location.pathname) && <Footer onLinkClick={handleNavClick} />}
-      <Assistant />
+      {location.pathname !== '/runner' && <Assistant />}
     </div>
   );
 }

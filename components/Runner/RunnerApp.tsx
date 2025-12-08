@@ -63,7 +63,7 @@ const RunnerApp: React.FC<RunnerAppProps> = ({ onBack }) => {
                     </div>
                     <div className="flex flex-col items-end gap-2">
                         <div className="flex gap-1 text-2xl text-red-500 drop-shadow-sm filter">
-                            {Array.from({ length: 3 }).map((_, i) => (
+                            {Array.from({ length: Math.max(3, lives) }).map((_, i) => (
                                 <span key={i} className={`transition-opacity ${i < lives ? 'opacity-100' : 'opacity-20'}`}>♥</span>
                             ))}
                         </div>
@@ -132,7 +132,7 @@ const LandingScreen = ({ onPlay, highScore }: { onPlay: () => void, highScore: n
 import Leaderboard from './Leaderboard';
 
 const GameOverScreen = ({ score, highScore, onRestart }: { score: number, highScore: number, onRestart: () => void }) => (
-    <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/95 backdrop-blur-md z-10 p-4">
+    <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/95 backdrop-blur-md z-10 p-4 pt-32">
         <h2 className="text-5xl font-bold text-red-500 mb-2 drop-shadow-md">GAME OVER</h2>
         <p className="text-slate-400 mb-8 uppercase tracking-widest text-xs">Run Complete</p>
 

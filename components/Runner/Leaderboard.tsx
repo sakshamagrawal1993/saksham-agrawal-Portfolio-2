@@ -98,6 +98,13 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ currentScore, onRestart }) =>
         <div className="flex flex-col items-center w-full max-w-md animate-fade-in-up">
             <h2 className="text-2xl font-bold text-slate-200 mb-6 uppercase tracking-widest border-b-2 border-slate-700 pb-2">Top Runners</h2>
 
+            <button
+                onClick={onRestart}
+                className="px-8 py-3 bg-white text-slate-900 rounded-full font-bold text-lg hover:bg-slate-200 transition-colors shadow-lg mb-8"
+            >
+                PLAY AGAIN
+            </button>
+
             <div className="w-full bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden mb-8">
                 {scores.length === 0 ? (
                     <div className="p-8 text-center text-slate-500">No records yet. Be the first!</div>
@@ -124,13 +131,6 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ currentScore, onRestart }) =>
                     </div>
                 )}
             </div>
-
-            <button
-                onClick={onRestart}
-                className="px-8 py-3 bg-white text-slate-900 rounded-full font-bold text-lg hover:bg-slate-200 transition-colors shadow-lg"
-            >
-                PLAY AGAIN
-            </button>
         </div>
     );
 };
