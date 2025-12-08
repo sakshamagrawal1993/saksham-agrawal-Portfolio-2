@@ -1,5 +1,6 @@
 // Force refresh - fixing import error
-import { useFrame } from '@react-three/fiber';
+import { useEffect } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
 import { Environment, Stars, ContactShadows } from '@react-three/drei';
 import { useRunnerStore } from './store';
 import Player from './Player';
@@ -9,6 +10,22 @@ import Obstacles from './Obstacles';
 // Main 3D Scene Component
 const RunnerScene = () => {
     const { speed, incrementDistance, addScore } = useRunnerStore();
+    const { camera, size } = useThree();
+
+    // Responsive Camera Adjustment
+    useEffect(() => {
+        const aspect = size.width / size.height;
+        if (aspect < 1) {
+            // Mobile/Portrait: High angle, looking ahead
+            camera.position.set(0, 6, 8);
+            camera.lookAt(0, 0, -15);
+        } else {
+            // Desktop/Landscape: Elevated view for better reaction time
+            camera.position.set(0, 4, 6);
+            camera.lookAt(0, 1, -20);
+        }
+        camera.updateProjectionMatrix();
+    }, [size, camera]);
 
     // Game loop updates
     useFrame((_, delta) => {

@@ -91,13 +91,7 @@ const Obstacles = () => {
                 // Lane Check
                 if (obs.lane === currentLane) {
                     // Collision!
-                    if (obs.type === 'GAP') {
-                        // Check if jumping? (Not implemented in store, need local player state or store jumping)
-                        // For now, treat GAP like any obstacle
-                        // Actually Plan said "cross only by jumping".
-                        // We need `isJumping` in store?
-                        // Let's ignore GAP logic for V1 or assume Hit.
-                    }
+                    const isJumping = useRunnerStore.getState().isJumping;
 
                     if (obs.type === 'COIN') {
                         addScore(50);
@@ -105,9 +99,21 @@ const Obstacles = () => {
                     } else if (obs.type === 'HEART') {
                         gainLife();
                         markHit(obs.id);
-                    } else if (['BOULDER', 'TREE'].includes(obs.type)) {
-                        loseLife();
-                        markHit(obs.id);
+                    } else {
+                        // Harmful Obstacles (Boulder, Tree)
+                        // Can we jump over them?
+                        // If jumping, we avoid them? 
+                        // Let's say yes for now to satisfy user request "jump over the obstacle".
+                        // Logic: If NOT Jumping, then Hit.
+                        if (!isJumping) {
+                            loseLife();
+                            markHit(obs.id);
+                        } else {
+                            // verify jump height? 
+                            // Simplification: Jumping = Invincible against obstacles (but not coins/hearts? No, we should still collect coins if we jump through them? 
+                            // Actually, in 3D, if you jump OVER a coin you miss it. 
+                            // But for "Obstacle", jumping saves you.
+                        }
                     }
                 }
             }
@@ -125,21 +131,34 @@ const Obstacles = () => {
 
     const spawnObstacle = () => {
         const lanes = [-1, 0, 1];
-        const lane = lanes[Math.floor(Math.random() * lanes.length)];
-        // const types: ObstacleType[] = ['BOULDER', 'TREE', 'COIN', 'COIN', 'HEART']; // Unused
-        const type = Math.random() < 0.05 ? 'HEART' : (Math.random() < 0.3 ? 'COIN' : (Math.random() < 0.6 ? 'BOULDER' : 'TREE'));
+        // Shuffle lanes or pick 1-2 random lanes
+        // We want at least 1 gap. So max 2 obstacles.
+        const numObstacles = Math.random() < 0.4 ? 2 : 1; // 40% chance of 2 obstacles
 
-        // Start Z needs to be relative to *current distance* so it appears at fixed absolute Z=-60
+        // Helper to get random type
+        const getType = () => {
+            const r = Math.random();
+            if (r < 0.1) return 'HEART';
+            if (r < 0.4) return 'COIN';
+            if (r < 0.7) return 'BOULDER';
+            return 'TREE';
+        }
+
         const currentDistance = useRunnerStore.getState().distance;
+        // Shuffle lanes
+        const shuffledLanes = lanes.sort(() => 0.5 - Math.random());
+        const selectedLanes = shuffledLanes.slice(0, numObstacles);
 
-        setObstacles(prev => [...prev, {
-            id: Date.now(),
-            type: type as ObstacleType,
+        const newObstacles: Obstacle[] = selectedLanes.map((lane, index) => ({
+            id: Date.now() + index, // Ensure unique ID
+            type: getType(),
             lane,
-            startZ: SPAWN_DISTANCE - currentDistance, // Z = StartZ + Dist => -60 - Dist + Dist = -60. Correct.
+            startZ: SPAWN_DISTANCE - currentDistance,
             offsetZ: 0,
             hit: false
-        }]);
+        }));
+
+        setObstacles(prev => [...prev, ...newObstacles]);
     };
 
     return (

@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import { useRunnerStore } from './store';
 
 const LANE_WIDTH = 2;
-const JUMP_FORCE = 5;
+const JUMP_FORCE = 7.5;
 const GRAVITY = 15;
 
 const Player = () => {
@@ -13,12 +13,19 @@ const Player = () => {
     // Actually, let's read lane FROM store.
 
     // Note: changing store causes re-render of this component, which is fine for lane change (rare event).
-    const { status, playerLane, setPlayerLane } = useRunnerStore();
+    const { status, playerLane, setPlayerLane, isJumping, setIsJumping } = useRunnerStore();
 
     const [yVelocity, setYVelocity] = useState(0);
-    const [isJumping, setIsJumping] = useState(false);
+    // const [isJumping, setIsJumping] = useState(false); // Using store now
 
     // Controls
+    useEffect(() => {
+        if (status !== 'playing') return;
+
+        // Changing to direct attach for cleaner diff
+    }, [status]);
+
+    // Re-implementing keys with store access
     useEffect(() => {
         if (status !== 'playing') return;
 
@@ -41,7 +48,7 @@ const Player = () => {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [status, isJumping, playerLane, setPlayerLane]); // Added playerLane and setPlayerLane to dependencies
+    }, [status, isJumping, playerLane, setPlayerLane, setIsJumping]); // Added playerLane and setPlayerLane to dependencies
 
     useFrame((_, delta) => {
         if (!mesh.current || status !== 'playing') return;
