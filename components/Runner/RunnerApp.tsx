@@ -53,7 +53,7 @@ const RunnerApp: React.FC<RunnerAppProps> = ({ onBack }) => {
         >
             {/* HUD - Head Up Display */}
             {status !== 'idle' && (
-                <div className="absolute top-24 left-0 w-full px-8 py-2 flex justify-between items-start z-10 pointer-events-none">
+                <div className="absolute top-20 left-0 w-full px-4 md:px-8 py-2 flex justify-between items-start z-10 pointer-events-none">
                     <div className="flex flex-col gap-1 bg-slate-900/50 p-2 rounded-lg border border-slate-700/50 backdrop-blur-sm">
                         <div className="flex items-baseline gap-2">
                             <h2 className="text-2xl font-bold text-yellow-400 drop-shadow-md">SCORE</h2>
@@ -77,7 +77,7 @@ const RunnerApp: React.FC<RunnerAppProps> = ({ onBack }) => {
             {/* Back Button */}
             <button
                 onClick={onBack}
-                className="absolute top-24 right-4 md:right-8 z-50 px-4 py-2 bg-red-500/80 hover:bg-red-600 text-white rounded-lg font-bold text-xs md:text-sm transition-colors shadow-lg pointer-events-auto backdrop-blur-sm border border-red-400/30"
+                className="absolute bottom-8 right-4 md:right-8 z-50 px-4 py-2 bg-red-500/80 hover:bg-red-600 text-white rounded-lg font-bold text-xs md:text-sm transition-colors shadow-lg pointer-events-auto backdrop-blur-sm border border-red-400/30"
             >
                 EXIT
             </button>
@@ -93,26 +93,26 @@ const RunnerApp: React.FC<RunnerAppProps> = ({ onBack }) => {
 };
 
 const LandingScreen = ({ onPlay, highScore }: { onPlay: () => void, highScore: number }) => (
-    <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900 z-10">
+    <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900 z-10 pt-20">
         <h1 className="text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 mb-2">RUNNER</h1>
         <p className="text-slate-400 mb-8 tracking-widest text-sm">ENDLESS DIMENSION JUMPER</p>
 
         <div className="space-y-4 text-center mb-12">
             <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700 max-w-sm">
                 <h3 className="text-yellow-400 mb-4 font-bold tracking-wider">CONTROLS</h3>
-                <div className="grid grid-cols-2 gap-4 text-sm text-slate-300">
+                <div className="grid grid-cols-2 gap-8 text-sm text-slate-300">
                     <div className="flex flex-col items-center">
-                        <div className="flex gap-1 mb-2">
-                            <span className="p-1.5 bg-slate-700 rounded">←</span>
-                            <span className="p-1.5 bg-slate-700 rounded">→</span>
+                        <div className="flex gap-1 mb-3 h-8 items-end">
+                            <span className="p-2 bg-slate-700 rounded shadow-lg border border-slate-600">←</span>
+                            <span className="p-2 bg-slate-700 rounded shadow-lg border border-slate-600">→</span>
                         </div>
-                        <span>Switch Lane</span>
+                        <span className="font-bold tracking-wide text-xs uppercase text-slate-400">Switch Lane</span>
                     </div>
                     <div className="flex flex-col items-center">
-                        <div className="mb-2">
-                            <span className="p-1.5 bg-slate-700 rounded">↑</span>
+                        <div className="flex mb-3 h-8 items-end">
+                            <span className="p-2 bg-slate-700 rounded shadow-lg border border-slate-600">↑</span>
                         </div>
-                        <span>Jump Gap</span>
+                        <span className="font-bold tracking-wide text-xs uppercase text-slate-400">Jump Gap</span>
                     </div>
                 </div>
             </div>
