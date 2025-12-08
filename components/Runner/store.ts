@@ -49,7 +49,16 @@ export const useRunnerStore = create<GameState>()(
 
             resetGame: () => set({ status: 'idle', score: 0, lives: 3, distance: 0, speed: 10 }),
 
-            addScore: (amount) => set((state) => ({ score: state.score + amount })),
+            addScore: (amount) => set((state) => {
+                const newScore = state.score + amount;
+                // Difficulty Scaling: Speed increases by 1 for every 100 points
+                // Base speed is 10.
+                const newSpeed = 10 + (newScore * 0.01);
+                return {
+                    score: newScore,
+                    speed: newSpeed
+                };
+            }),
 
             loseLife: () => {
                 const { lives } = get();

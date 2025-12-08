@@ -16,22 +16,60 @@ const RunnerApp: React.FC<RunnerAppProps> = ({ onBack }) => {
         return () => resetGame();
     }, [resetGame]);
 
+    // Touch Handling
+    const touchStart = React.useRef<{ x: number, y: number } | null>(null);
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    };
+
+    const handleTouchEnd = (e: React.TouchEvent) => {
+        if (!touchStart.current) return;
+        const diffX = e.changedTouches[0].clientX - touchStart.current.x;
+        const diffY = e.changedTouches[0].clientY - touchStart.current.y;
+        touchStart.current = null;
+
+        // Determine swipe direction
+        if (Math.abs(diffX) > Math.abs(diffY)) {
+            // Horizontal Swipe
+            if (Math.abs(diffX) > 30) { // Threshold
+                const { playerLane, setPlayerLane } = useRunnerStore.getState();
+                if (diffX > 0 && playerLane < 1) setPlayerLane(playerLane + 1);
+                if (diffX < 0 && playerLane > -1) setPlayerLane(playerLane - 1);
+            }
+        } else {
+            // Vertical Swipe
+            if (diffY < -30) { // Swipe Up
+                window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp' }));
+            }
+        }
+    };
+
     return (
-        <div className="w-full h-screen bg-slate-900 text-white relative overflow-hidden font-mono">
+        <div
+            className="w-full h-screen bg-slate-900 text-white relative overflow-hidden font-mono touch-none"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+        >
             {/* HUD - Head Up Display */}
             {status !== 'idle' && (
-                <div className="absolute top-0 left-0 w-full p-4 flex justify-between items-start z-10 pointer-events-none">
-                    <div className="flex flex-col gap-1">
-                        <h2 className="text-3xl font-bold text-yellow-400 drop-shadow-md">SCORE: {Math.floor(score)}</h2>
-                        <p className="text-sm text-slate-400">HI: {Math.floor(highScore)}</p>
+                <div className="absolute top-24 left-0 w-full px-8 py-2 flex justify-between items-start z-10 pointer-events-none">
+                    <div className="flex flex-col gap-1 bg-slate-900/50 p-2 rounded-lg border border-slate-700/50 backdrop-blur-sm">
+                        <div className="flex items-baseline gap-2">
+                            <h2 className="text-2xl font-bold text-yellow-400 drop-shadow-md">SCORE</h2>
+                            <span className="text-3xl text-white font-bold">{Math.floor(score)}</span>
+                        </div>
+                        <p className="text-xs text-slate-400 font-bold tracking-wider">HI {Math.floor(highScore)}</p>
                     </div>
-                    <div className="flex flex-col items-end gap-1">
-                        <div className="flex gap-1 text-2xl text-red-500">
-                            {Array.from({ length: Math.max(0, lives) }).map((_, i) => (
-                                <span key={i}>♥</span>
+                    <div className="flex flex-col items-end gap-2">
+                        <div className="flex gap-1 text-2xl text-red-500 drop-shadow-sm filter">
+                            {Array.from({ length: 3 }).map((_, i) => (
+                                <span key={i} className={`transition-opacity ${i < lives ? 'opacity-100' : 'opacity-20'}`}>♥</span>
                             ))}
                         </div>
-                        <p className="text-xl text-blue-300 font-bold">{Math.floor(distance)}m</p>
+                        <div className="px-3 py-1 bg-blue-900/50 rounded text-blue-200 font-bold border border-blue-500/30">
+                            {Math.floor(distance)}m
+                        </div>
                     </div>
                 </div>
             )}
@@ -39,9 +77,9 @@ const RunnerApp: React.FC<RunnerAppProps> = ({ onBack }) => {
             {/* Back Button */}
             <button
                 onClick={onBack}
-                className="absolute top-4 left-1/2 -translate-x-1/2 z-20 px-3 py-1 bg-white/10 hover:bg-white/20 backdrop-blur rounded-full text-xs text-white/50 transition-colors"
+                className="absolute top-24 right-4 md:right-8 z-50 px-4 py-2 bg-red-500/80 hover:bg-red-600 text-white rounded-lg font-bold text-xs md:text-sm transition-colors shadow-lg pointer-events-auto backdrop-blur-sm border border-red-400/30"
             >
-                Exit Game
+                EXIT
             </button>
 
             {/* Main Content */}
@@ -91,28 +129,26 @@ const LandingScreen = ({ onPlay, highScore }: { onPlay: () => void, highScore: n
     </div>
 );
 
-const GameOverScreen = ({ score, highScore, onRestart }: { score: number, highScore: number, onRestart: () => void }) => (
-    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm z-10">
-        <h2 className="text-5xl font-bold text-red-500 mb-2">GAME OVER</h2>
-        <p className="text-slate-400 mb-8">You hit an obstacle!</p>
+import Leaderboard from './Leaderboard';
 
-        <div className="flex gap-12 mb-12">
+const GameOverScreen = ({ score, highScore, onRestart }: { score: number, highScore: number, onRestart: () => void }) => (
+    <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/95 backdrop-blur-md z-10 p-4">
+        <h2 className="text-5xl font-bold text-red-500 mb-2 drop-shadow-md">GAME OVER</h2>
+        <p className="text-slate-400 mb-8 uppercase tracking-widest text-xs">Run Complete</p>
+
+        <div className="flex gap-12 mb-8">
             <div className="text-center">
-                <p className="text-sm text-slate-500 uppercase tracking-wider mb-1">Score</p>
+                <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Score</p>
                 <p className="text-4xl text-white font-bold">{Math.floor(score)}</p>
             </div>
             <div className="text-center">
-                <p className="text-sm text-slate-500 uppercase tracking-wider mb-1">Best</p>
+                <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Session Best</p>
                 <p className="text-4xl text-yellow-400 font-bold">{Math.floor(highScore)}</p>
             </div>
         </div>
 
-        <button
-            onClick={onRestart}
-            className="px-8 py-3 bg-white text-slate-900 rounded-full font-bold text-lg hover:bg-slate-200 transition-colors"
-        >
-            TRY AGAIN
-        </button>
+        {/* Leaderboard Section handles the rest (Celebration or List) */}
+        <Leaderboard currentScore={score} onRestart={onRestart} />
     </div>
 );
 
