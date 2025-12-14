@@ -1,17 +1,17 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_INSIGHTSLM_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_INSIGHTSLM_SUPABASE_ANON_KEY;
+// Use Ticketflow's Supabase instance
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Fallback for missing env vars to prevent build/runtime crash
+// Fallback for missing env vars
 const isSupabaseConfigured = supabaseUrl && supabaseAnonKey;
 
 if (!isSupabaseConfigured) {
-    console.error('Missing InsightsLM Supabase environment variables. InsightsLM features will not work.');
+    console.error('Missing Supabase environment variables for InsightsLM (Ticketflow Instance). features will not work.');
 }
 
-// Create client or fallback
 export const supabase = isSupabaseConfigured
     ? createClient(supabaseUrl, supabaseAnonKey)
-    : createClient('https://placeholder.supabase.co', 'placeholder') as any; // Prevent crash, calls will fail gracefully-ish
+    : createClient('https://placeholder.supabase.co', 'placeholder') as any;

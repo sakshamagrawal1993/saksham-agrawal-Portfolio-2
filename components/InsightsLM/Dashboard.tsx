@@ -16,36 +16,93 @@ interface Notebook {
     color?: string; // For the gradient/background style
 }
 
-// Mock Data for "Returning User" feeling
-const MOCK_NOTEBOOKS: Notebook[] = [
-    { id: '1', title: 'Product Mgmt 101', date: 'Oct 30, 2025', sourceCount: 20, icon: '💡', color: 'from-blue-500/20 to-purple-500/20' },
-    { id: '2', title: 'Smart Health Research', date: 'Aug 17, 2025', sourceCount: 42, icon: '🏋️', color: 'from-green-500/20 to-emerald-500/20' },
-    { id: '3', title: 'Q3 Financial Strategy', date: 'Jun 22, 2025', sourceCount: 5, icon: '📊', color: 'from-orange-500/20 to-red-500/20' },
-    { id: '4', title: 'Agentic AI Trends', date: 'May 10, 2025', sourceCount: 12, icon: '🤖', color: 'from-indigo-500/20 to-cyan-500/20' },
-];
-
-const FEATURED_NOTEBOOKS: Notebook[] = [
-    { id: 'f1', title: 'How do scientists link genetics to health?', date: 'Jul 9, 2025', sourceCount: 16, color: 'from-blue-600 to-indigo-700' },
-    { id: 'f2', title: 'The World Ahead 2025', date: 'Jul 7, 2025', sourceCount: 70, color: 'from-red-600 to-orange-700' },
-    { id: 'f3', title: 'Secrets of the Super Agers', date: 'May 6, 2025', sourceCount: 17, color: 'from-green-600 to-emerald-800' },
-];
-
+import { supabase } from './supabaseClient';
 import Analytics from '../../services/analytics';
 
 const Dashboard: React.FC<DashboardProps> = ({ onLogout, onBack }) => {
     const [selectedNotebook, setSelectedNotebook] = useState<Notebook | null>(null);
+    const [myNotebooks, setMyNotebooks] = useState<Notebook[]>([]);
+    const [featuredNotebooks, setFeaturedNotebooks] = useState<Notebook[]>([]);
+    const [loading, setLoading] = useState(true);
 
     React.useEffect(() => {
         Analytics.track('Dashboard View');
+        fetchNotebooks();
     }, []);
 
-    const handleSelectNotebook = (notebook: Notebook) => {
+    const fetchNotebooks = async () => {
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) return;
+
+            const { data, error } = await supabase
+                .from('notebooks')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+
+            if (data) {
+                const userId = session.user.id;
+                const mine = data.filter((n: any) => n.user_id === userId).map(mapToNotebook);
+                const featured = data.filter((n: any) => n.is_featured).map(mapToNotebook);
+
+                setMyNotebooks(mine);
+                setFeaturedNotebooks(featured);
+            }
+        } catch (error) {
+            console.error('Error fetching notebooks:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Helper to map DB row to UI model
+    const mapToNotebook = (row: any): Notebook => ({
+        id: row.id,
+        title: row.title,
+        date: new Date(row.created_at).toLocaleDateString(),
+        sourceCount: 0, // TODO: Fetch real source count via join or separate query
+        icon: row.emoji_icon,
+        color: row.gradient_bg
+    });
+
+    const handleSelectNotebook = async (notebook: Notebook) => {
         if (notebook.id === 'new') {
             Analytics.track('Create Notebook Start');
+            await createNotebook();
         } else {
             Analytics.track('Select Notebook', { notebook_id: notebook.id, title: notebook.title });
+            setSelectedNotebook(notebook);
         }
-        setSelectedNotebook(notebook);
+    };
+
+    const createNotebook = async () => {
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) return;
+
+            const { data, error } = await supabase
+                .from('notebooks')
+                .insert([{
+                    user_id: session.user.id,
+                    title: 'Untitled Notebook',
+                    emoji_icon: '📓',
+                    gradient_bg: 'from-blue-500 to-purple-500'
+                }])
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            if (data) {
+                const newNotebook = mapToNotebook(data);
+                setMyNotebooks([newNotebook, ...myNotebooks]);
+                setSelectedNotebook(newNotebook);
+            }
+        } catch (error) {
+            console.error('Error creating notebook:', error);
+        }
     };
 
     // If a notebook is selected, show the workspace view
@@ -56,14 +113,18 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onBack }) => {
                 notebookTitle={selectedNotebook.title}
                 onClose={() => {
                     setSelectedNotebook(null);
-                    Analytics.track('Dashboard View'); // Re-track when returning
+                    fetchNotebooks(); // Refresh on close
+                    Analytics.track('Dashboard View');
                 }}
                 onLogout={onLogout}
             />
         );
     }
 
-    // Otherwise, show the Dashboard (Notebook List View)
+    if (loading) {
+        return <div className="min-h-screen flex items-center justify-center bg-[#F5F2EB] text-[#2C2A26]/50">Loading Notebooks...</div>;
+    }
+
     return (
         <div className="min-h-screen bg-[#F5F2EB] text-[#2C2A26] font-sans flex flex-col">
 
@@ -147,8 +208,14 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onBack }) => {
                             <span className="font-serif font-bold text-[#2C2A26]">Create new notebook</span>
                         </div>
 
-                        {/* Existing Notebooks */}
-                        {MOCK_NOTEBOOKS.map(notebook => (
+                        {/* User's Notebooks */}
+                        {myNotebooks.length === 0 && (
+                            <div className="col-span-full py-8 text-center text-[#2C2A26]/40 italic">
+                                No notebooks yet. Create one to get started!
+                            </div>
+                        )}
+
+                        {myNotebooks.map(notebook => (
                             <div
                                 key={notebook.id}
                                 onClick={() => handleSelectNotebook(notebook)}
@@ -170,8 +237,12 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onBack }) => {
                                     <h3 className="font-serif font-bold text-lg leading-tight line-clamp-2 text-[#2C2A26] group-hover:text-black transition-colors">{notebook.title}</h3>
                                     <div className="flex items-center gap-2 text-[10px] text-[#2C2A26]/50 uppercase tracking-widest font-bold">
                                         <span>{notebook.date}</span>
-                                        <span>•</span>
-                                        <span>{notebook.sourceCount} sources</span>
+                                        {notebook.sourceCount > 0 && (
+                                            <>
+                                                <span>•</span>
+                                                <span>{notebook.sourceCount} sources</span>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -180,36 +251,42 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onBack }) => {
                 </div>
 
                 {/* Featured Notebooks Section */}
-                <div>
-                    <h2 className="text-sm font-bold uppercase tracking-widest text-[#2C2A26]/40 mb-6">Featured Notebooks</h2>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {FEATURED_NOTEBOOKS.map(notebook => (
-                            <div
-                                key={notebook.id}
-                                className="aspect-video rounded-2xl relative overflow-hidden cursor-pointer group shadow-sm hover:shadow-lg transition-all border border-[#D6D1C7]"
-                            >
-                                {/* Background Gradient/Image */}
-                                <div className={`absolute inset-0 bg-gradient-to-br ${notebook.color} opacity-90 group-hover:scale-105 transition-transform duration-500`}></div>
-                                <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors"></div>
+                {featuredNotebooks.length > 0 && (
+                    <div>
+                        <h2 className="text-sm font-bold uppercase tracking-widest text-[#2C2A26]/40 mb-6">Featured Notebooks</h2>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {featuredNotebooks.map(notebook => (
+                                <div
+                                    key={notebook.id}
+                                    className="aspect-video rounded-2xl relative overflow-hidden cursor-pointer group shadow-sm hover:shadow-lg transition-all border border-[#D6D1C7]"
+                                >
+                                    {/* Background Gradient/Image */}
+                                    <div className={`absolute inset-0 bg-gradient-to-br ${notebook.color} opacity-90 group-hover:scale-105 transition-transform duration-500`}></div>
+                                    <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors"></div>
 
-                                <div className="absolute bottom-0 left-0 p-6 text-white">
-                                    <div className="flex items-center gap-2 mb-2 opacity-80">
-                                        <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center">
-                                            <span className="text-[10px]">G</span>
+                                    <div className="absolute bottom-0 left-0 p-6 text-white">
+                                        <div className="flex items-center gap-2 mb-2 opacity-80">
+                                            <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center">
+                                                <span className="text-[10px]">G</span>
+                                            </div>
+                                            <span className="text-[10px] font-bold uppercase tracking-widest">Featured</span>
                                         </div>
-                                        <span className="text-[10px] font-bold uppercase tracking-widest">Google Research</span>
-                                    </div>
-                                    <h3 className="font-serif font-bold text-xl leading-tight mb-2 drop-shadow-md">{notebook.title}</h3>
-                                    <div className="flex items-center gap-2 text-[10px] opacity-80 uppercase tracking-widest font-bold">
-                                        <span>{notebook.date}</span>
-                                        <span>•</span>
-                                        <span>{notebook.sourceCount} sources</span>
+                                        <h3 className="font-serif font-bold text-xl leading-tight mb-2 drop-shadow-md">{notebook.title}</h3>
+                                        <div className="flex items-center gap-2 text-[10px] opacity-80 uppercase tracking-widest font-bold">
+                                            <span>{notebook.date}</span>
+                                            {notebook.sourceCount > 0 && (
+                                                <>
+                                                    <span>•</span>
+                                                    <span>{notebook.sourceCount} sources</span>
+                                                </>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
+                            ))}
+                        </div>
                     </div>
-                </div>
+                )}
 
             </div>
         </div>
