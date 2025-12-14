@@ -18,12 +18,15 @@ interface Notebook {
 
 import { supabase } from './supabaseClient';
 import Analytics from '../../services/analytics';
+import CreateNotebookModal from './Workspace/CreateNotebookModal';
 
 const Dashboard: React.FC<DashboardProps> = ({ onLogout, onBack }) => {
     const [selectedNotebook, setSelectedNotebook] = useState<Notebook | null>(null);
     const [myNotebooks, setMyNotebooks] = useState<Notebook[]>([]);
     const [featuredNotebooks, setFeaturedNotebooks] = useState<Notebook[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [creating, setCreating] = useState(false);
 
     React.useEffect(() => {
         Analytics.track('Dashboard View');
@@ -70,38 +73,43 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onBack }) => {
     const handleSelectNotebook = async (notebook: Notebook) => {
         if (notebook.id === 'new') {
             Analytics.track('Create Notebook Start');
-            await createNotebook();
+            setIsCreateModalOpen(true);
         } else {
             Analytics.track('Select Notebook', { notebook_id: notebook.id, title: notebook.title });
             setSelectedNotebook(notebook);
         }
     };
 
-    const createNotebook = async () => {
+    const handleCreateNotebook = async (data: { title: string; description: string; icon: string; bg: string }) => {
+        setCreating(true);
         try {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) return;
 
-            const { data, error } = await supabase
+            const { data: newNotebookData, error } = await supabase
                 .from('notebooks')
                 .insert([{
                     user_id: session.user.id,
-                    title: 'Untitled Notebook',
-                    emoji_icon: '📓',
-                    gradient_bg: 'from-blue-500 to-purple-500'
+                    title: data.title,
+                    description: data.description,
+                    emoji_icon: data.icon,
+                    gradient_bg: data.bg
                 }])
                 .select()
                 .single();
 
             if (error) throw error;
 
-            if (data) {
-                const newNotebook = mapToNotebook(data);
+            if (newNotebookData) {
+                const newNotebook = mapToNotebook(newNotebookData);
                 setMyNotebooks([newNotebook, ...myNotebooks]);
                 setSelectedNotebook(newNotebook);
+                setIsCreateModalOpen(false);
             }
         } catch (error) {
             console.error('Error creating notebook:', error);
+        } finally {
+            setCreating(false);
         }
     };
 
@@ -289,6 +297,13 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onBack }) => {
                 )}
 
             </div>
+
+            <CreateNotebookModal
+                isOpen={isCreateModalOpen}
+                onClose={() => setIsCreateModalOpen(false)}
+                onCreate={handleCreateNotebook}
+                loading={creating}
+            />
         </div>
     );
 };

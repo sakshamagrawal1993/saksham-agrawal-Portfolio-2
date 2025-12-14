@@ -1,48 +1,117 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { supabase } from '../supabaseClient';
 import SourcesPanel from './SourcesPanel';
 import ChatPanel from './ChatPanel';
 import StudioPanel from './StudioPanel';
 import AddSourceModal from './AddSourceModal';
-import Analytics from '../../../services/analytics'; // Fixed relative path
+import Analytics from '../../../services/analytics';
 
 interface NotebookLayoutProps {
+    notebookId: string;
     notebookTitle: string;
     onBack: () => void;
     onLogout: () => void;
 }
 
-const NotebookLayout: React.FC<NotebookLayoutProps> = ({ notebookTitle, onBack, onLogout }) => {
-    // State for managing sources/messages for now
-    // Ideally lifted up or managed via Context/Supabase
-    const [sources, setSources] = React.useState<any[]>([]);
+const NotebookLayout: React.FC<NotebookLayoutProps> = ({ notebookId, notebookTitle, onBack, onLogout }) => {
+    const [sources, setSources] = useState<any[]>([]);
+    const [messages, setMessages] = useState<{ role: 'user' | 'assistant', content: string }[]>([]);
+    const [isAddSourceModalOpen, setIsAddSourceModalOpen] = useState(false);
+    const [loadingSources, setLoadingSources] = useState(false);
 
     useEffect(() => {
-        Analytics.track('Workspace View', { notebook: notebookTitle });
-    }, [notebookTitle]);
-    const [messages, setMessages] = React.useState<{ role: 'user' | 'assistant', content: string }[]>([]);
-    const [isAddSourceModalOpen, setIsAddSourceModalOpen] = React.useState(false);
+        Analytics.track('Workspace View', { notebook: notebookTitle, id: notebookId });
+        fetchSources();
+    }, [notebookId]);
+
+    const fetchSources = async () => {
+        setLoadingSources(true);
+        try {
+            const { data, error } = await supabase
+                .from('sources')
+                .select('*')
+                .eq('notebook_id', notebookId)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            if (data) {
+                // Map DB columns to UI shape if necessary, or use as is
+                const mappedSources = data.map(s => ({
+                    id: s.id,
+                    name: s.title,
+                    type: s.type,
+                    // Add other fields as needed by SourcesPanel
+                }));
+                setSources(mappedSources);
+            }
+        } catch (error) {
+            console.error('Error fetching sources:', error);
+        } finally {
+            setLoadingSources(false);
+        }
+    };
 
     const handleAddSource = () => {
         setIsAddSourceModalOpen(true);
     };
 
-    const handleAddSourceData = (type: 'file' | 'link' | 'text', data: any) => {
-        let newSource = { name: 'Untitled', type: 'unknown' };
+    const handleAddSourceData = async (type: 'file' | 'link' | 'text', data: any) => {
+        // Prepare DB object
+        let newSourcePayload: any = {
+            notebook_id: notebookId,
+            type: 'text', // default fallback
+            title: 'Untitled Source',
+        };
 
         if (type === 'file') {
             const file = data as File;
             console.log("Uploading file:", file.name);
-            newSource = { name: file.name, type: 'pdf' }; // Mock type for now
+            // TODO: Upload to storage bucket first to get path
+            newSourcePayload = {
+                ...newSourcePayload,
+                type: 'pdf', // simplistic for now, should detect mime
+                title: file.name,
+                // storage_path: ... 
+            };
         } else if (type === 'link') {
             const { url, type: linkType } = data;
-            console.log("Adding link:", url);
-            newSource = { name: url, type: linkType === 'youtube' ? 'youtube' : 'website' };
+            newSourcePayload = {
+                ...newSourcePayload,
+                type: linkType === 'youtube' ? 'youtube' : 'website',
+                title: url,
+                source_url: url
+            };
         } else if (type === 'text') {
-            console.log("Adding text content");
-            newSource = { name: 'Pasted Text', type: 'text' };
+            newSourcePayload = {
+                ...newSourcePayload,
+                type: 'text',
+                title: 'Pasted Text',
+                extracted_text: data // Storing raw text directly
+            };
         }
 
-        setSources(prev => [...prev, newSource]);
+        try {
+            const { data: insertedSource, error } = await supabase
+                .from('sources')
+                .insert([newSourcePayload])
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            if (insertedSource) {
+                setSources(prev => [{
+                    id: insertedSource.id,
+                    name: insertedSource.title,
+                    type: insertedSource.type
+                }, ...prev]);
+                Analytics.track('Source Added', { type, notebookId });
+            }
+        } catch (error) {
+            console.error('Error adding source:', error);
+            alert('Failed to save source. See console.');
+        }
+
         setIsAddSourceModalOpen(false);
     };
 
@@ -70,8 +139,8 @@ const NotebookLayout: React.FC<NotebookLayoutProps> = ({ notebookTitle, onBack, 
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <button className="px-3 py-1.5 bg-[#2C2A26] text-[#F5F2EB] rounded-full text-xs font-bold hover:opacity-80 transition-opacity">
-                        + Create notebook
+                    <button onClick={handleAddSource} className="px-3 py-1.5 bg-[#2C2A26] text-[#F5F2EB] rounded-full text-xs font-bold hover:opacity-80 transition-opacity">
+                        + Add Source
                     </button>
                     <div className="h-4 w-[1px] bg-[#D6D1C7] mx-1"></div>
                     <button className="text-[#2C2A26]/60 hover:text-[#2C2A26] text-xs font-medium px-2 py-1 rounded hover:bg-[#EBE5D9]">
