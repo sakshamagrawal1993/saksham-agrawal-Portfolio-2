@@ -153,8 +153,19 @@ const NotebookLayout: React.FC<NotebookLayoutProps> = ({ notebookId, notebookTit
             // Determine file type
             let fileType = 'text';
             if (file.type.includes('pdf')) fileType = 'pdf';
-            else if (file.type.includes('audio')) fileType = 'audio';
-            else if (file.type.includes('word') || file.name.endsWith('.docx') || file.name.endsWith('.doc')) fileType = 'word'; // makeshift mapping
+            else if (file.type.includes('audio')) fileType = 'audio_file'; // Changed from 'audio' to match DB enum
+            else if (
+                file.type.includes('word') ||
+                file.name.endsWith('.docx') ||
+                file.name.endsWith('.doc')
+            ) fileType = 'word';
+            else if (
+                file.type.includes('excel') ||
+                file.type.includes('spreadsheet') ||
+                file.name.endsWith('.xlsx') ||
+                file.name.endsWith('.xls') ||
+                file.name.endsWith('.csv')
+            ) fileType = 'excel';
             // Add other mime checks as needed
 
             newSourcePayload = {
