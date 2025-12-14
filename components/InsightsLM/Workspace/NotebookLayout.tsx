@@ -17,7 +17,7 @@ const NotebookLayout: React.FC<NotebookLayoutProps> = ({ notebookId, notebookTit
     const [sources, setSources] = useState<any[]>([]);
     const [messages, setMessages] = useState<{ role: 'user' | 'assistant', content: string }[]>([]);
     const [isAddSourceModalOpen, setIsAddSourceModalOpen] = useState(false);
-    const [loadingSources, setLoadingSources] = useState(false);
+
 
     useEffect(() => {
         Analytics.track('Workspace View', { notebook: notebookTitle, id: notebookId });
@@ -25,7 +25,7 @@ const NotebookLayout: React.FC<NotebookLayoutProps> = ({ notebookId, notebookTit
     }, [notebookId]);
 
     const fetchSources = async () => {
-        setLoadingSources(true);
+
         try {
             const { data, error } = await supabase
                 .from('sources')
@@ -36,24 +36,84 @@ const NotebookLayout: React.FC<NotebookLayoutProps> = ({ notebookId, notebookTit
             if (error) throw error;
             if (data) {
                 // Map DB columns to UI shape if necessary, or use as is
-                const mappedSources = data.map(s => ({
+                const mappedSources = data.map((s: any) => ({
                     id: s.id,
                     name: s.title,
                     type: s.type,
-                    // Add other fields as needed by SourcesPanel
+                    storage_path: s.storage_path,
+                    source_url: s.source_url
                 }));
                 setSources(mappedSources);
             }
         } catch (error) {
             console.error('Error fetching sources:', error);
-        } finally {
-            setLoadingSources(false);
         }
     };
 
     const handleAddSource = () => {
         setIsAddSourceModalOpen(true);
     };
+
+    const handleOpenSource = async (source: any) => {
+        if (source.type === 'website' || source.type === 'youtube') {
+            window.open(source.source_url, '_blank');
+        } else if (source.storage_path) {
+            try {
+                const { data, error } = await supabase
+                    .storage
+                    .from('InsightsLM')
+                    .createSignedUrl(source.storage_path, 3600); // 1 hour expiry
+
+                if (error) throw error;
+                if (data?.signedUrl) {
+                    window.open(data.signedUrl, '_blank');
+                }
+            } catch (error) {
+                console.error('Error creating signed URL:', error);
+                alert('Failed to open file.');
+            }
+        }
+    };
+
+    const handleDeleteSources = async (sourceIds: string[]) => {
+        if (!sourceIds.length) return;
+
+        const confirmDelete = window.confirm(`Are you sure you want to delete ${sourceIds.length} source(s)?`);
+        if (!confirmDelete) return;
+
+        try {
+            // 1. Get storage paths for files to be deleted
+            const sourcesToDelete = sources.filter(s => sourceIds.includes(s.id));
+            const pathsToDelete = sourcesToDelete
+                .filter(s => s.storage_path)
+                .map(s => s.storage_path);
+
+            // 2. Delete from Storage (Try both buckets to be safe/clean legacy)
+            if (pathsToDelete.length > 0) {
+                // Try InsightsLM (current)
+                await supabase.storage.from('InsightsLM').remove(pathsToDelete);
+                // Try source_documents (legacy) - ignore errors
+                await supabase.storage.from('source_documents').remove(pathsToDelete);
+            }
+
+            // 3. Delete from DB
+            const { error: dbError } = await supabase
+                .from('sources')
+                .delete()
+                .in('id', sourceIds);
+
+            if (dbError) throw dbError;
+
+            // 4. Update UI
+            setSources(prev => prev.filter(s => !sourceIds.includes(s.id)));
+            Analytics.track('Sources Deleted', { count: sourceIds.length, notebookId });
+
+        } catch (error: any) {
+            console.error('Error deleting sources:', error);
+            alert('Failed to delete sources: ' + (error.message || error.error_description || JSON.stringify(error)));
+        }
+    };
+
 
     const handleAddSourceData = async (type: 'file' | 'link' | 'text', data: any) => {
         // Prepare DB object
@@ -66,12 +126,42 @@ const NotebookLayout: React.FC<NotebookLayoutProps> = ({ notebookId, notebookTit
         if (type === 'file') {
             const file = data as File;
             console.log("Uploading file:", file.name);
-            // TODO: Upload to storage bucket first to get path
+
+            // Get current user
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                console.error("No user found");
+                alert("You must be logged in to upload files.");
+                return;
+            }
+
+            // Sanitize filename
+            const fileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+            const filePath = `${user.id}/${notebookId}/${fileName}`;
+
+            // Upload to Supabase Storage
+            const { error: uploadError } = await supabase.storage
+                .from('InsightsLM')
+                .upload(filePath, file);
+
+            if (uploadError) {
+                console.error('Error uploading file:', uploadError);
+                alert('Failed to upload file: ' + uploadError.message);
+                return;
+            }
+
+            // Determine file type
+            let fileType = 'text';
+            if (file.type.includes('pdf')) fileType = 'pdf';
+            else if (file.type.includes('audio')) fileType = 'audio';
+            else if (file.type.includes('word') || file.name.endsWith('.docx') || file.name.endsWith('.doc')) fileType = 'word'; // makeshift mapping
+            // Add other mime checks as needed
+
             newSourcePayload = {
                 ...newSourcePayload,
-                type: 'pdf', // simplistic for now, should detect mime
+                type: fileType,
                 title: file.name,
-                // storage_path: ... 
+                storage_path: filePath,
             };
         } else if (type === 'link') {
             const { url, type: linkType } = data;
@@ -103,7 +193,9 @@ const NotebookLayout: React.FC<NotebookLayoutProps> = ({ notebookId, notebookTit
                 setSources(prev => [{
                     id: insertedSource.id,
                     name: insertedSource.title,
-                    type: insertedSource.type
+                    type: insertedSource.type,
+                    storage_path: insertedSource.storage_path,
+                    source_url: insertedSource.source_url
                 }, ...prev]);
                 Analytics.track('Source Added', { type, notebookId });
             }
@@ -166,7 +258,12 @@ const NotebookLayout: React.FC<NotebookLayoutProps> = ({ notebookId, notebookTit
             <div className="flex-1 grid grid-cols-[280px_1fr_300px] overflow-hidden">
 
                 {/* Left: Sources */}
-                <SourcesPanel sources={sources} onAddSource={handleAddSource} />
+                <SourcesPanel
+                    sources={sources}
+                    onAddSource={handleAddSource}
+                    onOpenSource={handleOpenSource}
+                    onDeleteSources={handleDeleteSources}
+                />
 
                 {/* Middle: Chat */}
                 <ChatPanel

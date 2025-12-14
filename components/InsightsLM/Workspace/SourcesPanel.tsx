@@ -4,25 +4,33 @@ import Analytics from '../../../services/analytics';
 interface SourcesPanelProps {
     sources: any[];
     onAddSource: () => void;
+    onOpenSource: (source: any) => void;
+    onDeleteSources: (ids: string[]) => void;
 }
 
-const SourcesPanel: React.FC<SourcesPanelProps> = ({ sources, onAddSource }) => {
-    // Mock selection state
-    const [selectedSources, setSelectedSources] = useState<Set<number>>(new Set());
+const SourcesPanel: React.FC<SourcesPanelProps> = ({ sources, onAddSource, onOpenSource, onDeleteSources }) => {
+    // Selection state using IDs
+    const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
 
     const toggleSelectAll = () => {
         if (selectedSources.size === sources.length) {
             setSelectedSources(new Set());
         } else {
-            setSelectedSources(new Set(sources.map((_, i) => i)));
+            setSelectedSources(new Set(sources.map(s => s.id)));
         }
     };
 
-    const toggleSource = (idx: number) => {
+    const toggleSource = (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
         const newSet = new Set(selectedSources);
-        if (newSet.has(idx)) newSet.delete(idx);
-        else newSet.add(idx);
+        if (newSet.has(id)) newSet.delete(id);
+        else newSet.add(id);
         setSelectedSources(newSet);
+    };
+
+    const handleDelete = () => {
+        onDeleteSources(Array.from(selectedSources));
+        setSelectedSources(new Set());
     };
 
     return (
@@ -96,21 +104,34 @@ const SourcesPanel: React.FC<SourcesPanelProps> = ({ sources, onAddSource }) => 
                 </div>
             ) : (
                 <div className="flex-1 overflow-hidden flex flex-col">
-                    <div className="flex items-center justify-between mb-2 px-1">
-                        <span className="text-xs text-[#2C2A26]/60 font-bold uppercase tracking-wider">Select all sources</span>
-                        <div
-                            onClick={toggleSelectAll}
-                            className={`w-4 h-4 rounded border border-[#2C2A26]/40 cursor-pointer flex items-center justify-center ${selectedSources.size === sources.length ? 'bg-[#2C2A26] border-[#2C2A26]' : 'bg-transparent'}`}
-                        >
-                            {selectedSources.size === sources.length && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                    <div className="flex items-center justify-between mb-2 px-1 text-xs">
+                        <span className="text-[#2C2A26]/60 font-bold uppercase tracking-wider">
+                            {selectedSources.size > 0 ? `${selectedSources.size} selected` : 'Select all sources'}
+                        </span>
+                        <div className="flex items-center gap-2">
+                            {selectedSources.size > 0 && (
+                                <button
+                                    onClick={handleDelete}
+                                    className="text-red-500 hover:text-red-600 font-medium transition-colors"
+                                >
+                                    Delete
+                                </button>
+                            )}
+                            <div className="h-4 w-[1px] bg-[#D6D1C7] mx-1"></div>
+                            <div
+                                onClick={toggleSelectAll}
+                                className={`w-4 h-4 rounded border border-[#2C2A26]/40 cursor-pointer flex items-center justify-center ${selectedSources.size === sources.length && sources.length > 0 ? 'bg-[#2C2A26] border-[#2C2A26]' : 'bg-transparent'}`}
+                            >
+                                {selectedSources.size === sources.length && sources.length > 0 && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                            </div>
                         </div>
                     </div>
                     <div className="space-y-1 overflow-y-auto pr-1 custom-scrollbar">
-                        {sources.map((source, idx) => (
+                        {sources.map((source) => (
                             <div
-                                key={idx}
+                                key={source.id}
                                 className="group flex items-center gap-3 p-2 rounded hover:bg-white border border-transparent hover:border-[#D6D1C7] cursor-pointer"
-                                onClick={() => toggleSource(idx)}
+                                onClick={() => onOpenSource(source)}
                             >
                                 <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center">
                                     {source.type === 'pdf' && <div className="w-full h-full rounded sm:rounded-sm bg-red-100 text-red-600 flex items-center justify-center text-[8px] font-bold">PDF</div>}
@@ -120,8 +141,11 @@ const SourcesPanel: React.FC<SourcesPanelProps> = ({ sources, onAddSource }) => 
                                     {!['pdf', 'website', 'youtube', 'text'].includes(source.type) && <div className="w-full h-full rounded sm:rounded-sm bg-gray-100 text-gray-400 flex items-center justify-center font-bold text-[8px]">?</div>}
                                 </div>
                                 <span className="text-xs text-[#2C2A26] truncate flex-1 font-medium">{source.name || 'Untitled Source'}</span>
-                                <div className={`w-4 h-4 rounded border border-[#2C2A26]/40 flex items-center justify-center flex-shrink-0 transition-colors ${selectedSources.has(idx) ? 'bg-[#2C2A26] border-[#2C2A26]' : 'group-hover:border-[#2C2A26]'}`}>
-                                    {selectedSources.has(idx) && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                                <div
+                                    onClick={(e) => toggleSource(source.id, e)}
+                                    className={`w-4 h-4 rounded border border-[#2C2A26]/40 flex items-center justify-center flex-shrink-0 transition-colors z-10 ${selectedSources.has(source.id) ? 'bg-[#2C2A26] border-[#2C2A26]' : 'group-hover:border-[#2C2A26]'}`}
+                                >
+                                    {selectedSources.has(source.id) && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
                                 </div>
                             </div>
                         ))}
