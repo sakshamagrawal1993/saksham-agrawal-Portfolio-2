@@ -17,12 +17,63 @@ const NotebookLayout: React.FC<NotebookLayoutProps> = ({ notebookId, notebookTit
     const [sources, setSources] = useState<any[]>([]);
     const [messages, setMessages] = useState<{ role: 'user' | 'assistant', content: string }[]>([]);
     const [isAddSourceModalOpen, setIsAddSourceModalOpen] = useState(false);
+    const [isLoadingSummary, setIsLoadingSummary] = useState(false);
 
 
     useEffect(() => {
         Analytics.track('Workspace View', { notebook: notebookTitle, id: notebookId });
         fetchSources();
+        fetchMessages();
+
+        // Subscribe to real-time changes if needed, but for now just fetch on load and after actions
     }, [notebookId]);
+
+    const fetchMessages = async () => {
+        try {
+            // Get session first
+            const { data: session } = await supabase
+                .from('chat_sessions')
+                .select('id')
+                .eq('notebook_id', notebookId)
+                .single();
+
+            if (session) {
+                const { data: msgs, error } = await supabase
+                    .from('chat_messages')
+                    .select('*')
+                    .eq('session_id', session.id)
+                    .order('created_at', { ascending: true });
+
+                if (error) throw error;
+
+                if (msgs) {
+                    const formattedMsgs = msgs.map((m: any) => ({
+                        role: m.role,
+                        content: m.content,
+                        type: m.type
+                    }));
+
+                    // Filter out summaries for the main chat list if they are displayed separately?
+                    // User said: "User should be shown the earlier chat ... and any summaries ... in a chronological manner"
+                    // And "UI of all chat messages will be the UI which is currently used"
+                    // So we probably want them ALL in messages state.
+
+                    // Identify the LAST summary to show in the Overview Panel if desired?
+                    // Or unified stream. The user said chronological manner.
+                    // But currently ChatPanel has a specific 'summary' prop for the overview.
+                    // Let's create a combined stream.
+
+                    // Actually, if there are multiple summaries, does the Overview show the latest?
+                    // User said "show... any summaries which have been generated in a chronological manner"
+                    // This implies they should be part of the message stream.
+
+                    setMessages(formattedMsgs);
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching messages:', error);
+        }
+    };
 
     const fetchSources = async () => {
 
@@ -41,7 +92,8 @@ const NotebookLayout: React.FC<NotebookLayoutProps> = ({ notebookId, notebookTit
                     name: s.title,
                     type: s.type,
                     storage_path: s.storage_path,
-                    source_url: s.source_url
+                    source_url: s.source_url,
+                    status: s.status // Map status from DB
                 }));
                 setSources(mappedSources);
             }
@@ -115,83 +167,92 @@ const NotebookLayout: React.FC<NotebookLayoutProps> = ({ notebookId, notebookTit
     };
 
 
+    const [isUploading, setIsUploading] = useState(false);
+
     const handleAddSourceData = async (type: 'file' | 'link' | 'text', data: any) => {
-        // Prepare DB object
-        let newSourcePayload: any = {
-            notebook_id: notebookId,
-            type: 'text', // default fallback
-            title: 'Untitled Source',
-        };
-
-        if (type === 'file') {
-            const file = data as File;
-            console.log("Uploading file:", file.name);
-
-            // Get current user
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) {
-                console.error("No user found");
-                alert("You must be logged in to upload files.");
-                return;
-            }
-
-            // Sanitize filename
-            const fileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-            const filePath = `${user.id}/${notebookId}/${fileName}`;
-
-            // Upload to Supabase Storage
-            const { error: uploadError } = await supabase.storage
-                .from('InsightsLM')
-                .upload(filePath, file);
-
-            if (uploadError) {
-                console.error('Error uploading file:', uploadError);
-                alert('Failed to upload file: ' + uploadError.message);
-                return;
-            }
-
-            // Determine file type
-            let fileType = 'text';
-            if (file.type.includes('pdf')) fileType = 'pdf';
-            else if (file.type.includes('audio')) fileType = 'audio_file'; // Changed from 'audio' to match DB enum
-            else if (
-                file.type.includes('word') ||
-                file.name.endsWith('.docx') ||
-                file.name.endsWith('.doc')
-            ) fileType = 'word';
-            else if (
-                file.type.includes('excel') ||
-                file.type.includes('spreadsheet') ||
-                file.name.endsWith('.xlsx') ||
-                file.name.endsWith('.xls') ||
-                file.name.endsWith('.csv')
-            ) fileType = 'excel';
-            // Add other mime checks as needed
-
-            newSourcePayload = {
-                ...newSourcePayload,
-                type: fileType,
-                title: file.name,
-                storage_path: filePath,
-            };
-        } else if (type === 'link') {
-            const { url, type: linkType } = data;
-            newSourcePayload = {
-                ...newSourcePayload,
-                type: linkType === 'youtube' ? 'youtube' : 'website',
-                title: url,
-                source_url: url
-            };
-        } else if (type === 'text') {
-            newSourcePayload = {
-                ...newSourcePayload,
-                type: 'text',
-                title: 'Pasted Text',
-                extracted_text: data // Storing raw text directly
-            };
-        }
+        if (isUploading) return;
+        setIsUploading(true);
 
         try {
+            // Prepare DB object
+            let newSourcePayload: any = {
+                notebook_id: notebookId,
+                type: 'text', // default fallback
+                title: 'Untitled Source',
+            };
+
+            if (type === 'file') {
+                const file = data as File;
+                console.log("Uploading file:", file.name);
+
+                // Get current user
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) {
+                    console.error("No user found");
+                    alert("You must be logged in to upload files.");
+                    setIsUploading(false);
+                    return;
+                }
+
+                // Sanitize filename
+                const fileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+                const filePath = `${user.id}/${notebookId}/${fileName}`;
+
+                // Upload to Supabase Storage
+                const { error: uploadError } = await supabase.storage
+                    .from('InsightsLM')
+                    .upload(filePath, file, {
+                        upsert: true
+                    });
+
+                if (uploadError) {
+                    console.error('Error uploading file:', uploadError);
+                    alert('Failed to upload file: ' + uploadError.message);
+                    setIsUploading(false);
+                    return;
+                }
+
+                // Determine file type
+                let fileType = 'text';
+                if (file.type.includes('pdf')) fileType = 'pdf';
+                else if (file.type.includes('audio')) fileType = 'audio_file'; // Changed from 'audio' to match DB enum
+                else if (
+                    file.type.includes('word') ||
+                    file.name.endsWith('.docx') ||
+                    file.name.endsWith('.doc')
+                ) fileType = 'word';
+                else if (
+                    file.type.includes('excel') ||
+                    file.type.includes('spreadsheet') ||
+                    file.name.endsWith('.xlsx') ||
+                    file.name.endsWith('.xls') ||
+                    file.name.endsWith('.csv')
+                ) fileType = 'excel';
+                // Add other mime checks as needed
+
+                newSourcePayload = {
+                    ...newSourcePayload,
+                    type: fileType,
+                    title: file.name,
+                    storage_path: filePath,
+                };
+            } else if (type === 'link') {
+                const { url, type: linkType } = data;
+                newSourcePayload = {
+                    ...newSourcePayload,
+                    type: linkType === 'youtube' ? 'youtube' : 'website',
+                    title: url,
+                    source_url: url
+                };
+            } else if (type === 'text') {
+                newSourcePayload = {
+                    ...newSourcePayload,
+                    type: 'text',
+                    title: 'Pasted Text',
+                    extracted_text: data // Storing raw text directly
+                };
+            }
+
             const { data: insertedSource, error } = await supabase
                 .from('sources')
                 .insert([newSourcePayload])
@@ -206,24 +267,108 @@ const NotebookLayout: React.FC<NotebookLayoutProps> = ({ notebookId, notebookTit
                     name: insertedSource.title,
                     type: insertedSource.type,
                     storage_path: insertedSource.storage_path,
-                    source_url: insertedSource.source_url
+                    source_url: insertedSource.source_url,
+                    status: 'pending' // Optimistic update
                 }, ...prev]);
                 Analytics.track('Source Added', { type, notebookId });
+
+                // Start loading summary
+                setIsLoadingSummary(true);
+
+                // Trigger n8n processing via Edge Function (Synchronous wait)
+                const { data: fnData, error: fnError } = await supabase.functions.invoke('process-source', {
+                    body: {
+                        source_id: insertedSource.id,
+                        notebook_id: notebookId,
+                        file_url: insertedSource.storage_path ?
+                            await (async () => {
+                                const { data } = await supabase.storage.from('InsightsLM').createSignedUrl(insertedSource.storage_path, 3600);
+                                return data?.signedUrl;
+                            })()
+                            : insertedSource.source_url,
+                        source_type: insertedSource.type,
+                        file_name: insertedSource.title
+                    }
+                });
+
+                // Stop loading regardless of outcome
+                setIsLoadingSummary(false);
+
+                if (fnError) {
+                    console.error('Failed to trigger processing:', fnError);
+                    // Update status to failed
+                    setSources(prev => prev.map(s =>
+                        s.id === insertedSource.id ? { ...s, status: 'failed' } : s
+                    ));
+                    // PERSIST FAILED STATUS
+                    await supabase.from('sources').update({ status: 'failed', processing_error: fnError.message }).eq('id', insertedSource.id);
+                    setIsUploading(false); // Release lock
+                    return;
+                }
+
+                // Success! Handle returned data
+                if (fnData) {
+                    console.log("Received n8n response:", fnData);
+
+                    // 1. Update Source Status (Green Tick)
+                    setSources(prev => prev.map(s =>
+                        s.id === insertedSource.id ? { ...s, status: 'completed' } : s
+                    ));
+
+                    // PERSIST SUCCESS STATUS
+                    await supabase.from('sources').update({ status: 'completed' }).eq('id', insertedSource.id);
+
+                    // 2. Refresh Chat History (Simulate real-time update)
+                    await fetchMessages();
+                }
             }
+
         } catch (error) {
             console.error('Error adding source:', error);
             alert('Failed to save source. See console.');
+            setIsLoadingSummary(false);
+        } finally {
+            setIsUploading(false);
+            setIsAddSourceModalOpen(false);
         }
-
-        setIsAddSourceModalOpen(false);
     };
 
-    const handleSendMessage = (msg: string) => {
-        setMessages([...messages, { role: 'user', content: msg }]);
-        // Mock response
-        setTimeout(() => {
-            setMessages(prev => [...prev, { role: 'assistant', content: "I've analyzed your source. Here is a summary..." }]);
-        }, 1000);
+    const handleSendMessage = async (msg: string) => {
+        if (!msg.trim()) return;
+
+        // Optimistic UI update
+        const newMessage = { role: 'user', content: msg, type: 'user_message' };
+        setMessages(prev => [...prev, newMessage as any]); // Type assertion for now
+
+        try {
+            const { data, error } = await supabase.functions.invoke('chat-notebook', {
+                body: {
+                    message: msg,
+                    notebook_id: notebookId
+                }
+            });
+
+            if (error) throw error;
+
+            if (data) {
+                // The function returns { ...n8nData, content: agentResponse }
+                // We can append the agent response
+                setMessages(prev => [...prev, {
+                    role: 'assistant',
+                    content: data.content,
+                    type: 'agent_response'
+                }]);
+            }
+
+        } catch (error) {
+            console.error('Error sending message:', error);
+            // Optionally remove the optimistic message or show error
+            setMessages(prev => [...prev, {
+                role: 'assistant',
+                content: "Sorry, I encountered an error connecting to the AI agent.",
+                type: 'error'
+            }]);
+        }
     };
 
 
@@ -284,6 +429,7 @@ const NotebookLayout: React.FC<NotebookLayoutProps> = ({ notebookId, notebookTit
                     notebookTitle={notebookTitle}
                     sourceCount={sources.length}
                     onAddSource={handleAddSource}
+                    isLoadingSummary={isLoadingSummary}
                 />
 
                 {/* Right: Studio */}

@@ -135,12 +135,37 @@ const SourcesPanel: React.FC<SourcesPanelProps> = ({ sources, onAddSource, onOpe
                             >
                                 <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center">
                                     {source.type === 'pdf' && <div className="w-full h-full rounded sm:rounded-sm bg-red-100 text-red-600 flex items-center justify-center text-[8px] font-bold">PDF</div>}
+                                    {source.type === 'word' && <div className="w-full h-full rounded sm:rounded-sm bg-blue-100 text-blue-600 flex items-center justify-center"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg></div>}
+                                    {source.type === 'excel' && <div className="w-full h-full rounded sm:rounded-sm bg-green-100 text-green-600 flex items-center justify-center"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg></div>}
+                                    {(source.type === 'audio' || source.type === 'audio_file') && <div className="w-full h-full rounded sm:rounded-sm bg-purple-100 text-purple-600 flex items-center justify-center"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" /></svg></div>}
                                     {source.type === 'website' && <div className="w-full h-full rounded sm:rounded-sm bg-gray-100 text-gray-600 flex items-center justify-center"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg></div>}
                                     {source.type === 'youtube' && <div className="w-full h-full rounded sm:rounded-sm bg-red-100 text-red-600 flex items-center justify-center"><svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z" /></svg></div>}
                                     {source.type === 'text' && <div className="w-full h-full rounded sm:rounded-sm bg-blue-100 text-blue-600 flex items-center justify-center"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg></div>}
-                                    {!['pdf', 'website', 'youtube', 'text'].includes(source.type) && <div className="w-full h-full rounded sm:rounded-sm bg-gray-100 text-gray-400 flex items-center justify-center font-bold text-[8px]">?</div>}
+                                    {!['pdf', 'word', 'excel', 'audio', 'audio_file', 'website', 'youtube', 'text'].includes(source.type) && <div className="w-full h-full rounded sm:rounded-sm bg-gray-100 text-gray-400 flex items-center justify-center font-bold text-[8px]">?</div>}
                                 </div>
-                                <span className="text-xs text-[#2C2A26] truncate flex-1 font-medium">{source.name || 'Untitled Source'}</span>
+                                <div className="flex-1 min-w-0 pr-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs text-[#2C2A26] truncate font-medium">{source.name || 'Untitled Source'}</span>
+                                        {(source.status === 'processing' || source.status === 'pending') && (
+                                            <div className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin flex-shrink-0" title="Processing..."></div>
+                                        )}
+                                        {(source.status === 'completed' || source.status === 'processed') && (
+                                            <div title="Processed">
+                                                <svg className="w-3 h-3 text-green-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            </div>
+                                        )}
+                                        {source.status === 'failed' && (
+                                            <div title="Processing Failed">
+                                                <svg className="w-3 h-3 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                            </div>
+                                        )}
+                                    </div>
+                                    {(source.status === 'processing' || source.status === 'pending') && <p className="text-[10px] text-indigo-500 animate-pulse">Generating embeddings...</p>}
+                                </div>
                                 <div
                                     onClick={(e) => toggleSource(source.id, e)}
                                     className={`w-4 h-4 rounded border border-[#2C2A26]/40 flex items-center justify-center flex-shrink-0 transition-colors z-10 ${selectedSources.has(source.id) ? 'bg-[#2C2A26] border-[#2C2A26]' : 'group-hover:border-[#2C2A26]'}`}
