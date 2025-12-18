@@ -15,14 +15,14 @@ const Footer: React.FC<FooterProps> = ({ onLinkClick }) => {
   return (
     <footer id="contact" className="bg-[#EBE7DE] pt-24 pb-12 px-6 text-[#5D5A53]">
       <div className="max-w-[1800px] mx-auto grid grid-cols-1 md:grid-cols-12 gap-12">
-        
+
         <div className="md:col-span-4">
           <h4 className="text-2xl font-serif text-[#2C2A26] mb-6">Saksham Agrawal.</h4>
           <p className="max-w-xs font-light leading-relaxed mb-6">
             Senior Product Manager specializing in building exceptional AI and Fintech experiences.
             Open for collaborations and opportunities.
           </p>
-          <a href="mailto:sakshamagrawal@gmail.com" className="text-[#2C2A26] border-b border-[#2C2A26] pb-1 hover:opacity-60 transition-opacity">sakshamagrawal@gmail.com</a>
+          <a href="mailto:sakshamagrawal1993@gmail.com" className="text-[#2C2A26] border-b border-[#2C2A26] pb-1 hover:opacity-60 transition-opacity">sakshamagrawal1993@gmail.com</a>
         </div>
 
         <div className="md:col-span-2">
@@ -33,7 +33,7 @@ const Footer: React.FC<FooterProps> = ({ onLinkClick }) => {
             <li><a href="#journal" onClick={(e) => onLinkClick(e, 'journal')} className="hover:text-[#2C2A26] transition-colors underline-offset-4 hover:underline">Insights</a></li>
           </ul>
         </div>
-        
+
         <div className="md:col-span-2">
           <h4 className="font-medium text-[#2C2A26] mb-6 tracking-wide text-sm uppercase">Social</h4>
           <ul className="space-y-4 font-light">
@@ -45,13 +45,13 @@ const Footer: React.FC<FooterProps> = ({ onLinkClick }) => {
 
         <div className="md:col-span-4">
           <h4 className="font-medium text-[#2C2A26] mb-6 tracking-wide text-sm uppercase">Availability</h4>
-           <p className="font-light leading-relaxed mb-4">
-             Currently open to product leadership roles and consulting.
-           </p>
-           <div className="flex items-center gap-2">
-               <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-               <span className="text-sm uppercase tracking-widest text-[#2C2A26]">Open to Work</span>
-           </div>
+          <p className="font-light leading-relaxed mb-4">
+            Currently open to product leadership roles and consulting.
+          </p>
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+            <span className="text-sm uppercase tracking-widest text-[#2C2A26]">Open to Work</span>
+          </div>
         </div>
       </div>
 

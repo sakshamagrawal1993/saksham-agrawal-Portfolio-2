@@ -21,7 +21,7 @@ serve(async (req) => {
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) throw new Error('Missing Authorization header')
 
-    const { message, notebook_id, session_id } = await req.json()
+    const { message, notebook_id } = await req.json()
 
     if (!message || !notebook_id) {
       throw new Error('Missing required fields')
@@ -105,9 +105,9 @@ serve(async (req) => {
       {
         headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
       },
-    )
+      )
 
-  } catch (error) {
+  } catch (error: any) {
     return new Response(
       JSON.stringify({ error: error.message }),
       {

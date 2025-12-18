@@ -91,7 +91,8 @@ const Obstacles = () => {
                 // Lane Check
                 if (obs.lane === currentLane) {
                     // Collision!
-                    const isJumping = useRunnerStore.getState().isJumping;
+                    // Collision!
+
 
                     if (obs.type === 'COIN') {
                         addScore(50);
@@ -101,18 +102,20 @@ const Obstacles = () => {
                         markHit(obs.id);
                     } else {
                         // Harmful Obstacles (Boulder, Tree)
-                        // Can we jump over them?
-                        // If jumping, we avoid them? 
-                        // Let's say yes for now to satisfy user request "jump over the obstacle".
-                        // Logic: If NOT Jumping, then Hit.
-                        if (!isJumping) {
+                        // Harmful Obstacles (Boulder, Tree)
+                        // Logic: If Player Y is high enough, we avoid hit.
+                        const yPos = useRunnerStore.getState().yPosition;
+
+                        // Height needed to clear:
+                        // Boulder: 1.0 (approx)
+                        // Tree: 1.5 (approx)
+                        const safeHeight = obs.type === 'BOULDER' ? 1.0 : 1.5;
+
+                        if (yPos < safeHeight) {
                             loseLife();
                             markHit(obs.id);
                         } else {
-                            // verify jump height? 
-                            // Simplification: Jumping = Invincible against obstacles (but not coins/hearts? No, we should still collect coins if we jump through them? 
-                            // Actually, in 3D, if you jump OVER a coin you miss it. 
-                            // But for "Obstacle", jumping saves you.
+                            // Safe jump!
                         }
                     }
                 }

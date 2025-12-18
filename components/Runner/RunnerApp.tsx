@@ -3,6 +3,7 @@ import { useRunnerStore } from './store';
 import { Canvas } from '@react-three/fiber';
 // Game Component
 import RunnerScene from './RunnerScene';
+import { LeaderboardService } from '../../services/leaderboardService';
 
 interface RunnerAppProps {
     onBack: () => void;
@@ -10,6 +11,15 @@ interface RunnerAppProps {
 
 const RunnerApp: React.FC<RunnerAppProps> = ({ onBack }) => {
     const { status, startGame, resetGame, score, lives, highScore, distance } = useRunnerStore();
+    const [globalBest, setGlobalBest] = React.useState<number | null>(null);
+
+    useEffect(() => {
+        const fetchGlobalBest = async () => {
+            const best = await LeaderboardService.getGlobalBest();
+            setGlobalBest(best);
+        };
+        fetchGlobalBest();
+    }, [status]); // Refresh when return to landing / status changes
 
     useEffect(() => {
         // Reset game on unmount
@@ -84,7 +94,7 @@ const RunnerApp: React.FC<RunnerAppProps> = ({ onBack }) => {
 
             {/* Main Content */}
             <div className="w-full h-full">
-                {status === 'idle' && <LandingScreen onPlay={startGame} highScore={highScore} />}
+                {status === 'idle' && <LandingScreen onPlay={startGame} highScore={globalBest || highScore} />}
                 {status === 'playing' && <GameContent />}
                 {status === 'gameover' && <GameOverScreen score={score} highScore={highScore} onRestart={startGame} />}
             </div>
@@ -92,7 +102,7 @@ const RunnerApp: React.FC<RunnerAppProps> = ({ onBack }) => {
     );
 };
 
-const LandingScreen = ({ onPlay, highScore }: { onPlay: () => void, highScore: number }) => (
+const LandingScreen = ({ onPlay, highScore }: { onPlay: () => void, highScore: number | null }) => (
     <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900 z-10 pt-20">
         <h1 className="text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 mb-2">RUNNER</h1>
         <p className="text-slate-400 mb-8 tracking-widest text-sm">ENDLESS DIMENSION JUMPER</p>
@@ -125,7 +135,7 @@ const LandingScreen = ({ onPlay, highScore }: { onPlay: () => void, highScore: n
             START RUNNING
         </button>
 
-        {highScore > 0 && <p className="mt-6 text-slate-500">Best Run: {Math.floor(highScore)}</p>}
+        {highScore !== null && highScore > 0 && <p className="mt-6 text-slate-500">Best Run: {Math.floor(highScore as number)}</p>}
     </div>
 );
 

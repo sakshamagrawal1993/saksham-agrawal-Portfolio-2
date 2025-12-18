@@ -14,6 +14,8 @@ interface GameState {
     setPlayerLane: (lane: number) => void;
     isJumping: boolean;
     setIsJumping: (jumping: boolean) => void;
+    yPosition: number;
+    setYPosition: (y: number) => void;
 
     // Actions
     startGame: () => void;
@@ -37,11 +39,13 @@ export const useRunnerStore = create<GameState>()(
             distance: 0,
             playerLane: 0,
             isJumping: false,
+            yPosition: 0.5,
 
-            startGame: () => set({ status: 'playing', score: 0, lives: 3, distance: 0, speed: 10, playerLane: 0, isJumping: false }),
+            startGame: () => set({ status: 'playing', score: 0, lives: 3, distance: 0, speed: 10, playerLane: 0, isJumping: false, yPosition: 0.5 }),
 
             setPlayerLane: (lane) => set({ playerLane: lane }),
             setIsJumping: (jumping) => set({ isJumping: jumping }),
+            setYPosition: (y) => set({ yPosition: y }),
 
             endGame: () => {
                 const { score, highScore } = get();

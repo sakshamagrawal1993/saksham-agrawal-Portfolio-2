@@ -58,7 +58,7 @@ export const sendMessageToGemini = async (history: { role: string, text: string 
     }
 
     if (!apiKey) {
-      return "I'm currently offline (Missing API Key). Feel free to email Saksham directly at sakshamagrawal@gmail.com!";
+      return "I'm currently offline (Missing API Key). Feel free to email Saksham directly at sakshamagrawal1993@gmail.com!";
     }
 
     const ai = new GoogleGenAI({ apiKey });

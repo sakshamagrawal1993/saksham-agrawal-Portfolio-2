@@ -26,6 +26,26 @@ export const LeaderboardService = {
     },
 
     /**
+     * Fetch absolute best score
+     */
+    getGlobalBest: async (): Promise<number | null> => {
+        const { data, error } = await supabaseGame
+            .from('game_leaderboard')
+            .select('score')
+            .order('score', { ascending: false })
+            .limit(1)
+            .single();
+
+        if (error) {
+            if (error.code !== 'PGRST116') { // No rows found
+                console.error('Error fetching global best:', error);
+            }
+            return null;
+        }
+        return data?.score || null;
+    },
+
+    /**
      * Check if a score qualifies for top 10
      */
     isTopScore: async (score: number): Promise<boolean> => {

@@ -13,7 +13,7 @@ const Player = () => {
     // Actually, let's read lane FROM store.
 
     // Note: changing store causes re-render of this component, which is fine for lane change (rare event).
-    const { status, playerLane, setPlayerLane, isJumping, setIsJumping } = useRunnerStore();
+    const { status, playerLane, setPlayerLane, isJumping, setIsJumping, setYPosition } = useRunnerStore();
 
     const [yVelocity, setYVelocity] = useState(0);
     // const [isJumping, setIsJumping] = useState(false); // Using store now
@@ -73,9 +73,9 @@ const Player = () => {
         }
 
         // Pass player position to store/manager for collision? 
-        // Actually, simpler to check collision in ObstacleManager by reading player ref or simplified lane logic
-        // We will attach a userData to mesh for easy access
+        // We use userData for debug/reference, but setYPosition for Obstacle logic
         mesh.current.userData = { lane: playerLane, isJumping, position: mesh.current.position };
+        setYPosition(mesh.current.position.y);
     });
 
     return (
