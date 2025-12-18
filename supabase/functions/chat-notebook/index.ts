@@ -77,7 +77,20 @@ serve(async (req) => {
     }
 
     const data = await n8nResponse.json()
-    const agentResponse = data.output || data.message || data.answer || JSON.stringify(data); // Adapt based on n8n output
+    
+    let agentResponse;
+    // Handle array response from n8n (common default)
+    if (Array.isArray(data) && data.length > 0) {
+        agentResponse = data[0].output?.Response || data[0].output?.summary || data[0].output || JSON.stringify(data[0]);
+    } else {
+        // Handle single object response
+        agentResponse = data.output?.Response || data.summary || data.output || data.message || data.answer || JSON.stringify(data);
+    }
+
+    // Ensure we have a string
+    if (typeof agentResponse === 'object') {
+        agentResponse = JSON.stringify(agentResponse);
+    }
 
     // 4. Persist Agent Response
     await supabaseClient.from('chat_messages').insert({

@@ -30,6 +30,28 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ messages, onSendMessage, hasSourc
         setInput('');
     };
 
+    // Helper for Action Buttons
+    const MessageActions = () => (
+        <div className="flex flex-wrap gap-2 mt-4">
+            <button className="flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-[#D6D1C7] hover:bg-[#EBE5D9] text-sm font-medium text-[#2C2A26] transition-all shadow-sm group">
+                <svg className="w-4 h-4 text-[#2C2A26]/60 group-hover:text-[#2C2A26]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
+                Save to note
+            </button>
+            <div className="flex items-center gap-1 bg-white border border-[#D6D1C7] rounded-full px-2 py-1 shadow-sm">
+                <button className="p-2 hover:bg-[#EBE5D9] rounded-full text-[#2C2A26]/60 hover:text-[#2C2A26] transition-colors" title="Copy">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                </button>
+                <div className="w-px h-4 bg-[#D6D1C7]"></div>
+                <button className="p-2 hover:bg-[#EBE5D9] rounded-full text-[#2C2A26]/60 hover:text-[#2C2A26] transition-colors" title="Good response">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" /></svg>
+                </button>
+                <button className="p-2 hover:bg-[#EBE5D9] rounded-full text-[#2C2A26]/60 hover:text-[#2C2A26] transition-colors" title="Bad response">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 01.485.06l3.76.94m-7 10v5a2 2 0 002 2h.095c.5 0 .905-.405.905-.905 0-.714.211-1.412.608-2.006L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5" /></svg>
+                </button>
+            </div>
+        </div>
+    );
+
     // Helper to render the Overview (Summary) Message
     const OverviewMessage = ({ content }: { content: string }) => (
         <div className="w-full max-w-3xl animate-fade-in-up mb-8 pt-8">
@@ -47,24 +69,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ messages, onSendMessage, hasSourc
                 <div dangerouslySetInnerHTML={{ __html: content.replace(/\n/g, '<br/>') }} />
             </div>
 
-            <div className="flex flex-wrap gap-2">
-                <button className="flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-[#D6D1C7] hover:bg-[#EBE5D9] text-sm font-medium text-[#2C2A26] transition-all shadow-sm group">
-                    <svg className="w-4 h-4 text-[#2C2A26]/60 group-hover:text-[#2C2A26]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
-                    Save to note
-                </button>
-                <div className="flex items-center gap-1 bg-white border border-[#D6D1C7] rounded-full px-2 py-1 shadow-sm">
-                    <button className="p-2 hover:bg-[#EBE5D9] rounded-full text-[#2C2A26]/60 hover:text-[#2C2A26] transition-colors" title="Copy">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                    </button>
-                    <div className="w-px h-4 bg-[#D6D1C7]"></div>
-                    <button className="p-2 hover:bg-[#EBE5D9] rounded-full text-[#2C2A26]/60 hover:text-[#2C2A26] transition-colors" title="Good response">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" /></svg>
-                    </button>
-                    <button className="p-2 hover:bg-[#EBE5D9] rounded-full text-[#2C2A26]/60 hover:text-[#2C2A26] transition-colors" title="Bad response">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 01.485.06l3.76.94m-7 10v5a2 2 0 002 2h.095c.5 0 .905-.405.905-.905 0-.714.211-1.412.608-2.006L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5" /></svg>
-                    </button>
-                </div>
-            </div>
+            <MessageActions />
         </div>
     );
 
@@ -110,19 +115,25 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ messages, onSendMessage, hasSourc
                             }
 
                             const isUser = msg.role === 'user';
-                            return (
-                                <div key={idx} className={`flex ${isUser ? 'justify-end' : 'justify-start'} animate-fade-in`}>
-                                    {!isUser && (
-                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex-shrink-0 mr-3 mt-1 text-[12px] flex items-center justify-center text-white font-bold shadow-sm">
-                                            ✨
+
+                            // User Message Style (Bubble)
+                            if (isUser) {
+                                return (
+                                    <div key={idx} className="flex justify-end animate-fade-in">
+                                        <div className="max-w-[85%] bg-[#2C2A26] text-[#F5F2EB] rounded-2xl rounded-tr-none px-5 py-3.5 text-sm leading-relaxed shadow-sm">
+                                            <div dangerouslySetInnerHTML={{ __html: msg.content.replace(/\n/g, '<br/>') }} />
                                         </div>
-                                    )}
-                                    <div className={`max-w-[85%] rounded-2xl px-5 py-3.5 text-sm leading-relaxed shadow-sm ${isUser
-                                            ? 'bg-[#2C2A26] text-[#F5F2EB] rounded-tr-none'
-                                            : 'bg-white border border-[#D6D1C7] text-[#2C2A26] rounded-tl-none'
-                                        }`}>
+                                    </div>
+                                );
+                            }
+
+                            // Agent Message Style (NotebookLM Style: Clean Text + Actions)
+                            return (
+                                <div key={idx} className="w-full animate-fade-in mb-6">
+                                    <div className="prose prose-lg max-w-none text-[#2C2A26]/90 leading-relaxed font-sans">
                                         <div dangerouslySetInnerHTML={{ __html: msg.content.replace(/\n/g, '<br/>') }} />
                                     </div>
+                                    <MessageActions />
                                 </div>
                             );
                         })}
