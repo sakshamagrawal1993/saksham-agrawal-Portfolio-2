@@ -21,12 +21,27 @@ export interface Project {
 }
 
 export interface JournalArticle {
-  id: number;
+  id: string; // Changed from number to string (UUID)
   title: string;
   date: string;
   excerpt: string;
   image: string;
-  content: React.ReactNode;
+  content: string; // Changed from ReactNode to string (HTML)
+  author_id?: string;
+  created_at?: string;
+}
+
+export interface JournalComment {
+  id: string;
+  article_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+  user?: { // Joined profile data
+    full_name: string;
+    avatar_url: string;
+  };
 }
 
 export interface ChatMessage {

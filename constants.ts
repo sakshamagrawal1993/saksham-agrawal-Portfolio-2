@@ -241,52 +241,6 @@ export const PROJECTS: Project[] = [
   }
 ];
 
-export const JOURNAL_ARTICLES: JournalArticle[] = [
-  {
-    id: 1,
-    title: "Agentic AI in Healthcare",
-    date: "December 2024",
-    excerpt: "How Jivi AI is moving from chatbots to connected care.",
-    image: "https://images.unsplash.com/photo-1531746790731-6c087fecd65a?auto=format&fit=crop&q=80&w=1000",
-    content: React.createElement(React.Fragment, null,
-      React.createElement("p", { className: "mb-6 text-[#5D5A53]" },
-        "At Jivi, we are not just building another chatbot. We are building 'Health Twin', a platform that understands a user's complete biomarker profile."
-      ),
-      React.createElement("p", { className: "mb-8 text-[#5D5A53]" },
-        "By utilizing Agentic RAG and Knowledge Graphs, we can provide differential diagnosis with high accuracy (94%+ in USMLE for Dr. Jivi), bridging the gap between fragmented data and actionable medical advice."
-      )
-    )
-  },
-  {
-    id: 2,
-    title: "Navigating Digital Lending Guidelines",
-    date: "October 2023",
-    excerpt: "Compliance as a product feature at BharatPe.",
-    image: "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?auto=format&fit=crop&q=80&w=1000",
-    content: React.createElement(React.Fragment, null,
-      React.createElement("p", { className: "mb-6 text-[#5D5A53]" },
-        "When RBI released new Digital Lending Guidelines, many saw it as a hurdle. At BharatPe, I led the product roadmap to turn compliance into a trust-building feature."
-      ),
-      React.createElement("p", { className: "mb-6 text-[#5D5A53]" },
-        "We redesigned the Credit Line/CCMS platform integration with NBFC partners, ensuring transparency while maintaining a seamless user experience for our 1.2 million Postpe card users."
-      )
-    )
-  },
-  {
-    id: 3,
-    title: "The Strategy of Device Financing",
-    date: "May 2022",
-    excerpt: "Unlocking growth for the underbanked at Xiaomi.",
-    image: "https://images.unsplash.com/photo-1556742049-0cfed4f7a07d?auto=format&fit=crop&q=80&w=1000",
-    content: React.createElement(React.Fragment, null,
-      React.createElement("p", { className: "mb-6 text-[#5D5A53]" },
-        "Launching Mi Credit Lite required onboarding 800+ offline retail partners. The challenge wasn't just credit risk; it was operational scalability."
-      ),
-      React.createElement("p", { className: "mb-8 text-[#5D5A53]" },
-        "By synchronizing the Xiaomi band with XFS for wearable payments and offering NFC-based solutions, we created an ecosystem that incentivized both merchants and consumers."
-      )
-    )
-  }
-];
+ export const JOURNAL_ARTICLES: JournalArticle[] = [];
 
 export const BRAND_NAME = 'Saksham.';

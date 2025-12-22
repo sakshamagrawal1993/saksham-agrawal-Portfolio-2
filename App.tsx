@@ -4,7 +4,7 @@
 */
 
 
-import React, { useEffect, Suspense, lazy } from 'react';
+import React, { useEffect, useState, Suspense, lazy } from 'react';
 import { Routes, Route, useNavigate, useLocation, useParams, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Analytics from './services/analytics';
@@ -17,9 +17,10 @@ import Assistant from './components/Assistant';
 import Footer from './components/Footer';
 import ProductDetail from './components/ProductDetail';
 import JournalDetail from './components/JournalDetail';
+import JournalLanding from './components/JournalLanding';
 import TicketflowApp from './components/Ticketflow/TicketflowApp';
 import InsightsLMApp from './components/InsightsLM/InsightsLMApp';
-import { PROJECTS, JOURNAL_ARTICLES } from './constants';
+import { PROJECTS } from './constants';
 
 const RunnerApp = lazy(() => import('./components/Runner/RunnerApp'));
 
@@ -92,10 +93,37 @@ function ProjectPage() {
   );
 }
 
+import { journalService } from './services/journal';
+import { JournalArticle } from './types';
+
 function JournalPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const article = JOURNAL_ARTICLES.find(a => a.id === Number(id));
+  const [article, setArticle] = useState<JournalArticle | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchArticle = async () => {
+      if (!id) return;
+      try {
+        const data = await journalService.getArticle(id);
+        if (data) {
+          setArticle(data);
+        } else {
+          // navigate('/'); // Optional: redirect if not found, or show error
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchArticle();
+  }, [id, navigate]);
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center bg-[#F5F2EB]">Loading...</div>;
+  }
 
   if (!article) {
     return <Navigate to="/" replace />;
@@ -160,6 +188,7 @@ function App() {
             </Suspense>
           } />
           <Route path="/project/:id" element={<ProjectPage />} />
+          <Route path="/journal" element={<JournalLanding />} />
           <Route path="/journal/:id" element={<JournalPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
