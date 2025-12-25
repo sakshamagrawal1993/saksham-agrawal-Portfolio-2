@@ -224,13 +224,13 @@ const PostEditor: React.FC = () => {
                             </div>
                         </div>
                     ) : (
-                        <label className={`bg-brand-gray/5 p-8 border border-dashed border-brand-gray/30 text-center rounded relative flex flex-col items-center justify-center gap-2 transition-colors hover:bg-brand-gray/10 ${!id ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                        <label className={`bg-brand-gray/5 p-8 border border-dashed border-brand-gray/30 text-center rounded relative flex flex-col items-center justify-center gap-2 transition-colors hover:bg-brand-gray/10 ${!id ? 'opacity-50 cursor-not-allowed' : ''}`}>
                             {isUploading ? <Loader2 className="w-8 h-8 animate-spin text-brand-gray" /> : <Upload className="w-8 h-8 text-brand-gray" />}
                             <span className="text-xs font-bold uppercase tracking-widest text-brand-gray">Upload Cover Image</span>
                             <input
                                 type="file"
                                 onChange={handleImageUpload}
-                                className="sr-only"
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                                 accept="image/*"
                                 disabled={!id || isUploading}
                             />
