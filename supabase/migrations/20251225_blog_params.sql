@@ -34,23 +34,30 @@ ALTER TABLE public.posts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.comments ENABLE ROW LEVEL SECURITY;
 
 -- Policies for Posts
+
+DROP POLICY IF EXISTS "Public can view published posts" ON public.posts;
 CREATE POLICY "Public can view published posts" ON public.posts
     FOR SELECT
     USING (is_published = true);
 
+DROP POLICY IF EXISTS "Authors can do everything on their posts" ON public.posts;
 CREATE POLICY "Authors can do everything on their posts" ON public.posts
     FOR ALL
     USING (auth.uid() = author_id);
 
 -- Policies for Comments
+
+DROP POLICY IF EXISTS "Public can view comments" ON public.comments;
 CREATE POLICY "Public can view comments" ON public.comments
     FOR SELECT
     USING (true);
 
+DROP POLICY IF EXISTS "Authenticated users can comment" ON public.comments;
 CREATE POLICY "Authenticated users can comment" ON public.comments
     FOR INSERT
     WITH CHECK (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Users can edit/delete their own comments" ON public.comments;
 CREATE POLICY "Users can edit/delete their own comments" ON public.comments
     FOR ALL
     USING (auth.uid() = user_id);
@@ -61,14 +68,18 @@ VALUES ('blog-media', 'blog-media', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- Storage Policies
+
+DROP POLICY IF EXISTS "Public Access" ON storage.objects;
 CREATE POLICY "Public Access" ON storage.objects
     FOR SELECT
     USING (bucket_id = 'blog-media');
 
+DROP POLICY IF EXISTS "Authenticated Upload" ON storage.objects;
 CREATE POLICY "Authenticated Upload" ON storage.objects
     FOR INSERT
     WITH CHECK (bucket_id = 'blog-media' AND auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Owner Delete" ON storage.objects;
 CREATE POLICY "Owner Delete" ON storage.objects
     FOR DELETE
     USING (bucket_id = 'blog-media' AND auth.uid() = owner);
