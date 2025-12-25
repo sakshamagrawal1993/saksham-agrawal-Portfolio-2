@@ -10,6 +10,17 @@ export default defineConfig(({ mode }) => {
     define: {
       // This ensures process.env.GEMINI_API_KEY in your code is replaced by the actual value during build
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
+    },
+    build: {
+      chunkSizeWarningLimit: 1600,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'three-vendor': ['three', '@react-three/fiber', '@react-three/drei'],
+            'spline-vendor': ['@splinetool/react-spline']
+          }
+        }
+      }
     }
   }
 })
