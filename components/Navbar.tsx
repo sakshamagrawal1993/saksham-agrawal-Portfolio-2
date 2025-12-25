@@ -57,8 +57,8 @@ const Navbar: React.FC<NavbarProps> = ({ onNavClick }) => {
           {/* Center Links - Desktop */}
           <div className={`hidden md:flex items-center gap-12 text-sm font-medium tracking-widest uppercase transition-colors duration-500 ${textColorClass}`}>
             <a href="#about" onClick={(e) => handleLinkClick(e, 'about')} className="hover:opacity-60 transition-opacity">About</a>
-            <a href="#work" onClick={(e) => handleLinkClick(e, 'work')} className="hover:opacity-60 transition-opacity">Work</a>
-            <a href="#journal" onClick={(e) => handleLinkClick(e, 'journal')} className="hover:opacity-60 transition-opacity">Insights</a>
+            <a href="#work" onClick={(e) => handleLinkClick(e, 'work')} className="hover:opacity-60 transition-opacity">Products</a>
+            <a href="#journal" onClick={(e) => handleLinkClick(e, 'journal')} className="hover:opacity-60 transition-opacity">Journal</a>
             <a href="#contact" onClick={(e) => handleLinkClick(e, 'contact')} className="hover:opacity-60 transition-opacity">Contact</a>
           </div>
 
@@ -89,8 +89,8 @@ const Navbar: React.FC<NavbarProps> = ({ onNavClick }) => {
         }`}>
         <div className="flex flex-col items-center space-y-8 text-xl font-serif font-medium text-[#2C2A26]">
           <a href="#about" onClick={(e) => handleLinkClick(e, 'about')} className="hover:opacity-60 transition-opacity">About</a>
-          <a href="#work" onClick={(e) => handleLinkClick(e, 'work')} className="hover:opacity-60 transition-opacity">Work</a>
-          <a href="#journal" onClick={(e) => handleLinkClick(e, 'journal')} className="hover:opacity-60 transition-opacity">Insights</a>
+          <a href="#work" onClick={(e) => handleLinkClick(e, 'work')} className="hover:opacity-60 transition-opacity">Products</a>
+          <a href="#journal" onClick={(e) => handleLinkClick(e, 'journal')} className="hover:opacity-60 transition-opacity">Journal</a>
           <a href="#contact" onClick={(e) => handleLinkClick(e, 'contact')} className="hover:opacity-60 transition-opacity">Contact</a>
         </div>
       </div>
