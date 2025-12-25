@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { Project } from '../types';
+import CreditCard from './ui/credit-card';
 
 interface ProjectDetailProps {
   project: Project;
@@ -33,14 +34,22 @@ const ProductDetail: React.FC<ProjectDetailProps> = ({ project, onBack }) => {
 
           {/* Left: Images */}
           <div className="lg:col-span-7 flex flex-col gap-8">
-            <div className="w-full aspect-video bg-[#EBE7DE] overflow-hidden">
-              <img
-                src={project.imageUrl}
-                alt={project.name}
-                className="w-full h-full object-cover animate-fade-in-up"
-              />
-            </div>
-            {project.gallery?.slice(1).map((img, idx) => (
+            {project.id === 'p3' ? (
+              <div className="w-full min-h-[400px] flex items-center justify-center bg-[#F5F2EB] border border-[#EBE7DE] rounded-xl overflow-hidden">
+                <CreditCard />
+              </div>
+            ) : (
+              <div className="w-full aspect-video bg-[#EBE7DE] overflow-hidden">
+                <img
+                  src={project.imageUrl}
+                  alt={project.name}
+                  className="w-full h-full object-cover animate-fade-in-up"
+                />
+              </div>
+            )}
+
+            {/* Show gallery only if not the card project, or if gallery has extra images */}
+            {project.id !== 'p3' && project.gallery?.slice(1).map((img, idx) => (
               <div key={idx} className="w-full aspect-video bg-[#EBE7DE] overflow-hidden">
                 <img src={img} alt="Detail" className="w-full h-full object-cover" />
               </div>

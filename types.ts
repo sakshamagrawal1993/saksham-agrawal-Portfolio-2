@@ -18,6 +18,7 @@ export interface Project {
   techStack: string[];
   repoUrl?: string;
   demoUrl?: string;
+  splineScene?: string;
 }
 
 export interface JournalArticle {

@@ -161,8 +161,10 @@ export const PROJECTS: Project[] = [
     gallery: [
       'https://images.unsplash.com/photo-1614212959648-8a2b535d496e?auto=format&fit=crop&q=80&w=1000'
     ],
+
     techStack: ['Banking Integration', 'Credit Risk', 'Go-To-Market', 'Stakeholder Mgmt'],
-    demoUrl: '#'
+    demoUrl: '#',
+
   },
   {
     id: 'p4',

@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { blogService } from '../../services/blog';
-import { supabase } from '../../services/journal';
+import { supabase } from '../../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Edit, Trash2, Loader2, Eye, EyeOff, LogIn, LogOut } from 'lucide-react';
 import { format } from 'date-fns';

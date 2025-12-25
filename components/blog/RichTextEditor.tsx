@@ -5,7 +5,7 @@ import Image from '@tiptap/extension-image';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 import { Bold, Italic, List, ListOrdered, Heading1, Heading2, Quote, Image as ImageIcon } from 'lucide-react';
-import { supabase } from '../../services/journal';
+import { supabase } from '../../lib/supabaseClient';
 
 interface RichTextEditorProps {
     content: any;

@@ -1,5 +1,5 @@
 
-import { supabase } from './journal'; // Re-use existing client
+import { supabase } from '../lib/supabaseClient';
 
 export interface Post {
   id: string;

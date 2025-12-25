@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { supabase } from '../../services/journal';
+import { supabase } from '../../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import Analytics from '../../services/analytics'; // Assuming analytics service exists since it was in InsightsLM
 

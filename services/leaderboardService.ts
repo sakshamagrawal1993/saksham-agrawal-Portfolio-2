@@ -1,4 +1,4 @@
-import { supabaseGame } from './supabaseGameClient';
+import { supabase as supabaseGame } from '../lib/supabaseClient';
 
 export interface LeaderboardEntry {
     id: string;

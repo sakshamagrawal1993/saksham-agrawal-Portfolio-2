@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Comment, blogService } from '../services/blog';
-import { supabase } from '../services/journal';
+import { supabase } from '../lib/supabaseClient';
 
 interface CommentSectionProps {
     articleId: string;

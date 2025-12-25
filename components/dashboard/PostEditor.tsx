@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { blogService, Post } from '../../services/blog';
 import RichTextEditor from '../blog/RichTextEditor';
 import { Loader2, Save, ArrowLeft, Upload, CheckCircle } from 'lucide-react';
-import { supabase } from '../../services/journal';
+import { supabase } from '../../lib/supabaseClient';
 
 const PostEditor: React.FC = () => {
     const { id } = useParams<{ id: string }>();

@@ -1,17 +1,10 @@
 
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabaseClient';
+
 import { JournalArticle, JournalComment } from '../types';
 
-// Initialize client (assumes env vars are available to the app, usually via a hook or context, 
-// but for a service file we might need to instantiate or import a shared client. 
-// checking existing patterns...)
-// Actually, it is better to import the shared supabase client if it exists. 
-// I'll check if there is a shared client first. For now, I'll assume standard createClient usage.
+// supabase client is imported from lib
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export const journalService = {
   async getArticles(): Promise<JournalArticle[]> {
