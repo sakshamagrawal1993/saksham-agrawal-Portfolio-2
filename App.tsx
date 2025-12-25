@@ -16,8 +16,13 @@ import Journal from './components/Journal';
 import Assistant from './components/Assistant';
 import Footer from './components/Footer';
 import ProductDetail from './components/ProductDetail';
-import JournalDetail from './components/JournalDetail';
-import JournalLanding from './components/JournalLanding';
+
+// import JournalLanding from './components/JournalLanding'; // Removed for unification
+import BlogFeed from './components/blog/BlogFeed';
+import BlogPost from './components/blog/BlogPost';
+import Dashboard from './components/dashboard/Dashboard';
+import Login from './components/auth/Login';
+import PostEditor from './components/dashboard/PostEditor';
 import TicketflowApp from './components/Ticketflow/TicketflowApp';
 import InsightsLMApp from './components/InsightsLM/InsightsLMApp';
 import { PROJECTS } from './constants';
@@ -65,9 +70,7 @@ function HomePage() {
       <ProductGrid onProductClick={(p) => {
         navigate(`/project/${p.id}`);
       }} />
-      <Journal onArticleClick={(a) => {
-        navigate(`/journal/${a.id}`);
-      }} />
+      <Journal />
     </>
   );
 }
@@ -93,49 +96,7 @@ function ProjectPage() {
   );
 }
 
-import { journalService } from './services/journal';
-import { JournalArticle } from './types';
 
-function JournalPage() {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const [article, setArticle] = useState<JournalArticle | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchArticle = async () => {
-      if (!id) return;
-      try {
-        const data = await journalService.getArticle(id);
-        if (data) {
-          setArticle(data);
-        } else {
-          // navigate('/'); // Optional: redirect if not found, or show error
-        }
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchArticle();
-  }, [id, navigate]);
-
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center bg-[#F5F2EB]">Loading...</div>;
-  }
-
-  if (!article) {
-    return <Navigate to="/" replace />;
-  }
-
-  return (
-    <JournalDetail
-      article={article}
-      onBack={() => navigate('/')}
-    />
-  );
-}
 
 function App() {
   const navigate = useNavigate();
@@ -175,7 +136,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-[#F5F2EB] font-sans text-[#2C2A26] selection:bg-[#D6D1C7] selection:text-[#2C2A26]">
-      {!['/ticketflow', '/insightslm'].includes(location.pathname) && <Navbar onNavClick={handleNavClick} />}
+      {!['/ticketflow', '/insightslm', '/login'].includes(location.pathname) && <Navbar onNavClick={handleNavClick} />}
 
       <main>
         <Routes>
@@ -188,13 +149,23 @@ function App() {
             </Suspense>
           } />
           <Route path="/project/:id" element={<ProjectPage />} />
-          <Route path="/journal" element={<JournalLanding />} />
-          <Route path="/journal/:id" element={<JournalPage />} />
+          <Route path="/project/:id" element={<ProjectPage />} />
+
+          {/* Unified Journal/Blog Routes */}
+          <Route path="/journal" element={<BlogFeed />} />
+          <Route path="/journal/:slug" element={<BlogPost />} />
+
+          {/* Dashboard Routes */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/dashboard/create" element={<PostEditor />} />
+          <Route path="/dashboard/edit/:id" element={<PostEditor />} />
+
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
 
-      {!['/ticketflow', '/insightslm'].includes(location.pathname) && <Footer onLinkClick={handleNavClick} />}
+      {!['/ticketflow', '/insightslm', '/login'].includes(location.pathname) && <Footer onLinkClick={handleNavClick} />}
       {location.pathname !== '/runner' && <Assistant />}
     </div>
   );

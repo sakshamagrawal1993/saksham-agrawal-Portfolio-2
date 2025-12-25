@@ -5,30 +5,19 @@
 
 
 import React, { useEffect, useState } from 'react';
-import { journalService } from '../services/journal';
-
-import { JournalArticle } from '../types';
-
-interface JournalProps {
-  onArticleClick: (article: JournalArticle) => void;
-}
-
-
-
-// ... imports kept same by tool usually, but I need to make sure I don't lose them if I replace whole file or block
+import { blogService, Post } from '../services/blog';
 import { useNavigate } from 'react-router-dom';
+import { format } from 'date-fns';
 
-// ... interface
-
-const Journal: React.FC<JournalProps> = ({ onArticleClick }) => {
-  const [articles, setArticles] = useState<JournalArticle[]>([]);
+const Journal: React.FC = () => {
+  const [articles, setArticles] = useState<Post[]>([]);
   const navigate = useNavigate();
 
   useEffect(() => {
     const loadArticles = async () => {
       try {
-        const data = await journalService.getArticles();
-        setArticles(data.slice(0, 3)); // Only take latest 3
+        const data = await blogService.getPosts(true); // true = published only
+        setArticles(data.slice(0, 3));
       } catch (error) {
         console.error('Failed to load journal articles', error);
       }
@@ -57,16 +46,23 @@ const Journal: React.FC<JournalProps> = ({ onArticleClick }) => {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
           {articles.map((article) => (
-            <div key={article.id} className="group cursor-pointer flex flex-col text-left" onClick={() => onArticleClick(article)}>
+            <div key={article.id} className="group cursor-pointer flex flex-col text-left" onClick={() => navigate(`/journal/${article.slug}`)}>
               <div className="w-full aspect-[4/3] overflow-hidden mb-8 bg-[#EBE7DE]">
-                <img
-                  src={article.image}
-                  alt={article.title}
-                  className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105 grayscale-[0.2] group-hover:grayscale-0"
-                />
+                {article.cover_image_url ? (
+                  <img
+                    src={article.cover_image_url}
+                    alt={article.title}
+                    className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105 grayscale-[0.2] group-hover:grayscale-0"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-[#EBE7DE] text-brand-gray/30 text-4xl font-serif">
+                    {article.title.charAt(0)}
+                  </div>
+                )}
+
               </div>
               <div className="flex flex-col flex-1 text-left">
-                <span className="text-xs font-medium uppercase tracking-widest text-[#A8A29E] mb-3">{article.date}</span>
+                <span className="text-xs font-medium uppercase tracking-widest text-[#A8A29E] mb-3">{format(new Date(article.created_at), 'MMM dd, yyyy')}</span>
                 <h3 className="text-2xl font-serif text-[#2C2A26] mb-4 leading-tight group-hover:underline decoration-1 underline-offset-4">{article.title}</h3>
                 <p className="text-[#5D5A53] font-light leading-relaxed line-clamp-3">{article.excerpt}</p>
               </div>
