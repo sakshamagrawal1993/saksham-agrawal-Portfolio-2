@@ -36,7 +36,7 @@ function HomePage() {
   useEffect(() => {
     const observerOptions = {
       root: null,
-      rootMargin: '-50% 0px -50% 0px', // Trigger when section is in the middle of viewport
+      rootMargin: '-30% 0px -70% 0px', // Trigger when section hits top 30% of viewport
       threshold: 0
     };
 
