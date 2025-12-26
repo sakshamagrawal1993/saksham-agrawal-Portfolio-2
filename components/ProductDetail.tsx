@@ -7,6 +7,7 @@
 import React from 'react';
 import { Project } from '../types';
 import CreditCard from './ui/credit-card';
+import { ShaderAnimation } from './ui/shader-animation';
 
 interface ProjectDetailProps {
   project: Project;
@@ -37,6 +38,10 @@ const ProductDetail: React.FC<ProjectDetailProps> = ({ project, onBack }) => {
             {project.id === 'p3' ? (
               <div className="w-full min-h-[400px] flex items-center justify-center bg-[#F5F2EB] border border-[#EBE7DE] rounded-xl overflow-hidden">
                 <CreditCard />
+              </div>
+            ) : project.id === 'p1' ? (
+              <div className="w-full aspect-video overflow-hidden rounded-xl">
+                <ShaderAnimation />
               </div>
             ) : (
               <div className="w-full aspect-video bg-[#EBE7DE] overflow-hidden">
