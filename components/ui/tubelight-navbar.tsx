@@ -1,8 +1,8 @@
 "use client"
 
-import React, { useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
-import { Link, useLocation } from "react-router-dom"
+import { useLocation } from "react-router-dom"
 import { LucideIcon } from "lucide-react"
 import { cn } from "../../lib/utils"
 
@@ -22,7 +22,6 @@ export function NavBar({ items, className, activeTab: explicitActiveTab }: NavBa
     const location = useLocation();
     // Default to first item or derive from location if explicit not provided
     const [activeTab, setActiveTab] = useState(items[0].name)
-    const [isMobile, setIsMobile] = useState(false)
 
     useEffect(() => {
         if (explicitActiveTab) {
@@ -40,16 +39,6 @@ export function NavBar({ items, className, activeTab: explicitActiveTab }: NavBa
             }
         }
     }, [location, items, explicitActiveTab]);
-
-    useEffect(() => {
-        const handleResize = () => {
-            setIsMobile(window.innerWidth < 768)
-        }
-
-        handleResize()
-        window.addEventListener("resize", handleResize)
-        return () => window.removeEventListener("resize", handleResize)
-    }, [])
 
     return (
         <div

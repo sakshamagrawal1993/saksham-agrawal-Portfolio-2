@@ -147,7 +147,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-[#F5F2EB] font-sans text-[#2C2A26] selection:bg-[#D6D1C7] selection:text-[#2C2A26]">
-      {!['/ticketflow', '/insightslm', '/login'].includes(location.pathname) && <Navbar onNavClick={handleNavClick} activeSection={activeSection} />}
+      {location.pathname === '/' && <Navbar onNavClick={handleNavClick} activeSection={activeSection} />}
 
 
       <main>

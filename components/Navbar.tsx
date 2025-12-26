@@ -5,7 +5,7 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { BRAND_NAME } from '../constants';
+
 import { BrandIcon } from './BrandIcon';
 import { NavBar } from './ui/tubelight-navbar';
 import { User, Briefcase, FileText, Send } from 'lucide-react';
