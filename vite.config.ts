@@ -7,6 +7,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, (process as any).cwd(), '');
   return {
     plugins: [react()],
+    base: '/',
     define: {
       // This ensures process.env.GEMINI_API_KEY in your code is replaced by the actual value during build
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
