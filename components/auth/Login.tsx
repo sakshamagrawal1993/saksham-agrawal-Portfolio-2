@@ -2,7 +2,8 @@
 import React, { useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
-import Analytics from '../../services/analytics'; // Assuming analytics service exists since it was in InsightsLM
+import Analytics from '../../services/analytics';
+import { useAuth } from '../../context/AuthContext';
 
 interface LoginProps {
     redirectPath?: string;
@@ -16,6 +17,7 @@ const Login: React.FC<LoginProps> = ({
     subtitle = 'Sign in to manage content'
 }) => {
     const navigate = useNavigate();
+    const { user } = useAuth();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
@@ -64,6 +66,40 @@ const Login: React.FC<LoginProps> = ({
             setLoading(false);
         }
     };
+
+    if (user) {
+        return (
+            <div className="min-h-screen bg-[#F5F2EB] flex flex-col justify-center items-center p-4 animate-fade-in-up">
+                <button
+                    onClick={() => navigate('/')}
+                    className="absolute top-8 left-8 text-[#2C2A26]/50 hover:text-[#2C2A26] font-serif italic transition-colors"
+                >
+                    ← Back to Portfolio
+                </button>
+
+                <div className="w-full max-w-md bg-white border border-[#D6D1C7] shadow-xl p-8 md:p-12 relative overflow-hidden text-center">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-purple-500"></div>
+
+                    <h1 className="text-3xl font-serif text-[#2C2A26] mb-4">Welcome Back</h1>
+                    <p className="text-[#2C2A26]/60 font-sans text-sm mb-8">You are already logged in as<br /><span className="font-bold text-[#2C2A26]">{user.email}</span></p>
+
+                    <button
+                        onClick={() => navigate(redirectPath)}
+                        className="w-full bg-[#2C2A26] text-[#F5F2EB] py-3 text-xs font-bold uppercase tracking-widest hover:bg-[#2C2A26]/90 transition-all mb-4"
+                    >
+                        Continue to {title === 'Journal Admin' ? 'Dashboard' : title}
+                    </button>
+
+                    <button
+                        onClick={() => supabase.auth.signOut()}
+                        className="text-xs text-[#2C2A26]/40 uppercase tracking-widest hover:text-red-500 transition-colors"
+                    >
+                        Sign Out
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-[#F5F2EB] flex flex-col justify-center items-center p-4 animate-fade-in-up">

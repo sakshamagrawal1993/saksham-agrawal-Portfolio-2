@@ -4,11 +4,13 @@ import { useQuery } from '@tanstack/react-query';
 import { blogService } from '../../services/blog';
 import BlogCard from './BlogCard';
 import SEOHead from '../SEOHead';
-import { Loader2, LogIn } from 'lucide-react';
+import { Loader2, LogIn, LayoutDashboard } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 
 const BlogFeed: React.FC = () => {
     const navigate = useNavigate();
+    const { user } = useAuth();
     const { data: posts, isLoading, error } = useQuery({
         queryKey: ['blog-posts'],
         queryFn: () => blogService.getPosts(true),
@@ -38,14 +40,25 @@ const BlogFeed: React.FC = () => {
             />
             <div className="min-h-screen bg-brand-light py-32 px-6 md:px-12 animate-fade-in-up">
                 <div className="max-w-[1200px] mx-auto relative px-12 md:px-0">
-                    <button
-                        onClick={() => navigate('/login')}
-                        className="absolute top-0 right-0 text-brand-gray hover:text-brand-dark transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-widest"
-                        title="Author Login"
-                    >
-                        <LogIn className="w-4 h-4" />
-                        Login
-                    </button>
+                    {user ? (
+                        <button
+                            onClick={() => navigate('/dashboard')}
+                            className="absolute top-0 right-0 text-brand-gray hover:text-brand-dark transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-widest"
+                            title="Open Dashboard"
+                        >
+                            <LayoutDashboard className="w-4 h-4" />
+                            Dashboard
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => navigate('/login')}
+                            className="absolute top-0 right-0 text-brand-gray hover:text-brand-dark transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-widest"
+                            title="Author Login"
+                        >
+                            <LogIn className="w-4 h-4" />
+                            Login
+                        </button>
+                    )}
 
                     <div className="mb-20 text-center">
                         <span className="block text-xs font-bold uppercase tracking-[0.2em] text-brand-gray mb-4">Editorial</span>
