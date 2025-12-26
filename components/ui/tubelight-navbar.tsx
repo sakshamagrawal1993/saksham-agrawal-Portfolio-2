@@ -25,13 +25,21 @@ export function NavBar({ items, className, activeTab: explicitActiveTab }: NavBa
     const [isMobile, setIsMobile] = useState(false)
 
     useEffect(() => {
-        // Basic hash/path matching to set initial active tab
-        const path = location.pathname + location.hash;
-        const found = items.find(item => path.includes(item.url) || (item.url === '/#work' && path === '/')); // simplistic fallback
-        if (found) {
-            setActiveTab(found.name);
+        if (explicitActiveTab) {
+            setActiveTab(explicitActiveTab);
         }
-    }, [location, items]);
+    }, [explicitActiveTab]);
+
+    useEffect(() => {
+        // Basic hash/path matching to set initial active tab only if no explicit tab provided
+        if (!explicitActiveTab) {
+            const path = location.pathname + location.hash;
+            const found = items.find(item => path.includes(item.url) || (item.url === '/#work' && path === '/'));
+            if (found) {
+                setActiveTab(found.name);
+            }
+        }
+    }, [location, items, explicitActiveTab]);
 
     useEffect(() => {
         const handleResize = () => {

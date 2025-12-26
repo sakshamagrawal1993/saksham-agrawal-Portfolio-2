@@ -12,9 +12,10 @@ import { User, Briefcase, FileText, Send } from 'lucide-react';
 
 interface NavbarProps {
   onNavClick: (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => void;
+  activeSection?: string;
 }
 
-const Navbar: React.FC<NavbarProps> = ({ onNavClick }) => {
+const Navbar: React.FC<NavbarProps> = ({ onNavClick, activeSection }) => {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -53,7 +54,7 @@ const Navbar: React.FC<NavbarProps> = ({ onNavClick }) => {
       </nav>
 
       {/* Tubelight Navbar - Fixed Top Center on Desktop, Bottom Center on Mobile */}
-      <NavBar items={navItems} />
+      <NavBar items={navItems} activeTab={activeSection} />
     </>
   );
 };
