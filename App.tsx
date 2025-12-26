@@ -31,34 +31,7 @@ const RunnerApp = lazy(() => import('./components/Runner/RunnerApp'));
 
 function HomePage() {
   const navigate = useNavigate();
-  const [activeSection, setActiveSection] = useState('About');
 
-  useEffect(() => {
-    const observerOptions = {
-      root: null,
-      rootMargin: '-30% 0px -70% 0px', // Trigger when section hits top 30% of viewport
-      threshold: 0
-    };
-
-    const observerCallback = (entries: IntersectionObserverEntry[]) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          const id = entry.target.id;
-          if (id === 'about') setActiveSection('About');
-          if (id === 'experience') setActiveSection('About');
-          if (id === 'work') setActiveSection('Products');
-          if (id === 'journal') setActiveSection('Journal');
-          if (id === 'contact') setActiveSection('Contact');
-        }
-      });
-    };
-
-    const observer = new IntersectionObserver(observerCallback, observerOptions);
-    const sections = document.querySelectorAll('section[id], footer[id]');
-    sections.forEach((section) => observer.observe(section));
-
-    return () => observer.disconnect();
-  }, []);
 
   return (
     <>
@@ -101,7 +74,7 @@ function App() {
 
     const observerOptions = {
       root: null,
-      rootMargin: '-40% 0px -40% 0px', // Center of screen
+      rootMargin: '-20% 0px -60% 0px', // Trigger when section hits top 20% of viewport
       threshold: 0
     };
 
@@ -112,6 +85,7 @@ function App() {
           // Map ID to Nav Item Name
           const map: Record<string, string> = {
             'about': 'About',
+            'experience': 'About', // Treat Experience as distinct section that maps to About
             'work': 'Products',
             'journal': 'Journal',
             'contact': 'Contact'
