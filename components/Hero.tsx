@@ -74,14 +74,14 @@ const Hero: React.FC = () => {
             <a
               href="#work"
               onClick={(e) => handleNavClick(e, 'work')}
-              className="px-8 py-4 bg-[#F5F2EB] text-[#2C2A26] text-sm font-semibold uppercase tracking-widest hover:bg-white transition-all duration-300 shadow-lg hover:translate-y-[-2px]"
+              className="px-8 py-4 bg-[#F5F2EB] text-[#2C2A26] text-sm font-semibold uppercase tracking-widest hover:bg-white transition-all duration-300 shadow-lg hover:translate-y-[-2px] flex items-center justify-center text-center"
             >
               View Projects
             </a>
             <a
               href="#contact"
               onClick={(e) => handleNavClick(e, 'contact')}
-              className="px-8 py-4 bg-transparent border border-[#F5F2EB] text-[#F5F2EB] text-sm font-semibold uppercase tracking-widest hover:bg-[#F5F2EB] hover:text-[#2C2A26] transition-all duration-300"
+              className="px-8 py-4 bg-transparent border border-[#F5F2EB] text-[#F5F2EB] text-sm font-semibold uppercase tracking-widest hover:bg-[#F5F2EB] hover:text-[#2C2A26] transition-all duration-300 flex items-center justify-center text-center"
             >
               Contact
             </a>
