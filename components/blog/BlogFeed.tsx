@@ -38,7 +38,7 @@ const BlogFeed: React.FC = () => {
                 title="Blog"
                 description="Thoughts on Product Management, AI, and Engineering."
             />
-            <div className="min-h-screen bg-brand-light py-32 px-6 md:px-12 animate-fade-in-up">
+            <div className="min-h-screen bg-brand-light pt-16 pb-32 md:py-32 px-6 md:px-12 animate-fade-in-up">
                 <div className="max-w-[1200px] mx-auto relative px-0">
                     <button
                         onClick={() => navigate('/#work')}
