@@ -72,7 +72,7 @@ const Login: React.FC<LoginProps> = ({
             <div className="min-h-screen bg-[#F5F2EB] flex flex-col justify-center items-center p-4 animate-fade-in-up">
                 <button
                     onClick={() => navigate('/')}
-                    className="absolute top-8 left-8 text-[#2C2A26]/50 hover:text-[#2C2A26] font-serif italic transition-colors"
+                    className="absolute top-4 left-4 md:top-8 md:left-8 text-[#2C2A26]/50 hover:text-[#2C2A26] font-serif italic transition-colors"
                 >
                     ← Back to Portfolio
                 </button>
@@ -105,7 +105,7 @@ const Login: React.FC<LoginProps> = ({
         <div className="min-h-screen bg-[#F5F2EB] flex flex-col justify-center items-center p-4 animate-fade-in-up">
             <button
                 onClick={() => navigate('/')}
-                className="absolute top-8 left-8 text-[#2C2A26]/50 hover:text-[#2C2A26] font-serif italic transition-colors"
+                className="absolute top-4 left-4 md:top-8 md:left-8 text-[#2C2A26]/50 hover:text-[#2C2A26] font-serif italic transition-colors"
             >
                 ← Back to Portfolio
             </button>

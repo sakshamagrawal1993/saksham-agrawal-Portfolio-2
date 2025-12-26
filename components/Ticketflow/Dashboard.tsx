@@ -207,7 +207,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onBack }) => {
     return (
         <div className="flex flex-col h-screen bg-[#F5F2EB] text-[#2C2A26]">
             {/* Top Navbar */}
-            <div className="bg-[#F5F2EB] border-b border-[#D6D1C7] px-8 py-5 flex justify-between items-center z-10">
+            <div className="bg-[#F5F2EB] border-b border-[#D6D1C7] px-4 py-3 md:px-8 md:py-5 flex justify-between items-center z-10">
                 <div className="flex items-center space-x-6">
                     <button onClick={onBack} className="text-[#2C2A26]/50 hover:text-[#2C2A26] font-serif italic transition-colors">← Back</button>
                     <h1 className="text-2xl font-serif text-[#2C2A26]">Ticketflow <span className="text-[#2C2A26]/30 text-lg font-sans">Dashboard</span></h1>

@@ -63,7 +63,7 @@ const RunnerApp: React.FC<RunnerAppProps> = ({ onBack }) => {
         >
             {/* HUD - Head Up Display */}
             {status !== 'idle' && (
-                <div className="absolute top-20 left-0 w-full px-4 md:px-8 py-2 flex justify-between items-start z-10 pointer-events-none">
+                <div className="absolute top-4 md:top-20 left-0 w-full px-4 md:px-8 py-2 flex justify-between items-start z-10 pointer-events-none">
                     <div className="flex flex-col gap-1 bg-slate-900/50 p-2 rounded-lg border border-slate-700/50 backdrop-blur-sm">
                         <div className="flex items-baseline gap-2">
                             <h2 className="text-2xl font-bold text-yellow-400 drop-shadow-md">SCORE</h2>

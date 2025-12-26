@@ -16,7 +16,7 @@ interface ProjectDetailProps {
 const ProductDetail: React.FC<ProjectDetailProps> = ({ project, onBack }) => {
 
   return (
-    <div className="pt-24 min-h-screen bg-[#F5F2EB] animate-fade-in-up">
+    <div className="pt-4 md:pt-24 min-h-screen bg-[#F5F2EB] animate-fade-in-up">
       <div className="max-w-[1800px] mx-auto px-6 md:px-12 pb-24">
 
         {/* Breadcrumb / Back */}
