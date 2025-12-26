@@ -45,6 +45,7 @@ function HomePage() {
         if (entry.isIntersecting) {
           const id = entry.target.id;
           if (id === 'about') setActiveSection('About');
+          if (id === 'experience') setActiveSection('About');
           if (id === 'work') setActiveSection('Products');
           if (id === 'journal') setActiveSection('Journal');
           if (id === 'contact') setActiveSection('Contact');
