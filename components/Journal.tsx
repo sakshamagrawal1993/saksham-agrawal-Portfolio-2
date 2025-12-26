@@ -8,6 +8,7 @@ import React, { useEffect, useState } from 'react';
 import { blogService, Post } from '../services/blog';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
+import { GlowCard } from './ui/spotlight-card';
 
 const Journal: React.FC = () => {
   const [articles, setArticles] = useState<Post[]>([]);
@@ -46,27 +47,34 @@ const Journal: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
           {articles.map((article) => (
-            <div key={article.id} className="group cursor-pointer flex flex-col text-left" onClick={() => navigate(`/journal/${article.slug}`)}>
-              <div className="w-full aspect-[4/3] overflow-hidden mb-8 bg-[#EBE7DE]">
-                {article.cover_image_url ? (
-                  <img
-                    src={article.cover_image_url}
-                    alt={article.title}
-                    className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105 grayscale-[0.2] group-hover:grayscale-0"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-[#EBE7DE] text-brand-gray/30 text-4xl font-serif">
-                    {article.title.charAt(0)}
-                  </div>
-                )}
-
+            <GlowCard
+              key={article.id}
+              glowColor="orange"
+              customSize={true}
+              className="w-full h-full cursor-pointer group !p-0"
+              onClick={() => navigate(`/journal/${article.slug}`)}
+            >
+              <div className="flex flex-col h-full bg-[#EBE7DE]/30">
+                <div className="w-full aspect-[4/3] overflow-hidden bg-[#EBE7DE]">
+                  {article.cover_image_url ? (
+                    <img
+                      src={article.cover_image_url}
+                      alt={article.title}
+                      className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105 grayscale-[0.2] group-hover:grayscale-0"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-[#EBE7DE] text-brand-gray/30 text-4xl font-serif">
+                      {article.title.charAt(0)}
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-col flex-1 text-left p-6">
+                  <span className="text-[10px] font-medium uppercase tracking-widest text-[#A8A29E] mb-3">{format(new Date(article.created_at), 'MMM dd, yyyy')}</span>
+                  <h3 className="text-xl font-serif text-[#2C2A26] mb-3 leading-tight group-hover:text-[#A84A00] transition-colors">{article.title}</h3>
+                  <p className="text-[#5D5A53] font-light leading-relaxed line-clamp-3 text-sm">{article.excerpt}</p>
+                </div>
               </div>
-              <div className="flex flex-col flex-1 text-left">
-                <span className="text-xs font-medium uppercase tracking-widest text-[#A8A29E] mb-3">{format(new Date(article.created_at), 'MMM dd, yyyy')}</span>
-                <h3 className="text-2xl font-serif text-[#2C2A26] mb-4 leading-tight group-hover:underline decoration-1 underline-offset-4">{article.title}</h3>
-                <p className="text-[#5D5A53] font-light leading-relaxed line-clamp-3">{article.excerpt}</p>
-              </div>
-            </div>
+            </GlowCard>
           ))}
         </div>
 

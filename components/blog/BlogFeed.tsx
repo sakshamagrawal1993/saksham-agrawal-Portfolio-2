@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { blogService } from '../../services/blog';
 import BlogCard from './BlogCard';
 import SEOHead from '../SEOHead';
-import { Loader2, LogIn, LayoutDashboard } from 'lucide-react';
+import { Loader2, LogIn, LayoutDashboard, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
@@ -40,6 +40,14 @@ const BlogFeed: React.FC = () => {
             />
             <div className="min-h-screen bg-brand-light py-32 px-6 md:px-12 animate-fade-in-up">
                 <div className="max-w-[1200px] mx-auto relative px-12 md:px-0">
+                    <button
+                        onClick={() => navigate('/#work')}
+                        className="absolute top-0 left-0 text-brand-gray hover:text-brand-dark transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-widest"
+                        title="Back to Home"
+                    >
+                        <ArrowLeft className="w-4 h-4" />
+                        Back
+                    </button>
                     {user ? (
                         <button
                             onClick={() => navigate('/dashboard')}
