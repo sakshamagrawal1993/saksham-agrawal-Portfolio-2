@@ -8,6 +8,7 @@ import React, { useEffect, useState, Suspense, lazy } from 'react';
 import { Routes, Route, useNavigate, useLocation, useParams, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Analytics from './services/analytics';
+import { AuthProvider } from './context/AuthContext';
 import Hero from './components/Hero';
 import ProductGrid from './components/ProductGrid';
 import About from './components/About';
@@ -146,39 +147,41 @@ function App() {
   }, [location.pathname, location.hash, location.search]);
 
   return (
-    <div className="min-h-screen bg-[#F5F2EB] font-sans text-[#2C2A26] selection:bg-[#D6D1C7] selection:text-[#2C2A26]">
-      {location.pathname === '/' && <Navbar onNavClick={handleNavClick} activeSection={activeSection} />}
+    <AuthProvider>
+      <div className="min-h-screen bg-[#F5F2EB] font-sans text-[#2C2A26] selection:bg-[#D6D1C7] selection:text-[#2C2A26]">
+        {location.pathname === '/' && <Navbar onNavClick={handleNavClick} activeSection={activeSection} />}
 
 
-      <main>
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/ticketflow" element={<TicketflowApp onBack={() => navigate('/#work')} />} />
-          <Route path="/insightslm" element={<InsightsLMApp onBack={() => navigate('/project/insightslm')} />} />
-          <Route path="/runner" element={
-            <Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-black text-white">Loading Game...</div>}>
-              <RunnerApp onBack={() => navigate('/project/runner')} />
-            </Suspense>
-          } />
-          <Route path="/project/:id" element={<ProjectPage />} />
+        <main>
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/ticketflow" element={<TicketflowApp onBack={() => navigate('/#work')} />} />
+            <Route path="/insightslm" element={<InsightsLMApp onBack={() => navigate('/project/insightslm')} />} />
+            <Route path="/runner" element={
+              <Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-black text-white">Loading Game...</div>}>
+                <RunnerApp onBack={() => navigate('/project/runner')} />
+              </Suspense>
+            } />
+            <Route path="/project/:id" element={<ProjectPage />} />
 
-          {/* Unified Journal/Blog Routes */}
-          <Route path="/journal" element={<BlogFeed />} />
-          <Route path="/journal/:slug" element={<BlogPost />} />
+            {/* Unified Journal/Blog Routes */}
+            <Route path="/journal" element={<BlogFeed />} />
+            <Route path="/journal/:slug" element={<BlogPost />} />
 
-          {/* Dashboard Routes */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/dashboard/create" element={<PostEditor />} />
-          <Route path="/dashboard/edit/:id" element={<PostEditor />} />
+            {/* Dashboard Routes */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/dashboard/create" element={<PostEditor />} />
+            <Route path="/dashboard/edit/:id" element={<PostEditor />} />
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </main>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </main>
 
-      {!['/ticketflow', '/insightslm', '/login'].includes(location.pathname) && <Footer onLinkClick={handleNavClick} />}
-      {location.pathname !== '/runner' && <Assistant />}
-    </div>
+        {!['/ticketflow', '/insightslm', '/login'].includes(location.pathname) && <Footer onLinkClick={handleNavClick} />}
+        {location.pathname !== '/runner' && <Assistant />}
+      </div>
+    </AuthProvider>
   );
 }
 
