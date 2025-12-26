@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 
-import React from 'react';
+
 import { Project, JournalArticle } from './types';
 
 // Placeholder PDF Base64. In production, replace this with a link to the actual file like "/Saksham_Agrawal_Resume.pdf"
