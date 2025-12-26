@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 
-import React from 'react';
+
 
 export interface Project {
   id: string;
@@ -18,7 +18,7 @@ export interface Project {
   techStack: string[];
   repoUrl?: string;
   demoUrl?: string;
-  splineScene?: string;
+
 }
 
 export interface JournalArticle {

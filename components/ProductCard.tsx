@@ -1,4 +1,4 @@
-import { SplineScene } from './ui/spline-scene';
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -22,11 +22,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) => {
       <GlowingEffect blur={0} borderWidth={3} spread={80} glow={true} disabled={false} proximity={64} inactiveZone={0.01} />
       <div className="relative z-10 flex flex-col gap-6 h-full">
         <div className="relative w-full aspect-[16/9] overflow-hidden bg-[#EBE7DE] rounded-xl">
-          {project.splineScene ? (
-            <div className="w-full h-full">
-              <SplineScene scene={project.splineScene} className="w-full h-full" />
-            </div>
-          ) : project.id === 'p3' ? (
+          {project.id === 'p3' ? (
             <div
               className="w-full h-full flex items-center justify-center bg-[#F5F2EB]"
               onClick={(e) => e.stopPropagation()}

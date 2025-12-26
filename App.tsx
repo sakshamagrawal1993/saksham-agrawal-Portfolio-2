@@ -17,18 +17,23 @@ import Journal from './components/Journal';
 import Assistant from './components/Assistant';
 import Footer from './components/Footer';
 import ProductDetail from './components/ProductDetail';
-
-// import JournalLanding from './components/JournalLanding'; // Removed for unification
-import BlogFeed from './components/blog/BlogFeed';
-import BlogPost from './components/blog/BlogPost';
-import Dashboard from './components/dashboard/Dashboard';
-import Login from './components/auth/Login';
-import PostEditor from './components/dashboard/PostEditor';
-import TicketflowApp from './components/Ticketflow/TicketflowApp';
-import InsightsLMApp from './components/InsightsLM/InsightsLMApp';
 import { PROJECTS } from './constants';
 
+// Lazy Load Route Components
+const BlogFeed = lazy(() => import('./components/blog/BlogFeed'));
+const BlogPost = lazy(() => import('./components/blog/BlogPost'));
+const Dashboard = lazy(() => import('./components/dashboard/Dashboard'));
+const Login = lazy(() => import('./components/auth/Login'));
+const PostEditor = lazy(() => import('./components/dashboard/PostEditor'));
+const TicketflowApp = lazy(() => import('./components/Ticketflow/TicketflowApp'));
+const InsightsLMApp = lazy(() => import('./components/InsightsLM/InsightsLMApp'));
 const RunnerApp = lazy(() => import('./components/Runner/RunnerApp'));
+
+const LoadingFallback = () => (
+  <div className="min-h-screen flex items-center justify-center bg-[#F5F2EB] font-serif italic text-[#2C2A26]/50">
+    Loading...
+  </div>
+);
 
 function HomePage() {
   const navigate = useNavigate();
@@ -155,8 +160,16 @@ function App() {
         <main>
           <Routes>
             <Route path="/" element={<HomePage />} />
-            <Route path="/ticketflow" element={<TicketflowApp onBack={() => navigate('/#work')} />} />
-            <Route path="/insightslm" element={<InsightsLMApp onBack={() => navigate('/project/insightslm')} />} />
+            <Route path="/ticketflow" element={
+              <Suspense fallback={<LoadingFallback />}>
+                <TicketflowApp onBack={() => navigate('/#work')} />
+              </Suspense>
+            } />
+            <Route path="/insightslm" element={
+              <Suspense fallback={<LoadingFallback />}>
+                <InsightsLMApp onBack={() => navigate('/project/insightslm')} />
+              </Suspense>
+            } />
             <Route path="/runner" element={
               <Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-black text-white">Loading Game...</div>}>
                 <RunnerApp onBack={() => navigate('/project/runner')} />
@@ -165,14 +178,38 @@ function App() {
             <Route path="/project/:id" element={<ProjectPage />} />
 
             {/* Unified Journal/Blog Routes */}
-            <Route path="/journal" element={<BlogFeed />} />
-            <Route path="/journal/:slug" element={<BlogPost />} />
+            <Route path="/journal" element={
+              <Suspense fallback={<LoadingFallback />}>
+                <BlogFeed />
+              </Suspense>
+            } />
+            <Route path="/journal/:slug" element={
+              <Suspense fallback={<LoadingFallback />}>
+                <BlogPost />
+              </Suspense>
+            } />
 
             {/* Dashboard Routes */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/dashboard/create" element={<PostEditor />} />
-            <Route path="/dashboard/edit/:id" element={<PostEditor />} />
+            <Route path="/login" element={
+              <Suspense fallback={<LoadingFallback />}>
+                <Login />
+              </Suspense>
+            } />
+            <Route path="/dashboard" element={
+              <Suspense fallback={<LoadingFallback />}>
+                <Dashboard />
+              </Suspense>
+            } />
+            <Route path="/dashboard/create" element={
+              <Suspense fallback={<LoadingFallback />}>
+                <PostEditor />
+              </Suspense>
+            } />
+            <Route path="/dashboard/edit/:id" element={
+              <Suspense fallback={<LoadingFallback />}>
+                <PostEditor />
+              </Suspense>
+            } />
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

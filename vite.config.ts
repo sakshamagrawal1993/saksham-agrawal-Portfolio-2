@@ -16,8 +16,10 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks: {
-            'three-vendor': ['three', '@react-three/fiber', '@react-three/drei'],
-            'spline-vendor': ['@splinetool/react-spline']
+            'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+            'vendor-utils': ['framer-motion', 'lucide-react', 'clsx', 'tailwind-merge', 'date-fns'],
+            'vendor-supabase': ['@supabase/supabase-js', '@tanstack/react-query'],
+            'three-vendor': ['three', '@react-three/fiber', '@react-three/drei']
           }
         }
       }
