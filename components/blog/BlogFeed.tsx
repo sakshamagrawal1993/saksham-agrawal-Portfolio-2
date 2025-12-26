@@ -39,7 +39,7 @@ const BlogFeed: React.FC = () => {
                 description="Thoughts on Product Management, AI, and Engineering."
             />
             <div className="min-h-screen bg-brand-light py-32 px-6 md:px-12 animate-fade-in-up">
-                <div className="max-w-[1200px] mx-auto relative px-12 md:px-0">
+                <div className="max-w-[1200px] mx-auto relative px-0">
                     <button
                         onClick={() => navigate('/#work')}
                         className="absolute top-0 left-0 text-brand-gray hover:text-brand-dark transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-widest"

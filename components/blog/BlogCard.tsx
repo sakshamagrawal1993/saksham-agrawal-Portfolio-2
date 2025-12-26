@@ -29,7 +29,7 @@ const BlogCard: React.FC<BlogCardProps> = ({ post }) => {
             onClick={() => navigate(`/journal/${post.slug}`)}
         >
             <div className="flex flex-col h-full">
-                <div className="w-full aspect-[16/9] overflow-hidden mb-6 bg-brand-light rounded-sm">
+                <div className="w-full aspect-[4/3] overflow-hidden mb-6 bg-brand-light rounded-sm">
                     {post.cover_image_url ? (
                         <img
                             src={post.cover_image_url}
