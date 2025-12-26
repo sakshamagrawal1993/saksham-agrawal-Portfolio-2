@@ -24,7 +24,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({ onProductClick }) => {
   }, [activeCategory]);
 
   return (
-    <section id="work" className="py-32 px-6 md:px-12 bg-[#F5F2EB]">
+    <section id="work" className="py-16 md:py-32 px-6 md:px-12 bg-[#F5F2EB]">
       <div className="max-w-[1800px] mx-auto">
 
         {/* Header Area */}
@@ -39,8 +39,8 @@ const ProductGrid: React.FC<ProductGridProps> = ({ onProductClick }) => {
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
                 className={`text-sm uppercase tracking-widest pb-1 border-b transition-all duration-300 ${activeCategory === cat
-                    ? 'border-[#2C2A26] text-[#2C2A26]'
-                    : 'border-transparent text-[#A8A29E] hover:text-[#2C2A26]'
+                  ? 'border-[#2C2A26] text-[#2C2A26]'
+                  : 'border-transparent text-[#A8A29E] hover:text-[#2C2A26]'
                   }`}
               >
                 {cat}

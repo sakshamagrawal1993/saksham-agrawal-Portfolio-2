@@ -27,7 +27,7 @@ const Journal: React.FC = () => {
   }, []);
 
   return (
-    <section id="journal" className="bg-[#F5F2EB] py-32 px-6 md:px-12">
+    <section id="journal" className="bg-[#F5F2EB] py-16 md:py-32 px-6 md:px-12">
       <div className="max-w-[1800px] mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-20 pb-8 border-b border-[#D6D1C7]">
           <div>
