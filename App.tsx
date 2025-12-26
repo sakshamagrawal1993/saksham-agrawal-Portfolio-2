@@ -30,6 +30,7 @@ import { PROJECTS } from './constants';
 const RunnerApp = lazy(() => import('./components/Runner/RunnerApp'));
 
 function HomePage() {
+  const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState('About');
 
   useEffect(() => {
