@@ -82,7 +82,7 @@ function App() {
 
     const observerOptions = {
       root: null,
-      rootMargin: '-20% 0px -60% 0px', // Trigger when section hits top 20% of viewport
+      rootMargin: '-40% 0px -40% 0px', // Center-focused intersection for better accuracy
       threshold: 0
     };
 
@@ -94,7 +94,7 @@ function App() {
           const map: Record<string, string> = {
             'about': 'About',
             'experience': 'About', // Treat Experience as distinct section that maps to About
-            'work': 'Products',
+            'work': 'Portfolio',
             'journal': 'Journal',
             'contact': 'Contact'
           };
@@ -118,7 +118,7 @@ function App() {
     e.preventDefault();
     setActiveSection(
       targetId === 'about' ? 'About' :
-        targetId === 'work' ? 'Products' :
+        targetId === 'work' ? 'Portfolio' :
           targetId === 'journal' ? 'Journal' :
             targetId === 'contact' ? 'Contact' : 'About'
     );
