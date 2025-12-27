@@ -40,7 +40,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({ onProductClick, featuredOnly 
         {/* Header Area */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-20 pb-8 border-b border-[#D6D1C7]">
           <div>
-            <h2 className="text-4xl md:text-6xl font-serif text-[#2C2A26] mb-4">The Portfolio</h2>
+            <h2 className="text-4xl md:text-6xl font-serif text-[#2C2A26]">The Portfolio</h2>
           </div>
 
           {/* View All Button - only show if featuredOnly */}
