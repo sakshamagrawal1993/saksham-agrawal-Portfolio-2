@@ -29,6 +29,8 @@ const TicketflowApp = lazy(() => import('./components/Ticketflow/TicketflowApp')
 const InsightsLMApp = lazy(() => import('./components/InsightsLM/InsightsLMApp'));
 const RunnerApp = lazy(() => import('./components/Runner/RunnerApp'));
 
+const PortfolioPage = lazy(() => import('./components/PortfolioPage'));
+
 const LoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-[#F5F2EB] font-serif italic text-[#2C2A26]/50">
     Loading...
@@ -44,7 +46,7 @@ function HomePage() {
       <Hero />
       <About />
       <Experience />
-      <ProductGrid onProductClick={(p) => navigate(`/project/${p.id}`)} />
+      <ProductGrid onProductClick={(p) => navigate(`/project/${p.id}`)} featuredOnly={true} />
       <Journal />
     </>
   );

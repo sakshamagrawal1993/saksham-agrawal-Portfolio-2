@@ -76,7 +76,7 @@ const Hero: React.FC = () => {
               onClick={(e) => handleNavClick(e, 'work')}
               className="px-8 py-4 bg-[#F5F2EB] text-[#2C2A26] text-sm font-semibold uppercase tracking-widest hover:bg-white transition-all duration-300 shadow-lg hover:translate-y-[-2px] flex items-center justify-center text-center"
             >
-              View Projects
+              Portfolio
             </a>
             <a
               href="#contact"
@@ -95,7 +95,7 @@ const Hero: React.FC = () => {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
         </svg>
       </div>
-    </section>
+    </section >
   );
 };
 

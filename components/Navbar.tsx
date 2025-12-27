@@ -28,7 +28,7 @@ const Navbar: React.FC<NavbarProps> = ({ onNavClick, activeSection }) => {
 
   const navItems = [
     { name: 'About', url: '#about', icon: User },
-    { name: 'Products', url: '#work', icon: Briefcase },
+    { name: 'Portfolio', url: '#work', icon: Briefcase },
     { name: 'Journal', url: '#journal', icon: FileText },
     { name: 'Contact', url: '#contact', icon: Send }
   ];
