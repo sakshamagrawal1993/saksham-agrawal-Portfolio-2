@@ -34,11 +34,11 @@ const ProductGrid: React.FC<ProductGridProps> = ({ onProductClick, featuredOnly 
   }, [activeCategory, featuredOnly]);
 
   return (
-    <section id="work" className="py-16 md:py-20 px-6 md:px-12 bg-[#F5F2EB]">
+    <section id="work" className="py-16 md:py-16 px-6 md:px-12 bg-[#F5F2EB]">
       <div className="max-w-[1800px] mx-auto">
 
         {/* Header Area */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-20 pb-8 border-b border-[#D6D1C7]">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 pb-6 border-b border-[#D6D1C7]">
           <div>
             <h2 className="text-4xl md:text-6xl font-serif text-[#2C2A26]">The Portfolio</h2>
           </div>
@@ -79,7 +79,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({ onProductClick, featuredOnly 
         )}
 
         {/* Large Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-x-12 gap-y-24">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-x-12 gap-y-16">
           {filteredProjects.map(project => (
             <ProjectCard key={project.id} project={project} onClick={onProductClick} />
           ))}
