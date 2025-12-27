@@ -31,7 +31,6 @@ const Journal: React.FC = () => {
       <div className="max-w-[1800px] mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-20 pb-8 border-b border-[#D6D1C7]">
           <div>
-            <span className="block text-xs font-bold uppercase tracking-[0.2em] text-[#A8A29E] mb-4">Editorial</span>
             <h2 className="text-4xl md:text-6xl font-serif text-[#2C2A26]">The Journal</h2>
           </div>
           <button
