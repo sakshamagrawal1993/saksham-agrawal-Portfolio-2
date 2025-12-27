@@ -162,6 +162,11 @@ function App() {
         <main>
           <Routes>
             <Route path="/" element={<HomePage />} />
+            <Route path="/portfolio" element={
+              <Suspense fallback={<LoadingFallback />}>
+                <PortfolioPage />
+              </Suspense>
+            } />
             <Route path="/ticketflow" element={
               <Suspense fallback={<LoadingFallback />}>
                 <TicketflowApp onBack={() => navigate('/#work')} />
