@@ -12,7 +12,7 @@ const About: React.FC = () => {
     <section id="about" className="bg-[#EBE7DE]">
 
       {/* Introduction / Bio */}
-      <div className="py-12 md:py-24 px-6 md:px-12 max-w-[1800px] mx-auto flex flex-col md:flex-row items-start gap-16 md:gap-32">
+      <div className="py-12 md:py-16 px-6 md:px-12 max-w-[1800px] mx-auto flex flex-col md:flex-row items-start gap-16 md:gap-32">
         <div className="md:w-1/3">
           <h2 className="text-4xl md:text-6xl font-serif text-[#2C2A26] leading-tight">
             Strategy meets <br /> execution.

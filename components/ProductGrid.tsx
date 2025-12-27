@@ -34,7 +34,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({ onProductClick, featuredOnly 
   }, [activeCategory, featuredOnly]);
 
   return (
-    <section id="work" className="py-16 md:py-32 px-6 md:px-12 bg-[#F5F2EB]">
+    <section id="work" className="py-16 md:py-20 px-6 md:px-12 bg-[#F5F2EB]">
       <div className="max-w-[1800px] mx-auto">
 
         {/* Header Area */}
