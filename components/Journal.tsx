@@ -53,7 +53,7 @@ const Journal: React.FC = () => {
               className="w-full h-full cursor-pointer group !p-0"
               onClick={() => navigate(`/journal/${article.slug}`)}
             >
-              <div className="flex flex-col h-full bg-[#EBE7DE]/30">
+              <div className="flex flex-col h-full bg-[#EBE7DE]/30 rounded-2xl overflow-hidden">
                 <div className="w-full aspect-[4/3] overflow-hidden bg-[#EBE7DE]">
                   {article.cover_image_url ? (
                     <img
