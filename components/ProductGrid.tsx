@@ -38,28 +38,46 @@ const ProductGrid: React.FC<ProductGridProps> = ({ onProductClick, featuredOnly 
       <div className="max-w-[1800px] mx-auto">
 
         {/* Header Area */}
-        <div className="flex flex-col items-center text-center mb-24 space-y-8">
-          <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#A8A29E]">Key Case Studies</span>
-          <h2 className="text-4xl md:text-6xl font-serif text-[#2C2A26]">The Portfolio</h2>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-20 pb-8 border-b border-[#D6D1C7]">
+          <div>
+            <span className="block text-xs font-bold uppercase tracking-[0.2em] text-[#A8A29E] mb-4">Key Case Studies</span>
+            <h2 className="text-4xl md:text-6xl font-serif text-[#2C2A26]">The Portfolio</h2>
+          </div>
 
-          {/* Minimal Filter - only show if NOT featuredOnly */}
-          {!featuredOnly && (
-            <div className="flex flex-wrap justify-center gap-8 pt-4 border-t border-[#D6D1C7]/50 w-full max-w-2xl">
-              {categories.map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => setActiveCategory(cat)}
-                  className={`text-sm uppercase tracking-widest pb-1 border-b transition-all duration-300 ${activeCategory === cat
-                    ? 'border-[#2C2A26] text-[#2C2A26]'
-                    : 'border-transparent text-[#A8A29E] hover:text-[#2C2A26]'
-                    }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
+          {/* View All Button - only show if featuredOnly */}
+          {featuredOnly && (
+            <button
+              onClick={() => {
+                window.scrollTo({ top: 0, behavior: 'instant' });
+                navigate('/portfolio');
+              }}
+              className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[#2C2A26] hover:opacity-60 transition-opacity mt-8 md:mt-0"
+            >
+              View All Products
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 8.25L21 12m0 0l-3.75 3.75M21 12H3" />
+              </svg>
+            </button>
           )}
         </div>
+
+        {/* Minimal Filter - only show if NOT featuredOnly */}
+        {!featuredOnly && (
+          <div className="flex flex-wrap gap-8 mb-16 w-full">
+            {categories.map(cat => (
+              <button
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                className={`text-sm uppercase tracking-widest pb-1 border-b transition-all duration-300 ${activeCategory === cat
+                  ? 'border-[#2C2A26] text-[#2C2A26]'
+                  : 'border-transparent text-[#A8A29E] hover:text-[#2C2A26]'
+                  }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Large Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-x-12 gap-y-24">
@@ -67,21 +85,6 @@ const ProductGrid: React.FC<ProductGridProps> = ({ onProductClick, featuredOnly 
             <ProjectCard key={project.id} project={project} onClick={onProductClick} />
           ))}
         </div>
-
-        {/* View All Button - only show if featuredOnly */}
-        {featuredOnly && (
-          <div className="flex justify-center mt-24">
-            <button
-              onClick={() => {
-                window.scrollTo({ top: 0, behavior: 'instant' });
-                navigate('/portfolio');
-              }}
-              className="px-8 py-4 bg-transparent border border-[#2C2A26] text-[#2C2A26] text-sm font-semibold uppercase tracking-widest hover:bg-[#2C2A26] hover:text-[#F5F2EB] transition-all duration-300"
-            >
-              View All Products
-            </button>
-          </div>
-        )}
       </div>
     </section>
   );
