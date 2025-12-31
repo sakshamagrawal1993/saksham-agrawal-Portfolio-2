@@ -173,7 +173,7 @@ const PostEditor: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-brand-light py-20 px-6 animate-fade-in-up">
-            <div className="max-w-[900px] mx-auto p-8 md:p-12">
+            <div className="max-w-[900px] mx-auto bg-white p-8 md:p-12 shadow-sm border border-brand-gray/10">
 
                 {/* Error Banner */}
                 {draftError && (
