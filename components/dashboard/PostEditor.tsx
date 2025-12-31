@@ -88,7 +88,6 @@ const PostEditor: React.FC = () => {
         onSuccess: () => {
             // This is fallback, mostly unused now due to auto-draft
             queryClient.invalidateQueries({ queryKey: ['dashboard-posts'] });
-            navigate('/dashboard');
         },
     });
 
@@ -98,7 +97,6 @@ const PostEditor: React.FC = () => {
             queryClient.invalidateQueries({ queryKey: ['dashboard-posts'] });
             queryClient.invalidateQueries({ queryKey: ['blog-posts'] });
             if (slug) queryClient.invalidateQueries({ queryKey: ['blog-post', slug] });
-            navigate('/dashboard');
         },
     });
 
