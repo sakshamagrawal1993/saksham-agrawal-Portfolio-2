@@ -162,6 +162,15 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, edit
         },
     });
 
+    React.useEffect(() => {
+        if (editor && content) {
+            const currentContent = editor.getJSON();
+            if (JSON.stringify(currentContent) !== JSON.stringify(content)) {
+                editor.commands.setContent(content);
+            }
+        }
+    }, [content, editor]);
+
     if (!editor) return null;
 
     const ToolbarButton = ({ onClick, isActive = false, children, title }: any) => (
@@ -176,7 +185,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, edit
     );
 
     return (
-        <div className="flex flex-col h-full bg-transparent">
+        <div className="flex flex-col h-full bg-transparent" >
             {editable && (
                 <div className="bg-transparent border-b border-gray-200/50 p-2 flex flex-wrap gap-1 sticky top-0 z-20">
                     {/* History */}
@@ -295,9 +304,9 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, edit
                 </div>
             )}
 
-            <div className="flex-1 overflow-auto bg-transparent cursor-text" onClick={() => editor.commands.focus()}>
+            < div className="flex-1 overflow-auto bg-transparent cursor-text" onClick={() => editor.commands.focus()}>
                 <EditorContent editor={editor} className="min-h-full" />
-            </div>
+            </div >
 
             <style>{`
                 .ProseMirror {
@@ -313,7 +322,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, edit
                     pointer-events: none;
                 }
             `}</style>
-        </div>
+        </div >
     );
 };
 
