@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { blogService } from '../../services/blog';
 import { supabase } from '../../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Edit, Trash2, Loader2, Eye, EyeOff, LogIn, LogOut } from 'lucide-react';
+import { Plus, Edit, Trash2, Loader2, Eye, EyeOff, LogIn, LogOut, ArrowLeft } from 'lucide-react';
 import { format } from 'date-fns';
 
 const Dashboard: React.FC = () => {
@@ -96,6 +96,14 @@ const Dashboard: React.FC = () => {
     return (
         <div className="min-h-screen bg-brand-light py-32 px-6 md:px-12 animate-fade-in-up">
             <div className="max-w-[1200px] mx-auto">
+                <button
+                    onClick={() => navigate('/journal')}
+                    className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[#2C2A26] hover:opacity-60 transition-opacity mb-8"
+                >
+                    <ArrowLeft className="w-4 h-4" />
+                    Back to Journal
+                </button>
+
                 <div className="flex justify-between items-center mb-12">
                     <h1 className="text-4xl font-serif text-brand-dark">Dashboard</h1>
 
