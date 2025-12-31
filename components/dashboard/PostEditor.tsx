@@ -25,6 +25,8 @@ const PostEditor: React.FC = () => {
         queryKey: ['post-editor', id],
         queryFn: () => blogService.getPostById(id!),
         enabled: !!id,
+        refetchOnWindowFocus: false, // Prevent overwriting unsaved changes
+        staleTime: Infinity, // Data is considered fresh once loaded
     });
 
     const [draftError, setDraftError] = useState<string | null>(null);
