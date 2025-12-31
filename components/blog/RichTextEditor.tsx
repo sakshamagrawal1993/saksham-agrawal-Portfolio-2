@@ -176,9 +176,9 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, edit
     );
 
     return (
-        <div className="flex flex-col h-full bg-white">
+        <div className="flex flex-col h-full bg-transparent">
             {editable && (
-                <div className="bg-white border-b border-gray-200 p-2 flex flex-wrap gap-1 sticky top-0 z-20">
+                <div className="bg-transparent border-b border-gray-200/50 p-2 flex flex-wrap gap-1 sticky top-0 z-20">
                     {/* History */}
                     <div className="flex gap-1 border-r border-gray-200 pr-2 mr-1">
                         <button onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} className="p-2 rounded hover:bg-gray-100 disabled:opacity-30">
@@ -295,7 +295,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, edit
                 </div>
             )}
 
-            <div className="flex-1 overflow-auto bg-white cursor-text" onClick={() => editor.commands.focus()}>
+            <div className="flex-1 overflow-auto bg-transparent cursor-text" onClick={() => editor.commands.focus()}>
                 <EditorContent editor={editor} className="min-h-full" />
             </div>
 
