@@ -176,7 +176,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, edit
     );
 
     return (
-        <div className="border border-gray-200 rounded-lg overflow-hidden flex flex-col h-full bg-white">
+        <div className="flex flex-col h-full bg-white">
             {editable && (
                 <div className="bg-white border-b border-gray-200 p-2 flex flex-wrap gap-1 sticky top-0 z-20">
                     {/* History */}
