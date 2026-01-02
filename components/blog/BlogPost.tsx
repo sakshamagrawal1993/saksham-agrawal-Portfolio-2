@@ -44,6 +44,7 @@ const BlogPost: React.FC = () => {
                 title={post.title}
                 description={post.excerpt}
                 image={post.cover_image_url}
+                url={window.location.href}
             />
             <div className="min-h-screen bg-brand-light pt-32 pb-20 animate-fade-in-up relative">
                 <button

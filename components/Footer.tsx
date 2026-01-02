@@ -43,16 +43,7 @@ const Footer: React.FC<FooterProps> = ({ onLinkClick }) => {
           </ul>
         </div>
 
-        <div className="md:col-span-4">
-          <h4 className="font-medium text-[#2C2A26] mb-6 tracking-wide text-sm uppercase">Availability</h4>
-          <p className="font-light leading-relaxed mb-4">
-            Currently open to product leadership roles and consulting.
-          </p>
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-            <span className="text-sm uppercase tracking-widest text-[#2C2A26]">Open to Work</span>
-          </div>
-        </div>
+
       </div>
 
       <div className="max-w-[1800px] mx-auto mt-20 pt-8 border-t border-[#D6D1C7] flex flex-col md:flex-row justify-between items-center text-xs uppercase tracking-widest opacity-60">
