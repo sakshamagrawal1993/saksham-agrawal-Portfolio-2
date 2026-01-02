@@ -77,7 +77,7 @@ const BlogPost: React.FC = () => {
                                 </div>
                                 <div>
                                     <div className="text-sm font-bold text-brand-dark">Saksham Agrawal</div>
-                                    <div className="text-xs text-brand-gray">Product Manager & Engineer</div>
+                                    <div className="text-xs text-brand-gray">Product Manager and Builder</div>
                                 </div>
                             </div>
                         </div>
