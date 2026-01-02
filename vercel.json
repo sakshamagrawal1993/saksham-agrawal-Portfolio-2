@@ -1,7 +1,18 @@
 {
     "rewrites": [
         {
-            "source": "/((?!assets/|.*\\..*).*)",
+            "source": "/journal/:slug",
+            "has": [
+                {
+                    "type": "header",
+                    "key": "User-Agent",
+                    "value": ".*(Twitterbot|facebookexternalhit|LinkedInBot|WhatsApp|TelegramBot|Slackbot|Discordbot).*"
+                }
+            ],
+            "destination": "/api/social-card?slug=:slug"
+        },
+        {
+            "source": "/((?!assets/|.*\\..*|api/).*)",
             "destination": "/index.html"
         }
     ]
