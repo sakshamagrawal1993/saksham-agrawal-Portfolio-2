@@ -25,7 +25,6 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) => {
           {project.id === 'p3' ? (
             <div
               className="w-full h-full flex items-center justify-center bg-[#F5F2EB]"
-              onClick={(e) => e.stopPropagation()}
             >
               <div className="scale-[0.85] origin-center">
                 <CreditCard />

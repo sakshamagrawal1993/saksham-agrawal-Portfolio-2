@@ -37,8 +37,8 @@ const Footer: React.FC<FooterProps> = ({ onLinkClick }) => {
         <div className="md:col-span-2">
           <h4 className="font-medium text-[#2C2A26] mb-6 tracking-wide text-sm uppercase">Social</h4>
           <ul className="space-y-4 font-light">
-            <li><a href="https://linkedin.com/in/saksham-agrawal/" target="_blank" rel="noreferrer" className="hover:text-[#2C2A26] transition-colors underline-offset-4 hover:underline">LinkedIn</a></li>
-            <li><a href="https://github.com" target="_blank" rel="noreferrer" className="hover:text-[#2C2A26] transition-colors underline-offset-4 hover:underline">GitHub</a></li>
+            <li><a href="https://www.linkedin.com/in/saksham-agrawal/" target="_blank" rel="noreferrer" className="hover:text-[#2C2A26] transition-colors underline-offset-4 hover:underline">LinkedIn</a></li>
+            <li><a href="https://github.com/sakshamagrawal1993" target="_blank" rel="noreferrer" className="hover:text-[#2C2A26] transition-colors underline-offset-4 hover:underline">GitHub</a></li>
             <li><a href="https://twitter.com" target="_blank" rel="noreferrer" className="hover:text-[#2C2A26] transition-colors underline-offset-4 hover:underline">Twitter/X</a></li>
           </ul>
         </div>
