@@ -11,17 +11,21 @@ export const config = {
 
 export default async function handler(request: Request) {
   const url = new URL(request.url);
-  // Assuming url is like /api/social-card?slug=my-post or rewritten from /journal/my-post
-  // If rewritten, we need to extract slug.
-  
-  // Let's assume we pass slug as query param for simplicity in the beginning,
-  // OR we extract it if this is a rewrite.
-  // The rewrite in vercel.json will map /journal/:slug -> /api/social-card?slug=:slug
-  
+  // Get the host from the request headers to support any domain (e.g. saksham-experiments.com)
+  const host = request.headers.get('host') || 'saksham-experiments.com';
+  const protocol = request.headers.get('x-forwarded-proto') || 'https';
+  const baseUrl = `${protocol}://${host}`;
+
   const slug = url.searchParams.get('slug');
 
   if (!slug) {
     return new Response('Missing slug', { status: 400 });
+  }
+
+  // Safety check for Environment Variables
+  if (!supabaseUrl || !supabaseKey) {
+     console.error('Missing Supabase Environment Variables in Vercel Function');
+     return new Response(getDefaultHTML(baseUrl), { headers: { 'Content-Type': 'text/html' } });
   }
 
   // Fetch the blog post
@@ -32,8 +36,7 @@ export default async function handler(request: Request) {
     .single();
 
   if (!post) {
-     // Fallback to default
-     return new Response(getDefaultHTML(), {
+     return new Response(getDefaultHTML(baseUrl), {
         headers: { 'Content-Type': 'text/html' },
      });
   }
@@ -49,17 +52,17 @@ export default async function handler(request: Request) {
       
       <!-- Open Graph / Facebook -->
       <meta property="og:type" content="article">
-      <meta property="og:url" content="https://saksham.io/journal/${slug}">
+      <meta property="og:url" content="${baseUrl}/journal/${slug}">
       <meta property="og:title" content="${post.title}">
       <meta property="og:description" content="${post.excerpt || ''}">
-      <meta property="og:image" content="${post.cover_image_url || 'https://saksham.io/og-image.png'}">
+      <meta property="og:image" content="${post.cover_image_url || `${baseUrl}/og-image.png`}">
 
       <!-- Twitter -->
       <meta property="twitter:card" content="summary_large_image">
-      <meta property="twitter:url" content="https://saksham.io/journal/${slug}">
+      <meta property="twitter:url" content="${baseUrl}/journal/${slug}">
       <meta property="twitter:title" content="${post.title}">
       <meta property="twitter:description" content="${post.excerpt || ''}">
-      <meta property="twitter:image" content="${post.cover_image_url || 'https://saksham.io/og-image.png'}">
+      <meta property="twitter:image" content="${post.cover_image_url || `${baseUrl}/og-image.png`}">
     </head>
     <body>
       <h1>${post.title}</h1>
@@ -76,7 +79,7 @@ export default async function handler(request: Request) {
   });
 }
 
-function getDefaultHTML() {
+function getDefaultHTML(baseUrl: string) {
     return `
     <!DOCTYPE html>
     <html lang="en">
@@ -85,7 +88,7 @@ function getDefaultHTML() {
         <title>Saksham Agrawal - Portfolio</title>
         <meta property="og:title" content="Saksham Agrawal - Product Leader">
         <meta property="og:description" content="Senior Product Manager building AI and Fintech solutions.">
-        <meta property="og:image" content="https://saksham.io/og-image.png">
+        <meta property="og:image" content="${baseUrl}/og-image.png">
     </head>
     <body>
         <p>Redirecting...</p>

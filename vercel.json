@@ -6,7 +6,7 @@
                 {
                     "type": "header",
                     "key": "User-Agent",
-                    "value": ".*(Twitterbot|facebookexternalhit|LinkedInBot|WhatsApp|TelegramBot|Slackbot|Discordbot).*"
+                    "value": ".*([Ll]inked[Ii]n|[Ff]acebook|[Tt]witter|[Bb]ot|[Ss]lack|[Dd]iscord|[Ww]hats[Aa]pp|[Tt]elegram).*"
                 }
             ],
             "destination": "/api/social-card?slug=:slug"
