@@ -53,6 +53,26 @@ export default {
                         // For prose-lg specifically if needed, but DEFAULT handles most
                     },
                 },
+                lg: {
+                    css: {
+                        'ul > li': {
+                            marginTop: '0em',
+                            marginBottom: '0em',
+                        },
+                        'ul > li > p': {
+                            marginTop: '0em',
+                            marginBottom: '0em',
+                        },
+                        'ol > li': {
+                            marginTop: '0em',
+                            marginBottom: '0em',
+                        },
+                        'ol > li > p': {
+                            marginTop: '0em',
+                            marginBottom: '0em',
+                        },
+                    },
+                },
             },
         },
     },
