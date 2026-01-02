@@ -5,6 +5,10 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL!;
 const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+export const config = {
+  runtime: 'edge',
+};
+
 export default async function handler(request: Request) {
   const url = new URL(request.url);
   // Assuming url is like /api/social-card?slug=my-post or rewritten from /journal/my-post
