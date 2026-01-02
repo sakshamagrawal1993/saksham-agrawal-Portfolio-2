@@ -16,6 +16,10 @@
             "destination": "/api/sitemap"
         },
         {
+            "source": "/google(.*).html",
+            "destination": "/google$1.html"
+        },
+        {
             "source": "/((?!assets/|.*\\..*|api/).*)",
             "destination": "/index.html"
         }
