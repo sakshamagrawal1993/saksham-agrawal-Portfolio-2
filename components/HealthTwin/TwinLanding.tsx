@@ -11,6 +11,7 @@ export const TwinLanding: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [user, setUser] = useState<any>(null);
     const [activeTab, setActiveTab] = useState<'my-twins' | 'featured'>('my-twins');
+    const [featuredTwins, setFeaturedTwins] = useState<HealthTwin[]>([]);
 
     // Create Modal State
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -27,6 +28,7 @@ export const TwinLanding: React.FC = () => {
             }
             setUser(session.user);
             fetchTwins(session.user.id);
+            fetchFeaturedTwins();
         };
 
         checkUser();
@@ -46,6 +48,20 @@ export const TwinLanding: React.FC = () => {
             console.error('Error fetching twins:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchFeaturedTwins = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('health_twins')
+                .select('*')
+                .eq('featured', true)
+                .order('created_at', { ascending: false });
+            if (error) throw error;
+            setFeaturedTwins(data || []);
+        } catch (error) {
+            console.error('Error fetching featured twins:', error);
         }
     };
 
@@ -221,9 +237,38 @@ export const TwinLanding: React.FC = () => {
                             ))}
                         </div>
                     ) : (
-                        <div className="flex items-center justify-center h-48 border border-dashed border-[#D6D1C7] rounded-xl bg-white/50">
-                            <p className="font-serif italic text-[#A8A29E]">No featured twins available at the moment.</p>
-                        </div>
+                        featuredTwins.length === 0 ? (
+                            <div className="flex items-center justify-center h-48 border border-dashed border-[#D6D1C7] rounded-xl bg-white/50">
+                                <p className="font-serif italic text-[#A8A29E]">No featured twins available at the moment.</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                {featuredTwins.map((twin) => (
+                                    <div
+                                        key={twin.id}
+                                        onClick={() => handleTwinSelect(twin)}
+                                        className="group cursor-pointer bg-white rounded-xl border border-[#EBE7DE] overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col"
+                                    >
+                                        <div className="h-24 bg-gradient-to-br from-[#3b82f6] to-[#8b5cf6] p-4 flex items-start justify-between">
+                                            <div className="w-8 h-8 rounded-md bg-white/20 backdrop-blur-sm flex items-center justify-center text-white font-serif">
+                                                {twin.name.charAt(0).toUpperCase()}
+                                            </div>
+                                            <span className="text-[10px] font-bold text-white/80 uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded-full backdrop-blur-sm">Featured</span>
+                                        </div>
+                                        <div className="p-5 flex-1 flex flex-col justify-between">
+                                            <div>
+                                                <h3 className="font-serif font-bold text-lg text-[#2C2A26] mb-1 group-hover:text-[#3b82f6] transition-colors truncate">
+                                                    {twin.name}
+                                                </h3>
+                                                <p className="text-xs text-[#A8A29E] line-clamp-2">
+                                                    {twin.description || 'No description provided.'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )
                     )}
                 </div>
             </main>

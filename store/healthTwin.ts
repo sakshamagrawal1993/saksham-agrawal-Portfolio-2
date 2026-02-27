@@ -6,6 +6,7 @@ export interface HealthTwin {
   user_id: string;
   name: string;
   description?: string;
+  featured?: boolean;
 }
 
 // 2. Health Scores
