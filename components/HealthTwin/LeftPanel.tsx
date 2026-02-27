@@ -166,7 +166,8 @@ Sleep Duration,7.5,hours,2026-02-27T23:00:00Z,2026-02-28T06:30:00Z,sleep,,
 Exercise Type,0,,2026-02-27T17:00:00Z,2026-02-27T18:00:00Z,exercise,ex-group-1,Running
 Exercise Duration,45,min,2026-02-27T17:00:00Z,,exercise,ex-group-1,
 Active Calories Burnt,320,kcal,2026-02-27T06:00:00Z,2026-02-27T22:00:00Z,activity,,`;
-        const blob = new Blob([sample], { type: 'text/csv' });
+        // Add BOM for Excel compatibility
+        const blob = new Blob(['\ufeff' + sample], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url; a.download = 'wearable_data_sample.csv'; a.click();
