@@ -29,20 +29,32 @@ export const RightPanel: React.FC = () => {
                     <div className="grid grid-cols-2 gap-3 mb-8">
                         {scores.length > 0 ? (
                             scores.map(scoreItem => (
-                                <div key={scoreItem.category} className="bg-white p-3 rounded-xl border border-[#EBE7DE] shadow-sm flex flex-col justify-between">
+                                <div
+                                    key={scoreItem.category}
+                                    className={`bg-white p-3 rounded-xl border border-[#EBE7DE] shadow-sm flex flex-col justify-between ${scoreItem.category === 'Overall Health' ? 'col-span-2 bg-[#F5F2EB]/50 border-[#A84A00]/20' : ''
+                                        }`}
+                                >
                                     <span className="text-xs text-[#5D5A53] font-medium">{scoreItem.category}</span>
                                     <div className="flex items-end justify-between mt-2">
-                                        <span className="text-lg font-serif">{scoreItem.score}</span>
-                                        <span className="text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full font-bold">+2</span>
+                                        <span className={`font-serif ${scoreItem.category === 'Overall Health' ? 'text-3xl text-[#A84A00]' : 'text-lg'}`}>
+                                            {scoreItem.score}
+                                        </span>
+                                        {scoreItem.category !== 'Overall Health' && (
+                                            <span className="text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full font-bold">+2</span>
+                                        )}
                                     </div>
                                 </div>
                             ))
                         ) : (
-                            ['Energy', 'Recovery', 'Focus', 'Defense', 'Cardio', 'Vitals', 'Environment', 'Overall'].map(cat => (
-                                <div key={cat} className="bg-white p-3 rounded-xl border border-[#EBE7DE] shadow-sm flex flex-col justify-between opacity-50">
+                            ['Overall Health', 'Energy', 'Recovery', 'Focus', 'Defense', 'Cardio', 'Vitals', 'Environment'].map(cat => (
+                                <div
+                                    key={cat}
+                                    className={`bg-white p-3 rounded-xl border border-[#EBE7DE] shadow-sm flex flex-col justify-between opacity-50 ${cat === 'Overall Health' ? 'col-span-2 bg-[#F5F2EB]/50 border-[#A84A00]/20' : ''
+                                        }`}
+                                >
                                     <span className="text-xs text-[#5D5A53] font-medium">{cat}</span>
                                     <div className="flex items-end justify-between mt-2">
-                                        <span className="text-lg font-serif">--</span>
+                                        <span className={`font-serif ${cat === 'Overall Health' ? 'text-3xl text-[#A84A00]' : 'text-lg'}`}>--</span>
                                     </div>
                                 </div>
                             ))

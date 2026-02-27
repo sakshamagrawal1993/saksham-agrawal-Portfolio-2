@@ -76,7 +76,7 @@ const ChartCard: React.FC<{ children: React.ReactNode; className?: string; param
 export const EditDataModal: React.FC<{ params: HealthParameter[]; onClose: () => void }> = ({ params, onClose }) => {
     const [rows, setRows] = useState<HealthParameter[]>([...params]);
     const [saving, setSaving] = useState(false);
-    const { wearableParameters, setWearableParameters } = useHealthTwinStore();
+    const { wearableParameters, setWearableParameters, parameterDefinitions } = useHealthTwinStore();
 
     const updateRow = (idx: number, field: string, value: string) => {
         setRows(prev => prev.map((r, i) => i === idx ? { ...r, [field]: field === 'parameter_value' ? Number(value) : value } : r));
@@ -96,6 +96,7 @@ export const EditDataModal: React.FC<{ params: HealthParameter[]; onClose: () =>
         try {
             for (const row of rows) {
                 await supabase.from('health_wearable_parameters').update({
+                    parameter_name: row.parameter_name,
                     parameter_value: row.parameter_value,
                     parameter_text: row.parameter_text || null,
                     unit: row.unit,
@@ -136,7 +137,19 @@ export const EditDataModal: React.FC<{ params: HealthParameter[]; onClose: () =>
                         <tbody>
                             {rows.map((r, i) => (
                                 <tr key={r.id} className="border-b border-[#EBE7DE] hover:bg-[#F5F2EB]/50">
-                                    <td className="py-2 text-[#5D5A53] pr-2">{r.parameter_name}</td>
+                                    <td className="py-2 text-[#5D5A53] pr-2">
+                                        <input
+                                            list="edit-parameter-list"
+                                            value={r.parameter_name}
+                                            onChange={e => updateRow(i, 'parameter_name', e.target.value)}
+                                            className="w-32 bg-[#F5F2EB] border border-[#EBE7DE] rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#A84A00]"
+                                        />
+                                        <datalist id="edit-parameter-list">
+                                            {parameterDefinitions.map(def => (
+                                                <option key={def.id} value={def.name} />
+                                            ))}
+                                        </datalist>
+                                    </td>
                                     <td className="py-2 pr-2">
                                         <input
                                             type={r.parameter_text ? 'text' : 'number'}

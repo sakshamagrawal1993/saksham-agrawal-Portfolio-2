@@ -69,7 +69,9 @@ export const HealthTwinDashboard: React.FC = () => {
                     wearableData,
                     scoresData,
                     recData,
-                    sourcesData
+                    sourcesData,
+                    definitionsData,
+                    rangesData
                 ] = await Promise.all([
                     supabase.from('health_personal_details').select('*').eq('twin_id', data.id).maybeSingle(),
                     supabase.from('health_summary').select('*').eq('twin_id', data.id).maybeSingle(),
@@ -77,7 +79,9 @@ export const HealthTwinDashboard: React.FC = () => {
                     supabase.from('health_wearable_parameters').select('*').eq('twin_id', data.id).order('recorded_at', { ascending: false }),
                     supabase.from('health_scores').select('*').eq('twin_id', data.id),
                     supabase.from('health_recommendations').select('*').eq('twin_id', data.id).order('created_at', { ascending: false }),
-                    supabase.from('health_sources').select('*').eq('twin_id', data.id).order('created_at', { ascending: false })
+                    supabase.from('health_sources').select('*').eq('twin_id', data.id).order('created_at', { ascending: false }),
+                    supabase.from('health_parameter_definitions').select('*'),
+                    supabase.from('health_parameter_ranges').select('*')
                 ]);
 
                 setPersonalDetails(personalData.data || null);
@@ -87,6 +91,13 @@ export const HealthTwinDashboard: React.FC = () => {
                 setScores(scoresData.data || []);
                 setRecommendations(recData.data || []);
                 setSources(sourcesData.data || []);
+
+                // Store definitions and ranges
+                useHealthTwinStore.getState().setParameterDefinitions(definitionsData.data || []);
+                useHealthTwinStore.getState().setParameterRanges(rangesData.data || []);
+
+                // Calculate fresh 0-100 scores
+                useHealthTwinStore.getState().calculateLiveScores();
             } catch (err) {
                 console.error("Error loading twin sub-data:", err);
             }

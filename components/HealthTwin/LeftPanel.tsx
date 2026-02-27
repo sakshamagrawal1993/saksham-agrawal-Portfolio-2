@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useRef } from 'react';
-import { Plus, FileText, Activity, Watch, UploadCloud, User, X, Check, Loader2, Pencil } from 'lucide-react';
+import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
+import { Plus, FileText, Activity, Watch, UploadCloud, User, X, Check, Loader2, Pencil, ChevronDown } from 'lucide-react';
 import { useHealthTwinStore } from '../../store/healthTwin';
 import { supabase } from '../../lib/supabaseClient';
 
@@ -25,7 +25,7 @@ const PROFILE_FIELDS = [
 
 export const LeftPanel: React.FC = () => {
     const {
-        activeTwinId, sources, labParameters, wearableParameters, personalDetails,
+        activeTwinId, sources, labParameters, wearableParameters, personalDetails, parameterDefinitions,
         setSources, setLabParameters, setWearableParameters, setPersonalDetails
     } = useHealthTwinStore();
 
@@ -39,8 +39,65 @@ export const LeftPanel: React.FC = () => {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Parameter state
-    const [paramForm, setParamForm] = useState({ name: '', value: '', unit: '', recorded_at: '' });
+    const [paramForm, setParamForm] = useState({
+        name: '', value: '', unit: '', recorded_at: '', ended_at: '',
+        is_present: false, bp_sys: '', bp_dia: '',
+        sleep_duration: '', sleep_quality: '',
+        sleep_hr: '', sleep_rr: '', sleep_temp_min: '', sleep_temp_max: '',
+        sleep_snoring: '', sleep_spo2_avg: '', sleep_spo2_min: '', sleep_low_oxygen: '',
+        exercise_type: '', exercise_duration: '',
+        hr_z1: '', hr_z2: '', hr_z3: '', hr_z4: '', hr_z5: '',
+        meal_type: '', meal_fat: '', meal_carb: '', meal_protein: '', meal_energy: ''
+    });
     const [paramSaving, setParamSaving] = useState(false);
+    const [dropdownOpen, setDropdownOpen] = useState(false);
+    const [dropdownSearch, setDropdownSearch] = useState('');
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+                setDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const allParameterOptions = useMemo(() => {
+        const arr = [
+            { id: 'group_bp', name: 'Blood Pressure', isGroup: true, desc: 'Systolic & Diastolic', category: 'vitals' },
+            { id: 'group_exercise', name: 'Exercise Session', isGroup: true, desc: 'Type, Duration & HR Zones', category: 'exercise' },
+            { id: 'group_sleep', name: 'Sleep Session', isGroup: true, desc: 'Detailed Sleep Stage & Metrics', category: 'sleep' },
+            { id: 'group_meal', name: 'Meal Session', isGroup: true, desc: 'Macros & Energy', category: 'nutrition' },
+        ];
+        parameterDefinitions.forEach(def => {
+            if (!arr.some(a => a.id === def.name)) {
+
+                // Identify symptoms for binary boolean UI
+                const isSymptom = def.category === 'symptoms' || def.name.includes('Indicator') || def.name.includes('- Presence') || [
+                    'Abdominal Pain', 'Acne', 'Appetite Loss', 'Back Pain', 'Bloating', 'Body Ache',
+                    'Breast Pain', 'Chills', 'Constipation', 'Cough', 'Craving', 'Diarrhea', 'Dizziness',
+                    'Dry Skin', 'Fatigue', 'Fever', 'Headache', 'Heartburn', 'Hot Flashes', 'Insomnia',
+                    'Mood Changes', 'Muscle Pain', 'Nausea', 'Night Sweats', 'Numbness', 'Pelvic Pain',
+                    'Skin Rash', 'Sore Throat', 'Vomiting', 'Wheezing', 'Vaginal Dryness', 'Cervical Mucus'
+                ].includes(def.name);
+
+                arr.push({
+                    id: def.name,
+                    name: def.name,
+                    isGroup: false,
+                    category: isSymptom ? 'symptoms' : def.category || '',
+                    desc: isSymptom ? 'Preset Indicator' : def.unit
+                });
+            }
+        });
+        return arr;
+    }, [parameterDefinitions]);
+
+    const filteredParameterOptions = useMemo(() => {
+        return allParameterOptions.filter(o => o.name.toLowerCase().includes(dropdownSearch.toLowerCase()) || o.category.toLowerCase().includes(dropdownSearch.toLowerCase()));
+    }, [allParameterOptions, dropdownSearch]);
 
     // Wearable CSV state
     const [wearableCsvFile, setWearableCsvFile] = useState<File | null>(null);
@@ -159,20 +216,82 @@ export const LeftPanel: React.FC = () => {
 
     // ---------- PARAMETER ----------
     const handleAddParameter = async () => {
-        if (!paramForm.name || !paramForm.value || !activeTwinId) return;
+        if (!paramForm.name || !activeTwinId) return;
         setParamSaving(true);
         try {
-            const { data, error } = await supabase.from('health_lab_parameters').insert({
-                twin_id: activeTwinId,
-                parameter_name: paramForm.name,
-                parameter_value: parseFloat(paramForm.value),
-                unit: paramForm.unit,
-                recorded_at: paramForm.recorded_at || new Date().toISOString()
-            }).select().single();
+            const selectedOpt = allParameterOptions.find(o => o.id === paramForm.name);
+            const rawCategory = selectedOpt?.category || '';
+            const normalizedCategory = rawCategory.toLowerCase().replace('wearable - ', '').trim();
+            const isWearableCategory = selectedOpt?.isGroup || ['vitals', 'activity', 'sleep', 'exercise', 'nutrition', 'recovery', 'symptoms', 'reproductive'].includes(normalizedCategory);
+
+            const rowsToInsert = [];
+            let targetTable = isWearableCategory ? 'health_wearable_parameters' : 'health_lab_parameters';
+
+            // GENERATE UUID for group_id if needed
+            const groupId = crypto.randomUUID();
+
+            if (paramForm.name === 'group_bp') {
+                rowsToInsert.push({ twin_id: activeTwinId, parameter_name: 'Blood Pressure Systolic', parameter_value: parseFloat(paramForm.bp_sys), unit: 'mmHg', recorded_at: paramForm.recorded_at || new Date().toISOString(), category: 'vitals', group_id: groupId });
+                rowsToInsert.push({ twin_id: activeTwinId, parameter_name: 'Blood Pressure Diastolic', parameter_value: parseFloat(paramForm.bp_dia), unit: 'mmHg', recorded_at: paramForm.recorded_at || new Date().toISOString(), category: 'vitals', group_id: groupId });
+            } else if (paramForm.name === 'group_exercise') {
+                rowsToInsert.push({ twin_id: activeTwinId, parameter_name: 'Exercise Type', parameter_text: paramForm.exercise_type, parameter_value: 0, recorded_at: paramForm.recorded_at || new Date().toISOString(), ended_at: paramForm.ended_at || null, category: 'exercise', group_id: groupId });
+                rowsToInsert.push({ twin_id: activeTwinId, parameter_name: 'Exercise Duration', parameter_value: parseFloat(paramForm.exercise_duration), unit: 'min', recorded_at: paramForm.recorded_at || new Date().toISOString(), category: 'exercise', group_id: groupId });
+                if (paramForm.hr_z1) rowsToInsert.push({ twin_id: activeTwinId, parameter_name: 'Exercise % Time in HR Zone 1', parameter_value: parseFloat(paramForm.hr_z1), recorded_at: paramForm.recorded_at || new Date().toISOString(), category: 'exercise', group_id: groupId });
+                if (paramForm.hr_z2) rowsToInsert.push({ twin_id: activeTwinId, parameter_name: 'Exercise % Time in HR Zone 2', parameter_value: parseFloat(paramForm.hr_z2), recorded_at: paramForm.recorded_at || new Date().toISOString(), category: 'exercise', group_id: groupId });
+                if (paramForm.hr_z3) rowsToInsert.push({ twin_id: activeTwinId, parameter_name: 'Exercise % Time in HR Zone 3', parameter_value: parseFloat(paramForm.hr_z3), recorded_at: paramForm.recorded_at || new Date().toISOString(), category: 'exercise', group_id: groupId });
+                if (paramForm.hr_z4) rowsToInsert.push({ twin_id: activeTwinId, parameter_name: 'Exercise % Time in HR Zone 4', parameter_value: parseFloat(paramForm.hr_z4), recorded_at: paramForm.recorded_at || new Date().toISOString(), category: 'exercise', group_id: groupId });
+                if (paramForm.hr_z5) rowsToInsert.push({ twin_id: activeTwinId, parameter_name: 'Exercise % Time in HR Zone 5', parameter_value: parseFloat(paramForm.hr_z5), recorded_at: paramForm.recorded_at || new Date().toISOString(), category: 'exercise', group_id: groupId });
+            } else if (paramForm.name === 'group_sleep') {
+                rowsToInsert.push({ twin_id: activeTwinId, parameter_name: 'Sleep Duration', parameter_value: parseFloat(paramForm.sleep_duration), unit: 'hours', recorded_at: paramForm.recorded_at || new Date().toISOString(), ended_at: paramForm.ended_at || null, category: 'sleep', group_id: groupId });
+                if (paramForm.sleep_quality) rowsToInsert.push({ twin_id: activeTwinId, parameter_name: 'Sleep Quality', parameter_value: parseFloat(paramForm.sleep_quality), unit: '%', recorded_at: paramForm.recorded_at || new Date().toISOString(), category: 'sleep', group_id: groupId });
+                if (paramForm.sleep_hr) rowsToInsert.push({ twin_id: activeTwinId, parameter_name: 'Sleep Average Heart Rate', parameter_value: parseFloat(paramForm.sleep_hr), unit: 'bpm', recorded_at: paramForm.recorded_at || new Date().toISOString(), category: 'sleep', group_id: groupId });
+                if (paramForm.sleep_rr) rowsToInsert.push({ twin_id: activeTwinId, parameter_name: 'Sleep Average Respiratory Rate', parameter_value: parseFloat(paramForm.sleep_rr), unit: 'breaths/min', recorded_at: paramForm.recorded_at || new Date().toISOString(), category: 'sleep', group_id: groupId });
+                if (paramForm.sleep_temp_min) rowsToInsert.push({ twin_id: activeTwinId, parameter_name: 'Sleep Skin Temperature Min', parameter_value: parseFloat(paramForm.sleep_temp_min), unit: '°C', recorded_at: paramForm.recorded_at || new Date().toISOString(), category: 'sleep', group_id: groupId });
+                if (paramForm.sleep_temp_max) rowsToInsert.push({ twin_id: activeTwinId, parameter_name: 'Sleep Skin Temperature Max', parameter_value: parseFloat(paramForm.sleep_temp_max), unit: '°C', recorded_at: paramForm.recorded_at || new Date().toISOString(), category: 'sleep', group_id: groupId });
+                if (paramForm.sleep_snoring) rowsToInsert.push({ twin_id: activeTwinId, parameter_name: 'Sleep Total Snoring Time', parameter_value: parseFloat(paramForm.sleep_snoring), unit: 'min', recorded_at: paramForm.recorded_at || new Date().toISOString(), category: 'sleep', group_id: groupId });
+                if (paramForm.sleep_spo2_avg) rowsToInsert.push({ twin_id: activeTwinId, parameter_name: 'Sleep Average SPO2', parameter_value: parseFloat(paramForm.sleep_spo2_avg), unit: '%', recorded_at: paramForm.recorded_at || new Date().toISOString(), category: 'sleep', group_id: groupId });
+                if (paramForm.sleep_spo2_min) rowsToInsert.push({ twin_id: activeTwinId, parameter_name: 'Sleep Min SPO2', parameter_value: parseFloat(paramForm.sleep_spo2_min), unit: '%', recorded_at: paramForm.recorded_at || new Date().toISOString(), category: 'sleep', group_id: groupId });
+                if (paramForm.sleep_low_oxygen) rowsToInsert.push({ twin_id: activeTwinId, parameter_name: 'Sleep Minutes Low Oxygen', parameter_value: parseFloat(paramForm.sleep_low_oxygen), unit: 'min', recorded_at: paramForm.recorded_at || new Date().toISOString(), category: 'sleep', group_id: groupId });
+            } else if (paramForm.name === 'group_meal') {
+                rowsToInsert.push({ twin_id: activeTwinId, parameter_name: 'Meal Type', parameter_text: paramForm.meal_type, parameter_value: 0, recorded_at: paramForm.recorded_at || new Date().toISOString(), category: 'nutrition', group_id: groupId });
+                if (paramForm.meal_fat) rowsToInsert.push({ twin_id: activeTwinId, parameter_name: 'Total Fat', parameter_value: parseFloat(paramForm.meal_fat), unit: 'g', recorded_at: paramForm.recorded_at || new Date().toISOString(), category: 'nutrition', group_id: groupId });
+                if (paramForm.meal_carb) rowsToInsert.push({ twin_id: activeTwinId, parameter_name: 'Total Carbohydrate', parameter_value: parseFloat(paramForm.meal_carb), unit: 'g', recorded_at: paramForm.recorded_at || new Date().toISOString(), category: 'nutrition', group_id: groupId });
+                if (paramForm.meal_protein) rowsToInsert.push({ twin_id: activeTwinId, parameter_name: 'Total Protein', parameter_value: parseFloat(paramForm.meal_protein), unit: 'g', recorded_at: paramForm.recorded_at || new Date().toISOString(), category: 'nutrition', group_id: groupId });
+                if (paramForm.meal_energy) rowsToInsert.push({ twin_id: activeTwinId, parameter_name: 'Total Energy', parameter_value: parseFloat(paramForm.meal_energy), unit: 'kcal', recorded_at: paramForm.recorded_at || new Date().toISOString(), category: 'nutrition', group_id: groupId });
+            } else {
+                let val = parseFloat(paramForm.value);
+                if (selectedOpt?.category === 'symptoms') val = paramForm.is_present ? 1 : 0;
+
+                rowsToInsert.push({
+                    twin_id: activeTwinId,
+                    parameter_name: paramForm.name,
+                    parameter_value: val,
+                    unit: paramForm.unit || '',
+                    recorded_at: paramForm.recorded_at || new Date().toISOString(),
+                    ended_at: paramForm.ended_at || null,
+                    category: isWearableCategory ? normalizedCategory : null
+                });
+            }
+
+            const { data, error } = await supabase.from(targetTable).insert(rowsToInsert).select();
             if (error) throw error;
 
-            setLabParameters([data, ...labParameters]);
-            setParamForm({ name: '', value: '', unit: '', recorded_at: '' });
+            if (isWearableCategory) {
+                setWearableParameters([...data, ...wearableParameters]);
+            } else {
+                setLabParameters([...data, ...labParameters]);
+            }
+
+            setParamForm({
+                name: '', value: '', unit: '', recorded_at: '', ended_at: '',
+                is_present: false, bp_sys: '', bp_dia: '',
+                sleep_duration: '', sleep_quality: '',
+                sleep_hr: '', sleep_rr: '', sleep_temp_min: '', sleep_temp_max: '',
+                sleep_snoring: '', sleep_spo2_avg: '', sleep_spo2_min: '', sleep_low_oxygen: '',
+                exercise_type: '', exercise_duration: '',
+                hr_z1: '', hr_z2: '', hr_z3: '', hr_z4: '', hr_z5: '',
+                meal_type: '', meal_fat: '', meal_carb: '', meal_protein: '', meal_energy: ''
+            });
             setModalOpen(false);
         } catch (err) { console.error('Error adding parameter:', err); }
         finally { setParamSaving(false); }
@@ -606,36 +725,250 @@ Active Calories Burnt,320,kcal,2026-02-27T06:00:00Z,2026-02-27T22:00:00Z,activit
                                 </div>
                             )}
 
-                            {/* ---- TAB: INDIVIDUAL PARAMETER ---- */}
-                            {activeSourceTab === 'parameter' && (
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="block text-xs font-bold uppercase tracking-widest text-[#5D5A53] mb-2">Parameter Name *</label>
-                                        <input value={paramForm.name} onChange={e => setParamForm({ ...paramForm, name: e.target.value })} placeholder="e.g. HDL Cholesterol, Heart Rate" className="w-full bg-[#F5F2EB] border border-[#EBE7DE] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#A84A00]" />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
+                            {/* ---- TAB: INDIVIDUAL PARAMETER / MANUAL ENTRY ---- */}
+                            {activeSourceTab === 'parameter' && (() => {
+                                const selectedEntity = allParameterOptions.find(o => o.id === paramForm.name);
+                                const isSymptom = selectedEntity?.category === 'symptoms' && !selectedEntity.isGroup;
+                                const isStandardMetric = selectedEntity && !selectedEntity.isGroup && !isSymptom;
+
+                                return (
+                                    <div className="space-y-4">
                                         <div>
-                                            <label className="block text-xs font-bold uppercase tracking-widest text-[#5D5A53] mb-2">Value *</label>
-                                            <input type="number" value={paramForm.value} onChange={e => setParamForm({ ...paramForm, value: e.target.value })} placeholder="e.g. 72" className="w-full bg-[#F5F2EB] border border-[#EBE7DE] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#A84A00]" />
+                                            <label className="block text-xs font-bold uppercase tracking-widest text-[#5D5A53] mb-2">Metric Type *</label>
+                                            <div className="relative" ref={dropdownRef}>
+                                                <div
+                                                    className="w-full bg-[#F5F2EB] border border-[#EBE7DE] rounded-xl px-4 py-3 text-sm flex justify-between items-center cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#A84A00]"
+                                                    onClick={() => setDropdownOpen(!dropdownOpen)}
+                                                >
+                                                    <span className={paramForm.name ? "text-[#2C2A26] font-medium" : "text-[#A8A29E]"}>
+                                                        {paramForm.name ? (selectedEntity?.name || paramForm.name) : 'Select metric...'}
+                                                    </span>
+                                                    <ChevronDown size={16} className="text-[#A8A29E]" />
+                                                </div>
+                                                {dropdownOpen && (
+                                                    <div className="absolute z-50 w-full mt-2 bg-white border border-[#EBE7DE] rounded-xl shadow-xl max-h-64 flex flex-col overflow-hidden">
+                                                        <div className="p-2 border-b border-[#EBE7DE]">
+                                                            <input
+                                                                autoFocus
+                                                                type="text"
+                                                                placeholder="Search metrics..."
+                                                                value={dropdownSearch}
+                                                                onChange={e => setDropdownSearch(e.target.value)}
+                                                                className="w-full bg-[#FAF9F6] border border-[#EBE7DE] rounded-lg px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-[#A84A00]"
+                                                            />
+                                                        </div>
+                                                        <div className="overflow-y-auto p-1">
+                                                            {filteredParameterOptions.length === 0 ? (
+                                                                <div className="p-3 text-center text-sm text-[#A8A29E]">No matches found</div>
+                                                            ) : filteredParameterOptions.map(opt => (
+                                                                <div
+                                                                    key={opt.id}
+                                                                    onClick={() => {
+                                                                        setParamForm(prev => ({
+                                                                            ...prev,
+                                                                            name: opt.id,
+                                                                            unit: opt.isGroup ? '' : (parameterDefinitions.find(d => d.name === opt.id)?.unit || '')
+                                                                        }));
+                                                                        setDropdownOpen(false);
+                                                                        setDropdownSearch('');
+                                                                    }}
+                                                                    className={`p-2.5 mx-1 my-0.5 rounded-lg flex items-center justify-between cursor-pointer hover:bg-[#F5F2EB] ${paramForm.name === opt.id ? 'bg-[#A84A00]/5 text-[#A84A00] font-medium' : 'text-[#2C2A26]'}`}
+                                                                >
+                                                                    <div className="flex flex-col">
+                                                                        <span className="text-sm">{opt.name}</span>
+                                                                        {(opt.desc || opt.category) && <span className="text-[10px] text-[#A8A29E] uppercase tracking-wider">{opt.desc} {opt.category && !opt.isGroup ? `• ${opt.category}` : ''}</span>}
+                                                                    </div>
+                                                                    {opt.isGroup && <span className="text-[10px] font-bold bg-[#F5F2EB] text-[#A8A29E] px-2 py-0.5 rounded-md">GROUP</span>}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
-                                        <div>
-                                            <label className="block text-xs font-bold uppercase tracking-widest text-[#5D5A53] mb-2">Unit</label>
-                                            <input value={paramForm.unit} onChange={e => setParamForm({ ...paramForm, unit: e.target.value })} placeholder="e.g. mg/dL, bpm" className="w-full bg-[#F5F2EB] border border-[#EBE7DE] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#A84A00]" />
-                                        </div>
+
+                                        {/* CONDITIONAL FORMS */}
+                                        {/* BLOOD PRESSURE */}
+                                        {paramForm.name === 'group_bp' && (
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-xs font-bold uppercase tracking-widest text-[#5D5A53] mb-2">Systolic (mmHg) *</label>
+                                                    <input type="number" value={paramForm.bp_sys} onChange={e => setParamForm({ ...paramForm, bp_sys: e.target.value })} placeholder="e.g. 120" className="w-full bg-[#F5F2EB] border border-[#EBE7DE] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#A84A00]" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold uppercase tracking-widest text-[#5D5A53] mb-2">Diastolic (mmHg) *</label>
+                                                    <input type="number" value={paramForm.bp_dia} onChange={e => setParamForm({ ...paramForm, bp_dia: e.target.value })} placeholder="e.g. 80" className="w-full bg-[#F5F2EB] border border-[#EBE7DE] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#A84A00]" />
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* EXERCISE */}
+                                        {paramForm.name === 'group_exercise' && (
+                                            <>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="block text-xs font-bold uppercase tracking-widest text-[#5D5A53] mb-2">Exercise Type *</label>
+                                                        <input type="text" value={paramForm.exercise_type} onChange={e => setParamForm({ ...paramForm, exercise_type: e.target.value })} placeholder="e.g. Running" className="w-full bg-[#F5F2EB] border border-[#EBE7DE] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#A84A00]" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-bold uppercase tracking-widest text-[#5D5A53] mb-2">Duration (min) *</label>
+                                                        <input type="number" value={paramForm.exercise_duration} onChange={e => setParamForm({ ...paramForm, exercise_duration: e.target.value })} placeholder="e.g. 45" className="w-full bg-[#F5F2EB] border border-[#EBE7DE] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#A84A00]" />
+                                                    </div>
+                                                </div>
+                                                <div className="bg-[#F5F2EB] p-4 rounded-xl border border-[#EBE7DE]">
+                                                    <label className="block text-xs font-bold uppercase tracking-widest text-[#5D5A53] mb-3">Heart Rate Zones (% of time)</label>
+                                                    <div className="grid grid-cols-5 gap-2">
+                                                        <div className="flex flex-col gap-1 items-center"><span className="text-[10px] text-[#A8A29E] font-bold">Z1</span><input type="number" value={paramForm.hr_z1} onChange={e => setParamForm({ ...paramForm, hr_z1: e.target.value })} className="w-full bg-white border border-[#EBE7DE] rounded-lg px-2 py-2 text-center text-xs focus:ring-[#A84A00]" /></div>
+                                                        <div className="flex flex-col gap-1 items-center"><span className="text-[10px] text-[#A8A29E] font-bold">Z2</span><input type="number" value={paramForm.hr_z2} onChange={e => setParamForm({ ...paramForm, hr_z2: e.target.value })} className="w-full bg-white border border-[#EBE7DE] rounded-lg px-2 py-2 text-center text-xs focus:ring-[#A84A00]" /></div>
+                                                        <div className="flex flex-col gap-1 items-center"><span className="text-[10px] text-[#A8A29E] font-bold">Z3</span><input type="number" value={paramForm.hr_z3} onChange={e => setParamForm({ ...paramForm, hr_z3: e.target.value })} className="w-full bg-white border border-[#EBE7DE] rounded-lg px-2 py-2 text-center text-xs focus:ring-[#A84A00]" /></div>
+                                                        <div className="flex flex-col gap-1 items-center"><span className="text-[10px] text-[#A8A29E] font-bold">Z4</span><input type="number" value={paramForm.hr_z4} onChange={e => setParamForm({ ...paramForm, hr_z4: e.target.value })} className="w-full bg-white border border-[#EBE7DE] rounded-lg px-2 py-2 text-center text-xs focus:ring-[#A84A00]" /></div>
+                                                        <div className="flex flex-col gap-1 items-center"><span className="text-[10px] text-[#A8A29E] font-bold">Z5</span><input type="number" value={paramForm.hr_z5} onChange={e => setParamForm({ ...paramForm, hr_z5: e.target.value })} className="w-full bg-white border border-[#EBE7DE] rounded-lg px-2 py-2 text-center text-xs focus:ring-[#A84A00]" /></div>
+                                                    </div>
+                                                </div>
+                                            </>
+                                        )}
+
+                                        {/* SLEEP */}
+                                        {paramForm.name === 'group_sleep' && (
+                                            <div className="flex flex-col gap-4">
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div>
+                                                        <label className="block text-[10px] font-bold uppercase tracking-widest text-[#5D5A53] mb-1 truncate">Duration (h) *</label>
+                                                        <input type="number" value={paramForm.sleep_duration} onChange={e => setParamForm({ ...paramForm, sleep_duration: e.target.value })} placeholder="7.5" className="w-full bg-[#F5F2EB] border border-[#EBE7DE] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#A84A00]" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[10px] font-bold uppercase tracking-widest text-[#5D5A53] mb-1 truncate">Quality %</label>
+                                                        <input type="number" value={paramForm.sleep_quality} onChange={e => setParamForm({ ...paramForm, sleep_quality: e.target.value })} placeholder="85" className="w-full bg-[#F5F2EB] border border-[#EBE7DE] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#A84A00]" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[10px] font-bold uppercase tracking-widest text-[#5D5A53] mb-1 truncate">Avg HR (bpm)</label>
+                                                        <input type="number" value={paramForm.sleep_hr} onChange={e => setParamForm({ ...paramForm, sleep_hr: e.target.value })} placeholder="60" className="w-full bg-[#F5F2EB] border border-[#EBE7DE] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#A84A00]" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[10px] font-bold uppercase tracking-widest text-[#5D5A53] mb-1 truncate">Resp Rate</label>
+                                                        <input type="number" value={paramForm.sleep_rr} onChange={e => setParamForm({ ...paramForm, sleep_rr: e.target.value })} placeholder="14" className="w-full bg-[#F5F2EB] border border-[#EBE7DE] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#A84A00]" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[10px] font-bold uppercase tracking-widest text-[#5D5A53] mb-1 truncate">SpO2 Avg %</label>
+                                                        <input type="number" value={paramForm.sleep_spo2_avg} onChange={e => setParamForm({ ...paramForm, sleep_spo2_avg: e.target.value })} placeholder="96" className="w-full bg-[#F5F2EB] border border-[#EBE7DE] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#A84A00]" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[10px] font-bold uppercase tracking-widest text-[#5D5A53] mb-1 truncate">SpO2 Min %</label>
+                                                        <input type="number" value={paramForm.sleep_spo2_min} onChange={e => setParamForm({ ...paramForm, sleep_spo2_min: e.target.value })} placeholder="92" className="w-full bg-[#F5F2EB] border border-[#EBE7DE] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#A84A00]" />
+                                                    </div>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-3 pb-2 mb-2 border-b border-[#EBE7DE]/50">
+                                                    <div>
+                                                        <label className="block text-[10px] font-bold uppercase tracking-widest text-[#5D5A53] mb-1 truncate">Temp Min (°C)</label>
+                                                        <input type="number" value={paramForm.sleep_temp_min} onChange={e => setParamForm({ ...paramForm, sleep_temp_min: e.target.value })} placeholder="35.5" className="w-full bg-[#F5F2EB] border border-[#EBE7DE] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#A84A00]" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[10px] font-bold uppercase tracking-widest text-[#5D5A53] mb-1 truncate">Temp Max (°C)</label>
+                                                        <input type="number" value={paramForm.sleep_temp_max} onChange={e => setParamForm({ ...paramForm, sleep_temp_max: e.target.value })} placeholder="37.2" className="w-full bg-[#F5F2EB] border border-[#EBE7DE] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#A84A00]" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[10px] font-bold uppercase tracking-widest text-[#5D5A53] mb-1 truncate">Snoring (min)</label>
+                                                        <input type="number" value={paramForm.sleep_snoring} onChange={e => setParamForm({ ...paramForm, sleep_snoring: e.target.value })} placeholder="0" className="w-full bg-[#F5F2EB] border border-[#EBE7DE] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#A84A00]" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[10px] font-bold uppercase tracking-widest text-[#5D5A53] mb-1 truncate">Low O2 (min)</label>
+                                                        <input type="number" value={paramForm.sleep_low_oxygen} onChange={e => setParamForm({ ...paramForm, sleep_low_oxygen: e.target.value })} placeholder="0" className="w-full bg-[#F5F2EB] border border-[#EBE7DE] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#A84A00]" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* MEAL */}
+                                        {paramForm.name === 'group_meal' && (
+                                            <div className="flex flex-col gap-4">
+                                                <div>
+                                                    <label className="block text-[10px] font-bold uppercase tracking-widest text-[#5D5A53] mb-2">Meal Type *</label>
+                                                    <select value={paramForm.meal_type} onChange={e => setParamForm({ ...paramForm, meal_type: e.target.value })} className="w-full bg-[#F5F2EB] border border-[#EBE7DE] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#A84A00] appearance-none cursor-pointer">
+                                                        <option value="" disabled>Select a meal type...</option>
+                                                        <option value="Breakfast">Breakfast</option>
+                                                        <option value="Lunch">Lunch</option>
+                                                        <option value="Dinner">Dinner</option>
+                                                        <option value="Snack">Snack</option>
+                                                    </select>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div>
+                                                        <label className="block text-[10px] font-bold uppercase tracking-widest text-[#5D5A53] mb-1 truncate">Energy (kcal)</label>
+                                                        <input type="number" value={paramForm.meal_energy} onChange={e => setParamForm({ ...paramForm, meal_energy: e.target.value })} placeholder="600" className="w-full bg-[#F5F2EB] border border-[#EBE7DE] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#A84A00]" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[10px] font-bold uppercase tracking-widest text-[#5D5A53] mb-1 truncate">Protein (g)</label>
+                                                        <input type="number" value={paramForm.meal_protein} onChange={e => setParamForm({ ...paramForm, meal_protein: e.target.value })} placeholder="40" className="w-full bg-[#F5F2EB] border border-[#EBE7DE] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#A84A00]" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[10px] font-bold uppercase tracking-widest text-[#5D5A53] mb-1 truncate">Carbs (g)</label>
+                                                        <input type="number" value={paramForm.meal_carb} onChange={e => setParamForm({ ...paramForm, meal_carb: e.target.value })} placeholder="60" className="w-full bg-[#F5F2EB] border border-[#EBE7DE] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#A84A00]" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[10px] font-bold uppercase tracking-widest text-[#5D5A53] mb-1 truncate">Fat (g)</label>
+                                                        <input type="number" value={paramForm.meal_fat} onChange={e => setParamForm({ ...paramForm, meal_fat: e.target.value })} placeholder="20" className="w-full bg-[#F5F2EB] border border-[#EBE7DE] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#A84A00]" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* SINGLE SYMPTOM */}
+                                        {isSymptom && (
+                                            <div>
+                                                <label className="flex items-center gap-4 cursor-pointer p-4 border border-[#EBE7DE] rounded-xl bg-white hover:border-[#A84A00]/50 transition-colors">
+                                                    <div className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors shrink-0 ${paramForm.is_present ? 'bg-[#A84A00] border-[#A84A00]' : 'border-[#A8A29E]'}`}>
+                                                        {paramForm.is_present && <Check size={16} className="text-white" />}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-[#2C2A26]">Symptom Present</p>
+                                                        <p className="text-xs text-[#A8A29E]">Check this if you are experiencing this symptom.</p>
+                                                    </div>
+                                                    <input type="checkbox" className="hidden" checked={paramForm.is_present} onChange={e => setParamForm({ ...paramForm, is_present: e.target.checked })} />
+                                                </label>
+                                            </div>
+                                        )}
+
+                                        {/* SINGLE STANDARD METRIC */}
+                                        {isStandardMetric && (
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-xs font-bold uppercase tracking-widest text-[#5D5A53] mb-2">Value *</label>
+                                                    <input type="number" value={paramForm.value} onChange={e => setParamForm({ ...paramForm, value: e.target.value })} placeholder="e.g. 72" className="w-full bg-[#F5F2EB] border border-[#EBE7DE] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#A84A00]" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold uppercase tracking-widest text-[#5D5A53] mb-2">Unit</label>
+                                                    <input value={paramForm.unit} onChange={e => setParamForm({ ...paramForm, unit: e.target.value })} placeholder="e.g. mg/dL, bpm" className="w-full bg-[#F5F2EB] border border-[#EBE7DE] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#A84A00]" />
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* TIMESTAMPS */}
+                                        {selectedEntity && (
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-xs font-bold uppercase tracking-widest text-[#5D5A53] mb-2">Recorded At *</label>
+                                                    <input type="datetime-local" value={paramForm.recorded_at} onChange={e => setParamForm({ ...paramForm, recorded_at: e.target.value })} className="w-full bg-[#F5F2EB] border border-[#EBE7DE] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#A84A00]" />
+                                                </div>
+
+                                                {(paramForm.name === 'group_exercise' || paramForm.name === 'group_sleep' || ['Step Count', 'Active Minutes'].includes(paramForm.name)) && (
+                                                    <div>
+                                                        <label className="block text-xs font-bold uppercase tracking-widest text-[#5D5A53] mb-2">Ended At</label>
+                                                        <input type="datetime-local" value={paramForm.ended_at} onChange={e => setParamForm({ ...paramForm, ended_at: e.target.value })} className="w-full bg-[#F5F2EB] border border-[#EBE7DE] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#A84A00]" />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        <button
+                                            onClick={handleAddParameter}
+                                            disabled={!paramForm.name || paramSaving}
+                                            className="w-full py-3 bg-[#A84A00] hover:bg-[#8A3D00] text-white rounded-xl font-medium text-sm disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            {paramSaving ? <><Loader2 size={16} className="animate-spin" /> Saving...</> : <><Check size={16} /> Save Reading</>}
+                                        </button>
                                     </div>
-                                    <div>
-                                        <label className="block text-xs font-bold uppercase tracking-widest text-[#5D5A53] mb-2">Recorded At</label>
-                                        <input type="datetime-local" value={paramForm.recorded_at} onChange={e => setParamForm({ ...paramForm, recorded_at: e.target.value })} className="w-full bg-[#F5F2EB] border border-[#EBE7DE] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#A84A00]" />
-                                    </div>
-                                    <button
-                                        onClick={handleAddParameter}
-                                        disabled={!paramForm.name || !paramForm.value || paramSaving}
-                                        className="w-full py-3 bg-[#A84A00] hover:bg-[#8A3D00] text-white rounded-xl font-medium text-sm disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-                                    >
-                                        {paramSaving ? <><Loader2 size={16} className="animate-spin" /> Saving...</> : <><Check size={16} /> Save Reading</>}
-                                    </button>
-                                </div>
-                            )}
+                                );
+                            })()}
 
                             {/* ---- TAB: FILL PROFILE ---- */}
                             {activeSourceTab === 'profile' && (

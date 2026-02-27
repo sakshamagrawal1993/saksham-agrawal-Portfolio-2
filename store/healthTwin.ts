@@ -74,6 +74,29 @@ export interface ChatMessage {
   timestamp: Date;
 }
 
+// 7. Parameter Definitions & Ranges
+export interface HealthParameterDefinition {
+  id: string;
+  name: string;
+  category: string;
+  unit: string;
+  axis_impact_weights: Record<string, number>;
+}
+
+export interface HealthParameterRange {
+  id: string;
+  parameter_id: string;
+  gender: string;
+  min_age: number;
+  max_age: number;
+  critical_min: number | null;
+  normal_min: number | null;
+  optimal_min: number | null;
+  optimal_max: number | null;
+  normal_max: number | null;
+  critical_max: number | null;
+}
+
 interface HealthTwinState {
   // Profiles
   twins: HealthTwin[];
@@ -89,6 +112,8 @@ interface HealthTwinState {
   sources: HealthSource[];
   labParameters: HealthParameter[];
   wearableParameters: HealthParameter[];
+  parameterDefinitions: HealthParameterDefinition[];
+  parameterRanges: HealthParameterRange[];
   
   setPersonalDetails: (data: HealthPersonalDetails | null) => void;
   setSummary: (data: HealthSummary | null) => void;
@@ -97,6 +122,8 @@ interface HealthTwinState {
   setSources: (data: HealthSource[]) => void;
   setLabParameters: (data: HealthParameter[]) => void;
   setWearableParameters: (data: HealthParameter[]) => void;
+  setParameterDefinitions: (data: HealthParameterDefinition[]) => void;
+  setParameterRanges: (data: HealthParameterRange[]) => void;
 
   // UI State
   activeTab: 'chat' | 'graphs';
@@ -106,9 +133,14 @@ interface HealthTwinState {
   chatHistory: ChatMessage[];
   addChatMessage: (msg: ChatMessage) => void;
   clearChat: () => void;
+
+  // Actions
+  calculateLiveScores: () => void;
 }
 
-export const useHealthTwinStore = create<HealthTwinState>((set) => ({
+import { calculateAxesScores } from '../utils/scoreCalculator';
+
+export const useHealthTwinStore = create<HealthTwinState>((set, get) => ({
   twins: [],
   activeTwinId: null,
   setTwins: (twins) => set({ twins }),
@@ -121,6 +153,8 @@ export const useHealthTwinStore = create<HealthTwinState>((set) => ({
   sources: [],
   labParameters: [],
   wearableParameters: [],
+  parameterDefinitions: [],
+  parameterRanges: [],
 
   setPersonalDetails: (personalDetails) => set({ personalDetails }),
   setSummary: (summary) => set({ summary }),
@@ -129,6 +163,8 @@ export const useHealthTwinStore = create<HealthTwinState>((set) => ({
   setSources: (sources) => set({ sources }),
   setLabParameters: (labParameters) => set({ labParameters }),
   setWearableParameters: (wearableParameters) => set({ wearableParameters }),
+  setParameterDefinitions: (parameterDefinitions) => set({ parameterDefinitions }),
+  setParameterRanges: (parameterRanges) => set({ parameterRanges }),
 
   activeTab: 'graphs',
   setActiveTab: (activeTab) => set({ activeTab }),
@@ -136,4 +172,19 @@ export const useHealthTwinStore = create<HealthTwinState>((set) => ({
   chatHistory: [],
   addChatMessage: (msg) => set((state) => ({ chatHistory: [...state.chatHistory, msg] })),
   clearChat: () => set({ chatHistory: [] }),
+
+  calculateLiveScores: () => {
+    const { labParameters, wearableParameters, parameterDefinitions, parameterRanges, personalDetails } = get();
+    if (parameterDefinitions.length === 0 || parameterRanges.length === 0) return;
+
+    const allParams = [...labParameters, ...wearableParameters];
+    const computedScores = calculateAxesScores(
+      allParams,
+      parameterDefinitions,
+      parameterRanges,
+      personalDetails
+    );
+
+    set({ scores: computedScores });
+  }
 }));

@@ -4,8 +4,11 @@ import { OrbitControls, ContactShadows, Environment } from '@react-three/drei';
 import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 
-// FBX model URL from Supabase storage
-const MODEL_URL = "https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/Digital%20Twin/male%20body.fbx";
+import { useHealthTwinStore } from '../../store/healthTwin';
+
+// FBX model URLs from Supabase storage
+const MALE_MODEL_URL = "https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/Digital%20Twin/male%20body.fbx";
+const FEMALE_MODEL_URL = "https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/Digital%20Twin/Female%20body.fbx";
 
 // Brownish wireframe material (matches the theme aesthetic)
 const MESH_COLOR = "#A84A00";
@@ -141,15 +144,17 @@ const FBXModel = ({ url }: { url: string }) => {
             scale: scaleFactor,
             position: new THREE.Vector3(
                 -center.x * scaleFactor,
-                -center.y * scaleFactor - 0.5, // shift down slightly
+                -center.y * scaleFactor, // center perfectly
                 -center.z * scaleFactor
             )
         };
     }, [fbx]);
 
     return (
-        <group ref={groupRef} scale={[scale, scale, scale]} position={[position.x, position.y, position.z]}>
-            <primitive object={fbx} />
+        <group ref={groupRef}>
+            <group scale={[scale, scale, scale]} position={[position.x, position.y - 0.5, position.z]}>
+                <primitive object={fbx} />
+            </group>
         </group>
     );
 };
@@ -174,6 +179,10 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode, fallbac
 }
 
 export const Twin3D: React.FC = () => {
+    const { personalDetails } = useHealthTwinStore();
+    const isFemale = personalDetails?.gender?.toLowerCase() === 'female' || personalDetails?.gender?.toLowerCase() === 'f';
+    const currentModelUrl = isFemale ? FEMALE_MODEL_URL : MALE_MODEL_URL;
+
     // Transparent canvas to seamlessly match the #F5F2EB page background
     return (
         <div className="w-full h-full relative" style={{ background: 'transparent' }}>
@@ -192,7 +201,7 @@ export const Twin3D: React.FC = () => {
                 {/* External FBX model with fallback */}
                 <ErrorBoundary fallback={<FallbackHuman />}>
                     <Suspense fallback={<FallbackHuman />}>
-                        <FBXModel url={MODEL_URL} />
+                        <FBXModel url={currentModelUrl} />
                     </Suspense>
                 </ErrorBoundary>
 
