@@ -260,6 +260,7 @@ export const ActivityChart: React.FC<ChartProps> = ({ data, onEditClick }) => {
 //  VITALS CHART
 // ========================
 export const VitalsChart: React.FC<ChartProps> = ({ data, onEditClick }) => {
+    const { dailyAggregates } = useHealthTwinStore();
     const catData = data.filter(d => d.category === 'vitals');
 
     // Heart rate time-series (most recent day)
@@ -270,9 +271,14 @@ export const VitalsChart: React.FC<ChartProps> = ({ data, onEditClick }) => {
     }));
 
     // Blood pressure (daily)
-    const bpSys = dailyValues(useHealthTwinStore.getState().dailyAggregates, 'Blood Pressure Systolic');
-    const bpDia = dailyValues(useHealthTwinStore.getState().dailyAggregates, 'Blood Pressure Diastolic');
-    const bpCombined = bpSys.map((s, i) => ({ date: s.date, systolic: s.value, diastolic: bpDia[i]?.value || 0 }));
+    const bpSys = dailyValues(dailyAggregates, 'Blood Pressure Systolic');
+    const bpDia = dailyValues(dailyAggregates, 'Blood Pressure Diastolic');
+    const bpDates = Array.from(new Set([...bpSys, ...bpDia].map(d => d.date))).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+    const bpCombined = bpDates.map(date => ({
+        date,
+        systolic: bpSys.find(s => s.date === date)?.value || 0,
+        diastolic: bpDia.find(d => d.date === date)?.value || 0
+    }));
 
     // Latest values
     const latestRHR = getByName(catData, 'Resting Heart Rate');
@@ -479,23 +485,34 @@ export const SleepChart: React.FC<ChartProps> = ({ data, onEditClick }) => {
 //  NUTRITION CHART
 // ========================
 export const NutritionChart: React.FC<ChartProps> = ({ data, onEditClick }) => {
-    const catData = data.filter(d => d.category === 'nutrition');
+    const { dailyAggregates } = useHealthTwinStore();
 
     // Latest day macros total
-    const allCarbs = getByName(catData, 'Total Carbohydrate');
-    const allFat = getByName(catData, 'Total Fat');
-    const allProtein = getByName(catData, 'Protein');
+    const rawCarbs = dailyAggregates.filter(d => d.parameter_name === 'Total Carbohydrate');
+    const rawFat = dailyAggregates.filter(d => d.parameter_name === 'Total Fat');
+    const rawProtein = dailyAggregates.filter(d => d.parameter_name === 'Total Protein');
 
-    const lastDay = allCarbs.length > 0 ? dayLabel(allCarbs[allCarbs.length - 1].recorded_at) : '';
-    const sumToday = (arr: HealthParameter[]) => arr.filter(d => dayLabel(d.recorded_at) === lastDay).reduce((s, d) => s + Number(d.parameter_value), 0);
+    const allRaw = [...rawCarbs, ...rawFat, ...rawProtein];
+    let latestDate = '';
+    let carbsVal = 0, fatVal = 0, proteinVal = 0;
+
+    if (allRaw.length > 0) {
+        allRaw.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        latestDate = allRaw[0].date;
+
+        carbsVal = Number(rawCarbs.find(d => d.date === latestDate)?.aggregate_value || 0);
+        fatVal = Number(rawFat.find(d => d.date === latestDate)?.aggregate_value || 0);
+        proteinVal = Number(rawProtein.find(d => d.date === latestDate)?.aggregate_value || 0);
+    }
+
+    const lastDay = latestDate ? dayLabel(latestDate) : '';
 
     const macros = [
-        { name: 'Carbs', value: sumToday(allCarbs), fill: '#3b82f6' },
-        { name: 'Fat', value: sumToday(allFat), fill: '#f59e0b' },
-        { name: 'Protein', value: sumToday(allProtein), fill: '#10b981' },
+        { name: 'Carbs', value: carbsVal, fill: '#3b82f6' },
+        { name: 'Fat', value: fatVal, fill: '#f59e0b' },
+        { name: 'Protein', value: proteinVal, fill: '#10b981' },
     ];
 
-    const { dailyAggregates } = useHealthTwinStore();
     const hydration = dailyValues(dailyAggregates, 'Hydration Volume');
 
     // Total energy is a sum block we built in migration, we can just grab it directly from dailyValues
@@ -504,7 +521,7 @@ export const NutritionChart: React.FC<ChartProps> = ({ data, onEditClick }) => {
     return (
         <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <ChartCard parameterNames={['Total Carbohydrate', 'Total Fat', 'Protein']} data={data} onEditClick={onEditClick}>
+                <ChartCard parameterNames={['Total Carbohydrate', 'Total Fat', 'Total Protein']} data={data} onEditClick={onEditClick}>
                     <SectionHeader title="Macro Split" subtitle={`Today's macronutrient breakdown (${lastDay})`} />
                     <div className="h-[220px]">
                         <ResponsiveContainer>
@@ -572,11 +589,12 @@ export const RecoveryChart: React.FC<ChartProps> = ({ data, onEditClick }) => {
     const physical = dailyValues(dailyAggregates, 'Physical Recovery');
     const mental = dailyValues(dailyAggregates, 'Mental Recovery');
 
-    const combined = stress.map((s, i) => ({
-        date: s.date,
-        stress: s.value,
-        physical: physical[i]?.value || 0,
-        mental: mental[i]?.value || 0,
+    const recDates = Array.from(new Set([...stress, ...physical, ...mental].map(d => d.date))).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+    const combined = recDates.map(date => ({
+        date,
+        stress: stress.find(s => s.date === date)?.value || 0,
+        physical: physical.find(p => p.date === date)?.value || 0,
+        mental: mental.find(m => m.date === date)?.value || 0,
     }));
 
     const latestStress = stress[stress.length - 1]?.value || 0;
