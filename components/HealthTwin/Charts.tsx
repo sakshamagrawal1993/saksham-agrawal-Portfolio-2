@@ -7,7 +7,7 @@ import {
 import {
     ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent
 } from '../ui/chart';
-import { HealthParameter, useHealthTwinStore } from '../../store/healthTwin';
+import { HealthParameter, HealthDailyAggregate, useHealthTwinStore } from '../../store/healthTwin';
 import { supabase } from '../../lib/supabaseClient';
 import { Pencil, X, Save, Trash2, ChevronLeft, ChevronRight, Droplet } from 'lucide-react';
 
@@ -27,8 +27,11 @@ function getByName(data: HealthParameter[], name: string) {
     return data.filter(d => d.parameter_name === name).sort((a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime());
 }
 
-function dailyValues(data: HealthParameter[], name: string) {
-    return getByName(data, name).map(d => ({ date: dayLabel(d.recorded_at), value: Number(d.parameter_value) }));
+function dailyValues(aggregates: HealthDailyAggregate[], name: string) {
+    return aggregates
+        .filter(d => d.parameter_name === name)
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .map(d => ({ date: dayLabel(d.date), value: Number(d.aggregate_value) }));
 }
 
 // ======== SECTION HEADER ========
@@ -190,11 +193,11 @@ type ChartProps = { data: HealthParameter[]; onEditClick?: (params: HealthParame
 //  ACTIVITY CHART
 // ========================
 export const ActivityChart: React.FC<ChartProps> = ({ data, onEditClick }) => {
-    const catData = data.filter(d => d.category === 'activity');
-    const steps = dailyValues(catData, 'Step Count');
-    const calories = dailyValues(catData, 'Active Calories Burnt');
-    const activeMin = dailyValues(catData, 'Active Minutes');
-    const distance = dailyValues(catData, 'Horizontal Distance Covered');
+    const { dailyAggregates } = useHealthTwinStore();
+    const steps = dailyValues(dailyAggregates, 'Step Count');
+    const calories = dailyValues(dailyAggregates, 'Active Calories Burnt');
+    const activeMin = dailyValues(dailyAggregates, 'Active Minutes');
+    const distance = dailyValues(dailyAggregates, 'Horizontal Distance Covered');
 
     const latestSteps = steps[steps.length - 1]?.value || 0;
     const latestCal = calories[calories.length - 1]?.value || 0;
@@ -267,8 +270,8 @@ export const VitalsChart: React.FC<ChartProps> = ({ data, onEditClick }) => {
     }));
 
     // Blood pressure (daily)
-    const bpSys = dailyValues(catData, 'Blood Pressure Systolic');
-    const bpDia = dailyValues(catData, 'Blood Pressure Diastolic');
+    const bpSys = dailyValues(useHealthTwinStore.getState().dailyAggregates, 'Blood Pressure Systolic');
+    const bpDia = dailyValues(useHealthTwinStore.getState().dailyAggregates, 'Blood Pressure Diastolic');
     const bpCombined = bpSys.map((s, i) => ({ date: s.date, systolic: s.value, diastolic: bpDia[i]?.value || 0 }));
 
     // Latest values
@@ -411,11 +414,11 @@ export const ExerciseChart: React.FC<ChartProps> = ({ data, onEditClick }) => {
 //  SLEEP CHART
 // ========================
 export const SleepChart: React.FC<ChartProps> = ({ data, onEditClick }) => {
-    const catData = data.filter(d => d.category === 'sleep');
-    const duration = dailyValues(catData, 'Sleep Duration');
-    const quality = dailyValues(catData, 'Sleep Quality');
-    const score = dailyValues(catData, 'Sleep Score');
-    const avgHR = dailyValues(catData, 'Sleep Average Heart Rate');
+    const { dailyAggregates } = useHealthTwinStore();
+    const duration = dailyValues(dailyAggregates, 'Sleep Duration');
+    const quality = dailyValues(dailyAggregates, 'Sleep Quality');
+    const score = dailyValues(dailyAggregates, 'Sleep Score');
+    const avgHR = dailyValues(dailyAggregates, 'Sleep Average Heart Rate');
 
     const latestScore = score[score.length - 1]?.value || 0;
     const latestDur = duration[duration.length - 1]?.value || 0;
@@ -492,14 +495,11 @@ export const NutritionChart: React.FC<ChartProps> = ({ data, onEditClick }) => {
         { name: 'Protein', value: sumToday(allProtein), fill: '#10b981' },
     ];
 
-    const hydration = dailyValues(catData, 'Hydration Volume');
-    const dailyCal = catData.filter(d => d.parameter_name === 'Total Energy Intake from Food')
-        .reduce((acc: Record<string, number>, d) => {
-            const day = dayLabel(d.recorded_at);
-            acc[day] = (acc[day] || 0) + Number(d.parameter_value);
-            return acc;
-        }, {});
-    const calByDay = Object.entries(dailyCal).map(([date, value]) => ({ date, value }));
+    const { dailyAggregates } = useHealthTwinStore();
+    const hydration = dailyValues(dailyAggregates, 'Hydration Volume');
+
+    // Total energy is a sum block we built in migration, we can just grab it directly from dailyValues
+    const calByDay = dailyValues(dailyAggregates, 'Total Energy Intake from Food');
 
     return (
         <div className="space-y-6">
@@ -567,10 +567,10 @@ export const NutritionChart: React.FC<ChartProps> = ({ data, onEditClick }) => {
 //  RECOVERY CHART
 // ========================
 export const RecoveryChart: React.FC<ChartProps> = ({ data, onEditClick }) => {
-    const catData = data.filter(d => d.category === 'recovery');
-    const stress = dailyValues(catData, 'Body Stress Score');
-    const physical = dailyValues(catData, 'Physical Recovery');
-    const mental = dailyValues(catData, 'Mental Recovery');
+    const { dailyAggregates } = useHealthTwinStore();
+    const stress = dailyValues(dailyAggregates, 'Body Stress Score');
+    const physical = dailyValues(dailyAggregates, 'Physical Recovery');
+    const mental = dailyValues(dailyAggregates, 'Mental Recovery');
 
     const combined = stress.map((s, i) => ({
         date: s.date,

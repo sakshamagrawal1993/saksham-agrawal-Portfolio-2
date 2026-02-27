@@ -97,6 +97,16 @@ export interface HealthParameterRange {
   critical_max: number | null;
 }
 
+// 8. Daily Aggregates
+export interface HealthDailyAggregate {
+  id: string;
+  twin_id: string;
+  date: string;
+  parameter_name: string;
+  aggregate_value: number;
+  unit: string;
+}
+
 interface HealthTwinState {
   // Profiles
   twins: HealthTwin[];
@@ -114,6 +124,7 @@ interface HealthTwinState {
   wearableParameters: HealthParameter[];
   parameterDefinitions: HealthParameterDefinition[];
   parameterRanges: HealthParameterRange[];
+  dailyAggregates: HealthDailyAggregate[];
   
   setPersonalDetails: (data: HealthPersonalDetails | null) => void;
   setSummary: (data: HealthSummary | null) => void;
@@ -124,6 +135,7 @@ interface HealthTwinState {
   setWearableParameters: (data: HealthParameter[]) => void;
   setParameterDefinitions: (data: HealthParameterDefinition[]) => void;
   setParameterRanges: (data: HealthParameterRange[]) => void;
+  setDailyAggregates: (data: HealthDailyAggregate[]) => void;
 
   // UI State
   activeTab: 'chat' | 'graphs';
@@ -165,6 +177,9 @@ export const useHealthTwinStore = create<HealthTwinState>((set, get) => ({
   setWearableParameters: (wearableParameters) => set({ wearableParameters }),
   setParameterDefinitions: (parameterDefinitions) => set({ parameterDefinitions }),
   setParameterRanges: (parameterRanges) => set({ parameterRanges }),
+
+  dailyAggregates: [],
+  setDailyAggregates: (dailyAggregates) => set({ dailyAggregates }),
 
   activeTab: 'graphs',
   setActiveTab: (activeTab) => set({ activeTab }),

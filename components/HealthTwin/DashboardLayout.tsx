@@ -21,7 +21,8 @@ export const HealthTwinDashboard: React.FC = () => {
         setWearableParameters,
         setScores,
         setRecommendations,
-        setSources
+        setSources,
+        setDailyAggregates
     } = useHealthTwinStore();
 
     const [loading, setLoading] = useState(true);
@@ -71,7 +72,8 @@ export const HealthTwinDashboard: React.FC = () => {
                     recData,
                     sourcesData,
                     definitionsData,
-                    rangesData
+                    rangesData,
+                    aggregatesData
                 ] = await Promise.all([
                     supabase.from('health_personal_details').select('*').eq('twin_id', data.id).maybeSingle(),
                     supabase.from('health_summary').select('*').eq('twin_id', data.id).maybeSingle(),
@@ -81,7 +83,8 @@ export const HealthTwinDashboard: React.FC = () => {
                     supabase.from('health_recommendations').select('*').eq('twin_id', data.id).order('created_at', { ascending: false }),
                     supabase.from('health_sources').select('*').eq('twin_id', data.id).order('created_at', { ascending: false }),
                     supabase.from('health_parameter_definitions').select('*'),
-                    supabase.from('health_parameter_ranges').select('*')
+                    supabase.from('health_parameter_ranges').select('*'),
+                    supabase.from('health_daily_aggregates').select('*').eq('twin_id', data.id).order('date', { ascending: false })
                 ]);
 
                 setPersonalDetails(personalData.data || null);
@@ -91,6 +94,7 @@ export const HealthTwinDashboard: React.FC = () => {
                 setScores(scoresData.data || []);
                 setRecommendations(recData.data || []);
                 setSources(sourcesData.data || []);
+                setDailyAggregates(aggregatesData.data || []);
 
                 // Store definitions and ranges
                 useHealthTwinStore.getState().setParameterDefinitions(definitionsData.data || []);
@@ -106,7 +110,7 @@ export const HealthTwinDashboard: React.FC = () => {
         };
 
         initDashboard();
-    }, [id, navigate, setActiveTwin, twins, setTwins, setPersonalDetails, setSummary, setLabParameters, setWearableParameters, setScores, setRecommendations, setSources]);
+    }, [id, navigate, setActiveTwin, twins, setTwins, setPersonalDetails, setSummary, setLabParameters, setWearableParameters, setScores, setRecommendations, setSources, setDailyAggregates]);
 
     if (loading) {
         return (
