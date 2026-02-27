@@ -1,23 +1,25 @@
 import React, { useRef, useMemo, Suspense } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, ContactShadows, Environment, useGLTF } from '@react-three/drei';
+import { Canvas, useFrame, useLoader } from '@react-three/fiber';
+import { OrbitControls, ContactShadows, Environment } from '@react-three/drei';
 import * as THREE from 'three';
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 
-// Fallback geometric human if the GLTF fails to load
+// FBX model URL from Supabase storage
+const MODEL_URL = "https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/Digital%20Twin/male%20body.fbx";
+
+// Brownish wireframe material (matches the theme aesthetic)
+const MESH_COLOR = "#A84A00";
+
+// Fallback geometric human if the FBX fails to load
 const FallbackHuman = () => {
     const groupRef = useRef<THREE.Group>(null);
-    const materialRef = useRef<THREE.MeshStandardMaterial>(null);
 
-    const color = "#A84A00";
+    const color = MESH_COLOR;
 
     useFrame((state) => {
         if (groupRef.current) {
             groupRef.current.position.y = Math.sin(state.clock.elapsedTime * 1.5) * 0.05;
             groupRef.current.rotation.y = state.clock.elapsedTime * 0.2;
-        }
-
-        if (materialRef.current) {
-            materialRef.current.emissiveIntensity = 0.5 + Math.sin(state.clock.elapsedTime * 3) * 0.2;
         }
     });
 
@@ -59,117 +61,98 @@ const FallbackHuman = () => {
             <mesh material={material} position={[0, 0.5, 0]}>
                 <cylinderGeometry args={[0.55, 0.4, 1.2, 12, 4]} />
             </mesh>
-            {/* Arms */}
             <mesh material={material} position={[-0.75, 0.4, 0]} rotation={[0, 0, -0.2]}>
                 <cylinderGeometry args={[0.12, 0.1, 1.0, 8, 3]} />
-            </mesh>
-            <mesh material={material} position={[-1.05, -0.6, 0]} rotation={[0, 0, -0.1]}>
-                <cylinderGeometry args={[0.1, 0.08, 1.0, 8, 3]} />
             </mesh>
             <mesh material={material} position={[0.75, 0.4, 0]} rotation={[0, 0, 0.2]}>
                 <cylinderGeometry args={[0.12, 0.1, 1.0, 8, 3]} />
             </mesh>
-            <mesh material={material} position={[1.05, -0.6, 0]} rotation={[0, 0, 0.1]}>
-                <cylinderGeometry args={[0.1, 0.08, 1.0, 8, 3]} />
-            </mesh>
-            {/* Legs */}
             <mesh material={material} position={[-0.25, -0.7, 0]} rotation={[0, 0, -0.1]}>
                 <cylinderGeometry args={[0.18, 0.12, 1.2, 8, 4]} />
-            </mesh>
-            <mesh material={material} position={[-0.4, -1.9, 0]} rotation={[0, 0, 0]}>
-                <cylinderGeometry args={[0.12, 0.08, 1.2, 8, 4]} />
             </mesh>
             <mesh material={material} position={[0.25, -0.7, 0]} rotation={[0, 0, 0.1]}>
                 <cylinderGeometry args={[0.18, 0.12, 1.2, 8, 4]} />
             </mesh>
-            <mesh material={material} position={[0.4, -1.9, 0]} rotation={[0, 0, 0]}>
-                <cylinderGeometry args={[0.12, 0.08, 1.2, 8, 4]} />
-            </mesh>
-
-            {/* Joints */}
             <Joint position={[0, 1.1, 0]} scale={1.2} />
             <Joint position={[-0.6, 0.9, 0]} scale={1.5} />
             <Joint position={[0.6, 0.9, 0]} scale={1.5} />
-            <Joint position={[-0.9, -0.1, 0]} />
-            <Joint position={[0.9, -0.1, 0]} />
-            <Joint position={[-1.15, -1.1, 0]} scale={0.8} />
-            <Joint position={[1.15, -1.1, 0]} scale={0.8} />
             <Joint position={[-0.25, -0.1, 0]} scale={1.5} />
             <Joint position={[0.25, -0.1, 0]} scale={1.5} />
-            <Joint position={[-0.35, -1.3, 0]} scale={1.2} />
-            <Joint position={[0.35, -1.3, 0]} scale={1.2} />
-            <Joint position={[-0.4, -2.5, 0]} scale={0.8} />
-            <Joint position={[0.4, -2.5, 0]} scale={0.8} />
-
-            {/* Inner Core */}
-            <mesh position={[0, 0.6, 0]}>
-                <icosahedronGeometry args={[0.2, 1]} />
-                <meshStandardMaterial color="#A84A00" emissive="#A84A00" emissiveIntensity={2} wireframe={true} />
-            </mesh>
-
-            {/* Brain node */}
-            <mesh position={[0, 1.6, 0]}>
-                <sphereGeometry args={[0.15, 8, 8]} />
-                <meshStandardMaterial color="#EBE7DE" emissive="#EBE7DE" emissiveIntensity={1.5} wireframe={true} />
-            </mesh>
         </group>
     );
 };
 
-// Component to load external GLTF/GLB models seamlessly
-const ExternalModel = ({ url }: { url: string }) => {
-    // Attempt to load the model. If it's missing, this component will throw and the ErrorBoundary/Fallback will catch it.
-    const { scene } = useGLTF(url);
+// Component to load external FBX models from Supabase
+const FBXModel = ({ url }: { url: string }) => {
+    const fbx = useLoader(FBXLoader, url);
     const groupRef = useRef<THREE.Group>(null);
 
-    // Apply the wireframe material and theme colors to all meshes in the imported model
-    const color = "#A84A00";
     const customMaterial = useMemo(() => {
         return new THREE.MeshStandardMaterial({
-            color: color,
-            emissive: color,
-            emissiveIntensity: 0.2, // Subtle glow
-            wireframe: true,        // Wireframe style applied to the imported unity/blender mesh
+            color: MESH_COLOR,
+            emissive: MESH_COLOR,
+            emissiveIntensity: 0.3,
+            wireframe: true,
             transparent: true,
-            opacity: 0.8,
+            opacity: 0.85,
             roughness: 0.2,
             metalness: 0.8,
             side: THREE.DoubleSide
         });
-    }, [color]);
+    }, []);
 
+    // Override all materials in the imported model
     useMemo(() => {
-        if (scene) {
-            scene.traverse((child) => {
+        if (fbx) {
+            fbx.traverse((child) => {
                 if (child instanceof THREE.Mesh) {
                     child.material = customMaterial;
                 }
             });
         }
-    }, [scene, customMaterial]);
+    }, [fbx, customMaterial]);
 
     useFrame((state) => {
         if (groupRef.current) {
-            groupRef.current.position.y = Math.sin(state.clock.elapsedTime * 1.5) * 0.05;
+            // Gentle floating animation
+            const baseY = Math.sin(state.clock.elapsedTime * 1.5) * 0.05;
+            groupRef.current.position.y = baseY;
+            // Slow auto-rotation
             groupRef.current.rotation.y = state.clock.elapsedTime * 0.2;
-            groupRef.current.scale.setScalar(1.5); // Adjust scale based on your typical Unity exports
-            groupRef.current.position.y -= 1; // Center it slightly down
         }
 
+        // Subtle emissive pulsing
         if (customMaterial) {
-            customMaterial.emissiveIntensity = 0.2 + Math.sin(state.clock.elapsedTime * 3) * 0.1;
+            customMaterial.emissiveIntensity = 0.3 + Math.sin(state.clock.elapsedTime * 3) * 0.15;
         }
     });
 
+    // Auto-center and scale: FBX exports often have different coordinate systems
+    const { scale, position } = useMemo(() => {
+        const box = new THREE.Box3().setFromObject(fbx);
+        const size = box.getSize(new THREE.Vector3());
+        const center = box.getCenter(new THREE.Vector3());
+
+        // Target a height of ~4 units in the scene
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const scaleFactor = 4 / maxDim;
+
+        return {
+            scale: scaleFactor,
+            position: new THREE.Vector3(
+                -center.x * scaleFactor,
+                -center.y * scaleFactor - 0.5, // shift down slightly
+                -center.z * scaleFactor
+            )
+        };
+    }, [fbx]);
+
     return (
-        <group ref={groupRef}>
-            <primitive object={scene} />
+        <group ref={groupRef} scale={[scale, scale, scale]} position={[position.x, position.y, position.z]}>
+            <primitive object={fbx} />
         </group>
     );
 };
-
-// Preload if the file exists (silently fails if it doesn't thanks to the catch in actual usage)
-// useGLTF.preload('/models/human.glb');
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode, fallback: React.ReactNode }, { hasError: boolean }> {
     constructor(props: any) {
@@ -178,6 +161,9 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode, fallbac
     }
     static getDerivedStateFromError() {
         return { hasError: true };
+    }
+    componentDidCatch(error: any) {
+        console.warn('Twin3D: Failed to load external model, using fallback.', error);
     }
     render() {
         if (this.state.hasError) {
@@ -188,29 +174,32 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode, fallbac
 }
 
 export const Twin3D: React.FC = () => {
-    // The background is set to transparent so it blends perfectly with the #F5F2EB background of the landing page.
+    // Transparent canvas to seamlessly match the #F5F2EB page background
     return (
         <div className="w-full h-full relative" style={{ background: 'transparent' }}>
-            {/* Added a subtle overlay glow to blend the 3D space with the #F5F2EB page */}
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#F5F2EB]/10 to-[#F5F2EB] pointer-events-none z-10" />
+            <Canvas
+                camera={{ position: [0, 1, 6], fov: 50 }}
+                className="w-full h-full"
+                style={{ background: 'transparent' }}
+                gl={{ alpha: true }}
+            >
+                {/* Lighting tuned for the beige page background */}
+                <ambientLight intensity={0.6} color="#ffffff" />
+                <directionalLight position={[10, 10, 5]} intensity={1.2} color="#ffffff" />
+                <directionalLight position={[-5, 5, -5]} intensity={0.4} color="#b0c4de" />
+                <spotLight position={[0, 10, 0]} intensity={0.8} color="#ffffff" penumbra={1} angle={0.5} />
 
-            <Canvas camera={{ position: [0, 1, 6], fov: 50 }} className="w-full h-full" style={{ background: 'transparent' }}>
-                <ambientLight intensity={0.5} color="#ffffff" />
-                <directionalLight position={[10, 10, 5]} intensity={1.5} color="#A84A00" />
-                <directionalLight position={[-10, -10, -5]} intensity={0.5} color="#EBE7DE" />
-                <spotLight position={[0, 10, 0]} intensity={1} color="#ffffff" penumbra={1} angle={0.5} />
-
-                {/* Attempt to load the external model, fallback to procedural one if the file isn't found */}
+                {/* External FBX model with fallback */}
                 <ErrorBoundary fallback={<FallbackHuman />}>
                     <Suspense fallback={<FallbackHuman />}>
-                        <ExternalModel url="/models/human.glb" />
+                        <FBXModel url={MODEL_URL} />
                     </Suspense>
                 </ErrorBoundary>
 
                 <Environment preset="studio" />
 
-                {/* Contact shadow connecting the model to the #F5F2EB floor */}
-                <ContactShadows position={[0, -2.5, 0]} opacity={0.3} scale={8} blur={2.5} far={4} color="#A84A00" />
+                {/* Subtle contact shadow */}
+                <ContactShadows position={[0, -2.5, 0]} opacity={0.2} scale={8} blur={2.5} far={4} color="#2C2A26" />
 
                 <OrbitControls
                     enablePan={false}

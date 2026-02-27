@@ -7,12 +7,13 @@ import {
     EditDataModal
 } from './Charts';
 import { HealthParameter } from '../../store/healthTwin';
-import { MessageSquare, LineChart, Activity, Heart, Dumbbell, Moon, Utensils, Brain, AlertCircle, Baby, LayoutGrid } from 'lucide-react';
+import { MessageSquare, LineChart, Activity, Heart, Dumbbell, Moon, Utensils, Brain, AlertCircle, Baby, LayoutGrid, MapPin, Wind, CloudSun } from 'lucide-react';
 
 const CATEGORIES = [
     { id: 'all', label: 'All', icon: LayoutGrid },
     { id: 'activity', label: 'Activity', icon: Activity },
     { id: 'vitals', label: 'Vitals', icon: Heart },
+    { id: 'atmosphere', label: 'Atmosphere', icon: CloudSun },
     { id: 'exercise', label: 'Exercise', icon: Dumbbell },
     { id: 'sleep', label: 'Sleep', icon: Moon },
     { id: 'nutrition', label: 'Nutrition', icon: Utensils },
@@ -32,8 +33,72 @@ const CHART_COMPONENTS = [
     { id: 'reproductive', Component: ReproductiveChart, label: 'Reproductive' },
 ];
 
+const AtmosphereWidget = ({ personalDetails }: { personalDetails: any }) => (
+    <div className="flex flex-col gap-3">
+        <div className="flex items-center gap-2 mb-1">
+            <span className="w-2 h-6 rounded-full bg-[#A84A00]" />
+            <h2 className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#5D5A53]">Atmosphere</h2>
+        </div>
+
+        <div className="bg-white border border-[#EBE7DE] rounded-xl p-5 shadow-sm">
+            {/* Location & Toggle */}
+            <div className="flex justify-between items-start mb-6">
+                <div className="flex gap-3 text-[#5D5A53]">
+                    <MapPin size={24} className="text-[#ef4444]" />
+                    <div>
+                        <p className="font-bold text-[#2C2A26] text-lg leading-tight">{personalDetails?.location || 'San Francisco, CA'}</p>
+                        <p className="text-xs font-mono text-[#A8A29E] uppercase tracking-wider mt-1">LAT: 37.77 • LON: -122.41</p>
+                    </div>
+                </div>
+                <div className="flex text-xs font-bold">
+                    <button className="bg-[#EBE7DE] text-[#3b82f6] px-4 py-2 rounded-l-lg hover:bg-[#D6D1C7] transition-colors shadow-inner">AIR</button>
+                    <button className="bg-white border border-[#EBE7DE] border-l-0 text-[#A8A29E] px-4 py-2 rounded-r-lg hover:bg-[#F5F2EB] transition-colors">LOC</button>
+                </div>
+            </div>
+
+            {/* Temp & AQI */}
+            <div className="flex items-end justify-between mb-6 border-b border-[#EBE7DE] pb-6">
+                <div>
+                    <span className="text-6xl font-serif text-[#2C2A26] leading-none">78°</span>
+                    <p className="text-xs font-bold text-[#A8A29E] uppercase tracking-widest mt-2">
+                        Partly Cloudy • H: 65%
+                    </p>
+                </div>
+                <div className="bg-[#10b981]/10 text-[#10b981] font-bold px-3 py-1.5 rounded-lg text-sm mb-1">
+                    AQI 42
+                </div>
+            </div>
+
+            {/* Metrics Grid */}
+            <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="text-center py-4 px-2 rounded-xl border border-[#EBE7DE] bg-[#FAF9F6]">
+                    <p className="text-[11px] font-bold text-[#A8A29E] uppercase tracking-widest mb-1.5">PM2.5</p>
+                    <p className="text-lg font-bold text-[#2C2A26]">12 <span className="text-[11px] text-[#A8A29E] font-normal">µg</span></p>
+                </div>
+                <div className="text-center py-4 px-2 rounded-xl border border-amber-200 bg-amber-50/50">
+                    <p className="text-[11px] font-bold text-amber-600 uppercase tracking-widest mb-1.5">Pollen</p>
+                    <p className="text-lg font-bold text-amber-500">High</p>
+                </div>
+                <div className="text-center py-4 px-2 rounded-xl border border-[#EBE7DE] bg-[#FAF9F6]">
+                    <p className="text-[11px] font-bold text-[#A8A29E] uppercase tracking-widest mb-1.5">UV Idx</p>
+                    <p className="text-lg font-bold text-[#2C2A26]">6</p>
+                </div>
+            </div>
+
+            {/* Suggestion alert */}
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex gap-3">
+                <Wind size={18} className="text-blue-500 shrink-0 mt-0.5" />
+                <p className="text-sm text-[#5D5A53] leading-relaxed">
+                    <span className="font-bold text-blue-600">Suggestion: </span>
+                    High pollen count detected. Consider indoor training or wearing sunglasses to reduce eye irritation during Zone 2 walks.
+                </p>
+            </div>
+        </div>
+    </div>
+);
+
 export const CenterPanel: React.FC = () => {
-    const { activeTab, setActiveTab, chatHistory, wearableParameters } = useHealthTwinStore();
+    const { activeTab, setActiveTab, chatHistory, wearableParameters, personalDetails } = useHealthTwinStore();
     const [chatInput, setChatInput] = useState('');
     const [activeCategory, setActiveCategory] = useState('all');
     const [editParams, setEditParams] = useState<HealthParameter[] | null>(null);
@@ -77,8 +142,8 @@ export const CenterPanel: React.FC = () => {
                                             key={cat.id}
                                             onClick={() => setActiveCategory(cat.id)}
                                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap ${isActive
-                                                    ? 'bg-[#A84A00] text-white shadow-sm'
-                                                    : 'bg-[#F5F2EB] text-[#5D5A53] hover:bg-[#EBE7DE]'
+                                                ? 'bg-[#A84A00] text-white shadow-sm'
+                                                : 'bg-[#F5F2EB] text-[#5D5A53] hover:bg-[#EBE7DE]'
                                                 }`}
                                         >
                                             <Icon size={13} />
@@ -91,8 +156,16 @@ export const CenterPanel: React.FC = () => {
 
                         {/* Chart Content */}
                         <div className="flex-1 overflow-y-auto p-6">
-                            {wearableParameters.length === 0 ? (
-                                <div className="h-full flex items-center justify-center text-[#A8A29E] text-center px-8">
+                            {/* IF ATMOSPHERE CATEGORY IS ACTIVE STANDALONE */}
+                            {activeCategory === 'atmosphere' && (
+                                <div className="mb-10">
+                                    <AtmosphereWidget personalDetails={personalDetails} />
+                                </div>
+                            )}
+
+                            {/* Wearable Charts */}
+                            {activeCategory !== 'atmosphere' && wearableParameters.length === 0 ? (
+                                <div className={`${activeCategory === 'all' ? 'h-full' : 'h-full'} flex items-center justify-center text-[#A8A29E] text-center px-8`}>
                                     <div>
                                         <LineChart size={40} className="mx-auto mb-4 opacity-30" />
                                         <p className="font-serif">No wearable data yet.</p>
@@ -100,30 +173,43 @@ export const CenterPanel: React.FC = () => {
                                     </div>
                                 </div>
                             ) : activeCategory === 'all' ? (
-                                // ALL VIEW: render every category in sequence
                                 <div className="space-y-10">
-                                    {CHART_COMPONENTS.map(({ id, Component, label }) => {
-                                        const hasCatData = wearableParameters.some(p => p.category === id);
+                                    {CATEGORIES.filter(c => c.id !== 'all').map((cat) => {
+                                        // Interleave Atmosphere before Exercise (which comes after Activity and Vitals based on CATEGORIES array)
+                                        if (cat.id === 'atmosphere') {
+                                            return (
+                                                <div key="atmosphere">
+                                                    <AtmosphereWidget personalDetails={personalDetails} />
+                                                </div>
+                                            );
+                                        }
+
+                                        const chartInfo = CHART_COMPONENTS.find(c => c.id === cat.id);
+                                        if (!chartInfo) return null;
+
+                                        const hasCatData = wearableParameters.some(p => p.category === cat.id);
                                         if (!hasCatData) return null;
+
+                                        const Component = chartInfo.Component;
                                         return (
-                                            <div key={id}>
+                                            <div key={cat.id}>
                                                 <div className="flex items-center gap-2 mb-4">
                                                     <span className="w-2 h-6 rounded-full bg-[#A84A00]" />
-                                                    <h2 className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#5D5A53]">{label}</h2>
+                                                    <h2 className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#5D5A53]">{chartInfo.label}</h2>
                                                 </div>
                                                 <Component data={wearableParameters} onEditClick={handleEditClick} />
                                             </div>
                                         );
                                     })}
                                 </div>
-                            ) : (
+                            ) : activeCategory !== 'atmosphere' ? (
                                 (() => {
                                     const match = CHART_COMPONENTS.find(c => c.id === activeCategory);
                                     if (!match) return null;
                                     const Comp = match.Component;
                                     return <Comp data={wearableParameters} onEditClick={handleEditClick} />;
                                 })()
-                            )}
+                            ) : null}
                         </div>
                     </div>
                 ) : (

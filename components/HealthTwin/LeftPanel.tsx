@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { Plus, FileText, Activity, Watch, UploadCloud, User, X, Check, Loader2 } from 'lucide-react';
+import { Plus, FileText, Activity, Watch, UploadCloud, User, X, Check, Loader2, Pencil } from 'lucide-react';
 import { useHealthTwinStore } from '../../store/healthTwin';
 import { supabase } from '../../lib/supabaseClient';
 
@@ -26,7 +26,7 @@ const PROFILE_FIELDS = [
 export const LeftPanel: React.FC = () => {
     const {
         activeTwinId, sources, labParameters, wearableParameters, personalDetails,
-        setActiveTab, setSources, setLabParameters, setWearableParameters, setPersonalDetails
+        setSources, setLabParameters, setWearableParameters, setPersonalDetails
     } = useHealthTwinStore();
 
     const [modalOpen, setModalOpen] = useState(false);
@@ -49,6 +49,9 @@ export const LeftPanel: React.FC = () => {
     const [csvError, setCsvError] = useState('');
     const [csvDragging, setCsvDragging] = useState(false);
     const csvInputRef = useRef<HTMLInputElement>(null);
+
+    // Wearable CSV source names (tracked locally for the sidebar display)
+    const [wearableCsvSources, setWearableCsvSources] = useState<string[]>([]);
 
     // Profile state
     const [profileForm, setProfileForm] = useState<Record<string, string>>({
@@ -77,8 +80,17 @@ export const LeftPanel: React.FC = () => {
         if (!fileToUpload || !activeTwinId) return;
         setUploading(true);
         try {
-            const fileName = `${activeTwinId}/${Date.now()}_${fileToUpload.name}`;
-            const { error: uploadError } = await supabase.storage.from('health_documents').upload(fileName, fileToUpload);
+            // Build file path: {userName}/{twinId}/{filename}
+            let userName = 'unknown';
+            if (personalDetails?.name) {
+                userName = personalDetails.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+            } else {
+                const { data: { session } } = await supabase.auth.getSession();
+                userName = (session?.user?.email?.split('@')[0] || session?.user?.id || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '_');
+            }
+            const fileName = `${userName}/${activeTwinId}/${fileToUpload.name}`;
+
+            const { error: uploadError } = await supabase.storage.from('health_documents').upload(fileName, fileToUpload, { upsert: true });
             if (uploadError) throw uploadError;
 
             const { data: { publicUrl } } = supabase.storage.from('health_documents').getPublicUrl(fileName);
@@ -90,10 +102,55 @@ export const LeftPanel: React.FC = () => {
 
             setSources([sourceData, ...sources]);
 
+            // Send webhook to n8n and await response with extracted parameters
             const N8N_WEBHOOK = import.meta.env.VITE_N8N_HEALTH_WEBHOOK_URL;
             if (N8N_WEBHOOK) {
-                await fetch(N8N_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source_id: sourceData.id, twin_id: activeTwinId, file_url: publicUrl }) });
+                try {
+                    const webhookResponse = await fetch(N8N_WEBHOOK, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ file_url: publicUrl, twin_id: activeTwinId, file_id: sourceData.id })
+                    });
+
+                    if (!webhookResponse.ok) throw new Error(`Webhook returned ${webhookResponse.status}`);
+
+                    const result = await webhookResponse.json();
+
+                    // Save extracted parameters to health_lab_parameters
+                    if (result.parameters && Array.isArray(result.parameters) && result.parameters.length > 0) {
+                        const paramRows = result.parameters.map((p: { parameter_name: string; parameter_value: number; unit: string; recorded_at: string }) => ({
+                            twin_id: activeTwinId,
+                            source_id: sourceData.id,
+                            parameter_name: p.parameter_name,
+                            parameter_value: p.parameter_value,
+                            unit: p.unit || '',
+                            recorded_at: p.recorded_at || new Date().toISOString(),
+                        }));
+
+                        const { data: insertedParams, error: paramError } = await supabase
+                            .from('health_lab_parameters')
+                            .insert(paramRows)
+                            .select();
+
+                        if (paramError) throw paramError;
+
+                        // Merge new parameters into store
+                        if (insertedParams) {
+                            setLabParameters([...insertedParams, ...labParameters]);
+                        }
+                    }
+
+                    // Mark source as completed
+                    await supabase.from('health_sources').update({ status: 'completed' }).eq('id', sourceData.id);
+                    setSources([{ ...sourceData, status: 'completed' }, ...sources.filter(s => s.id !== sourceData.id)]);
+                } catch (webhookErr) {
+                    console.error('Webhook/parameter processing error:', webhookErr);
+                    // Mark source as failed
+                    await supabase.from('health_sources').update({ status: 'failed', processing_error: String(webhookErr) }).eq('id', sourceData.id);
+                    setSources([{ ...sourceData, status: 'failed' }, ...sources.filter(s => s.id !== sourceData.id)]);
+                }
             }
+
             setFileToUpload(null);
             setModalOpen(false);
         } catch (err) { console.error('Error uploading report:', err); }
@@ -198,6 +255,7 @@ Active Calories Burnt,320,kcal,2026-02-27T06:00:00Z,2026-02-27T22:00:00Z,activit
             if (error) throw error;
 
             setWearableParameters([...(data || []), ...wearableParameters]);
+            setWearableCsvSources(prev => [...prev, wearableCsvFile.name]);
             setWearableCsvFile(null);
             setWearableCsvPreview([]);
             setModalOpen(false);
@@ -288,7 +346,17 @@ Active Calories Burnt,320,kcal,2026-02-27T06:00:00Z,2026-02-27T22:00:00Z,activit
 
                 {/* PERSONAL DETAILS OVERVIEW */}
                 <div className="flex flex-col gap-3">
-                    <h3 className="text-xs font-bold uppercase tracking-widest text-[#A8A29E] mb-2">My Profile</h3>
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-xs font-bold uppercase tracking-widest text-[#A8A29E]">My Profile</h3>
+                        {personalDetails && (
+                            <button
+                                onClick={() => { openModal(); setActiveSourceTab('profile'); }}
+                                className="text-xs font-bold text-[#A84A00] hover:underline flex items-center gap-1 transition-colors"
+                            >
+                                <Pencil size={10} /> Edit
+                            </button>
+                        )}
+                    </div>
                     {personalDetails ? (
                         <div className="bg-white border border-[#EBE7DE] rounded-xl p-4 shadow-sm text-sm">
                             <div className="flex justify-between border-b border-[#EBE7DE] pb-2 mb-2">
@@ -299,41 +367,82 @@ Active Calories Burnt,320,kcal,2026-02-27T06:00:00Z,2026-02-27T22:00:00Z,activit
                                 <span className="text-[#5D5A53]">Age / Gender</span>
                                 <span className="font-semibold">{personalDetails.age} / {personalDetails.gender}</span>
                             </div>
-                            <div className="flex justify-between">
+                            <div className="flex justify-between border-b border-[#EBE7DE] pb-2 mb-2">
                                 <span className="text-[#5D5A53]">Blood Type</span>
                                 <span className="font-semibold text-rose-600">{personalDetails.blood_type}</span>
                             </div>
+                            {personalDetails.height_cm ? (
+                                <div className="flex justify-between border-b border-[#EBE7DE] pb-2 mb-2">
+                                    <span className="text-[#5D5A53]">Height / Weight</span>
+                                    <span className="font-semibold">{personalDetails.height_cm} cm / {personalDetails.weight_kg} kg</span>
+                                </div>
+                            ) : null}
+                            {personalDetails.location ? (
+                                <div className="flex justify-between">
+                                    <span className="text-[#5D5A53]">Location</span>
+                                    <span className="font-semibold">{personalDetails.location}</span>
+                                </div>
+                            ) : null}
                         </div>
                     ) : (
-                        <div className="text-xs text-[#A8A29E] italic">Setup your profile to view details.</div>
+                        <div className="text-xs text-[#A8A29E] italic">Setup your profile to view details.
+                            <button onClick={() => { openModal(); setActiveSourceTab('profile'); }} className="ml-1 text-[#A84A00] font-bold hover:underline">Set up now →</button>
+                        </div>
                     )}
                 </div>
 
-                {/* LAB PARAMETERS LIST */}
+                {/* LAB REPORTS (file names only) */}
                 <div className="flex flex-col gap-3 mt-4">
-                    <h3 className="text-xs font-bold uppercase tracking-widest text-[#A8A29E] mb-2">Lab Parameters</h3>
-                    {labParameters.slice(0, 5).map(b => (
-                        <div key={b.id} onClick={() => setActiveTab('graphs')} className="flex justify-between items-center text-sm py-2 px-1 border-b border-[#EBE7DE] last:border-0 hover:bg-[#F5F2EB] cursor-pointer rounded-md transition-colors" title="Click to view details">
-                            <span className="text-[#5D5A53]">{b.parameter_name}</span>
-                            <span className="font-semibold text-[#A84A00]">{b.parameter_value} <span className="text-xs text-[#A8A29E] font-normal">{b.unit}</span></span>
-                        </div>
-                    ))}
-                    {labParameters.length === 0 && <div className="text-xs text-[#A8A29E] italic">No lab parameters extracted yet.</div>}
-                    {labParameters.length > 5 && <button className="text-xs font-medium text-[#A8A29E] hover:text-[#2C2A26] text-left mt-2 transition-colors">View all {labParameters.length} lab parameters...</button>}
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-[#A8A29E] mb-2">Lab Reports</h3>
+                    {sources.filter(s => s.source_type === 'lab_report').length > 0 ? (
+                        sources.filter(s => s.source_type === 'lab_report').map(src => (
+                            <div key={src.id} className="flex items-center justify-between p-3 bg-white border border-[#EBE7DE] rounded-xl shadow-sm hover:border-[#A84A00] transition-colors">
+                                <div className="flex items-center gap-3">
+                                    <FileText size={16} className={src.status === 'processing' ? 'text-amber-500' : 'text-[#A84A00]'} />
+                                    <div>
+                                        <span className="text-sm font-medium truncate max-w-[150px] block">{src.source_name}</span>
+                                        <span className="text-[10px] text-[#A8A29E]">{new Date(src.created_at || '').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                                    </div>
+                                </div>
+                                {src.status === 'processing' ? (
+                                    <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider bg-amber-50 px-2 py-0.5 rounded-full">Processing</span>
+                                ) : (
+                                    <span className="text-[10px] font-bold text-[#10b981] uppercase tracking-wider bg-emerald-50 px-2 py-0.5 rounded-full">Analyzed</span>
+                                )}
+                            </div>
+                        ))
+                    ) : (
+                        <div className="text-xs text-[#A8A29E] italic">No lab reports uploaded yet.</div>
+                    )}
                 </div>
 
-                {/* WEARABLE PARAMETERS LIST */}
+                {/* WEARABLE DATA SOURCES (CSV file names) */}
                 <div className="flex flex-col gap-3 mt-4">
-                    <h3 className="text-xs font-bold uppercase tracking-widest text-[#A8A29E] mb-2">Wearable Data</h3>
-                    {wearableParameters.slice(0, 5).map(b => (
-                        <div key={b.id} onClick={() => setActiveTab('graphs')} className="flex justify-between items-center text-sm py-2 px-1 border-b border-[#EBE7DE] last:border-0 hover:bg-[#F5F2EB] cursor-pointer rounded-md transition-colors" title="Click to view details">
-                            <span className="text-[#5D5A53]">{b.parameter_name}</span>
-                            <span className="font-semibold text-[#3b82f6]">{b.parameter_value} <span className="text-xs text-[#A8A29E] font-normal">{b.unit}</span></span>
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-[#A8A29E] mb-2">Wearable Data Sources</h3>
+                    {wearableCsvSources.length > 0 ? (
+                        wearableCsvSources.map((name, i) => (
+                            <div key={i} className="flex items-center gap-3 p-3 bg-white border border-[#EBE7DE] rounded-xl shadow-sm">
+                                <Watch size={16} className="text-[#3b82f6]" />
+                                <div>
+                                    <span className="text-sm font-medium truncate max-w-[150px] block">{name}</span>
+                                    <span className="text-[10px] text-[#A8A29E]">CSV import</span>
+                                </div>
+                            </div>
+                        ))
+                    ) : wearableParameters.length > 0 ? (
+                        <div className="flex items-center gap-3 p-3 bg-white border border-[#EBE7DE] rounded-xl shadow-sm">
+                            <Watch size={16} className="text-[#3b82f6]" />
+                            <div>
+                                <span className="text-sm font-medium">{wearableParameters.length} parameters synced</span>
+                                <span className="text-[10px] text-[#A8A29E] block">Pre-loaded data</span>
+                            </div>
                         </div>
-                    ))}
-                    {wearableParameters.length === 0 && <div className="text-xs text-[#A8A29E] italic">No wearable data synced yet.</div>}
-                    {wearableParameters.length > 5 && <button className="text-xs font-medium text-[#A8A29E] hover:text-[#2C2A26] text-left mt-2 transition-colors">View all {wearableParameters.length} wearables...</button>}
+                    ) : (
+                        <div className="text-xs text-[#A8A29E] italic">No wearable data synced yet.</div>
+                    )}
                 </div>
+
+
             </div>
 
             {/* ========== UNIFIED ADD SOURCES MODAL ========== */}
