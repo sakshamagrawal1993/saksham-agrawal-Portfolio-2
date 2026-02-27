@@ -159,53 +159,47 @@ export const LeftPanel: React.FC = () => {
 
             setSources([sourceData, ...sources]);
 
-            // Send webhook to n8n and await response with extracted parameters
-            const N8N_WEBHOOK = import.meta.env.VITE_N8N_HEALTH_WEBHOOK_URL;
-            if (N8N_WEBHOOK) {
-                try {
-                    const webhookResponse = await fetch(N8N_WEBHOOK, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ file_url: publicUrl, twin_id: activeTwinId, file_id: sourceData.id })
-                    });
+            // Call Supabase Edge Function to securely route the payload and auth header to n8n
+            try {
+                const { data: result, error: invokeError } = await supabase.functions.invoke('process-lab-report', {
+                    body: { file_url: publicUrl, twin_id: activeTwinId, file_id: sourceData.id }
+                });
 
-                    if (!webhookResponse.ok) throw new Error(`Webhook returned ${webhookResponse.status}`);
+                if (invokeError) throw invokeError;
+                if (!result) throw new Error("No data returned from edge function");
 
-                    const result = await webhookResponse.json();
+                // Save extracted parameters to health_lab_parameters
+                if (result.parameters && Array.isArray(result.parameters) && result.parameters.length > 0) {
+                    const paramRows = result.parameters.map((p: { parameter_name: string; parameter_value: number; unit: string; recorded_at: string }) => ({
+                        twin_id: activeTwinId,
+                        source_id: sourceData.id,
+                        parameter_name: p.parameter_name,
+                        parameter_value: p.parameter_value,
+                        unit: p.unit || '',
+                        recorded_at: p.recorded_at || new Date().toISOString(),
+                    }));
 
-                    // Save extracted parameters to health_lab_parameters
-                    if (result.parameters && Array.isArray(result.parameters) && result.parameters.length > 0) {
-                        const paramRows = result.parameters.map((p: { parameter_name: string; parameter_value: number; unit: string; recorded_at: string }) => ({
-                            twin_id: activeTwinId,
-                            source_id: sourceData.id,
-                            parameter_name: p.parameter_name,
-                            parameter_value: p.parameter_value,
-                            unit: p.unit || '',
-                            recorded_at: p.recorded_at || new Date().toISOString(),
-                        }));
+                    const { data: insertedParams, error: paramError } = await supabase
+                        .from('health_lab_parameters')
+                        .insert(paramRows)
+                        .select();
 
-                        const { data: insertedParams, error: paramError } = await supabase
-                            .from('health_lab_parameters')
-                            .insert(paramRows)
-                            .select();
+                    if (paramError) throw paramError;
 
-                        if (paramError) throw paramError;
-
-                        // Merge new parameters into store
-                        if (insertedParams) {
-                            setLabParameters([...insertedParams, ...labParameters]);
-                        }
+                    // Merge new parameters into store
+                    if (insertedParams) {
+                        setLabParameters([...insertedParams, ...labParameters]);
                     }
-
-                    // Mark source as completed
-                    await supabase.from('health_sources').update({ status: 'completed' }).eq('id', sourceData.id);
-                    setSources([{ ...sourceData, status: 'completed' }, ...sources.filter(s => s.id !== sourceData.id)]);
-                } catch (webhookErr) {
-                    console.error('Webhook/parameter processing error:', webhookErr);
-                    // Mark source as failed
-                    await supabase.from('health_sources').update({ status: 'failed', processing_error: String(webhookErr) }).eq('id', sourceData.id);
-                    setSources([{ ...sourceData, status: 'failed' }, ...sources.filter(s => s.id !== sourceData.id)]);
                 }
+
+                // Mark source as completed
+                await supabase.from('health_sources').update({ status: 'completed' }).eq('id', sourceData.id);
+                setSources([{ ...sourceData, status: 'completed' }, ...sources.filter(s => s.id !== sourceData.id)]);
+            } catch (webhookErr) {
+                console.error('Webhook/parameter processing error:', webhookErr);
+                // Mark source as failed
+                await supabase.from('health_sources').update({ status: 'failed', processing_error: String(webhookErr) }).eq('id', sourceData.id);
+                setSources([{ ...sourceData, status: 'failed' }, ...sources.filter(s => s.id !== sourceData.id)]);
             }
 
             setFileToUpload(null);
