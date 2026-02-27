@@ -224,7 +224,7 @@ export const TwinLanding: React.FC = () => {
                             {/* Create New Card */}
                             <button
                                 onClick={() => setShowCreateModal(true)}
-                                className="group relative aspect-video flex flex-col items-center justify-center bg-[#F5F2EB] border-2 border-dashed border-[#D6D1C7] rounded-xl hover:bg-white hover:border-[#A84A00] transition-all"
+                                className="group relative min-h-[220px] flex flex-col items-center justify-center bg-[#F5F2EB] border-2 border-dashed border-[#D6D1C7] rounded-xl hover:bg-white hover:border-[#A84A00] transition-all"
                             >
                                 <div className="w-12 h-12 rounded-full bg-[#EBE7DE] group-hover:bg-[#A84A00]/10 flex items-center justify-center mb-4 transition-colors">
                                     <Plus className="w-5 h-5 text-[#A8A29E] group-hover:text-[#A84A00] transition-colors" />
