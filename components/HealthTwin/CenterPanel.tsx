@@ -3,25 +3,40 @@ import { useHealthTwinStore } from '../../store/healthTwin';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import {
     ActivityChart, VitalsChart, ExerciseChart, SleepChart,
-    NutritionChart, RecoveryChart, SymptomsChart, ReproductiveChart
+    NutritionChart, RecoveryChart, SymptomsChart, ReproductiveChart,
+    EditDataModal
 } from './Charts';
-import { MessageSquare, LineChart, Activity, Heart, Dumbbell, Moon, Utensils, Brain, AlertCircle, Baby } from 'lucide-react';
+import { HealthParameter } from '../../store/healthTwin';
+import { MessageSquare, LineChart, Activity, Heart, Dumbbell, Moon, Utensils, Brain, AlertCircle, Baby, LayoutGrid } from 'lucide-react';
 
 const CATEGORIES = [
-    { id: 'activity', label: 'Activity', icon: Activity, Component: ActivityChart },
-    { id: 'vitals', label: 'Vitals', icon: Heart, Component: VitalsChart },
-    { id: 'exercise', label: 'Exercise', icon: Dumbbell, Component: ExerciseChart },
-    { id: 'sleep', label: 'Sleep', icon: Moon, Component: SleepChart },
-    { id: 'nutrition', label: 'Nutrition', icon: Utensils, Component: NutritionChart },
-    { id: 'recovery', label: 'Recovery', icon: Brain, Component: RecoveryChart },
-    { id: 'symptoms', label: 'Symptoms', icon: AlertCircle, Component: SymptomsChart },
-    { id: 'reproductive', label: 'Reproductive', icon: Baby, Component: ReproductiveChart },
+    { id: 'all', label: 'All', icon: LayoutGrid },
+    { id: 'activity', label: 'Activity', icon: Activity },
+    { id: 'vitals', label: 'Vitals', icon: Heart },
+    { id: 'exercise', label: 'Exercise', icon: Dumbbell },
+    { id: 'sleep', label: 'Sleep', icon: Moon },
+    { id: 'nutrition', label: 'Nutrition', icon: Utensils },
+    { id: 'recovery', label: 'Recovery', icon: Brain },
+    { id: 'symptoms', label: 'Symptoms', icon: AlertCircle },
+    { id: 'reproductive', label: 'Reproductive', icon: Baby },
 ] as const;
+
+const CHART_COMPONENTS = [
+    { id: 'activity', Component: ActivityChart, label: 'Activity' },
+    { id: 'vitals', Component: VitalsChart, label: 'Vitals' },
+    { id: 'exercise', Component: ExerciseChart, label: 'Exercise' },
+    { id: 'sleep', Component: SleepChart, label: 'Sleep' },
+    { id: 'nutrition', Component: NutritionChart, label: 'Nutrition' },
+    { id: 'recovery', Component: RecoveryChart, label: 'Recovery' },
+    { id: 'symptoms', Component: SymptomsChart, label: 'Symptoms' },
+    { id: 'reproductive', Component: ReproductiveChart, label: 'Reproductive' },
+];
 
 export const CenterPanel: React.FC = () => {
     const { activeTab, setActiveTab, chatHistory, wearableParameters } = useHealthTwinStore();
     const [chatInput, setChatInput] = useState('');
-    const [activeCategory, setActiveCategory] = useState('activity');
+    const [activeCategory, setActiveCategory] = useState('all');
+    const [editParams, setEditParams] = useState<HealthParameter[] | null>(null);
 
     const handleSendMessage = () => {
         if (!chatInput.trim()) return;
@@ -29,7 +44,9 @@ export const CenterPanel: React.FC = () => {
         setChatInput('');
     };
 
-    const ActiveChartComponent = CATEGORIES.find(c => c.id === activeCategory)?.Component || ActivityChart;
+    const handleEditClick = (params: HealthParameter[]) => {
+        setEditParams(params);
+    };
 
     return (
         <div className="flex flex-col h-full">
@@ -82,8 +99,30 @@ export const CenterPanel: React.FC = () => {
                                         <p className="text-sm mt-1">Add wearable data from the Sources panel to see visualizations.</p>
                                     </div>
                                 </div>
+                            ) : activeCategory === 'all' ? (
+                                // ALL VIEW: render every category in sequence
+                                <div className="space-y-10">
+                                    {CHART_COMPONENTS.map(({ id, Component, label }) => {
+                                        const hasCatData = wearableParameters.some(p => p.category === id);
+                                        if (!hasCatData) return null;
+                                        return (
+                                            <div key={id}>
+                                                <div className="flex items-center gap-2 mb-4">
+                                                    <span className="w-2 h-6 rounded-full bg-[#A84A00]" />
+                                                    <h2 className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#5D5A53]">{label}</h2>
+                                                </div>
+                                                <Component data={wearableParameters} onEditClick={handleEditClick} />
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             ) : (
-                                <ActiveChartComponent data={wearableParameters} />
+                                (() => {
+                                    const match = CHART_COMPONENTS.find(c => c.id === activeCategory);
+                                    if (!match) return null;
+                                    const Comp = match.Component;
+                                    return <Comp data={wearableParameters} onEditClick={handleEditClick} />;
+                                })()
                             )}
                         </div>
                     </div>
@@ -129,6 +168,9 @@ export const CenterPanel: React.FC = () => {
                     </div>
                 )}
             </div>
+
+            {/* Edit Modal */}
+            {editParams && <EditDataModal params={editParams} onClose={() => setEditParams(null)} />}
         </div>
     );
 };
