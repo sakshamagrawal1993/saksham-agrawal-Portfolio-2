@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
 // Get secrets explicitly for the Health Twin Webhook
-const N8N_HEALTH_WEBHOOK_URL = Deno.env.get('N8N_HEALTH_WEBHOOK_URL')
+const N8N_HEALTH_WEBHOOK_URL = Deno.env.get('N8N_Health_Twin_WEBHOOK_LAB_URL')
 const N8N_WEBHOOK_SECRET = Deno.env.get('N8N_WEBHOOK_SECRET')
 
 serve(async (req) => {
