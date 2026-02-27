@@ -28,6 +28,8 @@ const PostEditor = lazy(() => import('./components/dashboard/PostEditor'));
 const TicketflowApp = lazy(() => import('./components/Ticketflow/TicketflowApp'));
 const InsightsLMApp = lazy(() => import('./components/InsightsLM/InsightsLMApp'));
 const RunnerApp = lazy(() => import('./components/Runner/RunnerApp'));
+const TwinLanding = lazy(() => import('./components/HealthTwin/TwinLanding').then(m => ({ default: m.TwinLanding })));
+const HealthTwinDashboard = lazy(() => import('./components/HealthTwin/DashboardLayout'));
 
 const PortfolioPage = lazy(() => import('./components/PortfolioPage'));
 
@@ -182,6 +184,16 @@ function App() {
                 <RunnerApp onBack={() => navigate('/project/runner')} />
               </Suspense>
             } />
+            <Route path="/health-twin" element={
+              <Suspense fallback={<LoadingFallback />}>
+                <TwinLanding />
+              </Suspense>
+            } />
+            <Route path="/health-twin/:id" element={
+              <Suspense fallback={<LoadingFallback />}>
+                <HealthTwinDashboard />
+              </Suspense>
+            } />
             <Route path="/project/:id" element={<ProjectPage />} />
 
             {/* Unified Journal/Blog Routes */}
@@ -222,8 +234,8 @@ function App() {
           </Routes>
         </main>
 
-        {!['/ticketflow', '/insightslm', '/login'].includes(location.pathname) && <Footer onLinkClick={handleNavClick} />}
-        {location.pathname !== '/runner' && <Assistant />}
+        {!['/ticketflow', '/insightslm', '/login', '/health-twin'].includes(location.pathname) && <Footer onLinkClick={handleNavClick} />}
+        {!['/runner', '/health-twin'].includes(location.pathname) && <Assistant />}
       </div>
     </AuthProvider>
   );

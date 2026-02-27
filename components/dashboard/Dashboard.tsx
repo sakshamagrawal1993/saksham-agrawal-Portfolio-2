@@ -36,7 +36,7 @@ const Dashboard: React.FC = () => {
             return;
         }
         try {
-            const { data, error } = await supabase
+            const { data } = await supabase
                 .from('profiles')
                 .select('is_admin')
                 .eq('id', userId)

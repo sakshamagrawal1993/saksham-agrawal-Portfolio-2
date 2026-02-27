@@ -14,7 +14,7 @@ interface JournalDetailProps {
 }
 
 const JournalDetail: React.FC<JournalDetailProps> = ({ article: initialArticle, onBack }) => {
-  const [article, setArticle] = React.useState<JournalArticle | null>(initialArticle || null);
+  const [article] = React.useState<JournalArticle | null>(initialArticle || null);
 
   // If initialArticle is missing, we might need to fetch it (e.g. direct link)
   // But currently parent passes it. If we want to support direct linking where parent doesn't have it, 

@@ -17,7 +17,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ articleId }) => {
         checkUser();
 
         // Subscribe to auth changes
-        const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+        const { data: authListener } = supabase.auth.onAuthStateChange((_, session) => {
             setUserId(session?.user?.id || null);
         });
 
