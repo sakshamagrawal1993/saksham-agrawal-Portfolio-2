@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
 import { useHealthTwinStore, HealthTwin } from '../../store/healthTwin';
-import { Plus, Loader2, LogOut } from 'lucide-react';
+import { Plus, Loader2, LogOut, Star } from 'lucide-react';
 
 export const TwinLanding: React.FC = () => {
     const navigate = useNavigate();
@@ -109,6 +109,30 @@ export const TwinLanding: React.FC = () => {
     const handleLogout = async () => {
         await supabase.auth.signOut();
         navigate('/');
+    };
+
+    const handleToggleFeatured = async (e: React.MouseEvent, twin: HealthTwin) => {
+        e.stopPropagation(); // Don't navigate to the dashboard
+        const newVal = !twin.featured;
+        try {
+            const { error } = await supabase
+                .from('health_twins')
+                .update({ featured: newVal })
+                .eq('id', twin.id);
+            if (error) throw error;
+
+            // Update local state
+            setTwins(twins.map(t => t.id === twin.id ? { ...t, featured: newVal } : t));
+
+            // Also refresh featured list
+            if (newVal) {
+                setFeaturedTwins(prev => [{ ...twin, featured: true }, ...prev]);
+            } else {
+                setFeaturedTwins(prev => prev.filter(t => t.id !== twin.id));
+            }
+        } catch (err) {
+            console.error('Error toggling featured:', err);
+        }
     };
 
     if (loading) {
@@ -219,6 +243,13 @@ export const TwinLanding: React.FC = () => {
                                         <div className="w-8 h-8 rounded-md bg-white/20 backdrop-blur-sm flex items-center justify-center text-white font-serif">
                                             {twin.name.charAt(0).toUpperCase()}
                                         </div>
+                                        <button
+                                            onClick={(e) => handleToggleFeatured(e, twin)}
+                                            className="w-8 h-8 rounded-md bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/40 transition-colors"
+                                            title={twin.featured ? 'Remove from Featured' : 'Mark as Featured'}
+                                        >
+                                            <Star size={16} className={twin.featured ? 'fill-amber-300 text-amber-300' : 'text-white/70'} />
+                                        </button>
                                     </div>
                                     <div className="p-5 flex-1 flex flex-col justify-between">
                                         <div>
