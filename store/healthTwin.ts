@@ -59,6 +59,7 @@ export interface HealthParameter {
   parameter_value: number;
   unit: string;
   recorded_at: string;
+  ended_at?: string; // For range-based measurements (steps, sleep, etc.)
 }
 
 // Chat interface

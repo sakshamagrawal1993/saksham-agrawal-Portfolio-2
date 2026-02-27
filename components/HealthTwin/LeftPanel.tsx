@@ -131,7 +131,8 @@ export const LeftPanel: React.FC = () => {
                 parameter_name: item.parameter_name || item.name,
                 parameter_value: parseFloat(item.parameter_value || item.value),
                 unit: item.unit || '',
-                recorded_at: item.recorded_at || item.timestamp || new Date().toISOString()
+                recorded_at: item.recorded_at || item.timestamp || new Date().toISOString(),
+                ended_at: item.ended_at || item.end_timestamp || null
             }));
 
             const { data, error } = await supabase.from('health_wearable_parameters').insert(rows).select();
@@ -302,8 +303,8 @@ export const LeftPanel: React.FC = () => {
                                         key={tab.key}
                                         onClick={() => setActiveSourceTab(tab.key)}
                                         className={`flex items-center gap-3 p-4 rounded-xl border-2 text-left transition-all ${activeSourceTab === tab.key
-                                                ? 'border-[#A84A00] bg-[#A84A00]/5 shadow-sm'
-                                                : 'border-[#EBE7DE] hover:border-[#A8A29E] bg-white'
+                                            ? 'border-[#A84A00] bg-[#A84A00]/5 shadow-sm'
+                                            : 'border-[#EBE7DE] hover:border-[#A8A29E] bg-white'
                                             }`}
                                     >
                                         <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${activeSourceTab === tab.key ? 'bg-[#A84A00] text-white' : 'bg-[#F5F2EB] text-[#A8A29E]'
@@ -362,10 +363,10 @@ export const LeftPanel: React.FC = () => {
                             {/* ---- TAB: CONNECT WEARABLE (JSON) ---- */}
                             {activeSourceTab === 'wearable' && (
                                 <div>
-                                    <p className="text-sm text-[#5D5A53] mb-4">Paste wearable data as JSON. Each entry should have <code className="bg-[#F5F2EB] px-1.5 py-0.5 rounded text-xs font-mono">parameter_name</code>, <code className="bg-[#F5F2EB] px-1.5 py-0.5 rounded text-xs font-mono">parameter_value</code>, <code className="bg-[#F5F2EB] px-1.5 py-0.5 rounded text-xs font-mono">unit</code>, and <code className="bg-[#F5F2EB] px-1.5 py-0.5 rounded text-xs font-mono">recorded_at</code>.</p>
+                                    <p className="text-sm text-[#5D5A53] mb-4">Paste wearable data as JSON. Each entry should have <code className="bg-[#F5F2EB] px-1.5 py-0.5 rounded text-xs font-mono">parameter_name</code>, <code className="bg-[#F5F2EB] px-1.5 py-0.5 rounded text-xs font-mono">parameter_value</code>, <code className="bg-[#F5F2EB] px-1.5 py-0.5 rounded text-xs font-mono">unit</code>, <code className="bg-[#F5F2EB] px-1.5 py-0.5 rounded text-xs font-mono">recorded_at</code>, and optionally <code className="bg-[#F5F2EB] px-1.5 py-0.5 rounded text-xs font-mono">ended_at</code> for range-based data.</p>
                                     <textarea
-                                        rows={8}
-                                        placeholder={`[\n  {\n    "parameter_name": "Heart Rate",\n    "parameter_value": 72,\n    "unit": "bpm",\n    "recorded_at": "2026-02-27T10:00:00Z"\n  }\n]`}
+                                        rows={10}
+                                        placeholder={`[\n  {\n    "parameter_name": "Heart Rate",\n    "parameter_value": 72,\n    "unit": "bpm",\n    "recorded_at": "2026-02-27T10:00:00Z"\n  },\n  {\n    "parameter_name": "Steps",\n    "parameter_value": 8450,\n    "unit": "steps",\n    "recorded_at": "2026-02-27T06:00:00Z",\n    "ended_at": "2026-02-27T22:00:00Z"\n  }\n]`}
                                         value={wearableJson}
                                         onChange={(e) => { setWearableJson(e.target.value); setJsonError(''); }}
                                         className="w-full font-mono text-sm bg-[#F5F2EB] border border-[#EBE7DE] rounded-xl p-4 focus:outline-none focus:ring-2 focus:ring-[#A84A00] resize-none"
