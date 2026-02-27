@@ -39,7 +39,7 @@ const ProductDetail: React.FC<ProjectDetailProps> = ({ project, onBack }) => {
               <div className="w-full min-h-[400px] flex items-center justify-center bg-[#F5F2EB] border border-[#EBE7DE] rounded-xl overflow-hidden">
                 <CreditCard />
               </div>
-            ) : project.id === 'p1' ? (
+            ) : project.id === 'digital-twin' ? (
               <div className="w-full aspect-video overflow-hidden rounded-xl">
                 <ShaderAnimation />
               </div>

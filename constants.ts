@@ -119,7 +119,7 @@ export const PROJECTS: Project[] = [
     demoUrl: '/runner'
   },
   {
-    id: 'p1',
+    id: 'digital-twin',
     name: 'Health Twin Platform',
     tagline: 'Connected care via Knowledge Graphs.',
     description: 'A centralized platform connecting biomarkers to give users a holistic view of their health.',

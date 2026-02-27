@@ -30,7 +30,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) => {
                 <CreditCard />
               </div>
             </div>
-          ) : project.id === 'p1' ? (
+          ) : project.id === 'digital-twin' ? (
             <div className="w-full h-full overflow-hidden rounded-xl">
               <ShaderAnimation />
             </div>

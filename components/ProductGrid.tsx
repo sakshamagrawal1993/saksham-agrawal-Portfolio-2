@@ -25,7 +25,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({ onProductClick, featuredOnly 
   const filteredProjects = useMemo(() => {
     if (featuredOnly) {
       // Show only specific featured items in order
-      const featuredIds = ['insightslm', 'runner', 'p1', 'p2'];
+      const featuredIds = ['insightslm', 'runner', 'digital-twin', 'p2'];
       return featuredIds.map(id => PROJECTS.find(p => p.id === id)).filter((p): p is Project => !!p);
     }
 
