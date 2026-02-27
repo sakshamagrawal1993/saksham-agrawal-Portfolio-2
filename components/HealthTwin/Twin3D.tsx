@@ -1,25 +1,22 @@
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, Suspense } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Environment } from '@react-three/drei';
+import { OrbitControls, ContactShadows, Environment, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 
-const WireframeHuman = () => {
+// Fallback geometric human if the GLTF fails to load
+const FallbackHuman = () => {
     const groupRef = useRef<THREE.Group>(null);
     const materialRef = useRef<THREE.MeshStandardMaterial>(null);
 
-    // Color theme based on the uploaded image (cyan/blue glowing wireframe)
-    const color = "#00d2ff";
+    const color = "#A84A00";
 
     useFrame((state) => {
         if (groupRef.current) {
-            // Gentle hovering animation
             groupRef.current.position.y = Math.sin(state.clock.elapsedTime * 1.5) * 0.05;
-            // Slow rotation to showcase the 3D mesh
             groupRef.current.rotation.y = state.clock.elapsedTime * 0.2;
         }
 
         if (materialRef.current) {
-            // Slight pulsing effect on the wireframe emissive intensity
             materialRef.current.emissiveIntensity = 0.5 + Math.sin(state.clock.elapsedTime * 3) * 0.2;
         }
     });
@@ -38,7 +35,6 @@ const WireframeHuman = () => {
         });
     }, [color]);
 
-    // Helper to create joints (solid glowing spheres)
     const Joint = ({ position, scale = 1 }: { position: [number, number, number], scale?: number }) => (
         <mesh position={position}>
             <sphereGeometry args={[0.08 * scale, 16, 16]} />
@@ -57,36 +53,32 @@ const WireframeHuman = () => {
             <mesh material={material} position={[0, 1.6, 0]}>
                 <icosahedronGeometry args={[0.35, 2]} />
             </mesh>
-
             <mesh material={material} position={[0, 1.25, 0]}>
                 <cylinderGeometry args={[0.1, 0.15, 0.3, 8]} />
             </mesh>
-
             <mesh material={material} position={[0, 0.5, 0]}>
                 <cylinderGeometry args={[0.55, 0.4, 1.2, 12, 4]} />
             </mesh>
-
+            {/* Arms */}
             <mesh material={material} position={[-0.75, 0.4, 0]} rotation={[0, 0, -0.2]}>
                 <cylinderGeometry args={[0.12, 0.1, 1.0, 8, 3]} />
             </mesh>
             <mesh material={material} position={[-1.05, -0.6, 0]} rotation={[0, 0, -0.1]}>
                 <cylinderGeometry args={[0.1, 0.08, 1.0, 8, 3]} />
             </mesh>
-
             <mesh material={material} position={[0.75, 0.4, 0]} rotation={[0, 0, 0.2]}>
                 <cylinderGeometry args={[0.12, 0.1, 1.0, 8, 3]} />
             </mesh>
             <mesh material={material} position={[1.05, -0.6, 0]} rotation={[0, 0, 0.1]}>
                 <cylinderGeometry args={[0.1, 0.08, 1.0, 8, 3]} />
             </mesh>
-
+            {/* Legs */}
             <mesh material={material} position={[-0.25, -0.7, 0]} rotation={[0, 0, -0.1]}>
                 <cylinderGeometry args={[0.18, 0.12, 1.2, 8, 4]} />
             </mesh>
             <mesh material={material} position={[-0.4, -1.9, 0]} rotation={[0, 0, 0]}>
                 <cylinderGeometry args={[0.12, 0.08, 1.2, 8, 4]} />
             </mesh>
-
             <mesh material={material} position={[0.25, -0.7, 0]} rotation={[0, 0, 0.1]}>
                 <cylinderGeometry args={[0.18, 0.12, 1.2, 8, 4]} />
             </mesh>
@@ -94,82 +86,131 @@ const WireframeHuman = () => {
                 <cylinderGeometry args={[0.12, 0.08, 1.2, 8, 4]} />
             </mesh>
 
-            {/* Joints and connection points */}
-            {/* Neck/Shoulders */}
+            {/* Joints */}
             <Joint position={[0, 1.1, 0]} scale={1.2} />
             <Joint position={[-0.6, 0.9, 0]} scale={1.5} />
             <Joint position={[0.6, 0.9, 0]} scale={1.5} />
-
-            {/* Elbows */}
             <Joint position={[-0.9, -0.1, 0]} />
             <Joint position={[0.9, -0.1, 0]} />
-
-            {/* Wrists */}
             <Joint position={[-1.15, -1.1, 0]} scale={0.8} />
             <Joint position={[1.15, -1.1, 0]} scale={0.8} />
-
-            {/* Hips */}
             <Joint position={[-0.25, -0.1, 0]} scale={1.5} />
             <Joint position={[0.25, -0.1, 0]} scale={1.5} />
-
-            {/* Knees */}
             <Joint position={[-0.35, -1.3, 0]} scale={1.2} />
             <Joint position={[0.35, -1.3, 0]} scale={1.2} />
-
-            {/* Ankles */}
             <Joint position={[-0.4, -2.5, 0]} scale={0.8} />
             <Joint position={[0.4, -2.5, 0]} scale={0.8} />
 
-            {/* Inner Core / Heart */}
+            {/* Inner Core */}
             <mesh position={[0, 0.6, 0]}>
                 <icosahedronGeometry args={[0.2, 1]} />
-                <meshStandardMaterial
-                    color="#ffffff"
-                    emissive="#ffffff"
-                    emissiveIntensity={2}
-                    wireframe={true}
-                />
+                <meshStandardMaterial color="#A84A00" emissive="#A84A00" emissiveIntensity={2} wireframe={true} />
             </mesh>
 
             {/* Brain node */}
             <mesh position={[0, 1.6, 0]}>
                 <sphereGeometry args={[0.15, 8, 8]} />
-                <meshStandardMaterial
-                    color="#ffffff"
-                    emissive="#00d2ff"
-                    emissiveIntensity={1.5}
-                    wireframe={true}
-                />
+                <meshStandardMaterial color="#EBE7DE" emissive="#EBE7DE" emissiveIntensity={1.5} wireframe={true} />
             </mesh>
         </group>
     );
 };
 
-export const Twin3D: React.FC = () => {
+// Component to load external GLTF/GLB models seamlessly
+const ExternalModel = ({ url }: { url: string }) => {
+    // Attempt to load the model. If it's missing, this component will throw and the ErrorBoundary/Fallback will catch it.
+    const { scene } = useGLTF(url);
+    const groupRef = useRef<THREE.Group>(null);
+
+    // Apply the wireframe material and theme colors to all meshes in the imported model
+    const color = "#A84A00";
+    const customMaterial = useMemo(() => {
+        return new THREE.MeshStandardMaterial({
+            color: color,
+            emissive: color,
+            emissiveIntensity: 0.2, // Subtle glow
+            wireframe: true,        // Wireframe style applied to the imported unity/blender mesh
+            transparent: true,
+            opacity: 0.8,
+            roughness: 0.2,
+            metalness: 0.8,
+            side: THREE.DoubleSide
+        });
+    }, [color]);
+
+    useMemo(() => {
+        if (scene) {
+            scene.traverse((child) => {
+                if (child instanceof THREE.Mesh) {
+                    child.material = customMaterial;
+                }
+            });
+        }
+    }, [scene, customMaterial]);
+
+    useFrame((state) => {
+        if (groupRef.current) {
+            groupRef.current.position.y = Math.sin(state.clock.elapsedTime * 1.5) * 0.05;
+            groupRef.current.rotation.y = state.clock.elapsedTime * 0.2;
+            groupRef.current.scale.setScalar(1.5); // Adjust scale based on your typical Unity exports
+            groupRef.current.position.y -= 1; // Center it slightly down
+        }
+
+        if (customMaterial) {
+            customMaterial.emissiveIntensity = 0.2 + Math.sin(state.clock.elapsedTime * 3) * 0.1;
+        }
+    });
+
     return (
-        <div className="w-full h-full bg-gradient-to-b from-[#0a1128] to-[#000000]">
-            <Canvas camera={{ position: [0, 1, 6], fov: 50 }} className="w-full h-full">
-                <color attach="background" args={['#050814']} />
-                <fog attach="fog" args={['#050814', 4, 15]} />
+        <group ref={groupRef}>
+            <primitive object={scene} />
+        </group>
+    );
+};
 
-                <ambientLight intensity={0.2} color="#00d2ff" />
-                <directionalLight position={[10, 10, 5]} intensity={2} color="#00d2ff" />
-                <directionalLight position={[-10, -10, -5]} intensity={1} color="#0055ff" />
-                <spotLight position={[0, 10, 0]} intensity={2} color="#ffffff" penumbra={1} angle={0.5} />
+// Preload if the file exists (silently fails if it doesn't thanks to the catch in actual usage)
+// useGLTF.preload('/models/human.glb');
 
-                <WireframeHuman />
+class ErrorBoundary extends React.Component<{ children: React.ReactNode, fallback: React.ReactNode }, { hasError: boolean }> {
+    constructor(props: any) {
+        super(props);
+        this.state = { hasError: false };
+    }
+    static getDerivedStateFromError() {
+        return { hasError: true };
+    }
+    render() {
+        if (this.state.hasError) {
+            return this.props.fallback;
+        }
+        return this.props.children;
+    }
+}
 
-                <Environment preset="night" />
+export const Twin3D: React.FC = () => {
+    // The background is set to transparent so it blends perfectly with the #F5F2EB background of the landing page.
+    return (
+        <div className="w-full h-full relative" style={{ background: 'transparent' }}>
+            {/* Added a subtle overlay glow to blend the 3D space with the #F5F2EB page */}
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#F5F2EB]/10 to-[#F5F2EB] pointer-events-none z-10" />
 
-                {/* Glowing platform */}
-                <mesh position={[0, -2.2, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                    <ringGeometry args={[1.5, 1.6, 32]} />
-                    <meshBasicMaterial color="#00d2ff" transparent opacity={0.3} side={THREE.DoubleSide} />
-                </mesh>
-                <mesh position={[0, -2.2, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                    <circleGeometry args={[1.5, 32]} />
-                    <meshBasicMaterial color="#00d2ff" transparent opacity={0.05} side={THREE.DoubleSide} />
-                </mesh>
+            <Canvas camera={{ position: [0, 1, 6], fov: 50 }} className="w-full h-full" style={{ background: 'transparent' }}>
+                <ambientLight intensity={0.5} color="#ffffff" />
+                <directionalLight position={[10, 10, 5]} intensity={1.5} color="#A84A00" />
+                <directionalLight position={[-10, -10, -5]} intensity={0.5} color="#EBE7DE" />
+                <spotLight position={[0, 10, 0]} intensity={1} color="#ffffff" penumbra={1} angle={0.5} />
+
+                {/* Attempt to load the external model, fallback to procedural one if the file isn't found */}
+                <ErrorBoundary fallback={<FallbackHuman />}>
+                    <Suspense fallback={<FallbackHuman />}>
+                        <ExternalModel url="/models/human.glb" />
+                    </Suspense>
+                </ErrorBoundary>
+
+                <Environment preset="studio" />
+
+                {/* Contact shadow connecting the model to the #F5F2EB floor */}
+                <ContactShadows position={[0, -2.5, 0]} opacity={0.3} scale={8} blur={2.5} far={4} color="#A84A00" />
 
                 <OrbitControls
                     enablePan={false}

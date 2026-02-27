@@ -9,7 +9,7 @@ import {
 } from '../ui/chart';
 import { HealthParameter, useHealthTwinStore } from '../../store/healthTwin';
 import { supabase } from '../../lib/supabaseClient';
-import { Pencil, X, Save, Trash2 } from 'lucide-react';
+import { Pencil, X, Save, Trash2, ChevronLeft, ChevronRight, Droplet } from 'lucide-react';
 
 // ======== HELPERS ========
 const dayLabel = (iso: string) => {
@@ -646,16 +646,212 @@ export const SymptomsChart: React.FC<ChartProps> = ({ data, onEditClick }) => {
 };
 
 // ========================
-//  REPRODUCTIVE CHART
+//  MENSTRUAL LOG MODAL
+// ========================
+const LogMenstrualModal: React.FC<{
+    isOpen: boolean;
+    date: Date | null;
+    flowValue: number;
+    ovulationValue: boolean;
+    activeTwinId: string | null;
+    onClose: () => void;
+    onSave: (flow: number, ovulation: boolean) => Promise<void>;
+}> = ({ isOpen, date, flowValue, ovulationValue, onClose, onSave }) => {
+    const [flow, setFlow] = useState(flowValue);
+    const [ovulation, setOvulation] = useState(ovulationValue);
+    const [saving, setSaving] = useState(false);
+
+    // Sync state when props change
+    React.useEffect(() => {
+        if (isOpen) {
+            setFlow(flowValue);
+            setOvulation(ovulationValue);
+        }
+    }, [isOpen, flowValue, ovulationValue]);
+
+    if (!isOpen || !date) return null;
+
+    const handleSave = async () => {
+        setSaving(true);
+        await onSave(flow, ovulation);
+        setSaving(false);
+        onClose();
+    };
+
+    return (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={onClose}>
+            <div className="bg-white rounded-2xl shadow-2xl w-[95%] max-w-sm p-6 border border-[#EBE7DE] flex flex-col relative" onClick={e => e.stopPropagation()}>
+                <button onClick={onClose} className="absolute top-4 right-4 text-[#A8A29E] hover:text-[#2C2A26]"><X size={20} /></button>
+                <h2 className="font-serif text-lg text-[#2C2A26] mb-1">Log Menstrual Data</h2>
+                <p className="text-sm text-[#A8A29E] mb-6">{date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>
+
+                <div className="space-y-6 flex-1">
+                    <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-[#A8A29E] mb-3">Flow Level (0-5)</label>
+                        <div className="flex justify-between px-2">
+                            {[0, 1, 2, 3, 4, 5].map(level => (
+                                <button
+                                    key={level}
+                                    onClick={() => setFlow(level)}
+                                    className={`w-10 h-10 rounded-full flex flex-col items-center justify-center transition-all ${flow === level ? 'bg-[#ef4444] text-white shadow-md scale-110' : 'bg-[#F5F2EB] text-[#A8A29E] hover:bg-[#EBE7DE]'}`}
+                                >
+                                    <span className="text-sm font-bold leading-none">{level}</span>
+                                </button>
+                            ))}
+                        </div>
+                        <div className="flex justify-between px-2 mt-2 text-[10px] text-[#A8A29E]">
+                            <span>None</span>
+                            <span>Heavy</span>
+                        </div>
+                    </div>
+
+                    <div className="pt-4 border-t border-[#EBE7DE]">
+                        <label className="flex items-center gap-3 cursor-pointer">
+                            <div className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${ovulation ? 'bg-[#10b981] border-[#10b981]' : 'border-[#A8A29E]'}`}>
+                                {ovulation && <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                            </div>
+                            <div>
+                                <p className="text-sm font-bold text-[#2C2A26]">Ovulation Detected</p>
+                                <p className="text-xs text-[#A8A29E]">Mark if ovulation was confirmed</p>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div className="mt-8 pt-4 border-t border-[#EBE7DE] flex justify-end gap-3 w-full">
+                    <button onClick={onClose} className="px-4 py-2 text-sm font-bold text-[#5D5A53] hover:bg-[#F5F2EB] rounded-xl">Cancel</button>
+                    <button onClick={handleSave} disabled={saving} className="px-4 py-2 text-sm font-bold bg-[#A84A00] text-white hover:bg-[#8A3D00] disabled:opacity-50 rounded-xl flex items-center gap-2">
+                        {saving ? 'Saving...' : 'Save Data'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ========================
+//  REPRODUCTIVE CHART (Calendar)
 // ========================
 export const ReproductiveChart: React.FC<ChartProps> = ({ data, onEditClick }) => {
+    const { activeTwinId, wearableParameters, setWearableParameters } = useHealthTwinStore();
     const catData = data.filter(d => d.category === 'reproductive');
-    if (catData.length === 0) return <p className="text-[#A8A29E] italic">No reproductive health data available.</p>;
 
-    // Menstrual cycle phases
-    const cyclePhases = getByName(catData, 'Menstrual Cycle Phase').sort((a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime());
-    const cycleDays = getByName(catData, 'Menstrual Cycle Day');
+    // Calendar state
+    const [currentMonth, setCurrentMonth] = useState(() => {
+        if (catData.length > 0) {
+            const sorted = [...catData].sort((a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime());
+            return new Date(sorted[0].recorded_at);
+        }
+        return new Date();
+    });
+
+    const [modalOpen, setModalOpen] = useState(false);
+    const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+
+    // Filter relevant data
     const flowData = getByName(catData, 'Menstrual Flow Intensity');
+    const ovulationData = getByName(catData, 'Ovulation Detected');
+
+    // Calendar generation
+    const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
+    const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay();
+    const days = Array.from({ length: daysInMonth }, (_, i) => new Date(currentMonth.getFullYear(), currentMonth.getMonth(), i + 1));
+
+    const nextMonth = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
+    };
+    const prevMonth = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
+    };
+
+    const handleDayClick = (e: React.MouseEvent, date: Date) => {
+        e.stopPropagation(); // prevent triggering ChartCard global edit modal
+        setSelectedDate(date);
+        setModalOpen(true);
+    };
+
+    const getFlowForDate = (date: Date) => {
+        const iso = date.toISOString().split('T')[0];
+        const record = flowData.find(d => d.recorded_at.startsWith(iso));
+        return record ? Number(record.parameter_value) : 0;
+    };
+
+    const getOvulationForDate = (date: Date) => {
+        const iso = date.toISOString().split('T')[0];
+        const record = ovulationData.find(d => d.recorded_at.startsWith(iso));
+        return record ? Number(record.parameter_value) === 1 : false;
+    };
+
+    const handleSaveLog = async (flowLevel: number, isOvulation: boolean) => {
+        if (!selectedDate || !activeTwinId) return;
+        const isoDate = selectedDate.toISOString();
+        const datePrefix = isoDate.split('T')[0];
+
+        // Prepare new data records
+        const recordsToUpsert = [];
+
+        // Fetch existing records for this exact date to replace them or update
+        const existingFlow = flowData.find(d => d.recorded_at.startsWith(datePrefix));
+        const existingOvul = ovulationData.find(d => d.recorded_at.startsWith(datePrefix));
+
+        // Create flow record (if level > 0 or existing needs update/reset)
+        if (flowLevel > 0 || existingFlow) {
+            recordsToUpsert.push({
+                ...(existingFlow ? { id: existingFlow.id } : {}), // Update if exists
+                twin_id: activeTwinId,
+                parameter_name: 'Menstrual Flow Intensity',
+                parameter_value: flowLevel,
+                unit: 'level',
+                category: 'reproductive',
+                recorded_at: existingFlow ? existingFlow.recorded_at : isoDate,
+            });
+            // Also infer Phase
+            recordsToUpsert.push({
+                twin_id: activeTwinId,
+                parameter_name: 'Menstrual Cycle Phase',
+                parameter_value: 0,
+                parameter_text: flowLevel > 0 ? 'Menstruation' : 'Follicular',
+                category: 'reproductive',
+                recorded_at: existingFlow ? existingFlow.recorded_at : isoDate,
+            });
+        }
+
+        // Create ovulation record
+        if (isOvulation || existingOvul) {
+            recordsToUpsert.push({
+                ...(existingOvul ? { id: existingOvul.id } : {}),
+                twin_id: activeTwinId,
+                parameter_name: 'Ovulation Detected',
+                parameter_value: isOvulation ? 1 : 0,
+                unit: 'bool',
+                category: 'reproductive',
+                recorded_at: existingOvul ? existingOvul.recorded_at : isoDate,
+            });
+            if (isOvulation) {
+                recordsToUpsert.push({
+                    twin_id: activeTwinId,
+                    parameter_name: 'Menstrual Cycle Phase',
+                    parameter_value: 0,
+                    parameter_text: 'Ovulation',
+                    category: 'reproductive',
+                    recorded_at: existingOvul ? existingOvul.recorded_at : isoDate,
+                });
+            }
+        }
+
+        if (recordsToUpsert.length > 0) {
+            const { data: upsertedData, error } = await supabase.from('health_wearable_parameters').upsert(recordsToUpsert).select();
+            if (error) console.error('Error saving menstrual log:', error);
+            else if (upsertedData) {
+                // Remove old records from state if they got overwritten/upserted
+                const upsertedIds = upsertedData.map(d => d.id);
+                const filtered = wearableParameters.filter((p: HealthParameter) => !upsertedIds.includes(p.id) && !(p.category === 'reproductive' && p.recorded_at.startsWith(datePrefix)));
+                setWearableParameters([...upsertedData, ...filtered] as HealthParameter[]);
+            }
+        }
+    };
 
     const reproParams = [
         'Cervical Mucus Presence', 'Cervical Mucus Appearance', 'Intermenstrual Bleeding Record',
@@ -663,99 +859,76 @@ export const ReproductiveChart: React.FC<ChartProps> = ({ data, onEditClick }) =
         'Menstrual Cycle Phase', 'Menstrual Cycle Day', 'Menstrual Flow Intensity', 'Ovulation Detected'
     ];
 
-    // Phase colors
-    const phaseColor = (phase: string) => {
-        if (phase === 'Menstruation') return '#ef4444';
-        if (phase === 'Follicular') return '#3b82f6';
-        if (phase === 'Ovulation') return '#8b5cf6';
-        if (phase === 'Luteal') return '#f59e0b';
-        return '#EBE7DE';
-    };
-
-    // Other reproductive data (non-cycle)
-    const otherData = catData.filter(d => !['Menstrual Cycle Phase', 'Menstrual Cycle Day', 'Menstrual Flow Intensity', 'Ovulation Detected'].includes(d.parameter_name));
-    const otherDays = [...new Set(otherData.map(d => dayLabel(d.recorded_at)))];
-
     return (
         <ChartCard parameterNames={reproParams} data={data} onEditClick={onEditClick}>
-            <SectionHeader title="Menstrual Cycle" subtitle="Phase tracking and flow intensity" />
+            <SectionHeader title="Menstrual Calendar" subtitle="Track flow and ovulation. Click any date to log data." />
 
-            {/* Timeline */}
-            {cyclePhases.length > 0 && (
-                <div className="flex gap-1 mb-4">
-                    {cyclePhases.map((phase, i) => {
-                        const day = cycleDays.find(d => dayLabel(d.recorded_at) === dayLabel(phase.recorded_at));
-                        const flow = flowData.find(d => dayLabel(d.recorded_at) === dayLabel(phase.recorded_at));
-                        const color = phaseColor(phase.parameter_text || '');
-                        return (
-                            <div key={i} className="flex-1 group relative">
-                                <div
-                                    className="h-10 rounded-lg flex items-center justify-center text-white text-[10px] font-bold transition-all hover:scale-105 cursor-default"
-                                    style={{ backgroundColor: color }}
-                                    title={`Day ${day?.parameter_value || '?'}: ${phase.parameter_text}${flow ? ' — ' + flow.parameter_text : ''}`}
-                                >
-                                    D{day?.parameter_value || '?'}
-                                </div>
-                                <p className="text-[9px] text-center text-[#A8A29E] mt-1 truncate">{phase.parameter_text}</p>
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
-            <div className="flex flex-wrap gap-3 mt-2 mb-8">
-                {['Menstruation', 'Follicular', 'Ovulation', 'Luteal'].map(phase => (
-                    <span key={phase} className="flex items-center gap-1.5 text-xs text-[#5D5A53]">
-                        <span className="w-3 h-3 rounded-full" style={{ backgroundColor: phaseColor(phase) }} />
-                        {phase}
-                    </span>
-                ))}
-            </div>
-
-            {/* Flow Intensity */}
-            {flowData.length > 0 && (
-                <div className="mb-8">
-                    <SectionHeader title="Flow Intensity" subtitle="Daily menstrual flow level" />
-                    <div className="h-[180px]">
-                        <ChartContainer config={makeConfig('value', 'Flow Level', '#ef4444')} className="h-full w-full">
-                            <ResponsiveContainer>
-                                <BarChart data={flowData.map(d => ({ date: dayLabel(d.recorded_at), value: Number(d.parameter_value), label: d.parameter_text || '' }))} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#EBE7DE" />
-                                    <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: '#A8A29E', fontSize: 11 }} />
-                                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#A8A29E', fontSize: 11 }} domain={[0, 4]} />
-                                    <ChartTooltip content={<ChartTooltipContent />} />
-                                    <Bar dataKey="value" fill="#ef4444" radius={[6, 6, 0, 0]} maxBarSize={40} />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </ChartContainer>
+            <div className="bg-white border border-[#EBE7DE] rounded-2xl p-4 md:p-6 mb-6">
+                <div className="flex items-center justify-between mb-6">
+                    <h3 className="font-serif text-xl text-[#2C2A26] font-bold">
+                        {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                    </h3>
+                    <div className="flex gap-2">
+                        <button onClick={prevMonth} className="p-2 border border-[#EBE7DE] rounded-xl hover:bg-[#F5F2EB] text-[#5D5A53] transition-colors"><ChevronLeft size={18} /></button>
+                        <button onClick={nextMonth} className="p-2 border border-[#EBE7DE] rounded-xl hover:bg-[#F5F2EB] text-[#5D5A53] transition-colors"><ChevronRight size={18} /></button>
                     </div>
                 </div>
-            )}
 
-            {/* Other symptoms */}
-            {otherDays.length > 0 && (
-                <div className="space-y-3">
-                    <SectionHeader title="Other Reproductive Indicators" />
-                    {otherDays.map(day => {
-                        const dayData = otherData.filter(d => dayLabel(d.recorded_at) === day);
+                <div className="grid grid-cols-7 gap-1 md:gap-2 mb-2 text-center text-[10px] font-bold text-[#A8A29E] uppercase tracking-widest">
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => <div key={day} className="py-2">{day}</div>)}
+                </div>
+
+                <div className="grid grid-cols-7 gap-1 md:gap-2">
+                    {Array.from({ length: firstDayOfMonth }).map((_, i) => <div key={`empty-${i}`} className="h-12 md:h-16 rounded-xl bg-transparent" />)}
+                    {days.map(date => {
+                        const flow = getFlowForDate(date);
+                        const isOvulation = getOvulationForDate(date);
+                        const isToday = new Date().toDateString() === date.toDateString();
+
                         return (
-                            <div key={day} className="bg-[#F5F2EB] rounded-xl p-4 border border-[#EBE7DE]">
-                                <p className="text-xs font-bold text-[#A8A29E] uppercase tracking-widest mb-2">{day}</p>
-                                <div className="flex flex-wrap gap-2">
-                                    {dayData.map((d, i) => {
-                                        const isText = d.parameter_text;
-                                        const isActive = Number(d.parameter_value) === 1;
-                                        return (
-                                            <span key={i} className={`text-xs px-2.5 py-1 rounded-full ${isText ? 'bg-[#8b5cf6]/10 text-[#8b5cf6]' : isActive ? 'bg-[#E98226]/10 text-[#E98226]' : 'bg-[#EBE7DE] text-[#A8A29E]'}`}>
-                                                {d.parameter_name.replace(' Indicator', '')}: {isText || (isActive ? 'Yes' : 'No')}
-                                            </span>
-                                        );
-                                    })}
+                            <div
+                                key={date.toISOString()}
+                                onClick={(e) => handleDayClick(e, date)}
+                                className={`h-12 md:h-16 rounded-xl border flex flex-col items-center justify-start py-1 transition-all cursor-pointer relative overflow-hidden group hover:border-[#A84A00] ${isToday ? 'border-[#A84A00] bg-[#F5F2EB]' : 'border-[#EBE7DE] bg-white hover:bg-[#F5F2EB]/50'}`}
+                            >
+                                <span className={`text-[10px] md:text-xs font-bold ${isToday ? 'text-[#A84A00]' : 'text-[#5D5A53]'} ${flow > 0 ? 'opacity-80' : ''}`}>{date.getDate()}</span>
+
+                                <div className="absolute inset-0 flex items-center justify-center mt-3 pointer-events-none">
+                                    {isOvulation && (
+                                        <div className="absolute w-8 h-8 rounded-full border-2 border-[#10b981] opacity-70 scale-110" />
+                                    )}
+                                    {flow > 0 && (
+                                        <div
+                                            className="rounded-full bg-[#ef4444] opacity-80 flex items-center justify-center"
+                                            style={{
+                                                width: `${12 + (flow * 4)}px`,
+                                                height: `${12 + (flow * 4)}px`
+                                            }}
+                                        >
+                                            <Droplet className="text-white fill-white opacity-50" size={8 + (flow * 1.5)} />
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         );
                     })}
                 </div>
-            )}
+
+                <div className="flex flex-wrap gap-4 mt-6 pt-4 border-t border-[#EBE7DE] justify-center text-xs text-[#A8A29E]">
+                    <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-[#ef4444] opacity-80" /> Period Flow</div>
+                    <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full border-2 border-[#10b981] opacity-70" /> Ovulation</div>
+                </div>
+            </div>
+
+            <LogMenstrualModal
+                isOpen={modalOpen}
+                date={selectedDate}
+                flowValue={selectedDate ? getFlowForDate(selectedDate) : 0}
+                ovulationValue={selectedDate ? getOvulationForDate(selectedDate) : false}
+                activeTwinId={activeTwinId}
+                onClose={() => setModalOpen(false)}
+                onSave={handleSaveLog}
+            />
         </ChartCard>
     );
 };
