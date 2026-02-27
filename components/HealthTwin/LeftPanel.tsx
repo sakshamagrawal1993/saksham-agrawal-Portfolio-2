@@ -7,7 +7,7 @@ type SourceTab = 'upload' | 'wearable' | 'parameter' | 'profile';
 
 const SOURCE_TABS: { key: SourceTab; label: string; icon: React.ReactNode; desc: string }[] = [
     { key: 'upload', label: 'Upload Lab Report', icon: <UploadCloud size={20} />, desc: 'PDF, Images, CSV' },
-    { key: 'wearable', label: 'Connect Wearable', icon: <Watch size={20} />, desc: 'Paste JSON data' },
+    { key: 'wearable', label: 'Connect Wearable', icon: <Watch size={20} />, desc: 'Upload CSV data' },
     { key: 'parameter', label: 'Individual Parameter', icon: <Activity size={20} />, desc: 'Add manual readings' },
     { key: 'profile', label: 'Fill Profile', icon: <User size={20} />, desc: 'Personal details' },
 ];
@@ -42,10 +42,13 @@ export const LeftPanel: React.FC = () => {
     const [paramForm, setParamForm] = useState({ name: '', value: '', unit: '', recorded_at: '' });
     const [paramSaving, setParamSaving] = useState(false);
 
-    // Wearable JSON state
-    const [wearableJson, setWearableJson] = useState('');
+    // Wearable CSV state
+    const [wearableCsvFile, setWearableCsvFile] = useState<File | null>(null);
+    const [wearableCsvPreview, setWearableCsvPreview] = useState<Record<string, string>[]>([]);
     const [wearableSaving, setWearableSaving] = useState(false);
-    const [jsonError, setJsonError] = useState('');
+    const [csvError, setCsvError] = useState('');
+    const [csvDragging, setCsvDragging] = useState(false);
+    const csvInputRef = useRef<HTMLInputElement>(null);
 
     // Profile state
     const [profileForm, setProfileForm] = useState<Record<string, string>>({
@@ -118,32 +121,88 @@ export const LeftPanel: React.FC = () => {
         finally { setParamSaving(false); }
     };
 
-    // ---------- WEARABLE JSON ----------
+    // ---------- CSV PARSER ----------
+    const parseCsv = (text: string): Record<string, string>[] => {
+        const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+        if (lines.length < 2) throw new Error('CSV must have a header row and at least one data row.');
+        const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+        return lines.slice(1).map(line => {
+            const values = line.match(/("[^"]*"|[^,]+)/g)?.map(v => v.trim().replace(/^"|"$/g, '')) || [];
+            const row: Record<string, string> = {};
+            headers.forEach((h, i) => { row[h] = values[i] || ''; });
+            return row;
+        });
+    };
+
+    const handleCsvFileSelect = (file: File) => {
+        if (!file.name.endsWith('.csv')) { setCsvError('Please upload a .csv file'); return; }
+        setWearableCsvFile(file);
+        setCsvError('');
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const parsed = parseCsv(e.target?.result as string);
+                setWearableCsvPreview(parsed.slice(0, 5)); // preview max 5 rows
+            } catch (err: any) { setCsvError(err.message); }
+        };
+        reader.readAsText(file);
+    };
+
+    const handleCsvDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); setCsvDragging(true); }, []);
+    const handleCsvDragLeave = useCallback(() => setCsvDragging(false), []);
+    const handleCsvDrop = useCallback((e: React.DragEvent) => {
+        e.preventDefault(); setCsvDragging(false);
+        const file = e.dataTransfer.files?.[0];
+        if (file) handleCsvFileSelect(file);
+    }, []);
+
+    const downloadSampleCsv = () => {
+        const sample = `parameter_name,parameter_value,unit,recorded_at,ended_at,category,group_id,parameter_text
+Heart Rate,72,bpm,2026-02-27T10:00:00Z,,vitals,,
+Step Count,8450,steps,2026-02-27T06:00:00Z,2026-02-27T22:00:00Z,activity,,
+Blood Pressure Systolic,120,mmHg,2026-02-27T08:00:00Z,,vitals,bp-group-1,
+Blood Pressure Diastolic,80,mmHg,2026-02-27T08:00:00Z,,vitals,bp-group-1,
+Sleep Duration,7.5,hours,2026-02-27T23:00:00Z,2026-02-28T06:30:00Z,sleep,,
+Exercise Type,0,,2026-02-27T17:00:00Z,2026-02-27T18:00:00Z,exercise,ex-group-1,Running
+Exercise Duration,45,min,2026-02-27T17:00:00Z,,exercise,ex-group-1,
+Active Calories Burnt,320,kcal,2026-02-27T06:00:00Z,2026-02-27T22:00:00Z,activity,,`;
+        const blob = new Blob([sample], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'wearable_data_sample.csv'; a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    // ---------- WEARABLE CSV IMPORT ----------
     const handleWearableImport = async () => {
-        if (!wearableJson.trim() || !activeTwinId) return;
+        if (!wearableCsvFile || !activeTwinId) return;
         setWearableSaving(true);
-        setJsonError('');
+        setCsvError('');
         try {
-            const parsed = JSON.parse(wearableJson);
-            const entries = Array.isArray(parsed) ? parsed : [parsed];
-            const rows = entries.map((item: any) => ({
+            const text = await wearableCsvFile.text();
+            const parsed = parseCsv(text);
+            const rows = parsed.map((item) => ({
                 twin_id: activeTwinId,
-                parameter_name: item.parameter_name || item.name,
-                parameter_value: parseFloat(item.parameter_value || item.value),
+                parameter_name: item.parameter_name || item.name || '',
+                parameter_value: parseFloat(item.parameter_value || item.value || '0'),
                 unit: item.unit || '',
                 recorded_at: item.recorded_at || item.timestamp || new Date().toISOString(),
-                ended_at: item.ended_at || item.end_timestamp || null
+                ended_at: item.ended_at || item.end_timestamp || null,
+                category: item.category || null,
+                group_id: item.group_id || null,
+                parameter_text: item.parameter_text || null,
             }));
 
             const { data, error } = await supabase.from('health_wearable_parameters').insert(rows).select();
             if (error) throw error;
 
             setWearableParameters([...(data || []), ...wearableParameters]);
-            setWearableJson('');
+            setWearableCsvFile(null);
+            setWearableCsvPreview([]);
             setModalOpen(false);
         } catch (err: any) {
-            if (err instanceof SyntaxError) setJsonError('Invalid JSON format. Please check your input.');
-            else { console.error('Error importing wearable data:', err); setJsonError(err.message || 'Failed to save.'); }
+            console.error('Error importing CSV:', err);
+            setCsvError(err.message || 'Failed to import CSV.');
         }
         finally { setWearableSaving(false); }
     };
@@ -360,21 +419,76 @@ export const LeftPanel: React.FC = () => {
                                 </div>
                             )}
 
-                            {/* ---- TAB: CONNECT WEARABLE (JSON) ---- */}
+                            {/* ---- TAB: CONNECT WEARABLE (CSV) ---- */}
                             {activeSourceTab === 'wearable' && (
                                 <div>
-                                    <p className="text-sm text-[#5D5A53] mb-4">Paste wearable data as JSON. Each entry should have <code className="bg-[#F5F2EB] px-1.5 py-0.5 rounded text-xs font-mono">parameter_name</code>, <code className="bg-[#F5F2EB] px-1.5 py-0.5 rounded text-xs font-mono">parameter_value</code>, <code className="bg-[#F5F2EB] px-1.5 py-0.5 rounded text-xs font-mono">unit</code>, <code className="bg-[#F5F2EB] px-1.5 py-0.5 rounded text-xs font-mono">recorded_at</code>, and optionally <code className="bg-[#F5F2EB] px-1.5 py-0.5 rounded text-xs font-mono">ended_at</code> for range-based data.</p>
-                                    <textarea
-                                        rows={10}
-                                        placeholder={`[\n  {\n    "parameter_name": "Heart Rate",\n    "parameter_value": 72,\n    "unit": "bpm",\n    "recorded_at": "2026-02-27T10:00:00Z"\n  },\n  {\n    "parameter_name": "Steps",\n    "parameter_value": 8450,\n    "unit": "steps",\n    "recorded_at": "2026-02-27T06:00:00Z",\n    "ended_at": "2026-02-27T22:00:00Z"\n  }\n]`}
-                                        value={wearableJson}
-                                        onChange={(e) => { setWearableJson(e.target.value); setJsonError(''); }}
-                                        className="w-full font-mono text-sm bg-[#F5F2EB] border border-[#EBE7DE] rounded-xl p-4 focus:outline-none focus:ring-2 focus:ring-[#A84A00] resize-none"
-                                    />
-                                    {jsonError && <p className="text-xs text-rose-500 mt-2">{jsonError}</p>}
+                                    <div className="flex items-center justify-between mb-3">
+                                        <p className="text-sm text-[#5D5A53]">Upload a CSV with wearable data. Required columns: <code className="bg-[#F5F2EB] px-1.5 py-0.5 rounded text-xs font-mono">parameter_name</code>, <code className="bg-[#F5F2EB] px-1.5 py-0.5 rounded text-xs font-mono">parameter_value</code>, <code className="bg-[#F5F2EB] px-1.5 py-0.5 rounded text-xs font-mono">unit</code>, <code className="bg-[#F5F2EB] px-1.5 py-0.5 rounded text-xs font-mono">recorded_at</code>.</p>
+                                    </div>
+                                    <button onClick={downloadSampleCsv} className="text-xs text-[#A84A00] hover:underline font-bold mb-4 flex items-center gap-1">
+                                        <FileText size={12} /> Download Sample CSV
+                                    </button>
+
+                                    {/* Drag & Drop Zone */}
+                                    <div
+                                        onDragOver={handleCsvDragOver}
+                                        onDragLeave={handleCsvDragLeave}
+                                        onDrop={handleCsvDrop}
+                                        onClick={() => csvInputRef.current?.click()}
+                                        className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${csvDragging ? 'border-[#A84A00] bg-[#A84A00]/5' : 'border-[#EBE7DE] hover:border-[#A84A00]/40'
+                                            } ${wearableCsvFile ? 'bg-[#10b981]/5 border-[#10b981]' : ''}`}
+                                    >
+                                        <input
+                                            ref={csvInputRef}
+                                            type="file"
+                                            accept=".csv"
+                                            className="hidden"
+                                            onChange={e => { if (e.target.files?.[0]) handleCsvFileSelect(e.target.files[0]); }}
+                                        />
+                                        {wearableCsvFile ? (
+                                            <>
+                                                <Check size={24} className="mx-auto mb-2 text-[#10b981]" />
+                                                <p className="font-bold text-[#2C2A26] text-sm">{wearableCsvFile.name}</p>
+                                                <p className="text-xs text-[#A8A29E] mt-1">{wearableCsvPreview.length > 0 ? `${wearableCsvPreview.length} rows preview (click to change)` : 'Click to change file'}</p>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <UploadCloud size={24} className="mx-auto mb-2 text-[#A8A29E]" />
+                                                <p className="text-sm text-[#5D5A53] font-bold">Drop CSV file here or click to browse</p>
+                                                <p className="text-xs text-[#A8A29E] mt-1">.csv files only</p>
+                                            </>
+                                        )}
+                                    </div>
+
+                                    {/* Preview Table */}
+                                    {wearableCsvPreview.length > 0 && (
+                                        <div className="mt-4 overflow-x-auto">
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-[#A8A29E] mb-2">Preview (first {wearableCsvPreview.length} rows)</p>
+                                            <table className="w-full text-xs">
+                                                <thead>
+                                                    <tr className="border-b border-[#EBE7DE]">
+                                                        {Object.keys(wearableCsvPreview[0]).map(h => (
+                                                            <th key={h} className="py-1.5 pr-3 text-left text-[10px] font-bold uppercase tracking-widest text-[#A8A29E]">{h}</th>
+                                                        ))}
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {wearableCsvPreview.map((row, i) => (
+                                                        <tr key={i} className="border-b border-[#EBE7DE]/50">
+                                                            {Object.values(row).map((v, j) => (
+                                                                <td key={j} className="py-1.5 pr-3 text-[#5D5A53] truncate max-w-[120px]">{v || '—'}</td>
+                                                            ))}
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+
+                                    {csvError && <p className="text-xs text-rose-500 mt-2">{csvError}</p>}
                                     <button
                                         onClick={handleWearableImport}
-                                        disabled={!wearableJson.trim() || wearableSaving}
+                                        disabled={!wearableCsvFile || wearableSaving}
                                         className="mt-6 w-full py-3 bg-[#A84A00] hover:bg-[#8A3D00] text-white rounded-xl font-medium text-sm disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                                     >
                                         {wearableSaving ? <><Loader2 size={16} className="animate-spin" /> Importing...</> : <><Check size={16} /> Import Wearable Data</>}
