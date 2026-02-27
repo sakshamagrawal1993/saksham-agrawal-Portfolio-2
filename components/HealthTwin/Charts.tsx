@@ -803,22 +803,24 @@ export const ReproductiveChart: React.FC<ChartProps> = ({ data, onEditClick }) =
         setModalOpen(true);
     };
 
+    const getLocalDateStr = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+
     const getFlowForDate = (date: Date) => {
-        const iso = date.toISOString().split('T')[0];
-        const record = flowData.find(d => d.recorded_at.startsWith(iso));
+        const localStr = getLocalDateStr(date);
+        const record = flowData.find(d => d.recorded_at.startsWith(localStr));
         return record ? Number(record.parameter_value) : 0;
     };
 
     const getOvulationForDate = (date: Date) => {
-        const iso = date.toISOString().split('T')[0];
-        const record = ovulationData.find(d => d.recorded_at.startsWith(iso));
+        const localStr = getLocalDateStr(date);
+        const record = ovulationData.find(d => d.recorded_at.startsWith(localStr));
         return record ? Number(record.parameter_value) === 1 : false;
     };
 
     const handleSaveLog = async (flowLevel: number, isOvulation: boolean) => {
         if (!selectedDate || !activeTwinId) return;
-        const isoDate = selectedDate.toISOString();
-        const datePrefix = isoDate.split('T')[0];
+        const datePrefix = getLocalDateStr(selectedDate);
+        const isoDate = `${datePrefix}T12:00:00.000Z`;
 
         // Prepare new data records
         const recordsToUpsert = [];
