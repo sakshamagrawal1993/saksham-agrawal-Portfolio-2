@@ -49,22 +49,23 @@ const StatCard: React.FC<{ label: string; value: string | number; unit?: string;
 
 // ======== CHART WRAPPER WITH EDIT ========
 const ChartCard: React.FC<{ children: React.ReactNode; className?: string; parameterNames?: string[]; data?: HealthParameter[]; onEditClick?: (params: HealthParameter[]) => void }> = ({ children, className = '', parameterNames, data, onEditClick }) => {
+    const isEditable = !!(parameterNames && data && onEditClick);
     const handleEdit = () => {
-        if (parameterNames && data && onEditClick) {
+        if (isEditable && onEditClick) {
             const filtered = data.filter(d => parameterNames.includes(d.parameter_name));
             onEditClick(filtered);
         }
     };
     return (
-        <div className={`bg-white border border-[#EBE7DE] shadow-sm rounded-2xl p-6 relative group ${className}`}>
-            {parameterNames && data && onEditClick && (
-                <button
-                    onClick={handleEdit}
-                    className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity bg-[#F5F2EB] hover:bg-[#EBE7DE] border border-[#EBE7DE] rounded-lg p-1.5 text-[#5D5A53] hover:text-[#A84A00]"
-                    title="Edit data"
-                >
+        <div
+            onClick={isEditable ? handleEdit : undefined}
+            className={`bg-white border border-[#EBE7DE] shadow-sm rounded-2xl p-6 relative group transition-colors ${isEditable ? 'cursor-pointer hover:border-[#A84A00]/40' : ''} ${className}`}
+        >
+            {isEditable && (
+                <div className="absolute top-4 right-4 p-2 bg-[#F5F2EB] text-[#A84A00] rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2 pointer-events-none z-10">
+                    <span className="text-[10px] uppercase font-bold tracking-widest hidden sm:inline">Click to Edit Data</span>
                     <Pencil size={14} />
-                </button>
+                </div>
             )}
             {children}
         </div>
@@ -606,13 +607,13 @@ export const RecoveryChart: React.FC<ChartProps> = ({ data, onEditClick }) => {
 // ========================
 //  SYMPTOMS CHART (Heatmap-style grid)
 // ========================
-export const SymptomsChart: React.FC<ChartProps> = ({ data, onEditClick: _onEditClick }) => {
+export const SymptomsChart: React.FC<ChartProps> = ({ data, onEditClick }) => {
     const catData = data.filter(d => d.category === 'symptoms');
     const days = [...new Set(catData.map(d => dayLabel(d.recorded_at)))];
     const paramNames = [...new Set(catData.map(d => d.parameter_name))].sort();
 
     return (
-        <div className="space-y-4">
+        <ChartCard parameterNames={paramNames} data={data} onEditClick={onEditClick}>
             <SectionHeader title="Symptoms Tracker" subtitle="Binary indicators — orange = present, gray = absent" />
             <div className="overflow-x-auto">
                 <table className="w-full text-xs">
@@ -640,14 +641,14 @@ export const SymptomsChart: React.FC<ChartProps> = ({ data, onEditClick: _onEdit
                     </tbody>
                 </table>
             </div>
-        </div>
+        </ChartCard>
     );
 };
 
 // ========================
 //  REPRODUCTIVE CHART
 // ========================
-export const ReproductiveChart: React.FC<ChartProps> = ({ data, onEditClick: _onEditClick }) => {
+export const ReproductiveChart: React.FC<ChartProps> = ({ data, onEditClick }) => {
     const catData = data.filter(d => d.category === 'reproductive');
     if (catData.length === 0) return <p className="text-[#A8A29E] italic">No reproductive health data available.</p>;
 
@@ -656,15 +657,19 @@ export const ReproductiveChart: React.FC<ChartProps> = ({ data, onEditClick: _on
     const cycleDays = getByName(catData, 'Menstrual Cycle Day');
     const flowData = getByName(catData, 'Menstrual Flow Intensity');
 
+    const reproParams = [
+        'Cervical Mucus Presence', 'Cervical Mucus Appearance', 'Intermenstrual Bleeding Record',
+        'Breast Pain Indicator', 'Pelvic Pain Indicator', 'Vaginal Dryness Indicator',
+        'Menstrual Cycle Phase', 'Menstrual Cycle Day', 'Menstrual Flow Intensity', 'Ovulation Detected'
+    ];
+
     // Phase colors
     const phaseColor = (phase: string) => {
-        switch (phase) {
-            case 'Menstruation': return '#ef4444';
-            case 'Follicular': return '#3b82f6';
-            case 'Ovulation': return '#10b981';
-            case 'Luteal': return '#f59e0b';
-            default: return '#A8A29E';
-        }
+        if (phase === 'Menstruation') return '#ef4444';
+        if (phase === 'Follicular') return '#3b82f6';
+        if (phase === 'Ovulation') return '#8b5cf6';
+        if (phase === 'Luteal') return '#f59e0b';
+        return '#EBE7DE';
     };
 
     // Other reproductive data (non-cycle)
@@ -672,44 +677,43 @@ export const ReproductiveChart: React.FC<ChartProps> = ({ data, onEditClick: _on
     const otherDays = [...new Set(otherData.map(d => dayLabel(d.recorded_at)))];
 
     return (
-        <div className="space-y-6">
-            {/* Menstrual Cycle Timeline */}
+        <ChartCard parameterNames={reproParams} data={data} onEditClick={onEditClick}>
+            <SectionHeader title="Menstrual Cycle" subtitle="Phase tracking and flow intensity" />
+
+            {/* Timeline */}
             {cyclePhases.length > 0 && (
-                <ChartCard>
-                    <SectionHeader title="Menstrual Cycle" subtitle="Phase tracking and flow intensity" />
-                    <div className="flex gap-1 mb-4">
-                        {cyclePhases.map((phase, i) => {
-                            const day = cycleDays.find(d => dayLabel(d.recorded_at) === dayLabel(phase.recorded_at));
-                            const flow = flowData.find(d => dayLabel(d.recorded_at) === dayLabel(phase.recorded_at));
-                            const color = phaseColor(phase.parameter_text || '');
-                            return (
-                                <div key={i} className="flex-1 group relative">
-                                    <div
-                                        className="h-10 rounded-lg flex items-center justify-center text-white text-[10px] font-bold transition-all hover:scale-105 cursor-default"
-                                        style={{ backgroundColor: color }}
-                                        title={`Day ${day?.parameter_value || '?'}: ${phase.parameter_text}${flow ? ' — ' + flow.parameter_text : ''}`}
-                                    >
-                                        D{day?.parameter_value || '?'}
-                                    </div>
-                                    <p className="text-[9px] text-center text-[#A8A29E] mt-1 truncate">{phase.parameter_text}</p>
+                <div className="flex gap-1 mb-4">
+                    {cyclePhases.map((phase, i) => {
+                        const day = cycleDays.find(d => dayLabel(d.recorded_at) === dayLabel(phase.recorded_at));
+                        const flow = flowData.find(d => dayLabel(d.recorded_at) === dayLabel(phase.recorded_at));
+                        const color = phaseColor(phase.parameter_text || '');
+                        return (
+                            <div key={i} className="flex-1 group relative">
+                                <div
+                                    className="h-10 rounded-lg flex items-center justify-center text-white text-[10px] font-bold transition-all hover:scale-105 cursor-default"
+                                    style={{ backgroundColor: color }}
+                                    title={`Day ${day?.parameter_value || '?'}: ${phase.parameter_text}${flow ? ' — ' + flow.parameter_text : ''}`}
+                                >
+                                    D{day?.parameter_value || '?'}
                                 </div>
-                            );
-                        })}
-                    </div>
-                    <div className="flex flex-wrap gap-3 mt-2">
-                        {['Menstruation', 'Follicular', 'Ovulation', 'Luteal'].map(phase => (
-                            <span key={phase} className="flex items-center gap-1.5 text-xs text-[#5D5A53]">
-                                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: phaseColor(phase) }} />
-                                {phase}
-                            </span>
-                        ))}
-                    </div>
-                </ChartCard>
+                                <p className="text-[9px] text-center text-[#A8A29E] mt-1 truncate">{phase.parameter_text}</p>
+                            </div>
+                        );
+                    })}
+                </div>
             )}
+            <div className="flex flex-wrap gap-3 mt-2 mb-8">
+                {['Menstruation', 'Follicular', 'Ovulation', 'Luteal'].map(phase => (
+                    <span key={phase} className="flex items-center gap-1.5 text-xs text-[#5D5A53]">
+                        <span className="w-3 h-3 rounded-full" style={{ backgroundColor: phaseColor(phase) }} />
+                        {phase}
+                    </span>
+                ))}
+            </div>
 
             {/* Flow Intensity */}
             {flowData.length > 0 && (
-                <ChartCard>
+                <div className="mb-8">
                     <SectionHeader title="Flow Intensity" subtitle="Daily menstrual flow level" />
                     <div className="h-[180px]">
                         <ChartContainer config={makeConfig('value', 'Flow Level', '#ef4444')} className="h-full w-full">
@@ -724,7 +728,7 @@ export const ReproductiveChart: React.FC<ChartProps> = ({ data, onEditClick: _on
                             </ResponsiveContainer>
                         </ChartContainer>
                     </div>
-                </ChartCard>
+                </div>
             )}
 
             {/* Other symptoms */}
@@ -752,7 +756,7 @@ export const ReproductiveChart: React.FC<ChartProps> = ({ data, onEditClick: _on
                     })}
                 </div>
             )}
-        </div>
+        </ChartCard>
     );
 };
 
