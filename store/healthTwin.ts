@@ -58,9 +58,12 @@ export interface HealthParameter {
   id: string;
   parameter_name: string;
   parameter_value: number;
+  parameter_text?: string; // For non-numeric values (e.g. Exercise Type = "Running")
   unit: string;
   recorded_at: string;
   ended_at?: string; // For range-based measurements (steps, sleep, etc.)
+  group_id?: string; // Links related parameters (e.g. BP systolic + diastolic)
+  category?: string; // UI grouping: activity, vitals, exercise, sleep, nutrition, recovery, reproductive, symptoms
 }
 
 // Chat interface

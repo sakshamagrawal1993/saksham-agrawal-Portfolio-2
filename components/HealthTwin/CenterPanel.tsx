@@ -1,19 +1,35 @@
 import React, { useState } from 'react';
 import { useHealthTwinStore } from '../../store/healthTwin';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
-import { StepsChart, HeartRateChart } from './Charts';
-import { MessageSquare, LineChart } from 'lucide-react';
+import {
+    ActivityChart, VitalsChart, ExerciseChart, SleepChart,
+    NutritionChart, RecoveryChart, SymptomsChart, ReproductiveChart
+} from './Charts';
+import { MessageSquare, LineChart, Activity, Heart, Dumbbell, Moon, Utensils, Brain, AlertCircle, Baby } from 'lucide-react';
+
+const CATEGORIES = [
+    { id: 'activity', label: 'Activity', icon: Activity, Component: ActivityChart },
+    { id: 'vitals', label: 'Vitals', icon: Heart, Component: VitalsChart },
+    { id: 'exercise', label: 'Exercise', icon: Dumbbell, Component: ExerciseChart },
+    { id: 'sleep', label: 'Sleep', icon: Moon, Component: SleepChart },
+    { id: 'nutrition', label: 'Nutrition', icon: Utensils, Component: NutritionChart },
+    { id: 'recovery', label: 'Recovery', icon: Brain, Component: RecoveryChart },
+    { id: 'symptoms', label: 'Symptoms', icon: AlertCircle, Component: SymptomsChart },
+    { id: 'reproductive', label: 'Reproductive', icon: Baby, Component: ReproductiveChart },
+] as const;
 
 export const CenterPanel: React.FC = () => {
-    const { activeTab, setActiveTab, chatHistory } = useHealthTwinStore();
+    const { activeTab, setActiveTab, chatHistory, wearableParameters } = useHealthTwinStore();
     const [chatInput, setChatInput] = useState('');
+    const [activeCategory, setActiveCategory] = useState('activity');
 
     const handleSendMessage = () => {
-        // Basic wiring for now
         if (!chatInput.trim()) return;
         console.log("Sending chat message:", chatInput);
         setChatInput('');
     };
+
+    const ActiveChartComponent = CATEGORIES.find(c => c.id === activeCategory)?.Component || ActivityChart;
 
     return (
         <div className="flex flex-col h-full">
@@ -32,13 +48,43 @@ export const CenterPanel: React.FC = () => {
 
             <div className="flex-1 overflow-hidden">
                 {activeTab === 'graphs' ? (
-                    <div className="p-6 overflow-y-auto h-full space-y-8">
-                        <div className="bg-white border border-[#EBE7DE] shadow-sm rounded-2xl h-[350px] p-6">
-                            <HeartRateChart />
+                    <div className="flex flex-col h-full">
+                        {/* Category Picker */}
+                        <div className="px-4 py-3 border-b border-[#EBE7DE] overflow-x-auto flex-shrink-0">
+                            <div className="flex gap-1.5 min-w-max">
+                                {CATEGORIES.map(cat => {
+                                    const Icon = cat.icon;
+                                    const isActive = activeCategory === cat.id;
+                                    return (
+                                        <button
+                                            key={cat.id}
+                                            onClick={() => setActiveCategory(cat.id)}
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap ${isActive
+                                                    ? 'bg-[#A84A00] text-white shadow-sm'
+                                                    : 'bg-[#F5F2EB] text-[#5D5A53] hover:bg-[#EBE7DE]'
+                                                }`}
+                                        >
+                                            <Icon size={13} />
+                                            {cat.label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
                         </div>
 
-                        <div className="bg-white border border-[#EBE7DE] shadow-sm rounded-2xl h-[350px] p-6 mb-8">
-                            <StepsChart />
+                        {/* Chart Content */}
+                        <div className="flex-1 overflow-y-auto p-6">
+                            {wearableParameters.length === 0 ? (
+                                <div className="h-full flex items-center justify-center text-[#A8A29E] text-center px-8">
+                                    <div>
+                                        <LineChart size={40} className="mx-auto mb-4 opacity-30" />
+                                        <p className="font-serif">No wearable data yet.</p>
+                                        <p className="text-sm mt-1">Add wearable data from the Sources panel to see visualizations.</p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <ActiveChartComponent data={wearableParameters} />
+                            )}
                         </div>
                     </div>
                 ) : (
