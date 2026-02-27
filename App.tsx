@@ -234,8 +234,8 @@ function App() {
           </Routes>
         </main>
 
-        {!['/ticketflow', '/insightslm', '/login', '/health-twin'].includes(location.pathname) && <Footer onLinkClick={handleNavClick} />}
-        {!['/runner', '/health-twin'].includes(location.pathname) && <Assistant />}
+        {!['/ticketflow', '/insightslm', '/login'].includes(location.pathname) && !location.pathname.startsWith('/health-twin') && <Footer onLinkClick={handleNavClick} />}
+        {!['/runner'].includes(location.pathname) && !location.pathname.startsWith('/health-twin') && <Assistant />}
       </div>
     </AuthProvider>
   );
