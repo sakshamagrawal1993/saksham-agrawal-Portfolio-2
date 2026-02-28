@@ -170,28 +170,66 @@ export const LeftPanel: React.FC = () => {
 
                 // Navigate n8n's varied response wrappers (e.g. `[{ body: { output: { parameters: [] } } }]`)
                 let parameters = result.parameters;
+
+                console.log("[Health Twin] Raw n8n Response Result:", result);
+
                 if (!parameters) {
-                    const payload = Array.isArray(result) ? result[0] : result;
+                    let parsedResult = result;
+                    try {
+                        if (typeof result === 'string') {
+                            console.log("[Health Twin] Attempting to parse string result to JSON.");
+                            parsedResult = JSON.parse(result);
+                        }
+                    } catch (e) {
+                        console.error("[Health Twin] Failed to parse result string to JSON:", e);
+                    }
+
+                    const payload = Array.isArray(parsedResult) ? parsedResult[0] : parsedResult;
+                    console.log("[Health Twin] Payload Base:", payload);
 
                     // Dig through n8n wrapping permutations
                     let inner = payload;
-                    if (inner?.body) inner = inner.body;
-                    if (inner?.output) inner = inner.output;
-                    if (inner?.output) inner = inner.output; // Sometimes double-wrapped in 'output'
+                    if (inner?.body) {
+                        console.log("[Health Twin] Found 'body' wrapper.");
+                        inner = inner.body;
+                    }
+                    if (inner?.output) {
+                        console.log("[Health Twin] Found 'output' wrapper (first).");
+                        inner = inner.output;
+                    }
+                    if (inner?.output) { // Sometimes double-wrapped in 'output'
+                        console.log("[Health Twin] Found 'output' wrapper (second).");
+                        inner = inner.output;
+                    }
 
-                    if (inner?.parameters) parameters = inner.parameters;
-                    else if (Array.isArray(inner)) parameters = inner; // Fallback if it's just the array
+                    if (inner?.parameters) {
+                        console.log("[Health Twin] Found 'parameters' array inside inner object.");
+                        parameters = inner.parameters;
+                    }
+                    else if (Array.isArray(inner)) { // Fallback if it's just the array
+                        console.log("[Health Twin] Inner object is directly an array.");
+                        parameters = inner;
+                    }
+
+                    console.log("[Health Twin] Unwrapped Parameters Array:", parameters);
                 }
 
                 // Save extracted parameters to health_lab_parameters
                 if (parameters && Array.isArray(parameters) && parameters.length > 0) {
+                    console.log("[Health Twin] Attempting to insert", parameters.length, "rows into Supabase...");
+
+                    const parseDateSafely = (dateString: string) => {
+                        const parsed = Date.parse((dateString || '').trim());
+                        return isNaN(parsed) ? new Date().toISOString() : new Date(parsed).toISOString();
+                    };
+
                     const paramRows = parameters.map((p: any) => ({
                         twin_id: activeTwinId,
                         source_id: sourceData.id,
                         parameter_name: p.parameter_name,
                         parameter_value: Number(p.parameter_value) || 0,
                         unit: p.unit || '',
-                        recorded_at: p.recorded_at ? new Date(p.recorded_at).toISOString() : new Date().toISOString(),
+                        recorded_at: parseDateSafely(p.recorded_at),
                     }));
 
                     const { data: insertedParams, error: paramError } = await supabase
