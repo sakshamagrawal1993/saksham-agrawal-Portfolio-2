@@ -222,7 +222,20 @@ export const LeftPanel: React.FC = () => {
                         if (!dateString) return new Date().toISOString();
 
                         let cleanStr = dateString.trim();
-                        // If it's just YYYY-MM-DD, rigidly append midnight UTC so JS doesn't crash on incomplete strings
+
+                        // 1. Detect European/Indian format DD-MM-YYYY or DD/MM/YYYY
+                        const dmyRegex = /^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/;
+                        const dmyMatch = cleanStr.match(dmyRegex);
+                        if (dmyMatch) {
+                            // Rebuild as YYYY-MM-DD
+                            const day = dmyMatch[1].padStart(2, '0');
+                            const month = dmyMatch[2].padStart(2, '0');
+                            const year = dmyMatch[3];
+                            cleanStr = `${year}-${month}-${day}`;
+                        }
+
+                        // 2. If it's just YYYY-MM-DD (including rebuilt ones), rigidly append midnight UTC 
+                        // so JS doesn't crash on incomplete strings lacking timezone data.
                         if (/^\d{4}-\d{2}-\d{2}$/.test(cleanStr)) {
                             cleanStr = `${cleanStr}T00:00:00.000Z`;
                         }
