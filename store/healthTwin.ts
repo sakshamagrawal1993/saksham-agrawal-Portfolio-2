@@ -66,14 +66,6 @@ export interface HealthParameter {
   category?: string; // UI grouping: activity, vitals, exercise, sleep, nutrition, recovery, reproductive, symptoms
 }
 
-// Chat interface
-export interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: Date;
-}
-
 // 7. Parameter Definitions & Ranges
 export interface HealthParameterDefinition {
   id: string;
@@ -95,6 +87,89 @@ export interface HealthParameterRange {
   optimal_max: number | null;
   normal_max: number | null;
   critical_max: number | null;
+}
+
+// 8. Daily Aggregates
+export interface HealthDailyAggregate {
+  id: string;
+  twin_id: string;
+  date: string;
+  parameter_name: string;
+  aggregate_value: number;
+  unit: string;
+}
+
+// 9. Intelligent Chat & Memory
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp: Date;
+}
+
+export interface HealthChatSession {
+  id: string;
+  twin_id: string;
+  started_at: string;
+  active: boolean;
+}
+
+export interface HealthTwinMemory {
+  id: string;
+  twin_id: string;
+  memory_text: string;
+  source_message_id?: string;
+  created_at: string;
+}
+
+// 10. Store State Interface
+interface HealthTwinState {
+  // Profiles
+  twins: HealthTwin[];
+  activeTwinId: string | null;
+  setTwins: (twins: HealthTwin[]) => void;
+  setActiveTwin: (id: string) => void;
+
+  // 8-Table Active Data
+  personalDetails: HealthPersonalDetails | null;
+  summary: HealthSummary | null;
+  scores: HealthScore[];
+  recommendations: HealthRecommendation[];
+  sources: HealthSource[];
+  labParameters: HealthParameter[];
+  wearableParameters: HealthParameter[];
+  parameterDefinitions: HealthParameterDefinition[];
+  parameterRanges: HealthParameterRange[];
+  dailyAggregates: HealthDailyAggregate[];
+  
+  setPersonalDetails: (data: HealthPersonalDetails | null) => void;
+  setSummary: (data: HealthSummary | null) => void;
+  setScores: (data: HealthScore[]) => void;
+  setRecommendations: (data: HealthRecommendation[]) => void;
+  setSources: (data: HealthSource[]) => void;
+  setLabParameters: (data: HealthParameter[]) => void;
+  setWearableParameters: (data: HealthParameter[]) => void;
+  setParameterDefinitions: (data: HealthParameterDefinition[]) => void;
+  setParameterRanges: (data: HealthParameterRange[]) => void;
+  setDailyAggregates: (data: HealthDailyAggregate[]) => void;
+
+  // UI State
+  activeTab: 'chat' | 'graphs';
+  setActiveTab: (tab: 'chat' | 'graphs') => void;
+
+  // Chat & Memory
+  activeChatSessionId: string | null;
+  chatHistory: ChatMessage[];
+  twinMemories: HealthTwinMemory[];
+  
+  setActiveChatSessionId: (id: string | null) => void;
+  setChatHistory: (messages: ChatMessage[]) => void;
+  addChatMessage: (msg: ChatMessage) => void;
+  setTwinMemories: (memories: HealthTwinMemory[]) => void;
+  clearChat: () => void;
+
+  // Actions
+  calculateLiveScores: () => void;
 }
 
 // 8. Daily Aggregates
@@ -184,9 +259,16 @@ export const useHealthTwinStore = create<HealthTwinState>((set, get) => ({
   activeTab: 'graphs',
   setActiveTab: (activeTab) => set({ activeTab }),
 
+  activeChatSessionId: null,
+  setActiveChatSessionId: (activeChatSessionId) => set({ activeChatSessionId }),
+
   chatHistory: [],
+  setChatHistory: (chatHistory) => set({ chatHistory }),
   addChatMessage: (msg) => set((state) => ({ chatHistory: [...state.chatHistory, msg] })),
   clearChat: () => set({ chatHistory: [] }),
+
+  twinMemories: [],
+  setTwinMemories: (twinMemories) => set({ twinMemories }),
 
   calculateLiveScores: () => {
     const { labParameters, wearableParameters, parameterDefinitions, parameterRanges, personalDetails } = get();

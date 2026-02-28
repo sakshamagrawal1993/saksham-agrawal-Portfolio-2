@@ -1,0 +1,75 @@
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { corsHeaders } from '../_shared/cors.ts';
+
+serve(async (req) => {
+  // Handle CORS preflight request
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  try {
+    const payload = await req.json();
+    const { 
+      twin_id, 
+      session_id, 
+      message_text, 
+      personal_details_snapshot 
+    } = payload;
+
+    if (!twin_id || !session_id || !message_text) {
+      return new Response(
+        JSON.stringify({ error: 'Missing required parameters: twin_id, session_id, message_text' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
+
+    const n8nWebhookUrl = Deno.env.get('N8N_WEBHOOK_URL');
+    const n8nSecret = Deno.env.get('N8N_WEBHOOK_SECRET');
+
+    if (!n8nWebhookUrl || !n8nSecret) {
+      console.error('Missing N8N_WEBHOOK_URL or N8N_WEBHOOK_SECRET environment variables');
+      return new Response(
+        JSON.stringify({ error: 'System configuration error' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      );
+    }
+
+    // Forward the payload securely to n8n's Agent Webhook
+    const n8nResponse = await fetch(`${n8nWebhookUrl}/chat-agent`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-n8n-secret': n8nSecret,
+      },
+      body: JSON.stringify({
+        twin_id,
+        session_id,
+        message_text,
+        personal_details_snapshot
+      }),
+    });
+
+    if (!n8nResponse.ok) {
+      console.error(`n8n responded with status: ${n8nResponse.status}`);
+      const errorText = await n8nResponse.text();
+      return new Response(
+        JSON.stringify({ error: 'Failed to process chat through agent pipeline', details: errorText }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 502 }
+      );
+    }
+
+    const result = await n8nResponse.json();
+
+    return new Response(
+      JSON.stringify(result),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+    );
+
+  } catch (error) {
+    console.error('Edge Function Error:', error.message);
+    return new Response(
+      JSON.stringify({ error: 'Internal Server Error' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+    );
+  }
+});

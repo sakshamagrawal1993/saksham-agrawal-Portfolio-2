@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useHealthTwinStore } from '../../store/healthTwin';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
+import { supabase } from '../../lib/supabaseClient';
 import {
     ActivityChart, VitalsChart, ExerciseChart, SleepChart,
     NutritionChart, RecoveryChart, SymptomsChart, ReproductiveChart,
@@ -8,6 +9,8 @@ import {
 } from './Charts';
 import { HealthParameter } from '../../store/healthTwin';
 import { MessageSquare, LineChart, Activity, Heart, Dumbbell, Moon, Utensils, Brain, AlertCircle, Baby, LayoutGrid, MapPin, Wind, CloudSun, Droplet } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 const CATEGORIES = [
     { id: 'all', label: 'All', icon: LayoutGrid },
@@ -100,15 +103,71 @@ const AtmosphereWidget = ({ personalDetails }: { personalDetails: any }) => (
 );
 
 export const CenterPanel: React.FC = () => {
-    const { activeTab, setActiveTab, chatHistory, wearableParameters, labParameters, personalDetails } = useHealthTwinStore();
+    const { activeTwinId, activeTab, setActiveTab, activeChatSessionId, setActiveChatSessionId, chatHistory, addChatMessage, wearableParameters, labParameters, personalDetails } = useHealthTwinStore();
     const [chatInput, setChatInput] = useState('');
+    const [isChatLoading, setIsChatLoading] = useState(false);
     const [activeCategory, setActiveCategory] = useState('all');
     const [editParams, setEditParams] = useState<HealthParameter[] | null>(null);
 
-    const handleSendMessage = () => {
-        if (!chatInput.trim()) return;
-        console.log("Sending chat message:", chatInput);
+    const handleSendMessage = async () => {
+        if (!chatInput.trim() || isChatLoading || !activeTwinId) return;
+
+        const messageText = chatInput.trim();
         setChatInput('');
+        setIsChatLoading(true);
+
+        // Optimistically render user message
+        const mockUserMessageId = crypto.randomUUID();
+        addChatMessage({
+            id: mockUserMessageId,
+            role: 'user',
+            content: messageText,
+            timestamp: new Date()
+        });
+
+        try {
+            // First, if there's no active session, we should ideally create one. 
+            // For now, if activeChatSessionId is null, we pass a new UUID to the backend.
+            const sessionIdToUse = activeChatSessionId || crypto.randomUUID();
+
+            // If it was null before, set it now so subsequent messages in this session use it
+            if (!activeChatSessionId) {
+                setActiveChatSessionId(sessionIdToUse);
+            }
+
+            const { data, error } = await supabase.functions.invoke('chat-completion', {
+                body: {
+                    twin_id: activeTwinId,
+                    session_id: sessionIdToUse,
+                    message_text: messageText,
+                    personal_details_snapshot: personalDetails
+                }
+            });
+
+            if (error) throw error;
+
+            if (data?.assistant_reply) {
+                addChatMessage({
+                    id: crypto.randomUUID(),
+                    role: 'assistant',
+                    content: data.assistant_reply,
+                    timestamp: new Date()
+                });
+            } else {
+                console.error("Agent responded but missing assistant_reply payload", data);
+            }
+
+        } catch (error) {
+            console.error("Error communicating with chat agent:", error);
+            addChatMessage({
+                id: crypto.randomUUID(),
+                role: 'system',
+                content: 'There was an error connecting to your Digital Twin agent. Please try again.',
+                timestamp: new Date()
+            });
+        } finally {
+            setIsChatLoading(false);
+        }
     };
 
     const handleEditClick = (params: HealthParameter[]) => {
@@ -226,12 +285,25 @@ export const CenterPanel: React.FC = () => {
                             ) : (
                                 chatHistory.map(msg => (
                                     <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                        <div className={`max-w-[80%] p-3 rounded-2xl ${msg.role === 'user' ? 'bg-[#A84A00] text-white rounded-br-none' : 'bg-[#F5F2EB] text-[#2C2A26] rounded-bl-none border border-[#EBE7DE]'
+                                        <div className={`max-w-[85%] p-3 rounded-2xl ${msg.role === 'user' ? 'bg-[#A84A00] text-white rounded-br-none'
+                                            : msg.role === 'system' ? 'bg-[#ef4444]/10 text-[#ef4444] rounded-bl-none border border-[#ef4444]/20'
+                                                : 'bg-[#F5F2EB] text-[#2C2A26] rounded-bl-none border border-[#EBE7DE]'
                                             }`}>
-                                            <p className="text-sm">{msg.content}</p>
+                                            <div className="text-sm prose prose-sm max-w-none dark:prose-invert">
+                                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                                    {msg.content}
+                                                </ReactMarkdown>
+                                            </div>
                                         </div>
                                     </div>
                                 ))
+                            )}
+                            {isChatLoading && (
+                                <div className="flex justify-start">
+                                    <div className="bg-[#F5F2EB] text-[#A8A29E] p-3 rounded-2xl rounded-bl-none border border-[#EBE7DE] text-sm italic">
+                                        Agent is typing...
+                                    </div>
+                                </div>
                             )}
                         </div>
 
@@ -245,10 +317,11 @@ export const CenterPanel: React.FC = () => {
                                     value={chatInput}
                                     onChange={e => setChatInput(e.target.value)}
                                     onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
+                                    disabled={isChatLoading}
                                 />
                                 <button
                                     onClick={handleSendMessage}
-                                    disabled={!chatInput.trim()}
+                                    disabled={isChatLoading || !chatInput.trim()}
                                     className="bg-[#A84A00] hover:bg-[#8A3D00] disabled:bg-[#D6D1C7] text-white p-2 rounded-xl transition-colors m-1"
                                 >
                                     <MessageSquare size={16} />
