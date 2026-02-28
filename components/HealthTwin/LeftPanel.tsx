@@ -168,9 +168,19 @@ export const LeftPanel: React.FC = () => {
                 if (invokeError) throw invokeError;
                 if (!result) throw new Error("No data returned from edge function");
 
+                // Navigate n8n's varied response wrappers (e.g. `[{ body: { output: { parameters: [] } } }]`)
+                let parameters = result.parameters;
+                if (!parameters) {
+                    const payload = Array.isArray(result) ? result[0] : result;
+                    if (payload?.body?.output?.parameters) parameters = payload.body.output.parameters;
+                    else if (payload?.output?.parameters) parameters = payload.output.parameters;
+                    else if (payload?.body?.parameters) parameters = payload.body.parameters;
+                    else if (payload?.parameters) parameters = payload.parameters;
+                }
+
                 // Save extracted parameters to health_lab_parameters
-                if (result.parameters && Array.isArray(result.parameters) && result.parameters.length > 0) {
-                    const paramRows = result.parameters.map((p: { parameter_name: string; parameter_value: number; unit: string; recorded_at: string }) => ({
+                if (parameters && Array.isArray(parameters) && parameters.length > 0) {
+                    const paramRows = parameters.map((p: { parameter_name: string; parameter_value: number; unit: string; recorded_at: string }) => ({
                         twin_id: activeTwinId,
                         source_id: sourceData.id,
                         parameter_name: p.parameter_name,
