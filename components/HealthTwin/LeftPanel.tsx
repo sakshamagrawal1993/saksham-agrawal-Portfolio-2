@@ -219,7 +219,15 @@ export const LeftPanel: React.FC = () => {
                     console.log("[Health Twin] Attempting to insert", parameters.length, "rows into Supabase...");
 
                     const parseDateSafely = (dateString: string) => {
-                        const parsed = Date.parse((dateString || '').trim());
+                        if (!dateString) return new Date().toISOString();
+
+                        let cleanStr = dateString.trim();
+                        // If it's just YYYY-MM-DD, rigidly append midnight UTC so JS doesn't crash on incomplete strings
+                        if (/^\d{4}-\d{2}-\d{2}$/.test(cleanStr)) {
+                            cleanStr = `${cleanStr}T00:00:00.000Z`;
+                        }
+
+                        const parsed = Date.parse(cleanStr);
                         return isNaN(parsed) ? new Date().toISOString() : new Date(parsed).toISOString();
                     };
 
