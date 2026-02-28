@@ -4,10 +4,10 @@ import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import {
     ActivityChart, VitalsChart, ExerciseChart, SleepChart,
     NutritionChart, RecoveryChart, SymptomsChart, ReproductiveChart,
-    EditDataModal
+    LabReportsChart, EditDataModal
 } from './Charts';
 import { HealthParameter } from '../../store/healthTwin';
-import { MessageSquare, LineChart, Activity, Heart, Dumbbell, Moon, Utensils, Brain, AlertCircle, Baby, LayoutGrid, MapPin, Wind, CloudSun } from 'lucide-react';
+import { MessageSquare, LineChart, Activity, Heart, Dumbbell, Moon, Utensils, Brain, AlertCircle, Baby, LayoutGrid, MapPin, Wind, CloudSun, Droplet } from 'lucide-react';
 
 const CATEGORIES = [
     { id: 'all', label: 'All', icon: LayoutGrid },
@@ -20,6 +20,7 @@ const CATEGORIES = [
     { id: 'recovery', label: 'Recovery', icon: Brain },
     { id: 'symptoms', label: 'Symptoms', icon: AlertCircle },
     { id: 'reproductive', label: 'Reproductive', icon: Baby },
+    { id: 'lab', label: 'Lab Reports', icon: Droplet },
 ] as const;
 
 const CHART_COMPONENTS = [
@@ -31,6 +32,7 @@ const CHART_COMPONENTS = [
     { id: 'recovery', Component: RecoveryChart, label: 'Recovery' },
     { id: 'symptoms', Component: SymptomsChart, label: 'Symptoms' },
     { id: 'reproductive', Component: ReproductiveChart, label: 'Reproductive' },
+    { id: 'lab', Component: LabReportsChart, label: 'Lab Reports' },
 ];
 
 const AtmosphereWidget = ({ personalDetails }: { personalDetails: any }) => (
@@ -98,7 +100,7 @@ const AtmosphereWidget = ({ personalDetails }: { personalDetails: any }) => (
 );
 
 export const CenterPanel: React.FC = () => {
-    const { activeTab, setActiveTab, chatHistory, wearableParameters, personalDetails } = useHealthTwinStore();
+    const { activeTab, setActiveTab, chatHistory, wearableParameters, labParameters, personalDetails } = useHealthTwinStore();
     const [chatInput, setChatInput] = useState('');
     const [activeCategory, setActiveCategory] = useState('all');
     const [editParams, setEditParams] = useState<HealthParameter[] | null>(null);
@@ -163,13 +165,13 @@ export const CenterPanel: React.FC = () => {
                                 </div>
                             )}
 
-                            {/* Wearable Charts */}
-                            {activeCategory !== 'atmosphere' && wearableParameters.length === 0 ? (
+                            {/* Charts Content Container */}
+                            {activeCategory !== 'atmosphere' && (activeCategory === 'lab' ? labParameters : wearableParameters).length === 0 ? (
                                 <div className={`${activeCategory === 'all' ? 'h-full' : 'h-full'} flex items-center justify-center text-[#A8A29E] text-center px-8`}>
                                     <div>
                                         <LineChart size={40} className="mx-auto mb-4 opacity-30" />
-                                        <p className="font-serif">No wearable data yet.</p>
-                                        <p className="text-sm mt-1">Add wearable data from the Sources panel to see visualizations.</p>
+                                        <p className="font-serif">No {activeCategory === 'lab' ? 'lab' : 'wearable'} data yet.</p>
+                                        <p className="text-sm mt-1">Add data from the Sources panel to see visualizations.</p>
                                     </div>
                                 </div>
                             ) : activeCategory === 'all' ? (
@@ -187,7 +189,8 @@ export const CenterPanel: React.FC = () => {
                                         const chartInfo = CHART_COMPONENTS.find(c => c.id === cat.id);
                                         if (!chartInfo) return null;
 
-                                        const hasCatData = wearableParameters.some(p => p.category === cat.id);
+                                        const isLab = cat.id === 'lab';
+                                        const hasCatData = isLab ? labParameters.length > 0 : wearableParameters.some(p => p.category === cat.id);
                                         if (!hasCatData) return null;
 
                                         const Component = chartInfo.Component;
@@ -197,7 +200,7 @@ export const CenterPanel: React.FC = () => {
                                                     <span className="w-2 h-6 rounded-full bg-[#A84A00]" />
                                                     <h2 className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#5D5A53]">{chartInfo.label}</h2>
                                                 </div>
-                                                <Component data={wearableParameters} onEditClick={handleEditClick} />
+                                                <Component data={isLab ? labParameters : wearableParameters} onEditClick={handleEditClick} />
                                             </div>
                                         );
                                     })}
@@ -207,7 +210,8 @@ export const CenterPanel: React.FC = () => {
                                     const match = CHART_COMPONENTS.find(c => c.id === activeCategory);
                                     if (!match) return null;
                                     const Comp = match.Component;
-                                    return <Comp data={wearableParameters} onEditClick={handleEditClick} />;
+                                    const dataToPass = activeCategory === 'lab' ? labParameters : wearableParameters;
+                                    return <Comp data={dataToPass} onEditClick={handleEditClick} />;
                                 })()
                             ) : null}
                         </div>

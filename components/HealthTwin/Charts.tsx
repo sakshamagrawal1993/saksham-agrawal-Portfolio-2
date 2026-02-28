@@ -966,6 +966,114 @@ export const ReproductiveChart: React.FC<ChartProps> = ({ data, onEditClick }) =
     );
 };
 
+// ========================
+//  LAB REPORTS CHART
+// ========================
+export const LabReportsChart: React.FC<ChartProps> = ({ data, onEditClick }) => {
+    const { parameterDefinitions, parameterRanges } = useHealthTwinStore();
+
+    // Group lab reports to show only the newest
+    const latestParams = useMemo(() => {
+        const map = new Map<string, HealthParameter>();
+        data.forEach(p => {
+            const existing = map.get(p.parameter_name);
+            if (!existing || new Date(p.recorded_at) > new Date(existing.recorded_at)) {
+                map.set(p.parameter_name, p);
+            }
+        });
+        return Array.from(map.values()).sort((a, b) => a.parameter_name.localeCompare(b.parameter_name));
+    }, [data]);
+
+    return (
+        <div className="space-y-6">
+            <ChartCard data={data} onEditClick={onEditClick}>
+                <SectionHeader title="Biomarkers" subtitle="Latest lab report values compared to optimal reference ranges" />
+                <div className="space-y-6 mt-4">
+                    {latestParams.map(param => {
+                        const def = parameterDefinitions.find(d => d.name === param.parameter_name);
+                        const range = def ? parameterRanges.find(r => r.parameter_id === def.id) : null;
+
+                        // Calculate range positions relative to 100% width
+                        let minBound = range?.critical_min || range?.normal_min || range?.optimal_min || 0;
+                        let maxBound = range?.critical_max || range?.normal_max || range?.optimal_max || Math.max(minBound * 2, param.parameter_value * 1.5);
+
+                        // padding
+                        const padding = (maxBound - minBound) * 0.1 || 10;
+                        const absoluteMin = Math.max(0, minBound - padding);
+                        const absoluteMax = maxBound + padding;
+                        const totalRange = absoluteMax - absoluteMin;
+
+                        const getPercentage = (val: number) => Math.max(0, Math.min(100, ((val - absoluteMin) / totalRange) * 100));
+
+                        // Hard fallbacks if ranges are fully missing to prevent divide-by-zero explosions visually
+                        const optMinPct = range?.optimal_min ? getPercentage(range.optimal_min) : 25;
+                        const optMaxPct = range?.optimal_max ? getPercentage(range.optimal_max) : 75;
+                        const valPct = totalRange === 0 ? 50 : getPercentage(param.parameter_value);
+
+                        let statusColor = '#ef4444'; // red
+                        let statusText = 'Out of Range';
+
+                        if (range?.optimal_min != null && range?.optimal_max != null && param.parameter_value >= range.optimal_min && param.parameter_value <= range.optimal_max) {
+                            statusColor = '#10b981'; // green
+                            statusText = 'Optimal';
+                        } else if (range?.normal_min != null && range?.normal_max != null && param.parameter_value >= range.normal_min && param.parameter_value <= range.normal_max) {
+                            statusColor = '#f59e0b'; // yellow
+                            statusText = 'Normal';
+                        } else if (!range) {
+                            statusColor = '#3b82f6'; // blue
+                            statusText = 'Logged';
+                        }
+
+                        return (
+                            <div key={param.id} className="bg-[#F5F2EB] p-4 rounded-xl border border-[#EBE7DE]">
+                                <div className="flex justify-between items-end mb-3">
+                                    <div>
+                                        <h4 className="font-bold text-[#2C2A26]">{param.parameter_name}</h4>
+                                        <p className="text-[10px] text-[#A8A29E] uppercase tracking-widest">{dayLabel(param.recorded_at)}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-xl font-serif font-bold" style={{ color: statusColor }}>
+                                            {param.parameter_value} <span className="text-sm font-normal text-[#A8A29E]">{param.unit}</span>
+                                        </p>
+                                        <p className="text-[10px] uppercase font-bold tracking-widest" style={{ color: statusColor }}>{statusText}</p>
+                                    </div>
+                                </div>
+
+                                {/* Custom Bullet Chart */}
+                                <div className="h-4 bg-white border border-[#EBE7DE] rounded-full relative flex items-center">
+                                    {range?.optimal_min != null && range?.optimal_max != null && (
+                                        <div
+                                            className="absolute h-full bg-[#10b981]/20 border-x border-[#10b981]/40"
+                                            style={{ left: `${optMinPct}%`, width: `${optMaxPct - optMinPct}%` }}
+                                        />
+                                    )}
+                                    {/* Value Marker */}
+                                    <div
+                                        className="absolute w-3 h-full rounded-full shadow-sm z-10"
+                                        style={{ left: `calc(${valPct}% - 6px)`, backgroundColor: statusColor }}
+                                    />
+                                </div>
+                                <div className="flex justify-between text-[10px] text-[#A8A29E] font-bold mt-1.5 px-0.5" style={{ position: 'relative', height: '14px' }}>
+                                    {range?.optimal_min != null && (
+                                        <span style={{ position: 'absolute', left: `${optMinPct}%`, transform: 'translateX(-50%)' }}>
+                                            {range.optimal_min}
+                                        </span>
+                                    )}
+                                    {range?.optimal_max != null && (
+                                        <span style={{ position: 'absolute', left: `${optMaxPct}%`, transform: 'translateX(-50%)' }}>
+                                            {range.optimal_max}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </ChartCard>
+        </div>
+    );
+};
+
 // ============ LEGACY EXPORTS (keep backward compat) ============
 export const StepsChart = ActivityChart;
 export const HeartRateChart = VitalsChart;
