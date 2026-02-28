@@ -972,30 +972,36 @@ export const ReproductiveChart: React.FC<ChartProps> = ({ data, onEditClick }) =
 export const LabReportsChart: React.FC<ChartProps> = ({ data, onEditClick }) => {
     const { parameterDefinitions, parameterRanges } = useHealthTwinStore();
 
-    // Group lab reports to show only the newest
-    const latestParams = useMemo(() => {
-        const map = new Map<string, HealthParameter>();
+    // Group lab reports to show history + newest
+    const groupedParams = useMemo(() => {
+        const map = new Map<string, HealthParameter[]>();
         data.forEach(p => {
-            const existing = map.get(p.parameter_name);
-            if (!existing || new Date(p.recorded_at) > new Date(existing.recorded_at)) {
-                map.set(p.parameter_name, p);
-            }
+            const existing = map.get(p.parameter_name) || [];
+
+            // Deduplicate same-day readings (keeping the latest encountered one for that day)
+            // This prevents duplicate PDF uploads from drawing weird vertical lines on the chart
+            const pDay = dayLabel(p.recorded_at);
+            const filtered = existing.filter(e => dayLabel(e.recorded_at) !== pDay);
+
+            map.set(p.parameter_name, [...filtered, p].sort((a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime()));
         });
-        return Array.from(map.values()).sort((a, b) => a.parameter_name.localeCompare(b.parameter_name));
+        return Array.from(map.entries())
+            .map(([name, history]) => ({ name, history, latest: history[history.length - 1] }))
+            .sort((a, b) => a.name.localeCompare(b.name));
     }, [data]);
 
     return (
         <div className="space-y-6">
             <ChartCard data={data} onEditClick={onEditClick}>
-                <SectionHeader title="Biomarkers" subtitle="Latest lab report values compared to optimal reference ranges" />
-                <div className="space-y-6 mt-4">
-                    {latestParams.map(param => {
-                        const def = parameterDefinitions.find(d => d.name === param.parameter_name);
+                <SectionHeader title="Biomarkers & Trends" subtitle="Latest lab report values compared to optimal reference ranges, with historical trends" />
+                <div className="space-y-8 mt-4">
+                    {groupedParams.map(({ name, history, latest }) => {
+                        const def = parameterDefinitions.find(d => d.name === name);
                         const range = def ? parameterRanges.find(r => r.parameter_id === def.id) : null;
 
                         // Calculate range positions relative to 100% width
                         let minBound = range?.critical_min || range?.normal_min || range?.optimal_min || 0;
-                        let maxBound = range?.critical_max || range?.normal_max || range?.optimal_max || Math.max(minBound * 2, param.parameter_value * 1.5);
+                        let maxBound = range?.critical_max || range?.normal_max || range?.optimal_max || Math.max(minBound * 2, latest.parameter_value * 1.5);
 
                         // padding
                         const padding = (maxBound - minBound) * 0.1 || 10;
@@ -1008,15 +1014,15 @@ export const LabReportsChart: React.FC<ChartProps> = ({ data, onEditClick }) => 
                         // Hard fallbacks if ranges are fully missing to prevent divide-by-zero explosions visually
                         const optMinPct = range?.optimal_min ? getPercentage(range.optimal_min) : 25;
                         const optMaxPct = range?.optimal_max ? getPercentage(range.optimal_max) : 75;
-                        const valPct = totalRange === 0 ? 50 : getPercentage(param.parameter_value);
+                        const valPct = totalRange === 0 ? 50 : getPercentage(latest.parameter_value);
 
                         let statusColor = '#ef4444'; // red
                         let statusText = 'Out of Range';
 
-                        if (range?.optimal_min != null && range?.optimal_max != null && param.parameter_value >= range.optimal_min && param.parameter_value <= range.optimal_max) {
+                        if (range?.optimal_min != null && range?.optimal_max != null && latest.parameter_value >= range.optimal_min && latest.parameter_value <= range.optimal_max) {
                             statusColor = '#10b981'; // green
                             statusText = 'Optimal';
-                        } else if (range?.normal_min != null && range?.normal_max != null && param.parameter_value >= range.normal_min && param.parameter_value <= range.normal_max) {
+                        } else if (range?.normal_min != null && range?.normal_max != null && latest.parameter_value >= range.normal_min && latest.parameter_value <= range.normal_max) {
                             statusColor = '#f59e0b'; // yellow
                             statusText = 'Normal';
                         } else if (!range) {
@@ -1024,22 +1030,27 @@ export const LabReportsChart: React.FC<ChartProps> = ({ data, onEditClick }) => 
                             statusText = 'Logged';
                         }
 
+                        const chartData = history.map(h => ({
+                            date: dayLabel(h.recorded_at),
+                            value: h.parameter_value
+                        }));
+
                         return (
-                            <div key={param.id} className="bg-[#F5F2EB] p-4 rounded-xl border border-[#EBE7DE]">
+                            <div key={latest.id} className="bg-[#F5F2EB] p-4 rounded-xl border border-[#EBE7DE]">
                                 <div className="flex justify-between items-end mb-3">
                                     <div>
-                                        <h4 className="font-bold text-[#2C2A26]">{param.parameter_name}</h4>
-                                        <p className="text-[10px] text-[#A8A29E] uppercase tracking-widest">{dayLabel(param.recorded_at)}</p>
+                                        <h4 className="font-bold text-[#2C2A26]">{name}</h4>
+                                        <p className="text-[10px] text-[#A8A29E] uppercase tracking-widest">Latest: {dayLabel(latest.recorded_at)}</p>
                                     </div>
                                     <div className="text-right">
                                         <p className="text-xl font-serif font-bold" style={{ color: statusColor }}>
-                                            {param.parameter_value} <span className="text-sm font-normal text-[#A8A29E]">{param.unit}</span>
+                                            {latest.parameter_value} <span className="text-sm font-normal text-[#A8A29E]">{latest.unit}</span>
                                         </p>
                                         <p className="text-[10px] uppercase font-bold tracking-widest" style={{ color: statusColor }}>{statusText}</p>
                                     </div>
                                 </div>
 
-                                {/* Custom Bullet Chart */}
+                                {/* Custom Bullet Chart (Latest Value) */}
                                 <div className="h-4 bg-white border border-[#EBE7DE] rounded-full relative flex items-center">
                                     {range?.optimal_min != null && range?.optimal_max != null && (
                                         <div
@@ -1053,7 +1064,7 @@ export const LabReportsChart: React.FC<ChartProps> = ({ data, onEditClick }) => 
                                         style={{ left: `calc(${valPct}% - 6px)`, backgroundColor: statusColor }}
                                     />
                                 </div>
-                                <div className="flex justify-between text-[10px] text-[#A8A29E] font-bold mt-1.5 px-0.5" style={{ position: 'relative', height: '14px' }}>
+                                <div className="flex justify-between text-[10px] text-[#A8A29E] font-bold mt-1.5 px-0.5 mb-6" style={{ position: 'relative', height: '14px' }}>
                                     {range?.optimal_min != null && (
                                         <span style={{ position: 'absolute', left: `${optMinPct}%`, transform: 'translateX(-50%)' }}>
                                             {range.optimal_min}
@@ -1065,6 +1076,24 @@ export const LabReportsChart: React.FC<ChartProps> = ({ data, onEditClick }) => 
                                         </span>
                                     )}
                                 </div>
+
+                                {/* Historical Trend Line Graph (Only if multiple points exist) */}
+                                {history.length > 1 && (
+                                    <div className="h-[120px] mt-4 pt-4 border-t border-[#EBE7DE]/50">
+                                        <p className="text-[10px] text-[#A8A29E] uppercase tracking-widest font-bold mb-2">Historical Trend</p>
+                                        <ChartContainer config={makeConfig('value', name, statusColor)} className="h-full w-full">
+                                            <ResponsiveContainer>
+                                                <LineChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#EBE7DE" />
+                                                    <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: '#A8A29E', fontSize: 10 }} />
+                                                    <YAxis domain={['auto', 'auto']} axisLine={false} tickLine={false} tick={{ fill: '#A8A29E', fontSize: 10 }} />
+                                                    <ChartTooltip content={<ChartTooltipContent />} />
+                                                    <Line type="monotone" dataKey="value" stroke={statusColor} strokeWidth={2} dot={{ r: 3, fill: statusColor, strokeWidth: 0 }} activeDot={{ r: 5 }} />
+                                                </LineChart>
+                                            </ResponsiveContainer>
+                                        </ChartContainer>
+                                    </div>
+                                )}
                             </div>
                         );
                     })}
