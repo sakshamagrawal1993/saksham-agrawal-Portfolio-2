@@ -172,21 +172,26 @@ export const LeftPanel: React.FC = () => {
                 let parameters = result.parameters;
                 if (!parameters) {
                     const payload = Array.isArray(result) ? result[0] : result;
-                    if (payload?.body?.output?.parameters) parameters = payload.body.output.parameters;
-                    else if (payload?.output?.parameters) parameters = payload.output.parameters;
-                    else if (payload?.body?.parameters) parameters = payload.body.parameters;
-                    else if (payload?.parameters) parameters = payload.parameters;
+
+                    // Dig through n8n wrapping permutations
+                    let inner = payload;
+                    if (inner?.body) inner = inner.body;
+                    if (inner?.output) inner = inner.output;
+                    if (inner?.output) inner = inner.output; // Sometimes double-wrapped in 'output'
+
+                    if (inner?.parameters) parameters = inner.parameters;
+                    else if (Array.isArray(inner)) parameters = inner; // Fallback if it's just the array
                 }
 
                 // Save extracted parameters to health_lab_parameters
                 if (parameters && Array.isArray(parameters) && parameters.length > 0) {
-                    const paramRows = parameters.map((p: { parameter_name: string; parameter_value: number; unit: string; recorded_at: string }) => ({
+                    const paramRows = parameters.map((p: any) => ({
                         twin_id: activeTwinId,
                         source_id: sourceData.id,
                         parameter_name: p.parameter_name,
-                        parameter_value: p.parameter_value,
+                        parameter_value: Number(p.parameter_value) || 0,
                         unit: p.unit || '',
-                        recorded_at: p.recorded_at || new Date().toISOString(),
+                        recorded_at: p.recorded_at ? new Date(p.recorded_at).toISOString() : new Date().toISOString(),
                     }));
 
                     const { data: insertedParams, error: paramError } = await supabase
