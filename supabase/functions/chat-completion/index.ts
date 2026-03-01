@@ -1,4 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import { corsHeaders } from '../_shared/cors.ts';
 
 serve(async (req) => {
@@ -35,7 +36,7 @@ serve(async (req) => {
     }
 
     // Forward the payload securely to n8n's Agent Webhook
-    const n8nResponse = await fetch(`${n8nWebhookUrl}/chat-agent`, {
+    const n8nResponse = await fetch(n8nWebhookUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -59,6 +60,24 @@ serve(async (req) => {
     }
 
     const result = await n8nResponse.json();
+    const assistantReply = result.assistant_reply || result.output || '';
+
+    // Asynchronously log the assistant's reply to Postgres (fire and forget)
+    // We do this here instead of n8n to reduce latency on the webhook response
+    if (assistantReply) {
+      const supabaseAdmin = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
+      
+      supabaseAdmin.from('health_chat_messages').insert([{
+        session_id: session_id,
+        role: 'assistant',
+        content: assistantReply
+      }]).then(({ error }) => {
+        if (error) console.error('Failed to log assistant reply:', error.message);
+      });
+    }
 
     return new Response(
       JSON.stringify(result),
