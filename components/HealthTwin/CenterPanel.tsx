@@ -151,7 +151,8 @@ export const CenterPanel: React.FC = () => {
                     id: crypto.randomUUID(),
                     role: 'assistant',
                     content: data.assistant_reply,
-                    timestamp: new Date()
+                    timestamp: new Date(),
+                    widgets: data.widgets
                 });
             } else {
                 console.error("Agent responded but missing assistant_reply payload", data);
@@ -293,6 +294,60 @@ export const CenterPanel: React.FC = () => {
                                                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                                     {msg.content}
                                                 </ReactMarkdown>
+                                                {/* DYNAMIC METADATA WIDGET RENDERING */}
+                                                {msg.widgets && msg.widgets.length > 0 && (
+                                                    <div className="mt-4 space-y-4">
+                                                        {msg.widgets.map((widget, i) => (
+                                                            <div key={i} className="bg-white rounded-xl overflow-hidden border border-[#EBE7DE] shadow-sm">
+                                                                {widget.type === 'chart' && widget.data && (
+                                                                    <div className="p-4">
+                                                                        <h4 className="text-[11px] font-bold text-[#A8A29E] uppercase tracking-wider mb-4">{widget.title || 'Data Graph'}</h4>
+                                                                        <div className="h-32 flex items-end justify-between gap-1 mt-2 mx-2">
+                                                                            {widget.data.map((d: any, di: number) => {
+                                                                                const maxVal = Math.max(...widget.data.map((x: any) => Number(x.value) || 0));
+                                                                                const heightPct = maxVal > 0 ? Math.max(5, Math.min(100, (Number(d.value) / maxVal) * 100)) : 5;
+                                                                                return (
+                                                                                    <div key={di} className="w-full relative group h-full flex items-end">
+                                                                                        <div
+                                                                                            className="bg-[#A84A00]/80 group-hover:bg-[#A84A00] rounded-t-sm w-full transition-all duration-300"
+                                                                                            style={{ height: `${heightPct}%` }}
+                                                                                        ></div>
+                                                                                        {/* Tooltip */}
+                                                                                        <div className="opacity-0 group-hover:opacity-100 absolute -top-8 left-1/2 -translate-x-1/2 bg-[#2C2A26] text-white text-[10px] py-1 px-2 rounded whitespace-nowrap z-10 transition-opacity pointer-events-none">
+                                                                                            {d.label}: {d.value}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                        <div className="flex justify-between mt-3 text-[10px] text-[#A8A29E] font-mono border-t border-[#EBE7DE] pt-2">
+                                                                            <span>{widget.data[0]?.label}</span>
+                                                                            <span>{widget.data[widget.data.length - 1]?.label}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                                {widget.type === 'image' && widget.url && (
+                                                                    <div className="relative">
+                                                                        <img src={widget.url} alt={widget.alt_text || 'Reference Image'} className="w-full max-h-48 object-cover" />
+                                                                        {widget.alt_text && (
+                                                                            <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] p-1.5 px-3">
+                                                                                {widget.alt_text}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                                {widget.type === 'triage_action' && (
+                                                                    <div className="p-4 bg-orange-50/50">
+                                                                        <p className="text-sm text-orange-900 font-medium mb-3 leading-snug">{widget.action_text}</p>
+                                                                        <button className="w-full py-2.5 bg-[#A84A00] hover:bg-[#8A3D00] text-white text-xs tracking-wider font-bold rounded-lg transition-colors shadow-sm">
+                                                                            {widget.button_label || 'Take Action'}
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     </div>

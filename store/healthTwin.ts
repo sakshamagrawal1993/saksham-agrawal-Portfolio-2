@@ -100,11 +100,17 @@ export interface HealthDailyAggregate {
 }
 
 // 9. Intelligent Chat & Memory
+export interface ChatWidget {
+  type: 'chart' | 'image' | 'triage_action';
+  [key: string]: any;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: Date;
+  widgets?: ChatWidget[];
 }
 
 export interface HealthChatSession {
