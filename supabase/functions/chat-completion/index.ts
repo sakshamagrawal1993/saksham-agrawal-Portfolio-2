@@ -57,21 +57,40 @@ serve(async (req) => {
     }]);
 
     // 3. Forward the payload securely to n8n's Agent Webhook
+    // 3. Forward the payload securely to n8n's Agent Webhook
     //    Include the user_message_id so n8n can link memories to this message
-    const n8nResponse = await fetch(n8nWebhookUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-n8n-secret': n8nSecret,
-      },
-      body: JSON.stringify({
-        twin_id,
-        session_id,
-        message_text,
-        user_message_id: userMessageId,
-        personal_details_snapshot
-      }),
-    });
+    //    Use a 5-minute timeout since the Agent may need multiple tool calls
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000);
+
+    let n8nResponse;
+    try {
+      n8nResponse = await fetch(n8nWebhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-n8n-secret': n8nSecret,
+        },
+        body: JSON.stringify({
+          twin_id,
+          session_id,
+          message_text,
+          user_message_id: userMessageId,
+          personal_details_snapshot
+        }),
+        signal: controller.signal,
+      });
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        return new Response(
+          JSON.stringify({ error: 'Agent took too long to respond. Please try a simpler question.' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 504 }
+        );
+      }
+      throw fetchError;
+    }
+    clearTimeout(timeoutId);
 
     if (!n8nResponse.ok) {
       console.error(`n8n responded with status: ${n8nResponse.status}`);
@@ -82,7 +101,9 @@ serve(async (req) => {
       );
     }
 
-    const result = await n8nResponse.json();
+    // n8n sometimes wraps the response in an array — unwrap it
+    let parsedResult = await n8nResponse.json();
+    const result = Array.isArray(parsedResult) ? parsedResult[0] : parsedResult;
     const rawReply = result.assistant_reply || result.output || '';
 
     // The n8n Structured Output Parser double-encodes strings as JSON
