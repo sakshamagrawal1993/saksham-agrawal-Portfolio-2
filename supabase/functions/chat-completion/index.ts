@@ -114,8 +114,16 @@ serve(async (req) => {
       });
     }
 
+    // 5. Return the CLEANED response to the frontend
+    const cleanResponse = {
+      assistant_reply: assistantReply,
+      widgets: result.widgets || [],
+      session_id: session_id,
+      twin_id: twin_id
+    };
+
     return new Response(
-      JSON.stringify(result),
+      JSON.stringify(cleanResponse),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
 
