@@ -12,7 +12,7 @@ interface LoginProps {
 }
 
 const Login: React.FC<LoginProps> = ({
-    redirectPath = '/dashboard',
+    redirectPath = '/health-twin',
     title = 'Journal Admin',
     subtitle = 'Sign in to manage content'
 }) => {

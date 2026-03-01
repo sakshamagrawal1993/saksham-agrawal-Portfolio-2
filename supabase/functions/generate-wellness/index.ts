@@ -36,55 +36,52 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // ─── 2. Collect User Data ───────────────────────────────────
+    // ─── 2. Collect User Data (lean selects to minimize tokens) ────
     const [scoresRes, aggregatesRes, labsRes, personalRes, exerciseRes, sleepRes, memoriesRes] = await Promise.all([
-      supabase.from("health_scores").select("*").eq("twin_id", twin_id),
-      supabase.from("health_daily_aggregates").select("*").eq("twin_id", twin_id)
-        .gte("date", new Date(Date.now() - 14 * 86400000).toISOString().split("T")[0])
+      supabase.from("health_scores").select("category,score").eq("twin_id", twin_id),
+      supabase.from("health_daily_aggregates").select("date,parameter_name,aggregate_value,unit").eq("twin_id", twin_id)
+        .gte("date", new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0])
         .order("date", { ascending: false }),
-      supabase.from("health_lab_parameters").select("*").eq("twin_id", twin_id)
-        .order("recorded_at", { ascending: false }).limit(30),
-      supabase.from("health_personal_details").select("*").eq("twin_id", twin_id).single(),
-      supabase.from("health_wearable_parameters").select("*").eq("twin_id", twin_id).eq("category", "exercise")
-        .order("recorded_at", { ascending: false }).limit(30),
-      supabase.from("health_wearable_parameters").select("*").eq("twin_id", twin_id).eq("category", "sleep")
-        .order("recorded_at", { ascending: false }).limit(20),
-      supabase.from("health_twin_memories").select("*").eq("twin_id", twin_id)
-        .order("created_at", { ascending: false }).limit(20),
+      supabase.from("health_lab_parameters").select("parameter_name,value,unit,recorded_at").eq("twin_id", twin_id)
+        .order("recorded_at", { ascending: false }),
+      supabase.from("health_personal_details").select("name,age,gender,height_cm,weight_kg,blood_type,co_morbidities,location").eq("twin_id", twin_id).single(),
+      supabase.from("health_wearable_parameters").select("parameter_name,value,unit,recorded_at").eq("twin_id", twin_id).eq("category", "exercise")
+        .order("recorded_at", { ascending: false }).limit(10),
+      supabase.from("health_wearable_parameters").select("parameter_name,value,unit,recorded_at").eq("twin_id", twin_id).eq("category", "sleep")
+        .order("recorded_at", { ascending: false }).limit(7),
+      supabase.from("health_twin_memories").select("memory_text").eq("twin_id", twin_id)
+        .order("created_at", { ascending: false }).limit(10),
     ]);
 
+    // Compact the payload further — group aggregates by parameter
+    const aggregatesByParam: Record<string, {dates: string[], values: number[], unit: string}> = {};
+    for (const row of (aggregatesRes.data || [])) {
+      if (!aggregatesByParam[row.parameter_name]) {
+        aggregatesByParam[row.parameter_name] = { dates: [], values: [], unit: row.unit };
+      }
+      aggregatesByParam[row.parameter_name].dates.push(row.date);
+      aggregatesByParam[row.parameter_name].values.push(row.aggregate_value);
+    }
+
     const userData = {
+      personal: personalRes.data || null,
       scores: scoresRes.data || [],
-      daily_aggregates: aggregatesRes.data || [],
-      lab_parameters: labsRes.data || [],
-      personal_details: personalRes.data || null,
-      exercise_data: exerciseRes.data || [],
-      sleep_data: sleepRes.data || [],
+      weekly_aggregates: aggregatesByParam,
+      latest_labs: (labsRes.data || []).map((r: any) => ({ name: r.parameter_name, value: r.value, unit: r.unit, date: r.recorded_at?.split("T")[0] })),
+      recent_exercise: (exerciseRes.data || []).map((r: any) => ({ name: r.parameter_name, value: r.value, unit: r.unit })),
+      recent_sleep: (sleepRes.data || []).map((r: any) => ({ name: r.parameter_name, value: r.value, unit: r.unit })),
       memories: (memoriesRes.data || []).map((m: any) => m.memory_text),
     };
 
-    // ─── 3. Generate Programs via GPT-4o ────────────────────────
-    const systemPrompt = `You are a board-certified preventive medicine specialist and wellness coach.
-Given a patient's comprehensive health data, generate exactly 3-4 personalized wellness programs.
+    // ─── 3. Generate Programs via gpt-4o-mini ───────────────────
+    const systemPrompt = `You are a preventive medicine specialist. Given patient health data, generate exactly 3 personalized wellness programs.
+Rules: Reference ≥2 specific data points (exact numbers) per program. Cover different health domains. Address comorbidities if present. Icon must be one of: heart, dumbbell, moon, utensils, brain, shield.
+Return ONLY valid JSON.`;
 
-STRICT RULES:
-1. Each program MUST reference at least 2 SPECIFIC data points from the patient's actual data (exact numbers, not vague references).
-2. Programs should span different health domains (e.g., cardiovascular, metabolic, sleep, mental wellness, nutrition).
-3. If the patient has comorbidities listed, at least ONE program must directly address management or improvement related to them.
-4. Weekly plans must be realistic, specific, and progressive. Include exact durations, intensities, or targets.
-5. Expected outcomes must be evidence-based and time-bound (e.g., "Reduce resting HR by 5 bpm in 6 weeks").
-6. Use the patient's name in the "reason" field for personalization.
-7. Prioritize programs by clinical urgency: high = needs immediate attention, medium = improvement opportunity, low = optimization/maintenance.
-8. Icon must be one of: heart, dumbbell, moon, utensils, brain, shield, eye, lungs, bone, droplet
-
-Return ONLY valid JSON matching the provided schema. Do not include any text outside the JSON.`;
-
-    const userPrompt = `Generate personalized wellness programs for this patient.
+    const userPrompt = `Generate 3 wellness programs for this patient. Return JSON with "programs" array.
 
 PATIENT DATA:
-${JSON.stringify(userData, null, 2)}
-
-Return a JSON object with a "programs" array containing 3-4 programs.`;
+${JSON.stringify(userData)}`;
 
     const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -93,7 +90,7 @@ Return a JSON object with a "programs" array containing 3-4 programs.`;
         Authorization: `Bearer ${OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "gpt-4o",
+        model: "gpt-4o-mini",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
