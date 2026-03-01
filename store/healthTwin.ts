@@ -40,6 +40,34 @@ export interface HealthRecommendation {
   status: string;
 }
 
+// 5b. Wellness Programs
+export interface DataConnection {
+  metric: string;
+  value: string;
+  insight: string;
+}
+
+export interface WeeklyPlanItem {
+  day: string;
+  activity: string;
+  target_hr?: string;
+  goal?: string;
+}
+
+export interface WellnessProgram {
+  id: string;
+  title: string;
+  icon: string;
+  priority: 'high' | 'medium' | 'low';
+  duration: string;
+  reason: string;
+  data_connections: DataConnection[];
+  weekly_plan: WeeklyPlanItem[];
+  expected_outcomes: string[];
+  generated_at: string;
+  expires_at: string;
+}
+
 // 6.1 Health Personal Details
 export interface HealthPersonalDetails {
   id: string;
@@ -194,6 +222,12 @@ interface HealthTwinState {
   setTwinMemories: (memories: HealthTwinMemory[]) => void;
   clearChat: () => void;
 
+  // Wellness Programs
+  wellnessPrograms: WellnessProgram[];
+  isLoadingWellness: boolean;
+  setWellnessPrograms: (programs: WellnessProgram[]) => void;
+  setIsLoadingWellness: (loading: boolean) => void;
+
   // Actions
   calculateLiveScores: () => void;
 }
@@ -247,6 +281,12 @@ interface HealthTwinState {
   addChatMessage: (msg: ChatMessage) => void;
   clearChat: () => void;
 
+  // Wellness Programs
+  wellnessPrograms: WellnessProgram[];
+  isLoadingWellness: boolean;
+  setWellnessPrograms: (programs: WellnessProgram[]) => void;
+  setIsLoadingWellness: (loading: boolean) => void;
+
   // Actions
   calculateLiveScores: () => void;
 }
@@ -295,6 +335,11 @@ export const useHealthTwinStore = create<HealthTwinState>((set, get) => ({
 
   twinMemories: [],
   setTwinMemories: (twinMemories) => set({ twinMemories }),
+
+  wellnessPrograms: [],
+  isLoadingWellness: false,
+  setWellnessPrograms: (wellnessPrograms) => set({ wellnessPrograms }),
+  setIsLoadingWellness: (isLoadingWellness) => set({ isLoadingWellness }),
 
   calculateLiveScores: () => {
     const { labParameters, wearableParameters, parameterDefinitions, parameterRanges, personalDetails } = get();

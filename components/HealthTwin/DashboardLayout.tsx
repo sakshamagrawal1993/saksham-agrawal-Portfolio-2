@@ -22,7 +22,9 @@ export const HealthTwinDashboard: React.FC = () => {
         setScores,
         setRecommendations,
         setSources,
-        setDailyAggregates
+        setDailyAggregates,
+        setWellnessPrograms,
+        setIsLoadingWellness
     } = useHealthTwinStore();
 
     const [loading, setLoading] = useState(true);
@@ -73,7 +75,8 @@ export const HealthTwinDashboard: React.FC = () => {
                     sourcesData,
                     definitionsData,
                     rangesData,
-                    aggregatesData
+                    aggregatesData,
+                    wellnessData
                 ] = await Promise.all([
                     supabase.from('health_personal_details').select('*').eq('twin_id', data.id).maybeSingle(),
                     supabase.from('health_summary').select('*').eq('twin_id', data.id).maybeSingle(),
@@ -84,7 +87,10 @@ export const HealthTwinDashboard: React.FC = () => {
                     supabase.from('health_sources').select('*').eq('twin_id', data.id).order('created_at', { ascending: false }),
                     supabase.from('health_parameter_definitions').select('*'),
                     supabase.from('health_parameter_ranges').select('*'),
-                    supabase.from('health_daily_aggregates').select('*').eq('twin_id', data.id).order('date', { ascending: false })
+                    supabase.from('health_daily_aggregates').select('*').eq('twin_id', data.id).order('date', { ascending: false }),
+                    supabase.from('health_wellness_programs').select('*').eq('twin_id', data.id)
+                        .gt('expires_at', new Date().toISOString())
+                        .order('created_at', { ascending: false })
                 ]);
 
                 setPersonalDetails(personalData.data || null);
@@ -100,6 +106,34 @@ export const HealthTwinDashboard: React.FC = () => {
                 useHealthTwinStore.getState().setParameterDefinitions(definitionsData.data || []);
                 useHealthTwinStore.getState().setParameterRanges(rangesData.data || []);
 
+                // Set cached wellness programs
+                setWellnessPrograms(wellnessData.data || []);
+
+                // If no cached programs, trigger generation
+                if (!wellnessData.data || wellnessData.data.length === 0) {
+                    setIsLoadingWellness(true);
+                    try {
+                        const { data: { session } } = await supabase.auth.getSession();
+                        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+                        const res = await fetch(`${supabaseUrl}/functions/v1/generate-wellness`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${session?.access_token}`,
+                            },
+                            body: JSON.stringify({ twin_id: data.id }),
+                        });
+                        if (res.ok) {
+                            const result = await res.json();
+                            setWellnessPrograms(result.programs || []);
+                        }
+                    } catch (genErr) {
+                        console.error('Failed to auto-generate wellness programs:', genErr);
+                    } finally {
+                        setIsLoadingWellness(false);
+                    }
+                }
+
                 // Calculate fresh 0-100 scores
                 useHealthTwinStore.getState().calculateLiveScores();
             } catch (err) {
@@ -110,7 +144,7 @@ export const HealthTwinDashboard: React.FC = () => {
         };
 
         initDashboard();
-    }, [id, navigate, setActiveTwin, twins, setTwins, setPersonalDetails, setSummary, setLabParameters, setWearableParameters, setScores, setRecommendations, setSources, setDailyAggregates]);
+    }, [id, navigate, setActiveTwin, twins, setTwins, setPersonalDetails, setSummary, setLabParameters, setWearableParameters, setScores, setRecommendations, setSources, setDailyAggregates, setWellnessPrograms, setIsLoadingWellness]);
 
     if (loading) {
         return (
