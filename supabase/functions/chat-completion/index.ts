@@ -35,7 +35,29 @@ serve(async (req) => {
       );
     }
 
-    // Forward the payload securely to n8n's Agent Webhook
+    // Initialize Supabase Admin client (bypasses RLS with service role key)
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    // 1. Upsert chat session (create if new, update timestamp if existing)
+    await supabaseAdmin.from('health_chat_sessions').upsert(
+      { id: session_id, twin_id: twin_id, active: true },
+      { onConflict: 'id' }
+    );
+
+    // 2. Save the user's message and capture the generated ID
+    const userMessageId = crypto.randomUUID();
+    await supabaseAdmin.from('health_chat_messages').insert([{
+      id: userMessageId,
+      session_id: session_id,
+      role: 'user',
+      content: message_text
+    }]);
+
+    // 3. Forward the payload securely to n8n's Agent Webhook
+    //    Include the user_message_id so n8n can link memories to this message
     const n8nResponse = await fetch(n8nWebhookUrl, {
       method: 'POST',
       headers: {
@@ -46,6 +68,7 @@ serve(async (req) => {
         twin_id,
         session_id,
         message_text,
+        user_message_id: userMessageId,
         personal_details_snapshot
       }),
     });
@@ -63,16 +86,13 @@ serve(async (req) => {
     const rawReply = result.assistant_reply || result.output || '';
 
     // The n8n Structured Output Parser double-encodes strings as JSON
-    // (surrounding quotes + escaped \n etc.). JSON.parse decodes it cleanly in one shot.
     let assistantReply = rawReply;
     if (typeof rawReply === 'string') {
-      // If it looks like a JSON-encoded string, parse it
       const trimmed = rawReply.trim();
       if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
         try {
           assistantReply = JSON.parse(trimmed);
         } catch (_) {
-          // Fallback: strip quotes and unescape manually
           assistantReply = trimmed
             .slice(1, -1)
             .replace(/\\n/g, '\n')
@@ -83,14 +103,8 @@ serve(async (req) => {
       }
     }
 
-    // Asynchronously log the assistant's reply to Postgres (fire and forget)
-    // We do this here instead of n8n to reduce latency on the webhook response
+    // 4. Save the assistant's reply to the same session
     if (assistantReply) {
-      const supabaseAdmin = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-      );
-      
       supabaseAdmin.from('health_chat_messages').insert([{
         session_id: session_id,
         role: 'assistant',
