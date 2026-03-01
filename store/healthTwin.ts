@@ -100,8 +100,28 @@ export interface HealthDailyAggregate {
 }
 
 // 9. Intelligent Chat & Memory
+export type WidgetType = 'chart' | 'image' | 'triage_action';
+export type ChartType = 'line' | 'multi_line' | 'bar' | 'stacked_bar' | 'area' | 'donut' | 'scatter' | 'radar' | 'gauge' | 'heatmap';
+
 export interface ChatWidget {
-  type: 'chart' | 'image' | 'triage_action';
+  type: WidgetType;
+  chart_type?: ChartType;
+  title?: string;
+  data?: Array<Record<string, any>>;
+  x_axis_label?: string;
+  y_axis_label?: string;
+  // Image specific
+  url?: string;
+  alt_text?: string;
+  // Triage action specific
+  action_text?: string;
+  button_label?: string;
+  action_url?: string;
+  // Gauge specific
+  value?: number;
+  min?: number;
+  max?: number;
+  target?: number;
   [key: string]: any;
 }
 
