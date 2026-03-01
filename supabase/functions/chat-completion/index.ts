@@ -60,7 +60,18 @@ serve(async (req) => {
     }
 
     const result = await n8nResponse.json();
-    const assistantReply = result.assistant_reply || result.output || '';
+    const rawReply = result.assistant_reply || result.output || '';
+    // The n8n Structured Output Parser wraps strings in quotes and escapes special chars
+    // Strip surrounding quotes and unescape sequences like \n, \t, \"
+    const assistantReply = typeof rawReply === 'string' 
+      ? rawReply
+          .replace(/^"|"$/g, '')   // strip surrounding quotes
+          .replace(/\\n/g, '\n')   // unescape newlines
+          .replace(/\\t/g, '\t')   // unescape tabs
+          .replace(/\\"/g, '"')    // unescape embedded quotes
+          .replace(/\\\\/g, '\\')  // unescape backslashes
+          .trim()
+      : rawReply;
 
     // Asynchronously log the assistant's reply to Postgres (fire and forget)
     // We do this here instead of n8n to reduce latency on the webhook response
