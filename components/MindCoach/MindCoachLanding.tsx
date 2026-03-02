@@ -13,6 +13,7 @@ import {
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const TOTAL_STEPS = 8;
+const MAX_SELECTABLE_CONCERNS = 3;
 
 const CONCERN_OPTIONS = [
   'Anxiety & Worry',
@@ -438,7 +439,7 @@ function ConcernStep({
   const toggle = (concern: string) => {
     if (values.includes(concern)) {
       onChange(values.filter((c) => c !== concern));
-    } else if (values.length < 2) {
+    } else if (values.length < MAX_SELECTABLE_CONCERNS) {
       onChange([...values, concern]);
     }
   };
@@ -451,7 +452,7 @@ function ConcernStep({
             What brings you here today, {name}?
           </h2>
           <p className="text-sm text-[#2C2A26]/50 leading-relaxed">
-            Select up to 2 topics. Most people have more than one concern —
+            Select up to {MAX_SELECTABLE_CONCERNS} topics. Most people have more than one concern —
             that&apos;s completely normal.
           </p>
         </div>
@@ -459,7 +460,7 @@ function ConcernStep({
         <div className="flex flex-wrap gap-2.5">
           {CONCERN_OPTIONS.map((concern) => {
             const selected = values.includes(concern);
-            const maxed = values.length >= 2 && !selected;
+            const maxed = values.length >= MAX_SELECTABLE_CONCERNS && !selected;
             return (
               <button
                 key={concern}
@@ -649,44 +650,101 @@ function JourneyPreviewStep({
 }) {
   const [loading, setLoading] = useState(true);
   const [journey, setJourney] = useState<ReturnType<typeof generateMockJourney> | null>(null);
+  const [routedPathway, setRoutedPathway] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const navigate = useNavigate();
   const { setProfile, setJourney: setStoreJourney } = useMindCoachStore();
 
   useEffect(() => {
-    const t = setTimeout(() => {
-      setJourney(generateMockJourney(concerns));
-      setLoading(false);
-    }, 2000);
-    return () => clearTimeout(t);
-  }, [concerns]);
+    let cancelled = false;
+
+    const routeJourney = async () => {
+      try {
+        // 1. Create profile first so the edge function can associate it
+        const { data: profileData, error: profileError } = await supabase
+          .from('mind_coach_profiles')
+          .insert({ name, age, gender, concerns, therapist_persona: therapist })
+          .select()
+          .single();
+
+        if (profileError || !profileData) throw profileError;
+
+        // 2. Call the journey routing edge function
+        const { data, error } = await supabase.functions.invoke('mind-coach-journey', {
+          body: {
+            profile_id: profileData.id,
+            concerns,
+            dynamic_theme: null,
+          },
+        });
+
+        if (!cancelled && !error && data?.journey) {
+          const j = data.journey;
+          setRoutedPathway(data.pathway);
+          setJourney({
+            title: j.title,
+            description: `A personalized 4-phase journey designed around ${concerns.join(' and ').toLowerCase()}.`,
+            phases: (j.phases || []).map((p: any, i: number) => ({
+              phase_number: i + 1,
+              title: p.name,
+              goal: p.goal,
+              sessions: Array.from({ length: p.sessions || 3 }, (_, si) => ({
+                session_number: i * 3 + si + 1,
+                topic: `Session ${i * 3 + si + 1}`,
+                description: p.goal,
+              })),
+            })),
+          });
+          setProfile(profileData as MindCoachProfile);
+          setStoreJourney(j as MindCoachJourney);
+          setLoading(false);
+          return;
+        }
+      } catch (err) {
+        console.error('Journey routing failed, falling back to mock:', err);
+      }
+
+      // Fallback: use mock journey if the edge function fails
+      if (!cancelled) {
+        setJourney(generateMockJourney(concerns));
+        setLoading(false);
+      }
+    };
+
+    routeJourney();
+    return () => { cancelled = true; };
+  }, [concerns, name, age, gender, therapist, setProfile, setStoreJourney]);
 
   const handleStart = useCallback(async () => {
     if (!journey || saving) return;
     setSaving(true);
 
+    const profile = useMindCoachStore.getState().profile;
+    const storeJourney = useMindCoachStore.getState().journey;
+
     try {
+      // If profile + journey already created by the routing step, just navigate
+      if (profile && storeJourney) {
+        navigate(`/mind-coach/${profile.id}`);
+        return;
+      }
+
+      // Fallback: create profile + journey manually (mock path)
       const { data: profileData, error: profileError } = await supabase
         .from('mind_coach_profiles')
-        .insert({
-          name,
-          age,
-          gender,
-          concerns,
-          therapist_persona: therapist,
-        })
+        .insert({ name, age, gender, concerns, therapist_persona: therapist })
         .select()
         .single();
 
       if (profileError) throw profileError;
 
-      const profile = profileData as MindCoachProfile;
-      setProfile(profile);
+      const newProfile = profileData as MindCoachProfile;
+      setProfile(newProfile);
 
       const { data: journeyData, error: journeyError } = await supabase
         .from('mind_coach_journeys')
         .insert({
-          profile_id: profile.id,
+          profile_id: newProfile.id,
           title: journey.title,
           description: journey.description,
           concerns_snapshot: concerns,
@@ -700,7 +758,7 @@ function JourneyPreviewStep({
       if (journeyError) throw journeyError;
 
       setStoreJourney(journeyData as MindCoachJourney);
-      navigate(`/mind-coach/${profile.id}`);
+      navigate(`/mind-coach/${newProfile.id}`);
     } catch (err) {
       console.error('Failed to create profile:', err);
       setSaving(false);
@@ -740,6 +798,11 @@ function JourneyPreviewStep({
               {journey.title}
             </h2>
             <p className="text-sm text-[#2C2A26]/50">{journey.description}</p>
+            {routedPathway && (
+              <span className="inline-block text-xs px-2.5 py-1 bg-[#6B8F71]/10 text-[#6B8F71] font-medium rounded-full">
+                {routedPathway.replace(/_/g, ' ')}
+              </span>
+            )}
           </div>
 
           <div className="space-y-3 flex-1">

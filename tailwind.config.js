@@ -56,7 +56,7 @@ export default {
     		},
     		fontFamily: {
     			serif: [
-    				'Playfair Display"',
+    				'Playfair Display',
     				'serif'
     			],
     			sans: [
