@@ -107,9 +107,12 @@ export function calculateAxesScores(
   // Compute individual scores
   for (const param of Array.from(latestParams.values())) {
       // Match definition
+      const normalize = (s: string) => s.toLowerCase().replace(/_/g, ' ').trim();
+      const paramNameNorm = normalize(param.parameter_name);
+
       const def = definitions.find(d => 
-          d.name.toLowerCase() === param.parameter_name.toLowerCase() || 
-          d.id.toLowerCase() === param.parameter_name.toLowerCase()
+          normalize(d.name) === paramNameNorm || 
+          normalize(d.id) === paramNameNorm
       );
       if (!def) continue;
 

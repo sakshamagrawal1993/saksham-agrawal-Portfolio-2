@@ -61,8 +61,8 @@ export const PlaygroundScorePanel: React.FC = () => {
             </div>
 
             {/* Bottom Grid: All Axis Details */}
-            <div className="p-6 bg-[#FAF9F6] border-t border-[#EBE7DE] shrink-0">
-                <div className="grid grid-cols-3 gap-3">
+            <div className="p-4 bg-[#FAF9F6] border-t border-[#EBE7DE] shrink-0 overflow-y-auto max-h-[250px]">
+                <div className="grid grid-cols-4 gap-3">
                     {axisScores.map(scoreItem => {
                         const { delta, color, Icon } = getDeltaInfo(scoreItem.category, scoreItem.score);
                         return (

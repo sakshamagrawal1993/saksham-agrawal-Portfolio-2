@@ -290,22 +290,22 @@ export function playgroundToHealthParams(params: PlaygroundParameters): HealthPa
         p('comorb_sleep_apnea', params.sleep_apnea),
 
         // Activity
-        p('daily_steps', params.daily_steps, 'steps'),
-        p('active_minutes', params.active_minutes, 'min'),
-        p('distance_walked', params.distance_walked, 'km'),
+        p('Step Count', params.daily_steps, 'steps'),
+        p('Active Minutes', params.active_minutes, 'min'),
+        p('Horizontal Distance Covered', params.distance_walked, 'km'),
         p('floors_climbed', params.floors_climbed, 'floors'),
 
         // Vitals
-        p('heart_rate', params.heart_rate, 'bpm'),
-        p('resting_heart_rate', params.resting_heart_rate, 'bpm'),
-        p('hrv', params.hrv, 'ms'),
-        p('respiratory_rate', params.respiratory_rate, 'brpm'),
-        p('body_temperature', params.body_temperature, '°C'),
-        p('blood_glucose', params.blood_glucose, 'mg/dL'),
+        p('Heart Rate', params.heart_rate, 'bpm'),
+        p('Resting Heart Rate', params.resting_heart_rate, 'bpm'),
+        p('Average HRV', params.hrv, 'ms'),
+        p('Respiratory Rate', params.respiratory_rate, 'brpm'),
+        p('Body Temperature', params.body_temperature, '°C'),
+        p('Blood Glucose Record', params.blood_glucose, 'mg/dL'),
         p('blood_glucose_max', params.blood_glucose_max, 'mg/dL'),
         p('blood_glucose_min', params.blood_glucose_min, 'mg/dL'),
-        p('systolic_bp', params.systolic_bp, 'mmHg'),
-        p('diastolic_bp', params.diastolic_bp, 'mmHg'),
+        p('Blood Pressure Systolic', params.systolic_bp, 'mmHg'),
+        p('Blood Pressure Diastolic', params.diastolic_bp, 'mmHg'),
 
         // Environment
         p('aqi', params.aqi, 'index'),
@@ -313,31 +313,31 @@ export function playgroundToHealthParams(params: PlaygroundParameters): HealthPa
         p('pollen_level', params.pollen_level, 'level'),
 
         // Sleep
-        p('sleep_duration', params.sleep_duration, 'hrs'),
-        p('sleep_heart_rate', params.sleep_heart_rate, 'bpm'),
-        p('spo2_min', params.spo2_min, '%'),
-        p('sleep_quality', params.sleep_quality, 'score'),
+        p('Sleep Duration', params.sleep_duration, 'hrs'),
+        p('Sleep Average Heart Rate', params.sleep_heart_rate, 'bpm'),
+        p('Sleep Min SPO2', params.spo2_min, '%'),
+        p('Sleep Quality', params.sleep_quality, 'score'),
 
         // Nutrition
-        p('calorie_intake', params.calorie_intake, 'kcal'),
-        p('water_intake', params.water_intake, 'L'),
+        p('Total Energy Intake from Food', params.calorie_intake, 'kcal'),
+        p('Hydration Volume', params.water_intake, 'L'),
         p('protein_pct', params.protein_pct, '%'),
         p('carbs_pct', params.carbs_pct, '%'),
         p('fats_pct', params.fats_pct, '%'),
 
         // Stress & Recovery
-        p('stress_level', params.stress_level, 'score'),
-        p('recovery_score', params.recovery_score, 'score'),
+        p('Body Stress Score', params.stress_level, 'score'),
+        p('Recovery Score', params.recovery_score, 'score'),
 
         // Symptoms
         p('symp_abdominal_cramps', params.symptom_abdominal_cramps),
         p('symp_night_sweats', params.symptom_night_sweats),
-        p('headache', params.symptom_headache),
-        p('fatigue', params.symptom_fatigue),
-        p('insomnia', params.symptom_insomnia),
-        p('joint_pain', params.symptom_joint_pain),
-        p('dizziness', params.symptom_dizziness),
-        p('shortness_of_breath', params.symptom_shortness_of_breath),
+        p('Headache', params.symptom_headache),
+        p('Fatigue', params.symptom_fatigue),
+        p('Insomnia', params.symptom_insomnia),
+        p('Joint Pain', params.symptom_joint_pain),
+        p('Dizziness', params.symptom_dizziness),
+        p('Shortness of Breath', params.symptom_shortness_of_breath),
 
         // Labs
         p('41995-2', params.hba1c, '%'), // HbA1c LOINC
