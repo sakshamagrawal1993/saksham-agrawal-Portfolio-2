@@ -33,12 +33,16 @@ export const PlaygroundLayout: React.FC = () => {
 
     const [loading, setLoading] = useState(true);
 
+    const isInitialized = React.useRef(false);
+
     // 1. Initial Sync: Load baseline data from the main store into the playground store
     useEffect(() => {
         if (!id || activeTwinId !== id) {
             navigate(`/health-twin/${id || ''}`);
             return;
         }
+
+        if (isInitialized.current) return;
 
         const syncBaseline = () => {
             // Helper to find most recent value for a parameter name or id
@@ -123,6 +127,7 @@ export const PlaygroundLayout: React.FC = () => {
             };
 
             initializeBaseline(baseline, baselineScores);
+            isInitialized.current = true;
             setLoading(false);
         };
 

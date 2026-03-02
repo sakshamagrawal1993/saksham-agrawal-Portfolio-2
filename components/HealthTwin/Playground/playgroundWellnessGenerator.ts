@@ -1,150 +1,139 @@
-import { WellnessProgram } from '../../../store/healthTwin';
 import { PlaygroundParameters } from '../../../store/playgroundStore';
+import { WellnessProgram } from '../../../store/healthTwin';
 
-/**
- * Generates wellness plans locally for the playground to ensure instant feedback
- * and avoid unnecessary edge function calls during simulation.
- */
 export function generatePlaygroundWellness(params: PlaygroundParameters): WellnessProgram[] {
     const programs: WellnessProgram[] = [];
-    const now = new Date().toISOString();
-    const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    // 1. Cardiovascular Optimization
-    if (params.daily_steps < 7000 || params.resting_heart_rate > 75) {
+    // 1. Cardiovascular Optimization (based on high heart rate or low activity)
+    if (params.resting_heart_rate > 75 || params.daily_steps < 6000) {
         programs.push({
-            id: 'pg-cardio-' + Date.now(),
-            title: 'Cardiovascular Optimization',
-            icon: 'heart',
-            priority: params.resting_heart_rate > 85 ? 'high' : 'medium',
-            duration: '12 weeks',
-            reason: `Simulated resting HR of ${params.resting_heart_rate} bpm indicates potential for aerobic base improvement.`,
+            title: "Cardiovascular Optimization",
+            id: "pg-cardio",
+            generated_at: new Date().toISOString(),
+            expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
+            icon: "heart",
+            priority: params.resting_heart_rate > 85 ? "high" : "medium",
+            duration: "12 weeks",
+            reason: `Based on simulated resting HR of ${params.resting_heart_rate} bpm and activity levels.`,
             data_connections: [
-                { metric: 'Steps', value: params.daily_steps.toLocaleString(), insight: 'Below target for metabolic health.' },
-                { metric: 'Resting HR', value: `${params.resting_heart_rate} bpm`, insight: 'Cardiac efficiency marker.' }
+                { metric: "Resting Heart Rate", value: `${params.resting_heart_rate} bpm`, insight: "Elevated resting heart rate suggests potential for aerobic efficiency improvements." },
+                { metric: "Daily Steps", value: `${params.daily_steps}`, insight: "Simulated activity is below the 10,000-step optimal threshold." }
             ],
             weekly_plan: [
-                { day: 'Mon/Wed/Fri', activity: 'Zone 2 Cardio', goal: '35 mins steady state' },
-                { day: 'Tue/Thu', activity: 'Strength Training', goal: 'Focus on compound movements' }
+                { day: "Mon", activity: "Zone 2 Cardio", target_hr: "120-135 bpm", goal: "35 min" },
+                { day: "Wed", activity: "HIIT Intervals", target_hr: "150-165 bpm", goal: "20 min" },
+                { day: "Fri", activity: "Endurance Walk", target_hr: "110-120 bpm", goal: "60 min" }
             ],
-            expected_outcomes: ['Decrease in resting HR by 3-5 bpm', 'Improved recovery scores'],
-            generated_at: now,
-            expires_at: expires
+            expected_outcomes: [
+                "Reduction in resting heart rate by 5-8 bpm",
+                "Improved VO2 max over a 3-month period"
+            ]
         });
     }
 
-    // 2. Glycemic Stability
-    if (params.hba1c > 5.7 || params.blood_glucose > 100 || params.diabetes) {
+    // 2. Glycemic Stability (based on high blood glucose or diabetes simulation)
+    if (params.diabetes || params.blood_glucose > 100 || params.hba1c > 5.7) {
         programs.push({
-            id: 'pg-glycemic-' + Date.now(),
-            title: 'Glycemic Stability Plan',
-            icon: 'utensils',
-            priority: (params.hba1c > 6.5 || params.diabetes) ? 'high' : 'medium',
-            duration: '6 months',
-            reason: `Simulated HbA1c of ${params.hba1c}% suggests a benefit from glycemic load management.`,
+            title: "Glycemic Stability Plan",
+            id: "pg-glycemic",
+            generated_at: new Date().toISOString(),
+            expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
+            icon: "utensils",
+            priority: (params.diabetes || params.hba1c > 6.5) ? "high" : "medium",
+            duration: "6 months",
+            reason: "Targeting blood glucose management and insulin sensitivity.",
             data_connections: [
-                { metric: 'HbA1c', value: `${params.hba1c}%`, insight: 'Long-term glucose control marker.' },
-                { metric: 'Max Glucose', value: `${params.blood_glucose_max} mg/dL`, insight: 'Peak glycemic excursion.' }
+                { metric: "HbA1c", value: `${params.hba1c}%`, insight: "Simulated level indicates potential for glycemic load management." },
+                { metric: "Blood Glucose", value: `${params.blood_glucose} mg/dL`, insight: "Morning fasting state simulation suggests carbohydrate timing adjustments." }
             ],
             weekly_plan: [
-                { day: 'Daily', activity: 'Low GI Nutrition', goal: '< 150g net carbs' },
-                { day: 'Post-Meal', activity: 'Light Walk', goal: '10-15 mins to blunt spikes' }
+                { day: "Daily", activity: "Post-meal Walks", target_hr: "90-105 bpm", goal: "15 min" },
+                { day: "Tue/Thu", activity: "Strength Training", target_hr: "110-130 bpm", goal: "45 min" },
+                { day: "Sat", activity: "Metabolic Tracking", target_hr: "N/A", goal: "Log all meals" }
             ],
-            expected_outcomes: ['Stabilized energy levels', 'Reduction in simulated HbA1c'],
-            generated_at: now,
-            expires_at: expires
+            expected_outcomes: [
+                "Stabilization of fasting blood glucose below 100 mg/dL",
+                "Gradual reduction of HbA1c toward optimal range"
+            ]
         });
     }
 
-    // 3. Sleep & Recovery
-    if (params.sleep_duration < 6.5 || params.sleep_quality < 70 || params.stress_level > 60) {
+    // 3. Sleep & Recovery Protocol (based on low sleep or poor quality)
+    if (params.sleep_duration < 7 || params.sleep_quality < 80) {
         programs.push({
-            id: 'pg-sleep-' + Date.now(),
-            title: 'Sleep & Recovery Protocol',
-            icon: 'moon',
-            priority: (params.sleep_duration < 5) ? 'high' : 'medium',
-            duration: '4 weeks',
+            title: "Sleep & Recovery Protocol",
+            id: "pg-sleep",
+            generated_at: new Date().toISOString(),
+            expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
+            icon: "moon",
+            priority: params.sleep_duration < 5 ? "high" : "medium",
+            duration: "4 weeks",
             reason: `Simulated sleep duration of ${params.sleep_duration}h is below restorative thresholds.`,
             data_connections: [
-                { metric: 'Sleep', value: `${params.sleep_duration}h`, insight: 'Insufficient total duration.' },
-                { metric: 'Recovery', value: `${params.recovery_score}/100`, insight: 'Systemic readiness marker.' }
+                { metric: "Sleep Duration", value: `${params.sleep_duration}h`, insight: "Shortened sleep cycles impact hormonal balance and neural recovery." },
+                { metric: "Recovery Score", value: `${params.recovery_score}%`, insight: "Simulated recovery indicates potential for parasympathetic optimization." }
             ],
             weekly_plan: [
-                { day: 'Nightly', activity: 'Blue Light Blockers', goal: '90 mins before bed' },
-                { day: 'Morning', activity: 'Sunlight Exposure', goal: '20 mins upon waking' }
+                { day: "Nightly", activity: "Digital Detox", target_hr: "Relaxing", goal: "No screens 60m before bed" },
+                { day: "Mon/Wed", activity: "Yoga/Stretching", target_hr: "80-90 bpm", goal: "20 min PM" },
+                { day: "Daily", activity: "Morning Sunlight", target_hr: "N/A", goal: "10 min first thing" }
             ],
-            expected_outcomes: ['Improved deep sleep percentage', '20% increase in recovery score'],
-            generated_at: now,
-            expires_at: expires
+            expected_outcomes: [
+                "Increase in REM and Deep Sleep percentages",
+                "Improved morning alertness and sustained energy"
+            ]
         });
     }
 
-    // 4. Lipid Management
-    if (params.ldl > 130 || params.triglycerides > 150 || params.hyperlipidemia) {
+    // 4. Environmental Resilience (based on AQI or UV)
+    if (params.aqi > 100 || params.uv_index > 8) {
         programs.push({
-            id: 'pg-lipid-' + Date.now(),
-            title: 'Lipid Management Protocol',
-            icon: 'activity',
-            priority: params.ldl > 160 ? 'high' : 'medium',
-            duration: '6 months',
-            reason: `Elevated simulated LDL (${params.ldl} mg/dL) impacts long-term cardiovascular scoring.`,
+            title: "Environmental Resilience",
+            id: "pg-env",
+            generated_at: new Date().toISOString(),
+            expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
+            icon: "shield",
+            priority: "medium",
+            duration: "Seasonal",
+            reason: "Managing health impacts of simulated high-exposure environment.",
             data_connections: [
-                { metric: 'LDL', value: `${params.ldl} mg/dL`, insight: 'Atherogenic risk marker.' },
-                { metric: 'Triglycerides', value: `${params.triglycerides} mg/dL`, insight: 'Metabolic syndrome indicator.' }
+                { metric: "AQI", value: `${params.aqi}`, insight: "Simulated air quality necessitates respiratory protective measures." },
+                { metric: "UV Index", value: `${params.uv_index}`, insight: "High UV simulation requires antioxidant support and dermal protection." }
             ],
             weekly_plan: [
-                { day: 'Daily', activity: 'Soluble Fiber', goal: '25-35g per day' },
-                { day: '5x Weekly', activity: 'LISS Cardio', goal: '45 mins walking/cycling' }
+                { day: "Daily", activity: "Air Quality Tracking", target_hr: "N/A", goal: "Limit outdoor exposure when AQI > 150" },
+                { day: "Tue/Thu", activity: "Antioxidant Rich Diet", target_hr: "N/A", goal: "Vitamin C/E supplementation" },
+                { day: "Daily", activity: "HEPA Filtration", target_hr: "N/A", goal: "Run indoor air purifiers" }
             ],
-            expected_outcomes: ['Reduction in LDL-C', 'Improved HDL/Triglyceride ratio'],
-            generated_at: now,
-            expires_at: expires
+            expected_outcomes: [
+                "Reduced systemic inflammation from pollutants",
+                "Minimized oxidative stress from UV exposure"
+            ]
         });
     }
 
-    // 5. Environmental Resilience
-    if (params.aqi > 50 || params.pollen_level > 5) {
+    // Ensure we always return at least 3 plans for UI consistency
+    if (programs.length < 3) {
         programs.push({
-            id: 'pg-env-' + Date.now(),
-            title: 'Environmental Resilience',
-            icon: 'wind',
-            priority: params.aqi > 100 ? 'high' : 'medium',
-            duration: 'Ongoing',
-            reason: `Simulated AQI of ${params.aqi} increases respiratory inflammatory load.`,
+            title: "General Maintenance Program",
+            id: "pg-maint",
+            generated_at: new Date().toISOString(),
+            expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
+            icon: "heart",
+            priority: "low",
+            duration: "Indefinite",
+            reason: "Sustaining current health baseline.",
             data_connections: [
-                { metric: 'AQI', value: `${params.aqi}`, insight: 'Air quality impact on SPO2.' },
-                { metric: 'Pollen', value: `${params.pollen_level}`, insight: 'Allergenic stressor.' }
+                { metric: "Overall Health", value: "Optimal", insight: "Current simulation shows balanced vital metrics." }
             ],
             weekly_plan: [
-                { day: 'Daily', activity: 'Air Filtration', goal: 'Maintain HEPA in key rooms' },
-                { day: 'High AQI Days', activity: 'Indoor Exercise', goal: 'Avoid outdoor exertion' }
+                { day: "Daily", activity: "Baseline Movement", target_hr: "100-115 bpm", goal: "30 min" },
+                { day: "Sun", activity: "Wellness Review", target_hr: "N/A", goal: "Plan the next week" }
             ],
-            expected_outcomes: ['Maintained airway health', 'Reduced systemic inflammation'],
-            generated_at: now,
-            expires_at: expires
-        });
-    }
-
-    // 6. Nutritional Balance
-    if (params.protein_pct < 15 || params.calorie_intake > 3000) {
-        programs.push({
-            id: 'pg-nutrition-' + Date.now(),
-            title: 'Nutritional Balance Plan',
-            icon: 'utensils',
-            priority: 'medium',
-            duration: '4 weeks',
-            reason: `Simulated calorie intake of ${params.calorie_intake} kcal requires optimized macro splitting.`,
-            data_connections: [
-                { metric: 'Calories', value: `${params.calorie_intake} kcal`, insight: 'Daily energy budget.' },
-                { metric: 'Protein', value: `${params.protein_pct}%`, insight: 'Muscle preservation marker.' }
-            ],
-            weekly_plan: [
-                { day: 'Daily', activity: 'Protein Pacing', goal: '25g per meal' },
-                { day: 'Daily', activity: 'Water Intake', goal: `Target ${params.water_intake}L` }
-            ],
-            expected_outcomes: ['Optimized body composition', 'Sustained energy levels'],
-            generated_at: now,
-            expires_at: expires
+            expected_outcomes: [
+                "Maintenance of current strength and cardiovascular health",
+                "Long-term disease risk mitigation"
+            ]
         });
     }
 

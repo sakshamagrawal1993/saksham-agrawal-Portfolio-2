@@ -8,6 +8,7 @@ import {
   WellnessProgram
 } from './healthTwin';
 import { calculateAxesScores } from '../utils/scoreCalculator';
+import { supabase } from '../lib/supabaseClient';
 import { generatePlaygroundWellness } from '../components/HealthTwin/Playground/playgroundWellnessGenerator';
 
 export interface PlaygroundParameters {
@@ -110,6 +111,7 @@ interface PlaygroundState {
     initializeBaseline: (params: PlaygroundParameters, scores: HealthScore[]) => void;
     resetToBaseline: () => void;
     recalculateScores: (definitions: HealthParameterDefinition[], ranges: HealthParameterRange[]) => void;
+    generateWellnessPlan: () => Promise<void>;
     setWellnessPrograms: (programs: WellnessProgram[]) => void;
     setIsGeneratingWellness: (loading: boolean) => void;
 }
@@ -249,14 +251,52 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
             personalDetails
         );
 
-        // Also generate wellness programs locally
-        const wellness = generatePlaygroundWellness(parameters);
-
         set({ 
             scores: computedScores, 
-            wellnessPrograms: wellness,
             lastUpdated: Date.now() 
         });
+
+        // Trigger real-time wellness generation
+        get().generateWellnessPlan();
+    },
+
+    generateWellnessPlan: async () => {
+        const { parameters, scores, isGeneratingWellness } = get();
+        if (isGeneratingWellness) return;
+
+        set({ isGeneratingWellness: true });
+        try {
+            console.log('Invoking playground-wellness with:', { parameters, scores });
+            const { data, error } = await supabase.functions.invoke('playground-wellness', {
+                body: { 
+                    playground_state: parameters,
+                    computed_scores: scores
+                }
+            });
+
+            if (error) {
+                console.error('Edge function error:', error);
+                throw error;
+            }
+            
+            if (data?.programs) {
+                console.log('Successfully generated wellness programs:', data.programs);
+                set({ wellnessPrograms: data.programs });
+            } else {
+                console.warn('No programs returned from edge function:', data);
+                // Fallback if data is malformed
+                const fallbackWellness = generatePlaygroundWellness(parameters);
+                set({ wellnessPrograms: fallbackWellness });
+            }
+        } catch (err) {
+            console.error('Failed to generate playground wellness (AI failed):', err);
+            // FALLBACK TO LOCAL GEN (to ensure the user sees something during dev/missing deployment)
+            console.log('Falling back to local simulation engine...');
+            const fallbackWellness = generatePlaygroundWellness(parameters);
+            set({ wellnessPrograms: fallbackWellness });
+        } finally {
+            set({ isGeneratingWellness: false });
+        }
     },
 
     setWellnessPrograms: (wellnessPrograms) => set({ wellnessPrograms }),
