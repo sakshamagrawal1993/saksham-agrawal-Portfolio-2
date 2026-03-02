@@ -146,7 +146,7 @@ export const PROJECTS: Project[] = [
       'https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?auto=format&fit=crop&q=80&w=1000'
     ],
     techStack: ['LLMs', 'Safety Guardrails', 'Multilingual Support', 'PLG'],
-    demoUrl: '#'
+    demoUrl: '/mind-coach'
   },
   {
     id: 'p3',

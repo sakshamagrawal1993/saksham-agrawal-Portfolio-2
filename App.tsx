@@ -31,6 +31,8 @@ const RunnerApp = lazy(() => import('./components/Runner/RunnerApp'));
 const TwinLanding = lazy(() => import('./components/HealthTwin/TwinLanding').then(m => ({ default: m.TwinLanding })));
 const HealthTwinDashboard = lazy(() => import('./components/HealthTwin/DashboardLayout'));
 const PlaygroundLayout = lazy(() => import('./components/HealthTwin/Playground/PlaygroundLayout').then(m => ({ default: m.PlaygroundLayout })));
+const MindCoachLanding = lazy(() => import('./components/MindCoach/MindCoachLanding'));
+const MindCoachApp = lazy(() => import('./components/MindCoach/MindCoachApp'));
 
 const PortfolioPage = lazy(() => import('./components/PortfolioPage'));
 
@@ -200,6 +202,16 @@ function App() {
                 <PlaygroundLayout />
               </Suspense>
             } />
+            <Route path="/mind-coach" element={
+              <Suspense fallback={<LoadingFallback />}>
+                <MindCoachLanding />
+              </Suspense>
+            } />
+            <Route path="/mind-coach/:profileId" element={
+              <Suspense fallback={<LoadingFallback />}>
+                <MindCoachApp />
+              </Suspense>
+            } />
             <Route path="/project/:id" element={<ProjectPage />} />
 
             {/* Unified Journal/Blog Routes */}
@@ -240,8 +252,8 @@ function App() {
           </Routes>
         </main>
 
-        {!['/ticketflow', '/insightslm', '/login'].includes(location.pathname) && !location.pathname.startsWith('/health-twin') && <Footer onLinkClick={handleNavClick} />}
-        {!['/runner'].includes(location.pathname) && !location.pathname.startsWith('/health-twin') && <Assistant />}
+        {!['/ticketflow', '/insightslm', '/login'].includes(location.pathname) && !location.pathname.startsWith('/health-twin') && !location.pathname.startsWith('/mind-coach') && <Footer onLinkClick={handleNavClick} />}
+        {!['/runner'].includes(location.pathname) && !location.pathname.startsWith('/health-twin') && !location.pathname.startsWith('/mind-coach') && <Assistant />}
       </div>
     </AuthProvider>
   );

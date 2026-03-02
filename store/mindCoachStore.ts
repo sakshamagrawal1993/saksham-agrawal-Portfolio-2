@@ -1,0 +1,273 @@
+import { create } from 'zustand';
+
+// ── Types ──────────────────────────────────────────────────────────────────
+
+export type TherapistPersona = 'maya' | 'alex' | 'sage';
+
+export type Pathway =
+  | 'cognitive_reframing'
+  | 'boundary_setting'
+  | 'emotional_regulation'
+  | 'grief_and_acceptance'
+  | 'self_worth_building'
+  | 'behavioral_activation'
+  | 'exploratory_validation';
+
+export type SessionState = 'intake' | 'active' | 'wrapping_up' | 'completed';
+
+export type MemoryType =
+  | 'trigger'
+  | 'pattern'
+  | 'breakthrough'
+  | 'coping_strategy'
+  | 'life_context'
+  | 'preference';
+
+export type TabId = 'home' | 'sessions' | 'journey' | 'toolkit' | 'profile';
+
+export interface MindCoachProfile {
+  id: string;
+  user_id: string;
+  name: string;
+  age: number | null;
+  gender: string | null;
+  concerns: string[];
+  therapist_persona: TherapistPersona;
+  created_at: string;
+}
+
+export interface JourneyPhase {
+  phase_number: number;
+  title: string;
+  goal: string;
+  sessions: JourneySessionTopic[];
+}
+
+export interface JourneySessionTopic {
+  session_number: number;
+  topic: string;
+  description: string;
+}
+
+export interface MindCoachJourney {
+  id: string;
+  profile_id: string;
+  title: string;
+  description: string | null;
+  concerns_snapshot: string[];
+  phases: JourneyPhase[];
+  current_phase: number;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CaseNotes {
+  dynamic_theme: string;
+  pathway_used: Pathway;
+  emotional_state: string;
+  key_insight: string;
+  action_item: string;
+  techniques_practiced: string[];
+  parked_items: string[];
+  drift_events: string[];
+}
+
+export interface MindCoachSession {
+  id: string;
+  profile_id: string;
+  journey_id: string | null;
+  phase_number: number;
+  session_number: number;
+  dynamic_theme: string | null;
+  pathway: Pathway | null;
+  session_state: SessionState;
+  message_count: number;
+  summary: string | null;
+  summary_data: Record<string, unknown> | null;
+  case_notes: CaseNotes | null;
+  started_at: string;
+  ended_at: string | null;
+}
+
+export interface ChatMessage {
+  id: string;
+  session_id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  guardrail_status: 'passed' | 'corrected' | 'blocked' | null;
+  created_at: string;
+}
+
+export interface MindCoachMemory {
+  id: string;
+  profile_id: string;
+  memory_text: string;
+  memory_type: MemoryType;
+  source_session_id: string | null;
+  created_at: string;
+}
+
+export interface JournalEntry {
+  id: string;
+  profile_id: string;
+  title: string | null;
+  content: string;
+  mood: string | null;
+  prompt: string | null;
+  created_at: string;
+}
+
+export interface MoodEntry {
+  id: string;
+  profile_id: string;
+  score: number;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface Exercise {
+  id: string;
+  title: string;
+  type: 'breathing' | 'grounding' | 'meditation';
+  category: string;
+  duration_seconds: number;
+  description: string | null;
+  steps: { instruction: string; duration: number }[];
+  created_at: string;
+}
+
+// Feature unlock gates per phase
+export const UNLOCK_MAP: Record<number, string[]> = {
+  1: ['chat'],
+  2: ['chat', 'journal'],
+  3: ['chat', 'journal', 'exercises'],
+  4: ['chat', 'journal', 'exercises', 'meditation'],
+};
+
+// ── State ──────────────────────────────────────────────────────────────────
+
+interface MindCoachState {
+  // Profile
+  profile: MindCoachProfile | null;
+  setProfile: (p: MindCoachProfile | null) => void;
+
+  // Journey
+  journey: MindCoachJourney | null;
+  setJourney: (j: MindCoachJourney | null) => void;
+
+  // Sessions
+  sessions: MindCoachSession[];
+  activeSession: MindCoachSession | null;
+  setSessions: (s: MindCoachSession[]) => void;
+  setActiveSession: (s: MindCoachSession | null) => void;
+  updateActiveSession: (partial: Partial<MindCoachSession>) => void;
+
+  // Chat messages (current session only)
+  messages: ChatMessage[];
+  setMessages: (m: ChatMessage[]) => void;
+  addMessage: (m: ChatMessage) => void;
+  isLoading: boolean;
+  setIsLoading: (loading: boolean) => void;
+  isCrisisDetected: boolean;
+  setCrisisDetected: (detected: boolean) => void;
+
+  // Memory
+  memories: MindCoachMemory[];
+  recentCaseNotes: CaseNotes[];
+  setMemories: (m: MindCoachMemory[]) => void;
+  setRecentCaseNotes: (cn: CaseNotes[]) => void;
+
+  // Journal
+  journalEntries: JournalEntry[];
+  setJournalEntries: (e: JournalEntry[]) => void;
+
+  // Mood
+  moodEntries: MoodEntry[];
+  setMoodEntries: (e: MoodEntry[]) => void;
+
+  // Exercises
+  exercises: Exercise[];
+  setExercises: (e: Exercise[]) => void;
+
+  // UI
+  activeTab: TabId;
+  setActiveTab: (tab: TabId) => void;
+
+  // Computed
+  completedSessionCount: () => number;
+  currentPhaseSessionCount: () => number;
+  unlockedFeatures: () => string[];
+
+  // Reset
+  reset: () => void;
+}
+
+const initialState = {
+  profile: null,
+  journey: null,
+  sessions: [],
+  activeSession: null,
+  messages: [],
+  isLoading: false,
+  isCrisisDetected: false,
+  memories: [],
+  recentCaseNotes: [],
+  journalEntries: [],
+  moodEntries: [],
+  exercises: [],
+  activeTab: 'home' as TabId,
+};
+
+export const useMindCoachStore = create<MindCoachState>((set, get) => ({
+  ...initialState,
+
+  setProfile: (profile) => set({ profile }),
+  setJourney: (journey) => set({ journey }),
+
+  setSessions: (sessions) => set({ sessions }),
+  setActiveSession: (activeSession) => set({ activeSession }),
+  updateActiveSession: (partial) =>
+    set((state) => ({
+      activeSession: state.activeSession
+        ? { ...state.activeSession, ...partial }
+        : null,
+    })),
+
+  setMessages: (messages) => set({ messages }),
+  addMessage: (msg) =>
+    set((state) => ({ messages: [...state.messages, msg] })),
+  setIsLoading: (isLoading) => set({ isLoading }),
+  setCrisisDetected: (isCrisisDetected) => set({ isCrisisDetected }),
+
+  setMemories: (memories) => set({ memories }),
+  setRecentCaseNotes: (recentCaseNotes) => set({ recentCaseNotes }),
+
+  setJournalEntries: (journalEntries) => set({ journalEntries }),
+  setMoodEntries: (moodEntries) => set({ moodEntries }),
+  setExercises: (exercises) => set({ exercises }),
+
+  setActiveTab: (activeTab) => set({ activeTab }),
+
+  completedSessionCount: () =>
+    get().sessions.filter((s) => s.session_state === 'completed').length,
+
+  currentPhaseSessionCount: () => {
+    const { sessions, journey } = get();
+    if (!journey) return 0;
+    return sessions.filter(
+      (s) =>
+        s.session_state === 'completed' &&
+        s.phase_number === journey.current_phase
+    ).length;
+  },
+
+  unlockedFeatures: () => {
+    const { journey } = get();
+    const phase = journey?.current_phase ?? 1;
+    const completedPhase = Math.max(1, phase);
+    return UNLOCK_MAP[Math.min(completedPhase, 4)] ?? UNLOCK_MAP[1];
+  },
+
+  reset: () => set(initialState),
+}));
