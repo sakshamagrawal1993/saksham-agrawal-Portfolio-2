@@ -110,14 +110,29 @@ export function calculateAxesScores(
       const normalize = (s: string) => s.toLowerCase().replace(/_/g, ' ').trim();
       const paramNameNorm = normalize(param.parameter_name);
 
-      const def = definitions.find(d => 
+      let def = definitions.find(d => 
           normalize(d.name) === paramNameNorm || 
           normalize(d.id) === paramNameNorm
       );
+
+      // FALLBACK Definitions for Playground (if missing from DB)
+      if (!def) {
+          const defaults: Record<string, HealthParameterDefinition> = {
+              'aqi': { id: 'aqi', name: 'Air Quality Index', category: 'environment', unit: 'index', axis_impact_weights: { environment: 3, resilience: 2 } },
+              'uv_index': { id: 'uv_index', name: 'UV Index', category: 'environment', unit: 'index', axis_impact_weights: { environment: 3, resilience: 1 } },
+              'pollen_level': { id: 'pollen_level', name: 'Pollen Level', category: 'environment', unit: 'level', axis_impact_weights: { environment: 2, resilience: 3 } },
+              'floors_climbed': { id: 'floors_climbed', name: 'Floors Climbed', category: 'activity', unit: 'floors', axis_impact_weights: { energy: 2, strength: 2, heart: 1 } },
+              'water_intake': { id: 'water_intake', name: 'Daily Water Intake', category: 'nutrition', unit: 'L', axis_impact_weights: { energy: 1, resilience: 3 } },
+              'stress_level': { id: 'stress_level', name: 'Average Stress Level', category: 'mental', unit: 'score', axis_impact_weights: { mind: 3, hormone: 2 } },
+              'recovery_score': { id: 'recovery_score', name: 'Recovery Score', category: 'recovery', unit: 'score', axis_impact_weights: { strength: 3, energy: 2 } },
+          };
+          def = defaults[paramNameNorm] || Object.values(defaults).find(d => normalize(d.name) === paramNameNorm);
+      }
+
       if (!def) continue;
 
       // Match correct demographic range brackets
-      const matchedRanges = ranges.filter(r => r.parameter_id === def.id);
+      const matchedRanges = ranges.filter(r => r.parameter_id === def?.id);
       
       // Try specific gender + age
       let r = matchedRanges.find(r => r.gender === gender && age >= r.min_age && age <= r.max_age);
@@ -127,6 +142,23 @@ export function calculateAxesScores(
       if (!r) r = matchedRanges.find(r => r.gender === 'ALL' && age >= r.min_age && age <= r.max_age);
       // Fallback 3: Generic ALL
       if (!r) r = matchedRanges.find(r => r.gender === 'ALL');
+
+      // FALLBACK Ranges for Playground (if missing from DB)
+      if (!r && def) {
+          const defaultRanges: Record<string, any> = {
+              'aqi': { optimal_min: 0, optimal_max: 50, normal_min: 0, normal_max: 100, critical_min: null, critical_max: 300 },
+              'uv_index': { optimal_min: 0, optimal_max: 2, normal_min: 0, normal_max: 5, critical_min: null, critical_max: 11 },
+              'pollen_level': { optimal_min: 0, optimal_max: 3, normal_min: 0, normal_max: 6, critical_min: null, critical_max: 12 },
+              'floors_climbed': { optimal_min: 15, optimal_max: 100, normal_min: 5, normal_max: null, critical_min: null, critical_max: null },
+              'water_intake': { optimal_min: 2.7, optimal_max: 3.7, normal_min: 2.0, normal_max: 5.0, critical_min: null, critical_max: null },
+              'stress_level': { optimal_min: 0, optimal_max: 25, normal_min: 0, normal_max: 60, critical_min: null, critical_max: 90 },
+              'recovery_score': { optimal_min: 70, optimal_max: 100, normal_min: 40, normal_max: 100, critical_min: null, critical_max: null },
+          };
+          const dr = defaultRanges[def.id] || defaultRanges[normalize(def.name)];
+          if (dr) {
+              r = { ...dr, parameter_id: def.id, gender: 'ALL', min_age: 0, max_age: 120, id: `fallback-${def.id}` };
+          }
+      }
 
       if (!r) continue;
 
