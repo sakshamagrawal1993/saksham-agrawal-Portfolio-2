@@ -15,13 +15,31 @@ export const PlaygroundInputPanel: React.FC = () => {
             <div className="p-4 border-b border-[#EBE7DE] shrink-0 bg-[#FAF9F6]">
                 <h2 className="text-lg font-serif text-[#A84A00]">Parameter Inputs</h2>
                 <p className="text-[10px] text-[#A8A29E] font-medium tracking-wide uppercase mt-1">
-                    Adjust 55 health markers to simulate impact
+                    Adjust 56 health markers to simulate impact
                 </p>
             </div>
 
             <div className="flex-1 overflow-y-auto overflow-x-hidden">
                 {/* Profile & Co-morbidities */}
-                <CategoryCollapsible title="Profile & History" icon={User} defaultExpanded count={9}>
+                <CategoryCollapsible title="Profile & History" icon={User} defaultExpanded count={10}>
+                    <div className="flex flex-col gap-1 px-3 py-2">
+                        <label className="text-xs font-medium text-[#5D5A53]">Gender</label>
+                        <div className="flex p-1 bg-[#F5F1E8] rounded-md">
+                            {(['M', 'F', 'ALL'] as const).map((g) => (
+                                <button
+                                    key={g}
+                                    onClick={() => setParameter('gender', g)}
+                                    className={`flex-1 py-1 text-[10px] font-bold rounded transition-all uppercase tracking-wider ${parameters.gender === g
+                                            ? 'bg-white text-[#A84A00] shadow-sm'
+                                            : 'text-[#8C8980] hover:text-[#5D5A53]'
+                                        }`}
+                                >
+                                    {g === 'M' ? 'Male' : g === 'F' ? 'Female' : 'All'}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
                     <ParameterSlider
                         label="Age" value={parameters.age} min={0} max={120}
                         onChange={(v) => setParameter('age', v)} unit="yrs"
