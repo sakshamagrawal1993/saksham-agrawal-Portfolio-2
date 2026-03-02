@@ -5,7 +5,7 @@ import { useHealthTwinStore } from '../../store/healthTwin';
 import { LeftPanel } from './LeftPanel';
 import { CenterPanel } from './CenterPanel';
 import { RightPanel } from './RightPanel';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Zap } from 'lucide-react';
 
 export const HealthTwinDashboard: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -169,7 +169,7 @@ export const HealthTwinDashboard: React.FC = () => {
                 <div className="flex items-center gap-3">
                     <span className="text-sm text-[#5D5A53]">Active Twin:</span>
                     <select
-                        className="bg-transparent text-sm outline-none font-medium cursor-pointer max-w-[200px] truncate"
+                        className="bg-transparent text-sm outline-none font-medium cursor-pointer max-w-[200px] truncate mr-4"
                         value={activeTwinId || ''}
                         onChange={(e) => navigate(`/health-twin/${e.target.value}`)}
                     >
@@ -178,6 +178,14 @@ export const HealthTwinDashboard: React.FC = () => {
                             <option key={twin.id} value={twin.id}>{twin.name}</option>
                         ))}
                     </select>
+
+                    <button
+                        onClick={() => navigate(`/health-twin/${id}/playground`)}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-[#F5F1E8] text-[#A84A00] text-xs font-bold rounded-lg hover:bg-[#EBE7DE] transition-colors tracking-wider uppercase border border-[#EBE7DE]"
+                    >
+                        <Zap className="w-3.5 h-3.5 fill-[#A84A00]" />
+                        Open Playground
+                    </button>
                 </div>
             </header>
 

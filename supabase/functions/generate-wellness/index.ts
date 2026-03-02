@@ -12,7 +12,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { twin_id } = await req.json();
+    const { twin_id, playground_state } = await req.json();
     if (!twin_id) {
       return new Response(JSON.stringify({ error: "twin_id is required" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -22,18 +22,20 @@ Deno.serve(async (req: Request) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // ─── 1. Check Cache ─────────────────────────────────────────
-    const { data: cached } = await supabase
-      .from("health_wellness_programs")
-      .select("*")
-      .eq("twin_id", twin_id)
-      .gt("expires_at", new Date().toISOString())
-      .order("created_at", { ascending: false });
+    // ─── 1. Check Cache (Skip if playground simulation) ────────
+    if (!playground_state) {
+      const { data: cached } = await supabase
+        .from("health_wellness_programs")
+        .select("*")
+        .eq("twin_id", twin_id)
+        .gt("expires_at", new Date().toISOString())
+        .order("created_at", { ascending: false });
 
-    if (cached && cached.length > 0) {
-      return new Response(JSON.stringify({ programs: cached, source: "cache" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      if (cached && cached.length > 0) {
+        return new Response(JSON.stringify({ programs: cached, source: "cache" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     // ─── 2. Collect User Data (lean selects to minimize tokens) ────
@@ -71,6 +73,7 @@ Deno.serve(async (req: Request) => {
       recent_exercise: (exerciseRes.data || []).map((r: any) => ({ name: r.parameter_name, value: r.value, unit: r.unit })),
       recent_sleep: (sleepRes.data || []).map((r: any) => ({ name: r.parameter_name, value: r.value, unit: r.unit })),
       memories: (memoriesRes.data || []).map((m: any) => m.memory_text),
+      simulation_context: playground_state || null,
     };
 
     // ─── 3. Generate Programs via gpt-4o-mini ───────────────────
@@ -190,7 +193,14 @@ ${JSON.stringify(userData)}`;
 
     const programs = parsed.programs || [];
 
-    // ─── 4. Cache: Delete old + insert new ──────────────────────
+    // ─── 4. Cache (Skip save if playground simulation) ─────────
+    if (playground_state) {
+        return new Response(
+            JSON.stringify({ programs: programs, source: "simulation" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+    }
+
     await supabase
       .from("health_wellness_programs")
       .delete()

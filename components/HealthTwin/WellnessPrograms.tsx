@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { Heart, Dumbbell, Moon, Utensils, Brain, Shield, Eye, Wind, Bone, Droplet, ChevronDown, ChevronUp, RefreshCw, Target, Calendar, TrendingUp, Loader2 } from 'lucide-react';
 
 // ─── Icon Mapping ─────────────────────────────────────────────
-const ICON_MAP: Record<string, React.FC<any>> = {
+export const ICON_MAP: Record<string, React.FC<any>> = {
     heart: Heart, dumbbell: Dumbbell, moon: Moon, utensils: Utensils,
     brain: Brain, shield: Shield, eye: Eye, lungs: Wind, bone: Bone, droplet: Droplet,
 };
@@ -16,7 +16,7 @@ const PRIORITY_STYLES = {
 };
 
 // ─── Single Program Card ──────────────────────────────────────
-const ProgramCard: React.FC<{ program: WellnessProgram }> = ({ program }) => {
+export const ProgramCard: React.FC<{ program: WellnessProgram }> = ({ program }) => {
     const [expanded, setExpanded] = useState(false);
     const IconComp = ICON_MAP[program.icon] || Heart;
     const styles = PRIORITY_STYLES[program.priority] || PRIORITY_STYLES.medium;

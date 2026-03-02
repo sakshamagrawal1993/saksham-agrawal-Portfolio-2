@@ -178,9 +178,10 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode, fallbac
     }
 }
 
-export const Twin3D: React.FC = () => {
+export const Twin3D: React.FC<{ gender?: string }> = ({ gender }) => {
     const { personalDetails } = useHealthTwinStore();
-    const isFemale = personalDetails?.gender?.toLowerCase() === 'female' || personalDetails?.gender?.toLowerCase() === 'f';
+    const effectiveGender = gender || personalDetails?.gender;
+    const isFemale = effectiveGender?.toLowerCase() === 'female' || effectiveGender?.toLowerCase() === 'f';
     const currentModelUrl = isFemale ? FEMALE_MODEL_URL : MALE_MODEL_URL;
 
     // Transparent canvas to seamlessly match the #F5F2EB page background

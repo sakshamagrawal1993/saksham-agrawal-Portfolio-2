@@ -30,6 +30,7 @@ const InsightsLMApp = lazy(() => import('./components/InsightsLM/InsightsLMApp')
 const RunnerApp = lazy(() => import('./components/Runner/RunnerApp'));
 const TwinLanding = lazy(() => import('./components/HealthTwin/TwinLanding').then(m => ({ default: m.TwinLanding })));
 const HealthTwinDashboard = lazy(() => import('./components/HealthTwin/DashboardLayout'));
+const PlaygroundLayout = lazy(() => import('./components/HealthTwin/Playground/PlaygroundLayout').then(m => ({ default: m.PlaygroundLayout })));
 
 const PortfolioPage = lazy(() => import('./components/PortfolioPage'));
 
@@ -192,6 +193,11 @@ function App() {
             <Route path="/health-twin/:id" element={
               <Suspense fallback={<LoadingFallback />}>
                 <HealthTwinDashboard />
+              </Suspense>
+            } />
+            <Route path="/health-twin/:id/playground" element={
+              <Suspense fallback={<LoadingFallback />}>
+                <PlaygroundLayout />
               </Suspense>
             } />
             <Route path="/project/:id" element={<ProjectPage />} />
