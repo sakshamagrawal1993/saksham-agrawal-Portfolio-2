@@ -154,6 +154,7 @@ export function calculateAxesScores(
               'sleep duration': { id: 'sleep_duration', name: 'Sleep Duration', category: 'sleep', unit: 'hrs', axis_impact_weights: { mind: 3, strength: 2, hormone: 2 } },
               'sleep quality': { id: 'sleep_quality', name: 'Sleep Quality', category: 'sleep', unit: 'score', axis_impact_weights: { mind: 3, resilience: 2 } },
               'sleep min spo2': { id: 'spo2_min', name: 'Sleep Min SpO2', category: 'sleep', unit: '%', axis_impact_weights: { mind: 2, heart: 2 } },
+              'sleep average heart rate': { id: 'sleep_heart_rate', name: 'Sleep Average Heart Rate', category: 'sleep', unit: 'bpm', axis_impact_weights: { heart: 2, resilience: 1 } },
               
               // Recovery & Stress
               'body stress score': { id: 'stress_level', name: 'Average Stress Level', category: 'mental', unit: 'score', axis_impact_weights: { mind: 3, hormone: 2 } },
@@ -202,6 +203,7 @@ export function calculateAxesScores(
               
               'sleep_duration': { optimal_min: 7, optimal_max: 9, normal_min: 6, normal_max: 10, critical_min: 4, critical_max: 12 },
               'sleep_quality': { optimal_min: 85, optimal_max: 100, normal_min: 60, normal_max: 100, critical_min: 30, critical_max: null },
+              'sleep_heart_rate': { optimal_min: 45, optimal_max: 65, normal_min: 40, normal_max: 85, critical_min: 35, critical_max: 100 },
               'water_intake': { optimal_min: 2.7, optimal_max: 3.7, normal_min: 2.0, normal_max: 5.0, critical_min: 1.0, critical_max: 7.0 },
               'stress_level': { optimal_min: 0, optimal_max: 25, normal_min: 0, normal_max: 60, critical_min: null, critical_max: 90 },
               'recovery_score': { optimal_min: 70, optimal_max: 100, normal_min: 40, normal_max: 100, critical_min: 10, critical_max: null },

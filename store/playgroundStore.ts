@@ -318,9 +318,14 @@ export function playgroundToHealthParams(params: PlaygroundParameters): HealthPa
         recorded_at: now
     });
 
+    const weight = params.weight_kg;
+    const height = params.height_cm;
+    const bmi = weight / Math.pow(height / 100, 2);
+
     return [
         // Profile mapping (handled partly by calculator, but we can pass them)
-        p('weight_kg', params.weight_kg, 'kg'),
+        p('weight_kg', weight, 'kg'),
+        p('39156-5', parseFloat(bmi.toFixed(2)), 'kg/m²'), // Body Mass Index (BMI)
         
         // Co-morbidities (Mapping to comorb_ IDs from migration)
         p('comorb_diabetes', params.diabetes),

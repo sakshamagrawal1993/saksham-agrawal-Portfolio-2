@@ -136,7 +136,7 @@ export const PlaygroundLayout: React.FC = () => {
 
     // 2. Continuous Recalculation: Trigger scores on parameter change
     useEffect(() => {
-        if (!loading && parameterDefinitions.length > 0) {
+        if (!loading) {
             recalculateScores(parameterDefinitions, parameterRanges);
         }
     }, [parameters, parameterDefinitions, parameterRanges, recalculateScores, loading]);
