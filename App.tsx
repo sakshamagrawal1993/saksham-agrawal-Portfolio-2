@@ -160,6 +160,9 @@ function App() {
 
   return (
     <AuthProvider>
+      <div style={{ background: 'red', color: 'white', padding: '10px', textAlign: 'center', position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999 }}>
+        DEV SERVER CANARY: IF YOU SEE THIS, IT IS WORKING
+      </div>
       <div className="min-h-screen bg-[#F5F2EB] font-sans text-[#2C2A26] selection:bg-[#D6D1C7] selection:text-[#2C2A26]">
         {location.pathname === '/' && <Navbar onNavClick={handleNavClick} activeSection={activeSection} />}
 
