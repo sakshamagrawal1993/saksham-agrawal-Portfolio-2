@@ -17,7 +17,6 @@ function calculateParameterScore(
 
   if (typeof val === 'boolean') {
       // For boolean exact indicators: false is generally good (no symptom), true is bad (has symptom)
-      // We don't have boolean ranges in the DB schema setup properly, so we bypass it here.
       return val === true ? 20 : 100;
   }
 
@@ -49,9 +48,8 @@ function calculateParameterScore(
           // Borderline to Critical: 40-79
           const normMax = normal_max ?? optimal_max;
           const fraction = Math.min(1, (numVal - normMax) / (critical_max - normMax));
-          return Math.max(20, 80 - (fraction * 60)); // 20 is absolute bottom out unless extremely pathological
+          return Math.max(20, 80 - (fraction * 60)); 
       } 
-      // Off the charts without critical max known
       return Math.max(20, 80 - ((numVal - (normal_max ?? optimal_max)) / (normal_max ?? optimal_max)) * 50);
   }
 
@@ -68,11 +66,10 @@ function calculateParameterScore(
           const fraction = Math.min(1, (normMin - numVal) / (normMin - critical_min));
           return Math.max(20, 80 - (fraction * 60));
       }
-      // Off the charts low
       return Math.max(20, 80 - (( (normal_min ?? optimal_min) - numVal) / (normal_min ?? optimal_min)) * 50);
   }
 
-  return 50; // Unknown variance
+  return 50;
 }
 
 export function calculateAxesScores(
@@ -82,7 +79,7 @@ export function calculateAxesScores(
   details: HealthPersonalDetails | null
 ): HealthScore[] {
   
-  const age = details?.age ?? 30; // Default to 30 if unknown
+  const age = details?.age ?? 30;
   const gender = details?.gender === 'Female' ? 'F' : (details?.gender === 'Male' ? 'M' : 'ALL');
 
   const axesAccumulators = {
@@ -95,7 +92,6 @@ export function calculateAxesScores(
       environment: { score: 0, weight: 0, name: 'Environment' },
   };
 
-  // Group by parameter name to only use the MOST RECENT value
   const latestParams = new Map<string, HealthParameter>();
   for (const p of parameters) {
       const existing = latestParams.get(p.parameter_name.toLowerCase());
@@ -104,137 +100,120 @@ export function calculateAxesScores(
       }
   }
 
-  // Compute individual scores
   for (const param of Array.from(latestParams.values())) {
-      // Match definition
       const normalize = (s: string) => s.toLowerCase().replace(/_/g, ' ').trim();
       const paramNameNorm = normalize(param.parameter_name);
+      const paramIdNorm = param.parameter_name.toLowerCase().trim();
 
       let def = definitions.find(d => 
           normalize(d.name) === paramNameNorm || 
-          normalize(d.id) === paramNameNorm
+          normalize(d.id) === paramNameNorm ||
+          d.id.toLowerCase() === paramIdNorm
       );
 
-      // FALLBACK Definitions for Playground (if missing from DB)
-      if (!def) {
+      const hasWeights = (d: any) => d?.axis_impact_weights && Object.keys(d.axis_impact_weights).length > 0;
+      
+      if (!def || !hasWeights(def)) {
           const defaults: Record<string, HealthParameterDefinition> = {
-              // Environment
               'aqi': { id: 'aqi', name: 'Air Quality Index', category: 'environment', unit: 'index', axis_impact_weights: { environment: 3, resilience: 2 } },
               'uv_index': { id: 'uv_index', name: 'UV Index', category: 'environment', unit: 'index', axis_impact_weights: { environment: 3, resilience: 1 } },
               'pollen_level': { id: 'pollen_level', name: 'Pollen Level', category: 'environment', unit: 'level', axis_impact_weights: { environment: 2, resilience: 3 } },
-              
-              // Activity & Vitals
+              'step_count': { id: 'step_count', name: 'Step Count', category: 'activity', unit: 'steps', axis_impact_weights: { energy: 3, heart: 2, strength: 1 } },
               'step count': { id: 'step_count', name: 'Step Count', category: 'activity', unit: 'steps', axis_impact_weights: { energy: 3, heart: 2, strength: 1 } },
+              'daily steps': { id: 'step_count', name: 'Step Count', category: 'activity', unit: 'steps', axis_impact_weights: { energy: 3, heart: 2, strength: 1 } },
+              'active_minutes': { id: 'active_minutes', name: 'Active Minutes', category: 'activity', unit: 'min', axis_impact_weights: { energy: 3, heart: 2, strength: 2 } },
               'active minutes': { id: 'active_minutes', name: 'Active Minutes', category: 'activity', unit: 'min', axis_impact_weights: { energy: 3, heart: 2, strength: 2 } },
-              'floors climbed': { id: 'floors_climbed', name: 'Floors Climbed', category: 'activity', unit: 'floors', axis_impact_weights: { energy: 2, strength: 2, heart: 1 } },
-              'heart rate': { id: 'heart_rate', name: 'Heart Rate', category: 'vitals', unit: 'bpm', axis_impact_weights: { heart: 3, energy: 1 } },
+              'heart_rate': { id: 'heart_rate', name: 'Heart Rate', category: 'vitals', unit: 'bpm', axis_impact_weights: { heart: 3, energy: 1, resilience: 1 } },
+              'heart rate': { id: 'heart_rate', name: 'Heart Rate', category: 'vitals', unit: 'bpm', axis_impact_weights: { heart: 3, energy: 1, resilience: 1 } },
+              'avg heart rate': { id: 'heart_rate', name: 'Heart Rate', category: 'vitals', unit: 'bpm', axis_impact_weights: { heart: 3, energy: 1, resilience: 1 } },
+              'resting_heart_rate': { id: 'resting_heart_rate', name: 'Resting Heart Rate', category: 'vitals', unit: 'bpm', axis_impact_weights: { heart: 3, resilience: 1 } },
               'resting heart rate': { id: 'resting_heart_rate', name: 'Resting Heart Rate', category: 'vitals', unit: 'bpm', axis_impact_weights: { heart: 3, resilience: 1 } },
-              'average hrv': { id: 'hrv', name: 'Average HRV', category: 'vitals', unit: 'ms', axis_impact_weights: { mind: 2, resilience: 3, heart: 1 } },
+              'resting hr': { id: 'resting_heart_rate', name: 'Resting Heart Rate', category: 'vitals', unit: 'bpm', axis_impact_weights: { heart: 3, resilience: 1 } },
+              'respiratory_rate': { id: 'respiratory_rate', name: 'Respiratory Rate', category: 'vitals', unit: 'brpm', axis_impact_weights: { heart: 2, resilience: 2 } },
               'respiratory rate': { id: 'respiratory_rate', name: 'Respiratory Rate', category: 'vitals', unit: 'brpm', axis_impact_weights: { heart: 2, resilience: 2 } },
+              'body_temperature': { id: 'body_temperature', name: 'Body Temperature', category: 'vitals', unit: '°C', axis_impact_weights: { resilience: 3 } },
               'body temperature': { id: 'body_temperature', name: 'Body Temperature', category: 'vitals', unit: '°C', axis_impact_weights: { resilience: 3 } },
+              'body temp': { id: 'body_temperature', name: 'Body Temperature', category: 'vitals', unit: '°C', axis_impact_weights: { resilience: 3 } },
+              'systolic_bp': { id: 'systolic_bp', name: 'Blood Pressure Systolic', category: 'vitals', unit: 'mmHg', axis_impact_weights: { heart: 3, resilience: 1 } },
               'blood pressure systolic': { id: 'systolic_bp', name: 'Blood Pressure Systolic', category: 'vitals', unit: 'mmHg', axis_impact_weights: { heart: 3, resilience: 1 } },
+              'systolic bp': { id: 'systolic_bp', name: 'Blood Pressure Systolic', category: 'vitals', unit: 'mmHg', axis_impact_weights: { heart: 3, resilience: 1 } },
+              'diastolic_bp': { id: 'diastolic_bp', name: 'Blood Pressure Diastolic', category: 'vitals', unit: 'mmHg', axis_impact_weights: { heart: 3, resilience: 1 } },
               'blood pressure diastolic': { id: 'diastolic_bp', name: 'Blood Pressure Diastolic', category: 'vitals', unit: 'mmHg', axis_impact_weights: { heart: 3, resilience: 1 } },
-              
-              // Metabolism & Labs
+              'diastolic bp': { id: 'diastolic_bp', name: 'Blood Pressure Diastolic', category: 'vitals', unit: 'mmHg', axis_impact_weights: { heart: 3, resilience: 1 } },
+              'blood_glucose': { id: 'blood_glucose', name: 'Blood Glucose', category: 'labs', unit: 'mg/dL', axis_impact_weights: { energy: 3, hormone: 2 } },
+              'blood glucose': { id: 'blood_glucose', name: 'Blood Glucose', category: 'labs', unit: 'mg/dL', axis_impact_weights: { energy: 3, hormone: 2 } },
               'blood glucose record': { id: 'blood_glucose', name: 'Blood Glucose', category: 'labs', unit: 'mg/dL', axis_impact_weights: { energy: 3, hormone: 2 } },
-              '41995-2': { id: 'hba1c', name: 'HbA1c', category: 'labs', unit: '%', axis_impact_weights: { energy: 3, hormone: 2, resilience: 1 } },
-              '2093-3': { id: 'total_cholesterol', name: 'Total Cholesterol', category: 'labs', unit: 'mg/dL', axis_impact_weights: { heart: 3, energy: 1 } },
-              '2085-9': { id: 'hdl', name: 'HDL Cholesterol', category: 'labs', unit: 'mg/dL', axis_impact_weights: { heart: 3 } },
-              '13457-7': { id: 'ldl', name: 'LDL Cholesterol', category: 'labs', unit: 'mg/dL', axis_impact_weights: { heart: 3 } },
-              '2571-8': { id: 'triglycerides', name: 'Triglycerides', category: 'labs', unit: 'mg/dL', axis_impact_weights: { heart: 2, energy: 2 } },
-              
-              // Nutrition & Hydration
+              'hba1c': { id: 'hba1c', name: 'HbA1c', category: 'labs', unit: '%', axis_impact_weights: { energy: 3, hormone: 2, resilience: 1 } },
+              'calorie_intake': { id: 'calorie_intake', name: 'Calorie Intake', category: 'nutrition', unit: 'kcal', axis_impact_weights: { energy: 3, hormone: 1 } },
+              'calorie intake': { id: 'calorie_intake', name: 'Calorie Intake', category: 'nutrition', unit: 'kcal', axis_impact_weights: { energy: 3, hormone: 1 } },
               'total energy intake from food': { id: 'calorie_intake', name: 'Calorie Intake', category: 'nutrition', unit: 'kcal', axis_impact_weights: { energy: 3, hormone: 1 } },
+              'water_intake': { id: 'water_intake', name: 'Daily Water Intake', category: 'nutrition', unit: 'L', axis_impact_weights: { energy: 1, resilience: 3 } },
+              'water intake': { id: 'water_intake', name: 'Daily Water Intake', category: 'nutrition', unit: 'L', axis_impact_weights: { energy: 1, resilience: 3 } },
               'hydration volume': { id: 'water_intake', name: 'Daily Water Intake', category: 'nutrition', unit: 'L', axis_impact_weights: { energy: 1, resilience: 3 } },
-              'protein_pct': { id: 'protein_pct', name: 'Protein Percentage', category: 'nutrition', unit: '%', axis_impact_weights: { strength: 3, energy: 1 } },
-              'carbs_pct': { id: 'carbs_pct', name: 'Carbs Percentage', category: 'nutrition', unit: '%', axis_impact_weights: { energy: 3 } },
-              'fats_pct': { id: 'fats_pct', name: 'Fats Percentage', category: 'nutrition', unit: '%', axis_impact_weights: { energy: 2, hormone: 1 } },
-              
-              // Sleep
+              'sleep_duration': { id: 'sleep_duration', name: 'Sleep Duration', category: 'sleep', unit: 'hrs', axis_impact_weights: { mind: 3, strength: 2, hormone: 2 } },
               'sleep duration': { id: 'sleep_duration', name: 'Sleep Duration', category: 'sleep', unit: 'hrs', axis_impact_weights: { mind: 3, strength: 2, hormone: 2 } },
+              'sleep_quality': { id: 'sleep_quality', name: 'Sleep Quality', category: 'sleep', unit: 'score', axis_impact_weights: { mind: 3, resilience: 2 } },
               'sleep quality': { id: 'sleep_quality', name: 'Sleep Quality', category: 'sleep', unit: 'score', axis_impact_weights: { mind: 3, resilience: 2 } },
+              'spo2_min': { id: 'spo2_min', name: 'Sleep Min SpO2', category: 'sleep', unit: '%', axis_impact_weights: { mind: 2, heart: 2 } },
+              'spo2 min': { id: 'spo2_min', name: 'Sleep Min SpO2', category: 'sleep', unit: '%', axis_impact_weights: { mind: 2, heart: 2 } },
               'sleep min spo2': { id: 'spo2_min', name: 'Sleep Min SpO2', category: 'sleep', unit: '%', axis_impact_weights: { mind: 2, heart: 2 } },
+              'sleep_heart_rate': { id: 'sleep_heart_rate', name: 'Sleep Average Heart Rate', category: 'sleep', unit: 'bpm', axis_impact_weights: { heart: 2, resilience: 1 } },
+              'sleep hr': { id: 'sleep_heart_rate', name: 'Sleep Average Heart Rate', category: 'sleep', unit: 'bpm', axis_impact_weights: { heart: 2, resilience: 1 } },
               'sleep average heart rate': { id: 'sleep_heart_rate', name: 'Sleep Average Heart Rate', category: 'sleep', unit: 'bpm', axis_impact_weights: { heart: 2, resilience: 1 } },
-              
-              // Recovery & Stress
+              'stress_level': { id: 'stress_level', name: 'Average Stress Level', category: 'mental', unit: 'score', axis_impact_weights: { mind: 3, hormone: 2 } },
+              'stress level': { id: 'stress_level', name: 'Average Stress Level', category: 'mental', unit: 'score', axis_impact_weights: { mind: 3, hormone: 2 } },
               'body stress score': { id: 'stress_level', name: 'Average Stress Level', category: 'mental', unit: 'score', axis_impact_weights: { mind: 3, hormone: 2 } },
+              'recovery_score': { id: 'recovery_score', name: 'Recovery Score', category: 'recovery', unit: 'score', axis_impact_weights: { strength: 3, energy: 2, resilience: 1 } },
               'recovery score': { id: 'recovery_score', name: 'Recovery Score', category: 'recovery', unit: 'score', axis_impact_weights: { strength: 3, energy: 2, resilience: 1 } },
-              
-              // Vitamins
-              '1989-3': { id: 'vitamin_d', name: 'Vitamin D', category: 'labs', unit: 'ng/mL', axis_impact_weights: { resilience: 3, strength: 2, hormone: 1 } },
-              '2132-9': { id: 'vitamin_b12', name: 'Vitamin B12', category: 'labs', unit: 'pg/mL', axis_impact_weights: { energy: 3, mind: 2 } },
-              '3016-3': { id: 'tsh', name: 'TSH', category: 'labs', unit: 'mIU/L', axis_impact_weights: { hormone: 3, energy: 2 } },
-              '718-7': { id: 'hemoglobin', name: 'Hemoglobin', category: 'labs', unit: 'g/dL', axis_impact_weights: { energy: 3, heart: 2 } },
-              '2160-0': { id: 'creatinine', name: 'Creatinine', category: 'labs', unit: 'mg/dL', axis_impact_weights: { resilience: 2, energy: 1 } },
               '39156-5': { id: '39156-5', name: 'Body Mass Index (BMI)', category: 'vitals', unit: 'kg/m²', axis_impact_weights: { heart: 3, resilience: 2, strength: 1, energy: 1, mind: 1 } },
-
-              // Co-morbidities
+              'comorb_diabetes': { id: 'comorb_diabetes', name: 'Diabetes', category: 'history', unit: 'indicator', axis_impact_weights: { energy: 3, hormone: 2, resilience: 1 } },
               'comorb diabetes': { id: 'comorb_diabetes', name: 'Diabetes', category: 'history', unit: 'indicator', axis_impact_weights: { energy: 3, hormone: 2, resilience: 1 } },
+              'comorb_hypertension': { id: 'comorb_hypertension', name: 'Hypertension', category: 'history', unit: 'indicator', axis_impact_weights: { heart: 4, resilience: 1 } },
               'comorb hypertension': { id: 'comorb_hypertension', name: 'Hypertension', category: 'history', unit: 'indicator', axis_impact_weights: { heart: 4, resilience: 1 } },
-              'comorb hyperlipidemia': { id: 'comorb_hyperlipidemia', name: 'Hyperlipidemia', category: 'history', unit: 'indicator', axis_impact_weights: { heart: 3 } },
-              'comorb asthma': { id: 'comorb_asthma', name: 'Asthma', category: 'history', unit: 'indicator', axis_impact_weights: { resilience: 3, heart: 1 } },
-              'comorb sleep apnea': { id: 'comorb_sleep_apnea', name: 'Sleep Apnea', category: 'history', unit: 'indicator', axis_impact_weights: { heart: 3, resilience: 2, mind: 2 } },
-              
-              // Symptoms
-              'symp abdominal cramps': { id: 'symp_abdominal_cramps', name: 'Abdominal Cramps', category: 'symptoms', unit: 'indicator', axis_impact_weights: { resilience: 2, hormone: 1 } },
-              'symp night sweats': { id: 'symp_night_sweats', name: 'Night Sweats', category: 'symptoms', unit: 'indicator', axis_impact_weights: { resilience: 2, hormone: 2 } },
-              'headache': { id: 'headache', name: 'Headache', category: 'symptoms', unit: 'indicator', axis_impact_weights: { mind: 3, resilience: 1 } },
-              'fatigue': { id: 'fatigue', name: 'Fatigue', category: 'symptoms', unit: 'indicator', axis_impact_weights: { energy: 4, resilience: 1 } },
-              'insomnia': { id: 'insomnia', name: 'Insomnia', category: 'symptoms', unit: 'indicator', axis_impact_weights: { mind: 4, hormone: 1 } },
-              'joint pain': { id: 'joint_pain', name: 'Joint Pain', category: 'symptoms', unit: 'indicator', axis_impact_weights: { strength: 3, resilience: 1 } },
-              'dizziness': { id: 'dizziness', name: 'Dizziness', category: 'symptoms', unit: 'indicator', axis_impact_weights: { heart: 2, mind: 2 } },
-              'shortness of breath': { id: 'shortness_of_breath', name: 'Shortness of Breath', category: 'symptoms', unit: 'indicator', axis_impact_weights: { heart: 4, resilience: 2 } },
           };
-          def = defaults[paramNameNorm] || Object.values(defaults).find(d => normalize(d.name) === paramNameNorm);
+          
+          const fallback = defaults[paramIdNorm] || 
+                           defaults[paramNameNorm] || 
+                           Object.values(defaults).find(d => normalize(d.id) === paramNameNorm || normalize(d.name) === paramNameNorm);
+          
+          if (fallback) {
+              def = def ? { ...def, axis_impact_weights: fallback.axis_impact_weights } : fallback;
+          }
       }
 
       if (!def) continue;
 
-      // Match correct demographic range brackets
       const matchedRanges = ranges.filter(r => r.parameter_id === def?.id);
-      
-      // Try specific gender + age
       let r = matchedRanges.find(r => r.gender === gender && age >= r.min_age && age <= r.max_age);
-      // Fallback 1: specific gender, open age
       if (!r) r = matchedRanges.find(r => r.gender === gender);
-      // Fallback 2: ALL gender, specific age
       if (!r) r = matchedRanges.find(r => r.gender === 'ALL' && age >= r.min_age && age <= r.max_age);
-      // Fallback 3: Generic ALL
       if (!r) r = matchedRanges.find(r => r.gender === 'ALL');
 
-      // FALLBACK Ranges for Playground (if missing from DB)
       if (!r && def) {
           const drs: Record<string, any> = {
               'aqi': { optimal_min: 0, optimal_max: 50, normal_min: 0, normal_max: 100, critical_min: null, critical_max: 300 },
               'uv_index': { optimal_min: 0, optimal_max: 2, normal_min: 0, normal_max: 5, critical_min: null, critical_max: 11 },
               'pollen_level': { optimal_min: 0, optimal_max: 3, normal_min: 0, normal_max: 6, critical_min: null, critical_max: 12 },
-              
               'step_count': { optimal_min: 10000, optimal_max: 20000, normal_min: 5000, normal_max: 30000, critical_min: 2000, critical_max: null },
               'active_minutes': { optimal_min: 45, optimal_max: 120, normal_min: 20, normal_max: 300, critical_min: 5, critical_max: null },
               'resting_heart_rate': { optimal_min: 50, optimal_max: 70, normal_min: 40, normal_max: 90, critical_min: 35, critical_max: 110 },
               'systolic_bp': { optimal_min: 90, optimal_max: 120, normal_min: 80, normal_max: 140, critical_min: 70, critical_max: 180 },
               'diastolic_bp': { optimal_min: 60, optimal_max: 80, normal_min: 50, normal_max: 90, critical_min: 40, critical_max: 110 },
-              
               'blood_glucose': { optimal_min: 70, optimal_max: 99, normal_min: 60, normal_max: 140, critical_min: 40, critical_max: 250 },
               'hba1c': { optimal_min: 4.0, optimal_max: 5.6, normal_min: 3.5, normal_max: 6.4, critical_min: 3.0, critical_max: 10.0 },
-              
               'sleep_duration': { optimal_min: 7, optimal_max: 9, normal_min: 6, normal_max: 10, critical_min: 4, critical_max: 12 },
               'sleep_quality': { optimal_min: 85, optimal_max: 100, normal_min: 60, normal_max: 100, critical_min: 30, critical_max: null },
               'sleep_heart_rate': { optimal_min: 45, optimal_max: 65, normal_min: 40, normal_max: 85, critical_min: 35, critical_max: 100 },
               'water_intake': { optimal_min: 2.7, optimal_max: 3.7, normal_min: 2.0, normal_max: 5.0, critical_min: 1.0, critical_max: 7.0 },
               'stress_level': { optimal_min: 0, optimal_max: 25, normal_min: 0, normal_max: 60, critical_min: null, critical_max: 90 },
               'recovery_score': { optimal_min: 70, optimal_max: 100, normal_min: 40, normal_max: 100, critical_min: 10, critical_max: null },
-              
               'total_cholesterol': { optimal_min: 125, optimal_max: 200, normal_min: 100, normal_max: 240, critical_min: null, critical_max: 300 },
               'hdl': { optimal_min: 60, optimal_max: null, normal_min: 40, normal_max: null, critical_min: 30, critical_max: null },
               'ldl': { optimal_min: 0, optimal_max: 100, normal_min: 0, normal_max: 160, critical_min: null, critical_max: 190 },
               'triglycerides': { optimal_min: 0, optimal_max: 150, normal_min: 0, normal_max: 200, critical_min: null, critical_max: 500 },
-              
               'vitamin_d': { optimal_min: 30, optimal_max: 100, normal_min: 20, normal_max: 100, critical_min: 10, critical_max: null },
               'vitamin_b12': { optimal_min: 500, optimal_max: 900, normal_min: 200, normal_max: 1100, critical_min: 100, critical_max: null },
               'hemoglobin': { optimal_min: 13.5, optimal_max: 17.5, normal_min: 12.0, normal_max: 18.0, critical_min: 10.0, critical_max: 20.0 },
-              
-              // Missing Vitals Fallbacks
               'heart_rate': { optimal_min: 55, optimal_max: 85, normal_min: 50, normal_max: 100, critical_min: 40, critical_max: 160 },
               'respiratory_rate': { optimal_min: 12, optimal_max: 18, normal_min: 10, normal_max: 24, critical_min: 8, critical_max: 35 },
               'body_temperature': { optimal_min: 36.3, optimal_max: 37.3, normal_min: 35.5, normal_max: 38.0, critical_min: 34.0, critical_max: 40.0 },
@@ -245,7 +224,10 @@ export function calculateAxesScores(
                   ? { optimal_min: 18, optimal_max: 24, normal_min: 15, normal_max: 29, critical_min: null, critical_max: 34 }
                   : { optimal_min: 18.5, optimal_max: 25, normal_min: 16, normal_max: 30, critical_min: null, critical_max: 35 },
           };
-          const dr = drs[def.id] || drs[normalize(def.name)];
+          const dr = drs[def.id] || 
+                     drs[paramIdNorm] ||
+                     drs[normalize(def.name)] || 
+                     drs[normalize(def.id)];
           if (dr) {
               r = { ...dr, parameter_id: def.id, gender: 'ALL', min_age: 0, max_age: 120, id: `fallback-${def.id}` };
           }
@@ -256,7 +238,6 @@ export function calculateAxesScores(
       const pScore = calculateParameterScore(param.parameter_value, r);
       if (pScore === null) continue;
 
-      // Distribute score across axes according to definition weights
       const weights = def.axis_impact_weights as Record<string, number>;
       Object.keys(axesAccumulators).forEach(axisKey => {
           const w = weights[axisKey] ?? 0;
@@ -268,10 +249,8 @@ export function calculateAxesScores(
       });
   }
 
-  // Finalize averages
   const finalScores: HealthScore[] = Object.values(axesAccumulators).map(ax => {
       let finalScore = ax.weight > 0 ? Math.round(ax.score / ax.weight) : 0;
-      // Provide a Baseline of 85 if no data is found for an axis to keep UI looking somewhat complete
       if (ax.weight === 0) finalScore = 85; 
       
       return {
@@ -280,7 +259,6 @@ export function calculateAxesScores(
       };
   });
 
-  // Calculate Overall Score (Arithmetic Mean of the 7 axes)
   const totalScore = finalScores.reduce((sum, ax) => sum + ax.score, 0);
   const overallScore = Math.round(totalScore / finalScores.length);
   
