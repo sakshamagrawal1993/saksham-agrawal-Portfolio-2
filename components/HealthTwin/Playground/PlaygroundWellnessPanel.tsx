@@ -1,18 +1,35 @@
 import React from 'react';
 import { usePlaygroundStore } from '../../../store/playgroundStore';
 import { ProgramCard } from '../WellnessPrograms';
-import { Zap, CheckCircle2, Sparkles } from 'lucide-react';
+import { Zap, CheckCircle2, Sparkles, Loader2, RefreshCw } from 'lucide-react';
 
 export const PlaygroundWellnessPanel: React.FC = () => {
-    const { changedParams, wellnessPrograms, simulationSummary } = usePlaygroundStore();
+    const { changedParams, wellnessPrograms, simulationSummary, isGeneratingWellness, generateWellnessPlan } = usePlaygroundStore();
 
     return (
         <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#FAF9F6]">
-            <div className="p-4 border-b border-[#EBE7DE] shrink-0 bg-white">
-                <h2 className="text-lg font-serif text-[#A84A00]">Parallel Wellness Engine</h2>
-                <p className="text-[10px] text-[#A8A29E] font-medium tracking-wide uppercase mt-1">
-                    Simulation-specific interventions
-                </p>
+            <div className="p-4 border-b border-[#EBE7DE] shrink-0 bg-white flex items-center justify-between">
+                <div>
+                    <h2 className="text-lg font-serif text-[#A84A00]">Parallel Wellness Engine</h2>
+                    <p className="text-[10px] text-[#A8A29E] font-medium tracking-wide uppercase mt-1">
+                        Simulation-specific interventions
+                    </p>
+                </div>
+                {changedParams.size > 0 && (
+                    <button
+                        onClick={generateWellnessPlan}
+                        disabled={isGeneratingWellness}
+                        className="bg-[#A84A00] hover:bg-[#8B3D00] disabled:bg-[#A84A00]/50 text-white p-2 rounded-lg shadow-sm transition-all flex items-center gap-2 group"
+                        title="Generate personalized plans"
+                    >
+                        {isGeneratingWellness ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                            <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
+                        )}
+                        <span className="text-[10px] font-bold uppercase tracking-wider">Generate</span>
+                    </button>
+                )}
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
