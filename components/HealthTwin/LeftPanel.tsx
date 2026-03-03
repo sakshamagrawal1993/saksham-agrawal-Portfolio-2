@@ -26,7 +26,7 @@ const PROFILE_FIELDS = [
 export const LeftPanel: React.FC = () => {
     const {
         activeTwinId, sources, labParameters, wearableParameters, personalDetails, parameterDefinitions,
-        setSources, setLabParameters, setWearableParameters, setPersonalDetails
+        setSources, setLabParameters, setWearableParameters, setPersonalDetails, calculateLiveScores
     } = useHealthTwinStore();
 
     const [modalOpen, setModalOpen] = useState(false);
@@ -458,14 +458,17 @@ Active Calories Burnt,320,kcal,2026-02-27T06:00:00Z,2026-02-27T22:00:00Z,activit
         if (!activeTwinId) return;
         setProfileSaving(true);
         try {
+            const height = parseFloat(profileForm.height_cm) || 0;
+            const weight = parseFloat(profileForm.weight_kg) || 0;
+
             const payload = {
                 twin_id: activeTwinId,
                 name: profileForm.name,
                 age: parseInt(profileForm.age) || 0,
                 gender: profileForm.gender,
                 blood_type: profileForm.blood_type,
-                height_cm: parseFloat(profileForm.height_cm) || 0,
-                weight_kg: parseFloat(profileForm.weight_kg) || 0,
+                height_cm: height,
+                weight_kg: weight,
                 co_morbidities: profileForm.co_morbidities.split(',').map(s => s.trim()).filter(Boolean),
                 location: profileForm.location,
             };
@@ -475,6 +478,31 @@ Active Calories Burnt,320,kcal,2026-02-27T06:00:00Z,2026-02-27T22:00:00Z,activit
             if (error) throw error;
 
             setPersonalDetails(data);
+
+            // AUTO-CALCULATE BMI IF HEIGHT/WEIGHT PRESENT
+            if (height > 0 && weight > 0) {
+                const bmi = weight / Math.pow(height / 100, 2);
+                const bmiPayload = {
+                    twin_id: activeTwinId,
+                    parameter_name: 'Body Mass Index (BMI)',
+                    parameter_value: parseFloat(bmi.toFixed(2)),
+                    unit: 'kg/m²',
+                    recorded_at: new Date().toISOString(),
+                    category: 'vitals'
+                };
+
+                const { data: bmiData, error: bmiError } = await supabase
+                    .from('health_wearable_parameters')
+                    .insert(bmiPayload) // We use insert for history, or we could upsert if we only want latest
+                    .select().single();
+
+                if (!bmiError && bmiData) {
+                    setWearableParameters([bmiData, ...wearableParameters]);
+                    // Trigger score recalculation
+                    setTimeout(() => calculateLiveScores(), 500);
+                }
+            }
+
             setModalOpen(false);
         } catch (err) { console.error('Error saving profile:', err); }
         finally { setProfileSaving(false); }

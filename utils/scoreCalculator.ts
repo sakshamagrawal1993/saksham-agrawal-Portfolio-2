@@ -165,6 +165,7 @@ export function calculateAxesScores(
               '3016-3': { id: 'tsh', name: 'TSH', category: 'labs', unit: 'mIU/L', axis_impact_weights: { hormone: 3, energy: 2 } },
               '718-7': { id: 'hemoglobin', name: 'Hemoglobin', category: 'labs', unit: 'g/dL', axis_impact_weights: { energy: 3, heart: 2 } },
               '2160-0': { id: 'creatinine', name: 'Creatinine', category: 'labs', unit: 'mg/dL', axis_impact_weights: { resilience: 2, energy: 1 } },
+              '39156-5': { id: '39156-5', name: 'Body Mass Index (BMI)', category: 'vitals', unit: 'kg/m²', axis_impact_weights: { heart: 3, resilience: 2, strength: 1, energy: 1, mind: 1 } },
           };
           def = defaults[paramNameNorm] || Object.values(defaults).find(d => normalize(d.name) === paramNameNorm);
       }
@@ -213,6 +214,9 @@ export function calculateAxesScores(
               'vitamin_d': { optimal_min: 30, optimal_max: 100, normal_min: 20, normal_max: 100, critical_min: 10, critical_max: null },
               'vitamin_b12': { optimal_min: 500, optimal_max: 900, normal_min: 200, normal_max: 1100, critical_min: 100, critical_max: null },
               'hemoglobin': { optimal_min: 13.5, optimal_max: 17.5, normal_min: 12.0, normal_max: 18.0, critical_min: 10.0, critical_max: 20.0 },
+              '39156-5': gender === 'F' 
+                  ? { optimal_min: 18, optimal_max: 24, normal_min: 15, normal_max: 29, critical_min: null, critical_max: 34 }
+                  : { optimal_min: 18.5, optimal_max: 25, normal_min: 16, normal_max: 30, critical_min: null, critical_max: 35 },
           };
           const dr = drs[def.id] || drs[normalize(def.name)];
           if (dr) {
