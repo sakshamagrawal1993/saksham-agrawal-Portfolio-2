@@ -257,9 +257,6 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
             scores: computedScores, 
             lastUpdated: Date.now() 
         });
-
-        // Trigger real-time wellness generation
-        get().generateWellnessPlan();
     },
 
     generateWellnessPlan: async () => {

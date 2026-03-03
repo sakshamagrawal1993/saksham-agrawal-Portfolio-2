@@ -85,29 +85,31 @@ export function generatePlaygroundWellness(params: PlaygroundParameters): Wellne
         });
     }
 
-    // 4. Environmental Resilience (based on AQI or UV)
-    if (params.aqi > 100 || params.uv_index > 8) {
+    // 4. Environmental Resilience (based on AQI or UV or Asthma)
+    if (params.aqi > 100 || params.uv_index > 8 || params.asthma) {
         programs.push({
             title: "Environmental Resilience",
             id: "pg-env",
             generated_at: new Date().toISOString(),
             expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
             icon: "shield",
-            priority: "medium",
+            priority: (params.aqi > 200 || (params.asthma && params.aqi > 100)) ? "high" : "medium",
             duration: "Seasonal",
-            reason: "Managing health impacts of simulated high-exposure environment.",
+            reason: params.asthma 
+                ? `Managing respiratory sensitivity due to Asthma simulation in ${params.aqi} AQI environment.` 
+                : "Managing health impacts of simulated high-exposure environment.",
             data_connections: [
-                { metric: "AQI", value: `${params.aqi}`, insight: "Simulated air quality necessitates respiratory protective measures." },
-                { metric: "UV Index", value: `${params.uv_index}`, insight: "High UV simulation requires antioxidant support and dermal protection." }
+                { metric: "AQI", value: `${params.aqi}`, insight: params.aqi > 150 ? "Unhealthy air quality detected for sensitive respiratory systems." : "Simulated air quality necessitates respiratory protective measures." },
+                { metric: "Ashtma Simulation", value: params.asthma ? "Active" : "Inactive", insight: params.asthma ? "Heightened sensitivity to air pollutants and environmental triggers." : "No specific respiratory co-morbidity simulated." }
             ],
             weekly_plan: [
-                { day: "Daily", activity: "Air Quality Tracking", target_hr: "N/A", goal: "Limit outdoor exposure when AQI > 150" },
-                { day: "Tue/Thu", activity: "Antioxidant Rich Diet", target_hr: "N/A", goal: "Vitamin C/E supplementation" },
-                { day: "Daily", activity: "HEPA Filtration", target_hr: "N/A", goal: "Run indoor air purifiers" }
+                { day: "Daily", activity: "Air Quality Tracking", target_hr: "N/A", goal: `Limit outdoor exposure when AQI > ${params.asthma ? '100' : '150'}` },
+                { day: "Tue/Thu", activity: "Respiratory Support", target_hr: "Relaxing", goal: "Practice controlled breathing exercises" },
+                { day: "Daily", activity: "HEPA Filtration", target_hr: "N/A", goal: "Run indoor air purifiers at high settings" }
             ],
             expected_outcomes: [
                 "Reduced systemic inflammation from pollutants",
-                "Minimized oxidative stress from UV exposure"
+                "Prevention of asthma-related exacerbations in variable air quality"
             ]
         });
     }

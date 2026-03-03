@@ -26,7 +26,8 @@ Deno.serve(async (req: Request) => {
     // ─── STEP 1: Generate Health Summary ───────────────────────────
     const summarySystemPrompt = `You are a medical data analyst. 
 Given simulated health parameters and scores, provide a concise (max 100 words) summary of the user's current health status. 
-Identify key strengths and primary areas for improvement. 
+PRIORitize "Simulation Data": If co-morbidities like Asthma, Diabetes, or extreme Vitals (e.g. 500 AQI, 150 BPM) are added, explicitly mention their impact.
+Analyze how these new factors interact with existing baseline data to create a "What-If" health trajectory.
 Acknowledge this is a simulation.`;
 
     const summaryResponse = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -60,8 +61,9 @@ CRITICAL RULES:
 1. Output MUST include the health_summary provided.
 2. Icon must be one of: heart, dumbbell, moon, utensils, brain, shield.
 3. Priority MUST be High, Medium, or Low.
-4. Reference specific simulated data points.
-5. Return ONLY valid JSON matching the schema.`;
+4. Focus on "What-If" changes: If the user added Asthma or changed AQI to 500, these MUST be the primary drivers of the plans.
+5. Reference specific simulated data points.
+6. Return ONLY valid JSON matching the schema.`;
 
     const planUserPrompt = `
 HEALTH SUMMARY: ${healthSummary}
