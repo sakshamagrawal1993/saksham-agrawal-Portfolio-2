@@ -313,7 +313,7 @@ export function playgroundToHealthParams(params: PlaygroundParameters): HealthPa
     const p = (name: string, val: number | boolean, unit: string = ''): HealthParameter => ({
         id: `pg-${name}`,
         parameter_name: name,
-        parameter_value: typeof val === 'boolean' ? (val ? 1 : 0) : val,
+        parameter_value: val,
         unit,
         recorded_at: now
     });

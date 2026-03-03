@@ -167,6 +167,23 @@ export function calculateAxesScores(
               '718-7': { id: 'hemoglobin', name: 'Hemoglobin', category: 'labs', unit: 'g/dL', axis_impact_weights: { energy: 3, heart: 2 } },
               '2160-0': { id: 'creatinine', name: 'Creatinine', category: 'labs', unit: 'mg/dL', axis_impact_weights: { resilience: 2, energy: 1 } },
               '39156-5': { id: '39156-5', name: 'Body Mass Index (BMI)', category: 'vitals', unit: 'kg/m²', axis_impact_weights: { heart: 3, resilience: 2, strength: 1, energy: 1, mind: 1 } },
+
+              // Co-morbidities
+              'comorb diabetes': { id: 'comorb_diabetes', name: 'Diabetes', category: 'history', unit: 'indicator', axis_impact_weights: { energy: 3, hormone: 2, resilience: 1 } },
+              'comorb hypertension': { id: 'comorb_hypertension', name: 'Hypertension', category: 'history', unit: 'indicator', axis_impact_weights: { heart: 4, resilience: 1 } },
+              'comorb hyperlipidemia': { id: 'comorb_hyperlipidemia', name: 'Hyperlipidemia', category: 'history', unit: 'indicator', axis_impact_weights: { heart: 3 } },
+              'comorb asthma': { id: 'comorb_asthma', name: 'Asthma', category: 'history', unit: 'indicator', axis_impact_weights: { resilience: 3, heart: 1 } },
+              'comorb sleep apnea': { id: 'comorb_sleep_apnea', name: 'Sleep Apnea', category: 'history', unit: 'indicator', axis_impact_weights: { heart: 3, resilience: 2, mind: 2 } },
+              
+              // Symptoms
+              'symp abdominal cramps': { id: 'symp_abdominal_cramps', name: 'Abdominal Cramps', category: 'symptoms', unit: 'indicator', axis_impact_weights: { resilience: 2, hormone: 1 } },
+              'symp night sweats': { id: 'symp_night_sweats', name: 'Night Sweats', category: 'symptoms', unit: 'indicator', axis_impact_weights: { resilience: 2, hormone: 2 } },
+              'headache': { id: 'headache', name: 'Headache', category: 'symptoms', unit: 'indicator', axis_impact_weights: { mind: 3, resilience: 1 } },
+              'fatigue': { id: 'fatigue', name: 'Fatigue', category: 'symptoms', unit: 'indicator', axis_impact_weights: { energy: 4, resilience: 1 } },
+              'insomnia': { id: 'insomnia', name: 'Insomnia', category: 'symptoms', unit: 'indicator', axis_impact_weights: { mind: 4, hormone: 1 } },
+              'joint pain': { id: 'joint_pain', name: 'Joint Pain', category: 'symptoms', unit: 'indicator', axis_impact_weights: { strength: 3, resilience: 1 } },
+              'dizziness': { id: 'dizziness', name: 'Dizziness', category: 'symptoms', unit: 'indicator', axis_impact_weights: { heart: 2, mind: 2 } },
+              'shortness of breath': { id: 'shortness_of_breath', name: 'Shortness of Breath', category: 'symptoms', unit: 'indicator', axis_impact_weights: { heart: 4, resilience: 2 } },
           };
           def = defaults[paramNameNorm] || Object.values(defaults).find(d => normalize(d.name) === paramNameNorm);
       }
@@ -216,6 +233,14 @@ export function calculateAxesScores(
               'vitamin_d': { optimal_min: 30, optimal_max: 100, normal_min: 20, normal_max: 100, critical_min: 10, critical_max: null },
               'vitamin_b12': { optimal_min: 500, optimal_max: 900, normal_min: 200, normal_max: 1100, critical_min: 100, critical_max: null },
               'hemoglobin': { optimal_min: 13.5, optimal_max: 17.5, normal_min: 12.0, normal_max: 18.0, critical_min: 10.0, critical_max: 20.0 },
+              
+              // Missing Vitals Fallbacks
+              'heart_rate': { optimal_min: 55, optimal_max: 85, normal_min: 50, normal_max: 100, critical_min: 40, critical_max: 160 },
+              'respiratory_rate': { optimal_min: 12, optimal_max: 18, normal_min: 10, normal_max: 24, critical_min: 8, critical_max: 35 },
+              'body_temperature': { optimal_min: 36.3, optimal_max: 37.3, normal_min: 35.5, normal_max: 38.0, critical_min: 34.0, critical_max: 40.0 },
+              'spo2_min': { optimal_min: 95, optimal_max: 100, normal_min: 92, normal_max: 100, critical_min: 85, critical_max: null },
+              'calorie_intake': { optimal_min: 1800, optimal_max: 2500, normal_min: 1500, normal_max: 3000, critical_min: 1000, critical_max: 5000 },
+              'hrv': { optimal_min: 50, optimal_max: 150, normal_min: 30, normal_max: 200, critical_min: 15, critical_max: null },
               '39156-5': gender === 'F' 
                   ? { optimal_min: 18, optimal_max: 24, normal_min: 15, normal_max: 29, critical_min: null, critical_max: 34 }
                   : { optimal_min: 18.5, optimal_max: 25, normal_min: 16, normal_max: 30, critical_min: null, critical_max: 35 },

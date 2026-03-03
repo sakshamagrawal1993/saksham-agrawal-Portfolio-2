@@ -85,7 +85,7 @@ export interface HealthPersonalDetails {
 export interface HealthParameter {
   id: string;
   parameter_name: string;
-  parameter_value: number;
+  parameter_value: number | boolean;
   parameter_text?: string; // For non-numeric values (e.g. Exercise Type = "Running")
   unit: string;
   recorded_at: string;
