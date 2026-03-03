@@ -10,7 +10,7 @@ export const PlaygroundWellnessPanel: React.FC = () => {
         <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#FAF9F6]">
             <div className="p-4 border-b border-[#EBE7DE] shrink-0 bg-white flex items-center justify-between">
                 <div>
-                    <h2 className="text-lg font-serif text-[#A84A00]">Parallel Wellness Engine</h2>
+                    <h2 className="text-lg font-serif text-[#A84A00]">Wellness Plans</h2>
                     <p className="text-[10px] text-[#A8A29E] font-medium tracking-wide uppercase mt-1">
                         Simulation-specific interventions
                     </p>
