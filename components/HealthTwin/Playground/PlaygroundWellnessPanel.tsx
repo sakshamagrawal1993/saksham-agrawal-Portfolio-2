@@ -4,7 +4,7 @@ import { ProgramCard } from '../WellnessPrograms';
 import { Zap, CheckCircle2, Sparkles } from 'lucide-react';
 
 export const PlaygroundWellnessPanel: React.FC = () => {
-    const { changedParams, wellnessPrograms } = usePlaygroundStore();
+    const { changedParams, wellnessPrograms, simulationSummary } = usePlaygroundStore();
 
     return (
         <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#FAF9F6]">
@@ -36,10 +36,10 @@ export const PlaygroundWellnessPanel: React.FC = () => {
                             <div className="relative z-10">
                                 <span className="text-[10px] text-white/70 font-bold uppercase tracking-widest">Digital Twin simulation</span>
                                 <h3 className="text-white font-serif text-lg mt-1">
-                                    {wellnessPrograms.length} Active Simulated Strategies
+                                    Health Analysis
                                 </h3>
                                 <p className="text-white/80 text-xs mt-2 leading-relaxed">
-                                    These interventions are dynamically mapped to your "What-If" scenario to optimize health trajectories.
+                                    {simulationSummary || 'These interventions are dynamically mapped to your "What-If" scenario to optimize health trajectories.'}
                                 </p>
                             </div>
                         </div>

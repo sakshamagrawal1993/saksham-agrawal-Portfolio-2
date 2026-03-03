@@ -97,6 +97,7 @@ interface PlaygroundState {
     
     // Wellness
     wellnessPrograms: WellnessProgram[];
+    simulationSummary: string;
     isGeneratingWellness: boolean;
     
     // Metadata
@@ -180,6 +181,7 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
     scores: [],
     baselineScores: [],
     wellnessPrograms: [],
+    simulationSummary: '',
     isGeneratingWellness: false,
     lastUpdated: Date.now(),
     changedParams: new Set(),
@@ -266,8 +268,8 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
 
         set({ isGeneratingWellness: true });
         try {
-            console.log('Invoking playground-wellness with:', { parameters, scores });
-            const { data, error } = await supabase.functions.invoke('playground-wellness', {
+            console.log('Invoking generate-wellness-playground with:', { parameters, scores });
+            const { data, error } = await supabase.functions.invoke('generate-wellness-playground', {
                 body: { 
                     playground_state: parameters,
                     computed_scores: scores
@@ -281,16 +283,31 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
             
             if (data?.programs) {
                 console.log('Successfully generated wellness programs:', data.programs);
-                set({ wellnessPrograms: data.programs });
+                
+                // Map new schema to UI schema
+                const mappedPrograms: WellnessProgram[] = data.programs.map((p: any) => ({
+                    id: Math.random().toString(36).substr(2, 9),
+                    title: p.plan_name,
+                    icon: p.icon || 'heart',
+                    priority: (p.plan_priority || 'medium').toLowerCase(),
+                    duration: p.plan_duration,
+                    reason: p.plan_heading,
+                    data_connections: p.data_connections || [],
+                    weekly_plan: p.weekly_plan_activities || [],
+                    expected_outcomes: p.expected_outcomes || []
+                }));
+
+                set({ 
+                    wellnessPrograms: mappedPrograms,
+                    simulationSummary: data.health_summary || ''
+                });
             } else {
                 console.warn('No programs returned from edge function:', data);
-                // Fallback if data is malformed
                 const fallbackWellness = generatePlaygroundWellness(parameters);
                 set({ wellnessPrograms: fallbackWellness });
             }
         } catch (err) {
             console.error('Failed to generate playground wellness (AI failed):', err);
-            // FALLBACK TO LOCAL GEN (to ensure the user sees something during dev/missing deployment)
             console.log('Falling back to local simulation engine...');
             const fallbackWellness = generatePlaygroundWellness(parameters);
             set({ wellnessPrograms: fallbackWellness });
