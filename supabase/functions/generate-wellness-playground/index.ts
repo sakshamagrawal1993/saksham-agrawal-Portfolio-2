@@ -26,8 +26,8 @@ Deno.serve(async (req: Request) => {
     // ─── STEP 1: Generate Health Summary ───────────────────────────
     const summarySystemPrompt = `You are a medical data analyst. 
 Given simulated health parameters and scores, provide a concise (max 100 words) summary of the user's current health status. 
-PRIORitize "Simulation Data": If co-morbidities like Asthma, Diabetes, or extreme Vitals (e.g. 500 AQI, 150 BPM) are added, explicitly mention their impact.
-Analyze how these new factors interact with existing baseline data to create a "What-If" health trajectory.
+PRIORitize evaluating the actual values provided in the data payload. Pay special attention to any extreme vitals, poor environmental metrics (like high AQI or UV), or active co-morbidities (like Asthma or Diabetes).
+Analyze how these factors interact with existing baseline data to create a "What-If" health trajectory. Do NOT hallucinate values not present in the data.
 Acknowledge this is a simulation.`;
 
     const summaryResponse = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -55,14 +55,14 @@ Acknowledge this is a simulation.`;
 
     // ─── STEP 2: Generate Wellness Plans ────────────────────────────
     const planSystemPrompt = `You are a preventive medicine and health simulation expert.
-Generate exactly 3 personalized wellness plans based on the user's health summary and data.
+Generate exactly 3 personalized wellness plans based on the user's health summary and actual simulation data.
 
 CRITICAL RULES:
 1. Output MUST include the health_summary provided.
 2. Icon must be one of: heart, dumbbell, moon, utensils, brain, shield.
 3. Priority MUST be High, Medium, or Low.
-4. Focus on "What-If" changes: If the user added Asthma or changed AQI to 500, these MUST be the primary drivers of the plans.
-5. Reference specific simulated data points.
+4. Focus on the most significant data points: Prioritize creating plans that address the most severe out-of-range metrics, environmental risks, or active co-morbidities found in the user's data. 
+5. CRITICAL: Reference specific simulated data points ACCURATELY. Do NOT invent or assume values (e.g., if AQI is 45 in the data, you must use 45, do not invent extreme values). Use ONLY the provided JSON.
 6. Return ONLY valid JSON matching the schema.`;
 
     const planUserPrompt = `
