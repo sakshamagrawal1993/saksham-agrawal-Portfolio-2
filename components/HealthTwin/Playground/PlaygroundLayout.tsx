@@ -187,7 +187,7 @@ export const PlaygroundLayout: React.FC = () => {
 
             {/* 3-Column Playground Area */}
             <main className="flex-1 overflow-hidden">
-                <div className="grid grid-cols-[320px_1fr_350px] h-full">
+                <div className="grid grid-cols-[320px_minmax(350px,450px)_1fr] h-full">
                     {/* Left Column: Parameter Control */}
                     <section className="h-full border-r border-[#EBE7DE] bg-[#FAF9F6] flex flex-col shadow-[inset_-4px_0_12px_rgba(0,0,0,0.02)] overflow-hidden">
                         <PlaygroundInputPanel />

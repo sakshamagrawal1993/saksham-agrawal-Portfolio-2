@@ -25,58 +25,63 @@ export const PlaygroundScorePanel: React.FC = () => {
 
     return (
         <div className="flex-1 flex flex-col h-full bg-white overflow-hidden">
-            {/* Top Score Summary */}
-            <div className="p-8 border-b border-[#EBE7DE] bg-gradient-to-b from-[#FAF9F6] to-white shrink-0">
-                <div className="flex items-center justify-between mb-2">
-                    <h2 className="text-xs font-bold uppercase tracking-widest text-[#A8A29E]">Simulated Health State</h2>
-                    <div className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm border ${overallScore >= 80 ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
-                        (overallScore >= 60 ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-rose-50 text-rose-700 border-rose-100')
-                        }`}>
-                        {overallScore >= 80 ? 'Optimal' : (overallScore >= 60 ? 'Fair' : 'Critical')}
+            {/* Top Section: Overall Score + Compact 3D Twin */}
+            <div className="flex flex-row items-stretch border-b border-[#EBE7DE] bg-gradient-to-b from-[#FAF9F6] to-white shrink-0 h-[220px]">
+
+                {/* Score Summary (Left Side) */}
+                <div className="w-1/2 p-6 flex flex-col justify-center border-r border-[#EBE7DE]">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-xs font-bold uppercase tracking-widest text-[#A8A29E]">Overall Score</h2>
+                        <div className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm border ${overallScore >= 80 ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                            (overallScore >= 60 ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-rose-50 text-rose-700 border-rose-100')
+                            }`}>
+                            {overallScore >= 80 ? 'Optimal' : (overallScore >= 60 ? 'Fair' : 'Critical')}
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col items-start gap-1">
+                        <span className="text-6xl font-serif text-[#A84A00] tracking-tighter leading-none">
+                            {overallScore}
+                        </span>
+                        <div className="flex flex-col mt-2">
+                            <span className="text-xs font-medium text-[#5D5A53]">Overall Score</span>
+                            {overallDelta !== 0 && (
+                                <div className={`flex items-center gap-1 text-sm font-bold mt-0.5 ${overallDelta > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                    {overallDelta > 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                                    {overallDelta > 0 ? '+' : ''}{overallDelta} vs Real
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
-                <div className="flex items-baseline gap-4">
-                    <span className="text-6xl font-serif text-[#A84A00] tracking-tighter">
-                        {overallScore}
-                    </span>
-                    <div className="flex flex-col">
-                        <span className="text-xs font-medium text-[#5D5A53]">Overall Score</span>
-                        {overallDelta !== 0 && (
-                            <div className={`flex items-center gap-1 text-sm font-bold mt-0.5 ${overallDelta > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                {overallDelta > 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-                                {overallDelta > 0 ? '+' : ''}{overallDelta} vs Real Baseline
-                            </div>
-                        )}
+                {/* 3D Visualization (Right Side) */}
+                <div className="w-1/2 relative bg-white group overflow-hidden flex items-center justify-center">
+                    <div className="absolute inset-0 z-0 opacity-20 pointer-events-none bg-[radial-gradient(#EBE7DE_1px,transparent_1px)] [background-size:16px_16px]" />
+                    <div className="w-full h-full relative z-10 flex items-center justify-center scale-90 mt-4">
+                        <Twin3D gender={parameters.gender} />
                     </div>
                 </div>
+
             </div>
 
-            {/* Middle: 3D Visualization */}
-            <div className="flex-1 min-h-[300px] relative bg-white group overflow-hidden">
-                <div className="absolute inset-0 z-0 opacity-20 pointer-events-none bg-[radial-gradient(#EBE7DE_1px,transparent_1px)] [background-size:20px_20px]" />
-                <div className="w-full h-full relative z-10">
-                    <Twin3D gender={parameters.gender} />
-                </div>
-            </div>
-
-            {/* Bottom Grid: All Axis Details */}
-            <div className="p-4 bg-[#FAF9F6] border-t border-[#EBE7DE] shrink-0 overflow-y-auto max-h-[250px]">
-                <div className="grid grid-cols-4 gap-3">
+            {/* Bottom Grid: All Axis Details (Prominent) */}
+            <div className="flex-1 p-5 bg-[#FAF9F6] overflow-y-auto min-h-0">
+                <div className="grid grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 gap-4">
                     {axisScores.map(scoreItem => {
                         const { delta, color, Icon } = getDeltaInfo(scoreItem.category, scoreItem.score);
                         return (
-                            <div key={scoreItem.category} className="bg-white p-3 rounded-xl border border-[#EBE7DE] shadow-sm flex flex-col justify-between">
+                            <div key={scoreItem.category} className="bg-white p-4 rounded-xl border border-[#EBE7DE] shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow min-h-[100px]">
                                 <div className="flex items-start justify-between">
-                                    <span className="text-[10px] text-[#5D5A53] font-semibold leading-tight pr-2">
+                                    <span className="text-xs text-[#5D5A53] font-semibold leading-tight pr-2">
                                         {scoreItem.category}
                                     </span>
-                                    <Icon className={`w-3 h-3 ${delta > 0 ? 'text-emerald-500' : (delta < 0 ? 'text-rose-500' : 'text-[#A8A29E]')}`} />
+                                    <Icon className={`w-4 h-4 ${delta > 0 ? 'text-emerald-500' : (delta < 0 ? 'text-rose-500' : 'text-[#A8A29E]')}`} />
                                 </div>
-                                <div className="flex items-end justify-between mt-2">
-                                    <span className="text-xl font-serif text-[#2C2A26]">{scoreItem.score}</span>
+                                <div className="flex items-end justify-between mt-4">
+                                    <span className="text-3xl font-serif text-[#2C2A26]">{scoreItem.score}</span>
                                     {delta !== 0 && (
-                                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${color}`}>
+                                        <span className={`text-[11px] px-2 py-1 rounded-full font-bold ${color}`}>
                                             {delta > 0 ? '+' : ''}{delta}
                                         </span>
                                     )}
