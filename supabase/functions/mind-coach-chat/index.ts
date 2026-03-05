@@ -145,9 +145,18 @@ serve(async (req) => {
       }
     }
 
+    // --- SECONDARY LLM EVALUATION FOR DYNAMIC DISCOVERY ---
+    // This is now purely delegated to the n8n workflow. 
+    // n8n is expected to return pathway_confidence, dynamic_theme, and suggested_pathway in its JSON response.
+    let updatedTheme = result.dynamic_theme || dynamic_theme;
+    let updatedPathway = result.pathway || pathway || result.suggested_pathway;
+    let pathwayConfidence = sessionData?.pathway_confidence || 0;
+    
+    if (typeof result.pathway_confidence === 'number') {
+      pathwayConfidence = result.pathway_confidence;
+    }
+
     const updatedSessionState = result.session_state || session_state;
-    const updatedTheme = result.dynamic_theme || dynamic_theme;
-    const updatedPathway = result.pathway || pathway;
     const guardrailStatus = result.guardrail_status || 'passed';
     const crisisDetected = result.crisis_detected || false;
 
@@ -168,6 +177,7 @@ serve(async (req) => {
     if (updatedSessionState !== session_state) sessionUpdate.session_state = updatedSessionState;
     if (updatedTheme) sessionUpdate.dynamic_theme = updatedTheme;
     if (updatedPathway) sessionUpdate.pathway = updatedPathway;
+    if (pathwayConfidence !== undefined) sessionUpdate.pathway_confidence = pathwayConfidence;
 
     await supabaseAdmin
       .from('mind_coach_sessions')
@@ -197,6 +207,7 @@ serve(async (req) => {
         session_state: updatedSessionState,
         dynamic_theme: updatedTheme,
         pathway: updatedPathway,
+        pathway_confidence: pathwayConfidence,
         guardrail_status: guardrailStatus,
         crisis_detected: crisisDetected,
       }),

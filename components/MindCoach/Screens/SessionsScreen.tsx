@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, MessageCircle, Clock } from 'lucide-react';
 import { supabase } from '../../../lib/supabaseClient';
 import {
@@ -8,6 +8,7 @@ import {
   type ChatMessage as ChatMessageType,
 } from '../../../store/mindCoachStore';
 import { TherapistChat } from '../Chat/TherapistChat';
+import { PlanProposalModal } from '../PlanProposalModal';
 
 export const SessionsScreen: React.FC = () => {
   const profile = useMindCoachStore((s) => s.profile);
@@ -18,6 +19,7 @@ export const SessionsScreen: React.FC = () => {
   const setSessions = useMindCoachStore((s) => s.setSessions);
   const setMessages = useMindCoachStore((s) => s.setMessages);
   const [starting, setStarting] = useState(false);
+  const [showProposal, setShowProposal] = useState(false);
 
   const completedSessions = sessions.filter((s) => s.session_state === 'completed');
   const currentPhase = journey?.current_phase ?? 1;
@@ -75,7 +77,26 @@ export const SessionsScreen: React.FC = () => {
   }, [setActiveSession, setMessages]);
 
   if (activeSession) {
-    return <TherapistChat onBack={handleBack} />;
+    return (
+      <>
+        <TherapistChat
+          onBack={handleBack}
+          onViewProposal={() => setShowProposal(true)}
+        />
+        <AnimatePresence>
+          {showProposal && (
+            <PlanProposalModal
+              onClose={() => setShowProposal(false)}
+              onAccept={() => {
+                setShowProposal(false);
+                // Return to sessions list so they can easily start the newly provisioned Phase 1 Session 1
+                handleBack();
+              }}
+            />
+          )}
+        </AnimatePresence>
+      </>
+    );
   }
 
   return (

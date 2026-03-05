@@ -5,13 +5,26 @@ import { create } from 'zustand';
 export type TherapistPersona = 'maya' | 'alex' | 'sage';
 
 export type Pathway =
-  | 'cognitive_reframing'
-  | 'boundary_setting'
-  | 'emotional_regulation'
-  | 'grief_and_acceptance'
-  | 'self_worth_building'
-  | 'behavioral_activation'
-  | 'exploratory_validation';
+  | 'crisis_intervention_and_suicide_prevention'
+  | 'grief_and_loss_processing'
+  | 'depression_and_behavioral_activation'
+  | 'anxiety_and_stress_management'
+  | 'emotion_regulation_and_distress_tolerance'
+  | 'trauma_processing_and_ptsd'
+  | 'relationship_conflict_and_interpersonal'
+  | 'self_worth_and_self_esteem'
+  | 'boundary_setting_and_assertiveness'
+  | 'overthinking_rumination_and_cognitive_restructuring'
+  | 'sleep_and_insomnia'
+  | 'panic_and_physical_anxiety_symptoms'
+  | 'family_conflict_and_dynamics'
+  | 'abuse_and_safety'
+  | 'life_transition_and_adjustment'
+  | 'identity_and_self_concept'
+  | 'social_anxiety_and_isolation'
+  | 'anger_management'
+  | 'health_anxiety_and_somatic_symptoms'
+  | 'engagement_rapport_and_assessment';
 
 export type SessionState = 'intake' | 'active' | 'wrapping_up' | 'completed';
 
@@ -57,6 +70,10 @@ export interface MindCoachJourney {
   concerns_snapshot: string[];
   phases: JourneyPhase[];
   current_phase: number;
+  current_phase_index: number;
+  sessions_completed: number;
+  active: boolean;
+  discovery_state?: { suggested_pathway: Pathway; confidence: number; };
   version: number;
   created_at: string;
   updated_at: string;
@@ -81,6 +98,7 @@ export interface MindCoachSession {
   session_number: number;
   dynamic_theme: string | null;
   pathway: Pathway | null;
+  pathway_confidence?: number;
   session_state: SessionState;
   message_count: number;
   summary: string | null;

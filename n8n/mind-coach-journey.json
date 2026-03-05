@@ -1,0 +1,99 @@
+{
+    "name": "Mind Coach - Journey Routing",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "mind-coach-journey",
+                "options": {}
+            },
+            "id": "e1a7b8f2-3c4d-5e6f-7a8b-9c0d1e2f3a4b",
+            "name": "Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1.1,
+            "position": [
+                200,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "resource": "chat",
+                "operation": "create",
+                "model": "gpt-4o-mini",
+                "messages": {
+                    "messageValues": [
+                        {
+                            "role": "system",
+                            "content": "You are a clinical triage AI.\nGiven the user's concerns, map them to one of the following exact pathway IDs:\n1. crisis_intervention_and_suicide_prevention\n2. grief_and_loss_processing\n3. depression_and_behavioral_activation\n4. anxiety_and_stress_management\n5. emotion_regulation_and_distress_tolerance\n6. trauma_processing_and_ptsd\n7. relationship_conflict_and_interpersonal\n8. self_worth_and_self_esteem\n9. boundary_setting_and_assertiveness\n10. overthinking_rumination_and_cognitive_restructuring\n11. sleep_and_insomnia\n12. panic_and_physical_anxiety_symptoms\n13. family_conflict_and_dynamics\n14. abuse_and_safety\n15. life_transition_and_adjustment\n16. identity_and_self_concept\n17. social_anxiety_and_isolation\n18. anger_management\n19. health_anxiety_and_somatic_symptoms\n20. engagement_rapport_and_assessment\n\nReturn EXACTLY AND ONLY valid JSON: { \"pathway\": \"<id>\", \"reasoning\": \"<short string>\" }"
+                        },
+                        {
+                            "role": "user",
+                            "content": "={{ JSON.stringify($json.body.concerns) }}"
+                        }
+                    ]
+                },
+                "jsonParameters": true,
+                "options": {
+                    "responseFormat": {
+                        "type": "json_object"
+                    },
+                    "temperature": 0.2
+                }
+            },
+            "id": "f2b8c9d0-4e5f-6a7b-8c9d-0e1f2a3b4c5d",
+            "name": "OpenAI Routing LLM",
+            "type": "n8n-nodes-base.openAi",
+            "typeVersion": 1,
+            "position": [
+                420,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={{ JSON.parse($json.message.content) }}",
+                "options": {}
+            },
+            "id": "a3b4c5d6-e7f8-9a0b-1c2d-3e4f5a6b7c8d",
+            "name": "Respond to Webhook",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1,
+            "position": [
+                640,
+                300
+            ]
+        }
+    ],
+    "pinData": {},
+    "connections": {
+        "Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "OpenAI Routing LLM",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "OpenAI Routing LLM": {
+            "main": [
+                [
+                    {
+                        "node": "Respond to Webhook",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "active": false,
+    "settings": {
+        "executionOrder": "v1"
+    },
+    "versionId": "f0adba17-0eb4-45e3-aafa-8f6b47c0af11"
+}

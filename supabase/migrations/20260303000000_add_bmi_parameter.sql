@@ -19,30 +19,12 @@ ON CONFLICT (id) DO UPDATE SET
 
 -- Male BMI Ranges
 INSERT INTO public.health_parameter_ranges (parameter_id, gender, min_age, max_age, normal_min, optimal_min, optimal_max, normal_max, critical_max)
-VALUES ('39156-5', 'M', 0, 120, 16, 18.5, 25, 30, 35)
-ON CONFLICT (parameter_id, gender, min_age, max_age) DO UPDATE SET
-    normal_min = EXCLUDED.normal_min,
-    optimal_min = EXCLUDED.optimal_min,
-    optimal_max = EXCLUDED.optimal_max,
-    normal_max = EXCLUDED.normal_max,
-    critical_max = EXCLUDED.critical_max;
+VALUES ('39156-5', 'M', 0, 120, 16, 18.5, 25, 30, 35);
 
 -- Female BMI Ranges
 INSERT INTO public.health_parameter_ranges (parameter_id, gender, min_age, max_age, normal_min, optimal_min, optimal_max, normal_max, critical_max)
-VALUES ('39156-5', 'F', 0, 120, 15, 18, 24, 29, 34)
-ON CONFLICT (parameter_id, gender, min_age, max_age) DO UPDATE SET
-    normal_min = EXCLUDED.normal_min,
-    optimal_min = EXCLUDED.optimal_min,
-    optimal_max = EXCLUDED.optimal_max,
-    normal_max = EXCLUDED.normal_max,
-    critical_max = EXCLUDED.critical_max;
+VALUES ('39156-5', 'F', 0, 120, 15, 18, 24, 29, 34);
 
 -- Catch-all for other/unspecified
 INSERT INTO public.health_parameter_ranges (parameter_id, gender, min_age, max_age, normal_min, optimal_min, optimal_max, normal_max, critical_max)
-VALUES ('39156-5', 'ALL', 0, 120, 16, 18.5, 25, 30, 35)
-ON CONFLICT (parameter_id, gender, min_age, max_age) DO UPDATE SET
-    normal_min = EXCLUDED.normal_min,
-    optimal_min = EXCLUDED.optimal_min,
-    optimal_max = EXCLUDED.optimal_max,
-    normal_max = EXCLUDED.normal_max,
-    critical_max = EXCLUDED.critical_max;
+VALUES ('39156-5', 'ALL', 0, 120, 16, 18.5, 25, 30, 35);

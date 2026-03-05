@@ -1,0 +1,339 @@
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { supabase } from '../../lib/supabaseClient';
+import {
+    useMindCoachStore,
+    type Pathway,
+    type JourneyPhase,
+} from '../../store/mindCoachStore';
+
+const PATHWAY_PLAYBOOKS: Record<string, { name: string; phases: { name: string; goal: string; sessions: number }[] }> = {
+    crisis_intervention_and_suicide_prevention: {
+        name: 'Safety & Connection Plan',
+        phases: [
+            { name: 'Safety First', goal: "Reduce access to means; know your warning signs and use your safety plan.", sessions: 3 },
+            { name: 'Stay Connected', goal: "Identify 2–3 people or resources you will contact when you feel at risk.", sessions: 3 },
+            { name: 'Daily Anchors', goal: "Keep 1–2 small non-negotiable daily actions (e.g. one call, one short walk).", sessions: 3 },
+            { name: 'When to Reach Out', goal: "Know when to use your safety plan or crisis line.", sessions: 3 },
+        ],
+    },
+    grief_and_loss_processing: {
+        name: 'Healing Through Grief Plan',
+        phases: [
+            { name: 'Honour the Loss', goal: "Allow space to feel and talk about the loss; no fixed timeline.", sessions: 3 },
+            { name: 'Feel & Process', goal: "Notice and name emotions; allow memories and meaning-making.", sessions: 3 },
+            { name: 'Re-engage Gently', goal: "Choose one or two small valued activities to return to.", sessions: 3 },
+            { name: 'Carry Forward', goal: "Keep a way to remember and stay connected to what matters.", sessions: 3 },
+        ],
+    },
+    depression_and_behavioral_activation: {
+        name: 'Re-engagement & Mood Plan',
+        phases: [
+            { name: 'Understand the Cycle', goal: "Notice how withdrawal and low activity affect your mood.", sessions: 3 },
+            { name: 'Small Steps Back', goal: "Schedule 1–2 very small, achievable activities each day.", sessions: 3 },
+            { name: 'Build Momentum', goal: "Gradually add variety and a bit more challenge.", sessions: 3 },
+            { name: 'Keep Going', goal: "Keep a simple routine of activities; when you slip, return to small steps.", sessions: 3 },
+        ],
+    },
+    anxiety_and_stress_management: {
+        name: 'Calm & Coping Plan',
+        phases: [
+            { name: 'Understand Your Anxiety', goal: "Notice what triggers worry and stress; see how avoidance keeps anxiety going.", sessions: 3 },
+            { name: 'Ground & Breathe', goal: "Practice grounding and slow breathing when anxious.", sessions: 3 },
+            { name: 'Face Fears Gradually', goal: "Take one small step toward a situation you avoid.", sessions: 3 },
+            { name: 'Stay Steady', goal: "Keep using grounding and exposure; return to the plan without judgment.", sessions: 3 },
+        ],
+    },
+    emotion_regulation_and_distress_tolerance: {
+        name: 'Emotional Balance Plan',
+        phases: [
+            { name: 'Notice & Name', goal: "Pause to notice and name emotions without judging them.", sessions: 3 },
+            { name: 'Tolerate Distress', goal: "Use distress tolerance when emotions are intense.", sessions: 3 },
+            { name: 'Regulate & Choose', goal: "Check the facts and try opposite action when emotions don't fit the situation.", sessions: 3 },
+            { name: 'Practice Daily', goal: "Use one skill each day; notice what helps.", sessions: 3 },
+        ],
+    },
+    trauma_processing_and_ptsd: {
+        name: 'Safety to Healing Plan',
+        phases: [
+            { name: 'Safety & Stability', goal: "Focus on feeling safe in the here and now.", sessions: 3 },
+            { name: 'Understand Trauma', goal: "Learn how trauma affects mind and body.", sessions: 3 },
+            { name: 'Process at Your Pace', goal: "Process trauma memories in a structured way when stable.", sessions: 3 },
+            { name: 'Live Beyond Triggers', goal: "Plan for triggers and setbacks; keep using grounding.", sessions: 3 },
+        ],
+    },
+    relationship_conflict_and_interpersonal: {
+        name: 'Connection & Communication Plan',
+        phases: [
+            { name: 'See the Pattern', goal: "Notice how you and the other person interact in conflict.", sessions: 3 },
+            { name: 'Communicate Clearly', goal: "Practice I-statements and listening.", sessions: 3 },
+            { name: 'Try New Ways', goal: "Try one new way of responding in a real situation.", sessions: 3 },
+            { name: 'Nurture the Relationship', goal: "Keep using clear communication and boundaries.", sessions: 3 },
+        ],
+    },
+    self_worth_and_self_esteem: {
+        name: 'Self-Worth Building Plan',
+        phases: [
+            { name: 'Challenge the Inner Critic', goal: "Notice negative self-talk; gather evidence.", sessions: 3 },
+            { name: 'Act As If', goal: "Do one small thing 'as if' you believe you have value.", sessions: 3 },
+            { name: 'Self-Compassion', goal: "Offer yourself the same kindness you'd give a friend.", sessions: 3 },
+            { name: 'Own Your Story', goal: "Build a fairer story about yourself.", sessions: 3 },
+        ],
+    },
+    boundary_setting_and_assertiveness: {
+        name: 'Boundaries & Respect Plan',
+        phases: [
+            { name: 'Know Your Limits', goal: "Clarify what you're okay with and what you're not.", sessions: 3 },
+            { name: 'Say It Clearly', goal: "Practice one clear, calm, assertive statement.", sessions: 3 },
+            { name: 'Start Small', goal: "Use your boundary in one lower-stakes situation.", sessions: 3 },
+            { name: 'Hold Steady', goal: "Reinforce boundaries without apologising for your needs.", sessions: 3 },
+        ],
+    },
+    overthinking_rumination_and_cognitive_restructuring: {
+        name: 'Quiet Mind Plan',
+        phases: [
+            { name: 'Catch the Loop', goal: "Notice when you're overthinking or ruminating.", sessions: 3 },
+            { name: 'Question Thoughts', goal: "Use a thought record: situation, thought, emotion.", sessions: 3 },
+            { name: 'Worry Time Only', goal: "Postpone worry to a short daily 'worry time'.", sessions: 3 },
+            { name: 'Distance & Let Go', goal: "See thoughts as just thoughts.", sessions: 3 },
+        ],
+    },
+    sleep_and_insomnia: {
+        name: 'Restful Sleep Plan',
+        phases: [
+            { name: 'Sleep Habits', goal: "Keep a consistent wake time; use the bed only for sleep.", sessions: 3 },
+            { name: 'Wind Down', goal: "Do a short relaxation or wind-down routine before bed.", sessions: 3 },
+            { name: 'Bed for Sleep Only', goal: "If awake 20 minutes, get up and do something calm.", sessions: 3 },
+            { name: 'Track & Adjust', goal: "Keep a simple sleep diary.", sessions: 3 },
+        ],
+    },
+    panic_and_physical_anxiety_symptoms: {
+        name: 'Calm Body & Mind Plan',
+        phases: [
+            { name: 'Understand Panic', goal: "Learn that panic is the body's alarm.", sessions: 3 },
+            { name: 'Breathe & Ground', goal: "Practise slow breathing and grounding.", sessions: 3 },
+            { name: 'Face Sensations', goal: "Practise interoceptive exposure.", sessions: 3 },
+            { name: 'Stay Calm in Life', goal: "Gradually enter situations you've avoided.", sessions: 3 },
+        ],
+    },
+    family_conflict_and_dynamics: {
+        name: 'Family Calm & Boundaries Plan',
+        phases: [
+            { name: 'Map the Dynamics', goal: "Notice who's involved and what triggers conflict.", sessions: 3 },
+            { name: 'Regulate & Communicate', goal: "Use emotion regulation when triggered.", sessions: 3 },
+            { name: 'Set Boundaries', goal: "Choose one boundary with family; state it and keep it.", sessions: 3 },
+            { name: 'Stay Steady with Family', goal: "Plan for difficult conversations or events.", sessions: 3 },
+        ],
+    },
+    abuse_and_safety: {
+        name: 'Safety First Plan',
+        phases: [
+            { name: 'Safety Now', goal: "Know where you're safe; reduce immediate risk.", sessions: 3 },
+            { name: 'Plan Your Exit', goal: "Make a practical exit plan.", sessions: 3 },
+            { name: 'Connect to Support', goal: "Reach out to services when you're ready.", sessions: 3 },
+            { name: 'Heal When Safe', goal: "Focus on trauma and emotional healing when safe.", sessions: 3 },
+        ],
+    },
+    life_transition_and_adjustment: {
+        name: 'Transition & Adjustment Plan',
+        phases: [
+            { name: 'Acknowledge the Change', goal: "Name what has changed and allow mixed feelings.", sessions: 3 },
+            { name: 'Cope Day to Day', goal: "Use coping strategies that work for you.", sessions: 3 },
+            { name: 'Rebuild Routines', goal: "Re-establish small daily routines.", sessions: 3 },
+            { name: 'Find New Meaning', goal: "Set short-term goals in this chapter of life.", sessions: 3 },
+        ],
+    },
+    identity_and_self_concept: {
+        name: 'Discovering Yourself Plan',
+        phases: [
+            { name: 'Explore Without Judgment', goal: "Notice what you value and how you want to be.", sessions: 3 },
+            { name: 'Clarify Values', goal: "Name what matters in different life areas.", sessions: 3 },
+            { name: 'Try On Who You Are', goal: "Do one small experiment in self-expression.", sessions: 3 },
+            { name: 'Own Your Story', goal: "Gradually build a story about yourself.", sessions: 3 },
+        ],
+    },
+    social_anxiety_and_isolation: {
+        name: 'Reconnect & Comfort Plan',
+        phases: [
+            { name: 'Understand Your Fears', goal: "Notice automatic thoughts and safety behaviours.", sessions: 3 },
+            { name: 'Challenge Thoughts', goal: "Question thoughts about judgment or rejection.", sessions: 3 },
+            { name: 'Step Out Gently', goal: "Do one small social step.", sessions: 3 },
+            { name: 'Build Connection', goal: "Keep taking small steps toward connection.", sessions: 3 },
+        ],
+    },
+    anger_management: {
+        name: 'Calm Response Plan',
+        phases: [
+            { name: 'Spot the Triggers', goal: "Notice what triggers anger and signs in your body.", sessions: 3 },
+            { name: 'Pause & Ground', goal: "Pause; use breathing before reacting.", sessions: 3 },
+            { name: "Respond, Don't React", goal: "Choose an assertive response instead of aggression.", sessions: 3 },
+            { name: 'Keep Your Cool', goal: "Plan for high-trigger moments.", sessions: 3 },
+        ],
+    },
+    health_anxiety_and_somatic_symptoms: {
+        name: 'Body-Mind Calm Plan',
+        phases: [
+            { name: 'Understand the Link', goal: "Learn how worry affects body sensations.", sessions: 3 },
+            { name: 'Less Reassurance', goal: "Cut down on checking or asking others.", sessions: 3 },
+            { name: 'Face Health Fears', goal: "Gradually face health-related triggers.", sessions: 3 },
+            { name: 'Live Fully', goal: "Shift attention to valued activities.", sessions: 3 },
+        ],
+    },
+    engagement_rapport_and_assessment: {
+        name: 'General Wellness',
+        phases: [
+            { name: 'Engagement', goal: "Establish trust and safe space.", sessions: 3 },
+            { name: 'Awareness', goal: "Recognize patterns.", sessions: 3 },
+            { name: 'Strategies', goal: "Identify coping mechanisms.", sessions: 3 },
+            { name: 'Growth', goal: "Apply strategies to daily life.", sessions: 3 },
+        ]
+    }
+};
+
+interface PlanProposalModalProps {
+    onClose: () => void;
+    onAccept: () => void;
+}
+
+export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, onAccept }) => {
+    const profile = useMindCoachStore((s) => s.profile);
+    const activeSession = useMindCoachStore((s) => s.activeSession);
+    const journey = useMindCoachStore((s) => s.journey);
+    const setJourney = useMindCoachStore((s) => s.setJourney);
+    const updateActiveSession = useMindCoachStore((s) => s.updateActiveSession);
+
+    const [saving, setSaving] = useState(false);
+
+    // Fallback to exploratory validation if no pathway was routed
+    const suggestedPathwayId = activeSession?.pathway === 'engagement_rapport_and_assessment'
+        ? 'exploratory_validation' // Fallback mapping
+        : (activeSession?.pathway || 'exploratory_validation');
+
+    const playbook = PATHWAY_PLAYBOOKS[suggestedPathwayId] || PATHWAY_PLAYBOOKS.engagement_rapport_and_assessment;
+
+    const handleAcceptProposal = async () => {
+        if (!profile || !journey || saving) return;
+        setSaving(true);
+
+        try {
+            // 1. Mark existing journey as inactive
+            await supabase
+                .from('mind_coach_journeys')
+                .update({ active: false })
+                .eq('id', journey.id);
+
+            // 2. Format phases
+            const customPhases: JourneyPhase[] = playbook.phases.map((p, i) => ({
+                phase_number: i + 1,
+                title: p.name,
+                goal: p.goal,
+                sessions: Array.from({ length: p.sessions }, (_, si) => ({
+                    session_number: i * 3 + si + 1,
+                    topic: `Session ${i * 3 + si + 1}`,
+                    description: p.goal,
+                })),
+            }));
+
+            // 3. Create NEW journey for the correct pathway
+            const { data: routeData, error: err } = await supabase
+                .from('mind_coach_journeys')
+                .insert({
+                    profile_id: profile.id,
+                    pathway: suggestedPathwayId,
+                    title: playbook.name,
+                    phases: customPhases,
+                    current_phase: 1,
+                    current_phase_index: 0,
+                    sessions_completed: 0,
+                    active: true,
+                    version: 1,
+                })
+                .select()
+                .single();
+
+            if (err) throw err;
+
+            // 4. End the current Assessment session so the user can start a targeted session
+            if (activeSession) {
+                await supabase
+                    .from('mind_coach_sessions')
+                    .update({ session_state: 'completed', ended_at: new Date().toISOString() })
+                    .eq('id', activeSession.id);
+                updateActiveSession({ session_state: 'completed' });
+            }
+
+            setJourney(routeData as any);
+            onAccept();
+        } catch (err) {
+            console.error('Failed to accept proposal', err);
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div
+                className="absolute inset-0 bg-[#2C2A26]/40 backdrop-blur-sm"
+                onClick={onClose}
+            />
+            <motion.div
+                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                className="relative bg-[#FAFAF7] w-full max-w-md rounded-3xl overflow-hidden shadow-xl max-h-[90vh] flex flex-col"
+            >
+                <div className="p-6 bg-white border-b border-[#E8E4DE] shrink-0">
+                    <p className="text-xs font-semibold text-[#6B8F71] uppercase tracking-wide mb-2">Therapy Proposal</p>
+                    <h2 className="text-2xl font-serif text-[#2C2A26] leading-tight mb-3">
+                        {playbook.name}
+                    </h2>
+                    <p className="text-sm text-[#2C2A26]/70 leading-relaxed">
+                        Based on our conversation about <strong>"{activeSession?.dynamic_theme || 'your experiences'}"</strong>, I've designed a specialized clinical approach for us to move forward.
+                    </p>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-6 bg-[#FAF9F7] space-y-4">
+                    <p className="text-xs font-semibold text-[#2C2A26]/50 uppercase tracking-wide">
+                        Your 4-Phase Plan
+                    </p>
+                    <div className="space-y-3">
+                        {playbook.phases.map((phase, i) => (
+                            <div key={i} className="bg-white border border-[#E8E4DE] p-4 rounded-2xl flex gap-4">
+                                <div className="shrink-0 flex flex-col items-center">
+                                    <div className="w-6 h-6 rounded-full bg-[#6B8F71]/10 flex items-center justify-center text-xs font-bold text-[#6B8F71]">
+                                        {i + 1}
+                                    </div>
+                                    {i < 3 && <div className="w-0.5 h-full bg-[#E8E4DE] my-1" />}
+                                </div>
+                                <div>
+                                    <h4 className="text-sm font-semibold text-[#2C2A26] mb-1">{phase.name}</h4>
+                                    <p className="text-sm text-[#2C2A26]/60 leading-relaxed">{phase.goal}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="p-5 bg-white border-t border-[#E8E4DE] shrink-0 space-y-3">
+                    <p className="text-xs text-center text-[#2C2A26]/50 mb-2">
+                        Does this path feel right to you? You are the expert on your own life.
+                    </p>
+                    <button
+                        onClick={handleAcceptProposal}
+                        disabled={saving}
+                        className="w-full py-3.5 bg-[#6B8F71] text-white font-medium rounded-xl hover:bg-[#5A7D60] focus:ring-4 focus:ring-[#6B8F71]/20 transition-all disabled:opacity-50"
+                    >
+                        {saving ? 'Creating your plan...' : 'Yes, let\'s start this plan'}
+                    </button>
+                    <button
+                        onClick={onClose}
+                        disabled={saving}
+                        className="w-full py-3.5 bg-transparent border border-[#E8E4DE] text-[#2C2A26]/70 font-medium rounded-xl hover:bg-[#F5F0EB] transition-all disabled:opacity-50"
+                    >
+                        Actually, I want to talk about something else
+                    </button>
+                </div>
+            </motion.div>
+        </div>
+    );
+};

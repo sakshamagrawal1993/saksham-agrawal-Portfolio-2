@@ -1,0 +1,324 @@
+{
+    "name": "Mind Coach - Therapist Chat & Discovery",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "mind-coach-chat",
+                "options": {}
+            },
+            "id": "1",
+            "name": "Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1.1,
+            "position": [
+                0,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "resource": "chat",
+                "operation": "create",
+                "model": "gpt-4o-mini",
+                "messages": {
+                    "messageValues": [
+                        {
+                            "role": "system",
+                            "content": "You are an AI crisis detector for a mental health application.\nAnalyze the user's message. If it contains immediate threat to life, self-harm, or severe abuse, respond with JSON:\n{ \"crisis_detected\": true, \"reply\": \"I want to make sure you are safe. Please consider reaching out to a crisis line immediately.\" }\nOtherwise respond with:\n{ \"crisis_detected\": false }"
+                        },
+                        {
+                            "role": "user",
+                            "content": "={{ $json.body.message_text }}"
+                        }
+                    ]
+                },
+                "options": {
+                    "responseFormat": {
+                        "type": "json_object"
+                    },
+                    "temperature": 0
+                }
+            },
+            "id": "2",
+            "name": "Crisis Engine",
+            "type": "n8n-nodes-base.openAi",
+            "typeVersion": 1,
+            "position": [
+                220,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "dataType": "boolean",
+                "value1": "={{ JSON.parse($json.message.content).crisis_detected }}",
+                "rules": {
+                    "rules": [
+                        {
+                            "value2": true
+                        }
+                    ]
+                }
+            },
+            "id": "3",
+            "name": "Is Crisis?",
+            "type": "n8n-nodes-base.switch",
+            "typeVersion": 1,
+            "position": [
+                440,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={{ JSON.parse($node[\"Crisis Engine\"].json.message.content) }}",
+                "options": {}
+            },
+            "id": "4",
+            "name": "Return Crisis Alert",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1,
+            "position": [
+                660,
+                100
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const data = $node[\"Webhook\"].json.body;\nconst persona = data.profile.therapist_persona || \"Empathetic Listener\";\nconst theme = data.dynamic_theme || \"Unknown\";\nconst memories = (data.memories || []).map(m => `- ${m.type}: ${m.text}`).join('\\n');\n\nconst systemPrompt = `You are a mental health coach. Your persona is: ${persona}.\\n` +\n`The current clinical theme is: ${theme}.\\n` +\n`User memories Context:\\n${memories}\\n\\n` +\n`Respond empathetically in a single short message. Focus purely on emotional reflection.`;\n\nreturn [{ json: { systemPrompt } }];"
+            },
+            "id": "5",
+            "name": "Prompt Builder",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                660,
+                420
+            ]
+        },
+        {
+            "parameters": {
+                "resource": "chat",
+                "operation": "create",
+                "model": "gpt-4o",
+                "messages": {
+                    "messageValues": [
+                        {
+                            "role": "system",
+                            "content": "={{ $json.systemPrompt }}"
+                        },
+                        {
+                            "role": "user",
+                            "content": "={{ $node[\"Webhook\"].json.body.message_text }}"
+                        }
+                    ]
+                },
+                "options": {
+                    "temperature": 0.7
+                }
+            },
+            "id": "6",
+            "name": "Therapist LLM",
+            "type": "n8n-nodes-base.openAi",
+            "typeVersion": 1,
+            "position": [
+                880,
+                420
+            ]
+        },
+        {
+            "parameters": {
+                "dataType": "string",
+                "value1": "={{ $node[\"Webhook\"].json.body.pathway }}",
+                "rules": {
+                    "rules": [
+                        {
+                            "value2": "engagement_rapport_and_assessment"
+                        }
+                    ]
+                }
+            },
+            "id": "7",
+            "name": "Is Assessment Phase?",
+            "type": "n8n-nodes-base.switch",
+            "typeVersion": 1,
+            "position": [
+                1100,
+                420
+            ]
+        },
+        {
+            "parameters": {
+                "resource": "chat",
+                "operation": "create",
+                "model": "gpt-4o-mini",
+                "messages": {
+                    "messageValues": [
+                        {
+                            "role": "system",
+                            "content": "You are a clinical AI evaluating an intake session.\\nBased on the user's latest message and the therapist's reply, return JSON:\\n{\\n  \"dynamic_theme\": \"<3-5 words>\",\\n  \"suggested_pathway\": \"<one of the 20 pathway strings>\",\\n  \"pathway_confidence\": <integer 0-100>\\n}"
+                        },
+                        {
+                            "role": "user",
+                            "content": "Therapist said: {{ $node[\"Therapist LLM\"].json.message.content }}"
+                        }
+                    ]
+                },
+                "options": {
+                    "responseFormat": {
+                        "type": "json_object"
+                    },
+                    "temperature": 0.1
+                }
+            },
+            "id": "8",
+            "name": "Discovery LLM",
+            "type": "n8n-nodes-base.openAi",
+            "typeVersion": 1,
+            "position": [
+                1320,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const chatReply = $node[\"Therapist LLM\"].json.message.content;\n// Default fallback mapping if they aren't in Assessment Phase\nlet merged = {\n  reply: chatReply,\n  guardrail_status: \"passed\",\n  crisis_detected: false\n};\n\n// If they went through Discovery node\nif ($node[\"Discovery LLM\"]) {\n  try {\n    const discovery = JSON.parse($node[\"Discovery LLM\"].json.message.content);\n    merged.dynamic_theme = discovery.dynamic_theme;\n    merged.suggested_pathway = discovery.suggested_pathway;\n    merged.pathway_confidence = discovery.pathway_confidence;\n  } catch (e) {}\n}\n\nreturn [{ json: merged }];"
+            },
+            "id": "9",
+            "name": "Format JSON Reply",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1540,
+                420
+            ]
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={{ $json }}",
+                "options": {}
+            },
+            "id": "10",
+            "name": "Respond to Webhook (Success)",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1,
+            "position": [
+                1760,
+                420
+            ]
+        }
+    ],
+    "pinData": {},
+    "connections": {
+        "Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Crisis Engine",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Crisis Engine": {
+            "main": [
+                [
+                    {
+                        "node": "Is Crisis?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Is Crisis?": {
+            "main": [
+                [
+                    {
+                        "node": "Return Crisis Alert",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Prompt Builder",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Prompt Builder": {
+            "main": [
+                [
+                    {
+                        "node": "Therapist LLM",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Therapist LLM": {
+            "main": [
+                [
+                    {
+                        "node": "Is Assessment Phase?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Is Assessment Phase?": {
+            "main": [
+                [
+                    {
+                        "node": "Discovery LLM",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Format JSON Reply",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Discovery LLM": {
+            "main": [
+                [
+                    {
+                        "node": "Format JSON Reply",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Format JSON Reply": {
+            "main": [
+                [
+                    {
+                        "node": "Respond to Webhook (Success)",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "active": false,
+    "settings": {
+        "executionOrder": "v1"
+    },
+    "versionId": "b1b2b3b4-c5c6-d7d8-e9e0-f1f2f3f4f5f6"
+}

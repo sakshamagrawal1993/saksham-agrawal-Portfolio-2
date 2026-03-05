@@ -402,10 +402,9 @@ function GenderStep({
               key={option}
               onClick={() => onChange(option)}
               className={`p-4 rounded-2xl border-2 text-sm font-medium transition-all duration-200
-                ${
-                  value === option
-                    ? 'border-[#6B8F71] bg-[#6B8F71]/5 text-[#2C2A26]'
-                    : 'border-[#E8E4DE] bg-white text-[#2C2A26]/70 hover:border-[#6B8F71]/40'
+                ${value === option
+                  ? 'border-[#6B8F71] bg-[#6B8F71]/5 text-[#2C2A26]'
+                  : 'border-[#E8E4DE] bg-white text-[#2C2A26]/70 hover:border-[#6B8F71]/40'
                 }`}
             >
               {option}
@@ -467,12 +466,11 @@ function ConcernStep({
                 onClick={() => toggle(concern)}
                 disabled={maxed}
                 className={`px-4 py-2 rounded-full text-sm transition-all duration-200
-                  ${
-                    selected
-                      ? 'bg-[#6B8F71] text-white shadow-sm'
-                      : maxed
-                        ? 'bg-[#F5F0EB] text-[#2C2A26]/25 cursor-not-allowed'
-                        : 'bg-white border border-[#E8E4DE] text-[#2C2A26]/70 hover:border-[#6B8F71]/40'
+                  ${selected
+                    ? 'bg-[#6B8F71] text-white shadow-sm'
+                    : maxed
+                      ? 'bg-[#F5F0EB] text-[#2C2A26]/25 cursor-not-allowed'
+                      : 'bg-white border border-[#E8E4DE] text-[#2C2A26]/70 hover:border-[#6B8F71]/40'
                   }`}
               >
                 {concern}
@@ -523,10 +521,9 @@ function TherapistStep({
                 key={t.id}
                 onClick={() => onChange(t.id)}
                 className={`w-full text-left p-4 rounded-2xl border-2 transition-all duration-200
-                  ${
-                    selected
-                      ? 'border-[#6B8F71] bg-[#6B8F71]/5'
-                      : 'border-[#E8E4DE] bg-white hover:border-[#6B8F71]/30'
+                  ${selected
+                    ? 'border-[#6B8F71] bg-[#6B8F71]/5'
+                    : 'border-[#E8E4DE] bg-white hover:border-[#6B8F71]/30'
                   }`}
               >
                 <div className="flex items-start gap-3">
@@ -660,7 +657,7 @@ function JourneyPreviewStep({
 
     const routeJourney = async () => {
       try {
-        // 1. Create profile first so the edge function can associate it
+        // 1. Create profile
         const { data: profileData, error: profileError } = await supabase
           .from('mind_coach_profiles')
           .insert({ name, age, gender, concerns, therapist_persona: therapist })
@@ -669,51 +666,41 @@ function JourneyPreviewStep({
 
         if (profileError || !profileData) throw profileError;
 
-        // 2. Call the journey routing edge function
-        const { data, error } = await supabase.functions.invoke('mind-coach-journey', {
-          body: {
-            profile_id: profileData.id,
-            concerns,
-            dynamic_theme: null,
-          },
-        });
-
-        if (!cancelled && !error && data?.journey) {
-          const j = data.journey;
-          setRoutedPathway(data.pathway);
+        if (!cancelled) {
+          // 2. Hardcode the engagement assessment pathway instead of calling the edge function
+          setRoutedPathway('engagement_rapport_and_assessment');
           setJourney({
-            title: j.title,
-            description: `A personalized 4-phase journey designed around ${concerns.join(' and ').toLowerCase()}.`,
-            phases: (j.phases || []).map((p: any, i: number) => ({
-              phase_number: i + 1,
-              title: p.name,
-              goal: p.goal,
-              sessions: Array.from({ length: p.sessions || 3 }, (_, si) => ({
-                session_number: i * 3 + si + 1,
-                topic: `Session ${i * 3 + si + 1}`,
-                description: p.goal,
-              })),
-            })),
+            title: 'Initial Assessment Phase',
+            description: 'Before we formulate a precise plan, let\'s take a few sessions just to unpack what\'s going on. I am here to listen and understand your world.',
+            phases: [
+              {
+                phase_number: 1,
+                title: 'Engagement & Rapport',
+                goal: 'Establish trust, safe space, and baseline emotional state.',
+                sessions: [
+                  { session_number: 1, topic: 'Initial Check-in', description: 'Opening up in a safe space.' },
+                  { session_number: 2, topic: 'Deeper Exploration', description: 'Unpacking your immediate concerns.' },
+                  { session_number: 3, topic: 'Pattern Recognition', description: 'Starting to map the underlying themes.' },
+                ],
+              },
+            ],
           });
           setProfile(profileData as MindCoachProfile);
-          setStoreJourney(j as MindCoachJourney);
+          // Don't set store journey yet, handleStart does that
           setLoading(false);
-          return;
         }
       } catch (err) {
-        console.error('Journey routing failed, falling back to mock:', err);
-      }
-
-      // Fallback: use mock journey if the edge function fails
-      if (!cancelled) {
-        setJourney(generateMockJourney(concerns));
-        setLoading(false);
+        console.error('Failed to create initial profile:', err);
+        if (!cancelled) {
+          setJourney(generateMockJourney(concerns));
+          setLoading(false);
+        }
       }
     };
 
     routeJourney();
     return () => { cancelled = true; };
-  }, [concerns, name, age, gender, therapist, setProfile, setStoreJourney]);
+  }, [concerns, name, age, gender, therapist, setProfile]);
 
   const handleStart = useCallback(async () => {
     if (!journey || saving) return;
@@ -750,6 +737,9 @@ function JourneyPreviewStep({
           concerns_snapshot: concerns,
           phases: journey.phases,
           current_phase: 1,
+          current_phase_index: 0,
+          sessions_completed: 0,
+          active: true,
           version: 1,
         })
         .select()

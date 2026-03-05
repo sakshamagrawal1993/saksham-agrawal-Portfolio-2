@@ -23,9 +23,10 @@ const MOCK_REPLY =
 
 interface TherapistChatProps {
   onBack: () => void;
+  onViewProposal?: () => void;
 }
 
-export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack }) => {
+export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProposal }) => {
   const profile = useMindCoachStore((s) => s.profile);
   const journey = useMindCoachStore((s) => s.journey);
   const activeSession = useMindCoachStore((s) => s.activeSession);
@@ -116,6 +117,9 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack }) => {
       if (data.pathway) {
         updateActiveSession({ pathway: data.pathway });
       }
+      if (typeof data.pathway_confidence === 'number') {
+        updateActiveSession({ pathway_confidence: data.pathway_confidence });
+      }
       if (data.crisis_detected) {
         setCrisisDetected(true);
       }
@@ -185,7 +189,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack }) => {
     onBack();
   };
 
-  const showEndSession = activeSession && activeSession.message_count >= 10;
+  const showEndSession = activeSession && activeSession.message_count >= 10 && activeSession.pathway !== 'engagement_rapport_and_assessment';
 
   if (showSummary && sessionSummary) {
     return (
@@ -300,6 +304,52 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack }) => {
           <p className="text-xs text-[#6B8F71]">Online</p>
         </div>
       </div>
+
+      {/* Assessment/Thematic Compass UI */}
+      {activeSession?.pathway === 'engagement_rapport_and_assessment' && (
+        <div className="bg-[#FAF9F7] border-b border-[#E8E4DE] px-4 py-3 shrink-0">
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-[#2C2A26]/80 uppercase tracking-wide">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
+              </svg>
+              Clinical Insight
+            </div>
+            {activeSession.pathway_confidence !== undefined && (
+              <span className="text-[10px] uppercase font-bold text-[#6B8F71] bg-[#6B8F71]/10 px-2 py-0.5 rounded-full">
+                {activeSession.pathway_confidence < 40 ? 'Listening' :
+                  activeSession.pathway_confidence < 80 ? 'Connecting' :
+                    'Formulating'}
+              </span>
+            )}
+          </div>
+
+          <div className="text-sm text-[#2C2A26] mb-2">
+            <span className="text-[#2C2A26]/50">Exploring: </span>
+            <span className="font-medium">{activeSession.dynamic_theme || 'Understanding your story...'}</span>
+          </div>
+
+          {(activeSession.pathway_confidence !== undefined && activeSession.pathway_confidence >= 80) || activeSession.message_count >= 10 ? (
+            <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className="pt-2 border-t border-[#E8E4DE]">
+              <p className="text-sm text-[#2C2A26]/80 mb-2">
+                I have gathered enough context to propose a highly personalized therapy plan for you.
+              </p>
+              <button
+                onClick={onViewProposal}
+                className="w-full py-2 bg-[#2C2A26] text-white text-sm font-medium rounded-xl hover:bg-[#2C2A26]/90 transition-colors"
+                disabled={!onViewProposal}
+              >
+                View Therapy Proposal
+              </button>
+            </motion.div>
+          ) : (
+            <div className="text-xs text-[#2C2A26]/40 italic">
+              Share openly. A personalized path will be revealed soon.
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
