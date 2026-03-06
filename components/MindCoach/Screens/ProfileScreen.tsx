@@ -1,8 +1,9 @@
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Settings, Phone, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Settings, Phone, ExternalLink, Trash2 } from 'lucide-react';
 import { AreaChart, Area, XAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../../../lib/supabaseClient';
 import {
   useMindCoachStore,
   type TherapistPersona,
@@ -52,6 +53,8 @@ export const ProfileScreen: React.FC = () => {
   const sessions = useMindCoachStore((s) => s.sessions);
   const moodEntries = useMindCoachStore((s) => s.moodEntries);
   const completedSessionCount = useMindCoachStore((s) => s.completedSessionCount);
+  const resetLocalStore = useMindCoachStore((s) => s.reset);
+  const [resetting, setResetting] = React.useState(false);
 
   const persona = profile?.therapist_persona ?? 'maya';
   const meta = THERAPIST_META[persona];
@@ -76,6 +79,31 @@ export const ProfileScreen: React.FC = () => {
         score: m.score,
       }));
   }, [moodEntries]);
+
+  const handleResetData = async () => {
+    if (!profile) return;
+
+    const confirmWipe = window.confirm(
+      "Are you sure you want to completely erase your Mind Coach journey? This will delete all your sessions, memories, and progress permanently."
+    );
+
+    if (!confirmWipe) return;
+
+    setResetting(true);
+    try {
+      // Deleting the root profile propagates ON DELETE CASCADE to all other mind_coach_* tables.
+      await supabase.from('mind_coach_profiles').delete().eq('id', profile.id);
+      resetLocalStore();
+      navigate('/mind-coach', { replace: true });
+    } catch (e) {
+      console.error('Failed to reset data:', e);
+      alert('Failed to delete data. Please try again.');
+    } finally {
+      if (window.location.pathname.includes('/mind-coach')) {
+        setResetting(false);
+      }
+    }
+  };
 
   return (
     <div className="p-5 pb-4 space-y-5">
@@ -213,6 +241,28 @@ export const ProfileScreen: React.FC = () => {
             <p className="text-xs text-[#2C2A26]/60">Call or text 988 — available 24/7</p>
           </div>
         </div>
+      </motion.div>
+
+      {/* Start Afresh (Danger Zone) */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.22 }}
+      >
+        <button
+          onClick={handleResetData}
+          disabled={resetting}
+          className="w-full flex items-center justify-center gap-2 bg-white rounded-xl p-3.5 border border-red-200 text-red-500 hover:bg-red-50 transition-colors"
+        >
+          {resetting ? (
+            <span className="text-sm font-medium">Resetting...</span>
+          ) : (
+            <>
+              <Trash2 size={16} />
+              <span className="text-sm font-medium">Delete Journey & Start Afresh</span>
+            </>
+          )}
+        </button>
       </motion.div>
 
       {/* Back to portfolio */}
