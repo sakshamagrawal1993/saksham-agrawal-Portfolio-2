@@ -18,6 +18,7 @@ export const SessionsScreen: React.FC = () => {
   const setActiveSession = useMindCoachStore((s) => s.setActiveSession);
   const setSessions = useMindCoachStore((s) => s.setSessions);
   const setMessages = useMindCoachStore((s) => s.setMessages);
+  const setActiveTab = useMindCoachStore((s) => s.setActiveTab);
   const [starting, setStarting] = useState(false);
   const [showProposal, setShowProposal] = useState(false);
 
@@ -82,6 +83,10 @@ export const SessionsScreen: React.FC = () => {
         <TherapistChat
           onBack={handleBack}
           onViewProposal={() => setShowProposal(true)}
+          onReturnHome={() => {
+            handleBack();
+            setActiveTab('home');
+          }}
         />
         <AnimatePresence>
           {showProposal && (

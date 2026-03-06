@@ -24,9 +24,10 @@ const MOCK_REPLY =
 interface TherapistChatProps {
   onBack: () => void;
   onViewProposal?: () => void;
+  onReturnHome?: () => void;
 }
 
-export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProposal }) => {
+export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProposal, onReturnHome }) => {
   const profile = useMindCoachStore((s) => s.profile);
   const journey = useMindCoachStore((s) => s.journey);
   const activeSession = useMindCoachStore((s) => s.activeSession);
@@ -186,7 +187,11 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
   const handleCloseSummary = () => {
     setShowSummary(false);
     setSessionSummary(null);
-    onBack();
+    if (onReturnHome) {
+      onReturnHome();
+    } else {
+      onBack();
+    }
   };
 
   const showEndSession = activeSession && activeSession.message_count >= 10 && activeSession.pathway !== 'engagement_rapport_and_assessment';
