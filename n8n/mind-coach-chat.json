@@ -87,7 +87,7 @@
         },
         {
             "parameters": {
-                "jsCode": "const data = $node[\"Webhook\"].json.body;\nconst persona = data.profile.therapist_persona || \"Empathetic Listener\";\nconst theme = data.dynamic_theme || \"Unknown\";\nconst memories = (data.memories || []).map(m => `- ${m.type}: ${m.text}`).join('\\n');\n\nconst systemPrompt = `You are a mental health coach. Your persona is: ${persona}.\\n` +\n`The current clinical theme is: ${theme}.\\n` +\n`User memories Context:\\n${memories}\\n\\n` +\n`Respond empathetically in a single short message. Focus purely on emotional reflection.`;\n\nreturn [{ json: { systemPrompt } }];"
+                "jsCode": "const data = $node[\"Webhook\"].json.body;\nconst persona = data.profile.therapist_persona || \"Empathetic Listener\";\nconst theme = data.dynamic_theme || \"Unknown\";\nconst memories = (data.memories || []).map(m => `- ${m.type}: ${m.text}`).join('\\n');\n\nconst systemPrompt = `You are a mental health coach.\\nYour persona is: ${persona}\\nCurrent clinical theme: ${theme}\\nUser memories Context:\\n${memories}\\n\\nINSTRUCTIONS:\\nRespond empathetically in a single short message.\\n\\nYou also have the ability to inject dynamic tools into the chat. If the user exhibits acute panic or high emotional distress, inject a grounding exercise ('box_breathing' or 'senses_54321'). If they struggle with sleep or physical tension, inject a video ('meditation_sleep' or 'somatic_tension'). If they mention persistent anxiety/worry (GAD-7), stress (PSS-4), or depression (PHQ-9) and you haven't assessed them recently, inject an assessment.\\n\\nReturn ONLY valid JSON in this exact format:\\n{\\n  \"reply\": \"<Your empathetic conversational response>\",\\n  \"dynamic_content\": {\\n    \"type\": \"video|game|assessment\",\\n    \"payload\": \"<id_of_tool>\"\\n  }\\n}\\n\\n(Omit the dynamic_content key entirely if no tool is needed).`;\n\nreturn [{ json: { systemPrompt } }];"
             },
             "id": "5",
             "name": "Prompt Builder",
@@ -116,7 +116,10 @@
                     ]
                 },
                 "options": {
-                    "temperature": 0.7
+                    "responseFormat": {
+                        "type": "json_object"
+                    },
+                    "temperature": 0.5
                 }
             },
             "id": "6",
@@ -184,7 +187,7 @@
         },
         {
             "parameters": {
-                "jsCode": "const chatReply = $node[\"Therapist LLM\"].json.message.content;\n// Default fallback mapping if they aren't in Assessment Phase\nlet merged = {\n  reply: chatReply,\n  guardrail_status: \"passed\",\n  crisis_detected: false\n};\n\n// If they went through Discovery node\nif ($node[\"Discovery LLM\"]) {\n  try {\n    const discovery = JSON.parse($node[\"Discovery LLM\"].json.message.content);\n    merged.dynamic_theme = discovery.dynamic_theme;\n    merged.suggested_pathway = discovery.suggested_pathway;\n    merged.pathway_confidence = discovery.pathway_confidence;\n  } catch (e) {}\n}\n\nreturn [{ json: merged }];"
+                "jsCode": "let chatOutput = {};\ntry {\n  chatOutput = JSON.parse($node[\"Therapist LLM\"].json.message.content);\n} catch (e) {\n  chatOutput = { reply: $node[\"Therapist LLM\"].json.message.content };\n}\n\nlet merged = {\n  reply: chatOutput.reply,\n  dynamic_content: chatOutput.dynamic_content,\n  guardrail_status: \"passed\",\n  crisis_detected: false\n};\n\n// If they went through Discovery node\nif ($node[\"Discovery LLM\"]) {\n  try {\n    const discovery = JSON.parse($node[\"Discovery LLM\"].json.message.content);\n    merged.dynamic_theme = discovery.dynamic_theme;\n    merged.suggested_pathway = discovery.suggested_pathway;\n    merged.pathway_confidence = discovery.pathway_confidence;\n  } catch (e) {}\n}\n\nreturn [{ json: merged }];"
             },
             "id": "9",
             "name": "Format JSON Reply",

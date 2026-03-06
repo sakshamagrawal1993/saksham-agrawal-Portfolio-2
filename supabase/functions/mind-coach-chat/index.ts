@@ -159,6 +159,7 @@ serve(async (req) => {
     const updatedSessionState = result.session_state || session_state;
     const guardrailStatus = result.guardrail_status || 'passed';
     const crisisDetected = result.crisis_detected || false;
+    const dynamicContent = result.dynamic_content || null;
 
     // 6. Persist assistant reply
     if (assistantReply) {
@@ -210,6 +211,7 @@ serve(async (req) => {
         pathway_confidence: pathwayConfidence,
         guardrail_status: guardrailStatus,
         crisis_detected: crisisDetected,
+        dynamic_content: dynamicContent,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );

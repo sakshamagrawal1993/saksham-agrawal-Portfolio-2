@@ -38,7 +38,9 @@ export type MemoryType =
 
 export type TabId = 'home' | 'sessions' | 'journey' | 'toolkit' | 'profile';
 
-export interface MindCoachProfile {
+import { DynamicContentType } from '../lib/dynamicContentLibrary';
+
+interface MindCoachProfile {
   id: string;
   user_id: string;
   name: string;
@@ -115,6 +117,10 @@ export interface ChatMessage {
   content: string;
   guardrail_status: 'passed' | 'corrected' | 'blocked' | null;
   created_at: string;
+  dynamic_content?: {
+    type: DynamicContentType;
+    payload: any;
+  };
 }
 
 export interface MindCoachMemory {
