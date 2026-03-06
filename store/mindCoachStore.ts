@@ -40,7 +40,7 @@ export type TabId = 'home' | 'sessions' | 'journey' | 'toolkit' | 'profile';
 
 import { DynamicContentType } from '../lib/dynamicContentLibrary';
 
-interface MindCoachProfile {
+export interface MindCoachProfile {
   id: string;
   user_id: string;
   name: string;

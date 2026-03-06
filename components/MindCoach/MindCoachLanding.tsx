@@ -1,7 +1,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../lib/supabaseClient';
+import { useAuth } from '../../context/AuthContext';
 import {
   useMindCoachStore,
   type TherapistPersona,
@@ -651,6 +652,7 @@ function JourneyPreviewStep({
   const [saving, setSaving] = useState(false);
   const navigate = useNavigate();
   const { setProfile, setJourney: setStoreJourney } = useMindCoachStore();
+  const { user } = useAuth();
 
   useEffect(() => {
     let cancelled = false;
@@ -660,7 +662,7 @@ function JourneyPreviewStep({
         // 1. Create profile
         const { data: profileData, error: profileError } = await supabase
           .from('mind_coach_profiles')
-          .insert({ name, age, gender, concerns, therapist_persona: therapist })
+          .insert({ user_id: user?.id, name, age, gender, concerns, therapist_persona: therapist })
           .select()
           .single();
 
@@ -719,7 +721,7 @@ function JourneyPreviewStep({
       // Fallback: create profile + journey manually (mock path)
       const { data: profileData, error: profileError } = await supabase
         .from('mind_coach_profiles')
-        .insert({ name, age, gender, concerns, therapist_persona: therapist })
+        .insert({ user_id: user?.id, name, age, gender, concerns, therapist_persona: therapist })
         .select()
         .single();
 
@@ -833,6 +835,7 @@ function JourneyPreviewStep({
 // ── Orchestrator ─────────────────────────────────────────────────────────────
 
 const MindCoachLanding: React.FC = () => {
+  const { user } = useAuth();
   const [step, setStep] = useState(1);
   const [direction, setDirection] = useState(1);
 
@@ -852,6 +855,32 @@ const MindCoachLanding: React.FC = () => {
     setDirection(-1);
     setStep((s) => Math.max(s - 1, 1));
   }, []);
+
+  // Pre-fill user name from global profile if available
+  useEffect(() => {
+    let active = true;
+    async function fetchName() {
+      if (!user?.id) return;
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .single();
+
+      if (active && !error && data?.full_name) {
+        const firstName = data.full_name.split(' ')[0];
+        setName(firstName || data.full_name);
+      }
+    }
+
+    fetchName();
+    return () => { active = false; };
+  }, [user?.id]);
+
+  if (!user) {
+    return <Navigate to="/mind-coach/login" replace />;
+  }
 
   const renderStep = () => {
     switch (step) {

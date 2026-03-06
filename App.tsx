@@ -207,6 +207,11 @@ function App() {
                 <MindCoachLanding />
               </Suspense>
             } />
+            <Route path="/mind-coach/login" element={
+              <Suspense fallback={<LoadingFallback />}>
+                <Login title="Mind Coach" subtitle="Log in to start your wellness journey" redirectPath="/mind-coach" />
+              </Suspense>
+            } />
             <Route path="/mind-coach/:profileId" element={
               <Suspense fallback={<LoadingFallback />}>
                 <MindCoachApp />

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Navigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
+import { useAuth } from '../../context/AuthContext';
 import { useMindCoachStore, TabId } from '../../store/mindCoachStore';
 import { BottomNav } from './BottomNav';
 import { PhoneFrame } from './shared/PhoneFrame';
@@ -31,6 +32,7 @@ const MindCoachApp: React.FC = () => {
   const { profileId } = useParams<{ profileId: string }>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
 
   const activeTab = useMindCoachStore((s) => s.activeTab);
   const setProfile = useMindCoachStore((s) => s.setProfile);
@@ -113,6 +115,10 @@ const MindCoachApp: React.FC = () => {
       reset();
     };
   }, [profileId, setProfile, setJourney, setSessions, setMemories, setMoodEntries, setExercises, reset]);
+
+  if (!user) {
+    return <Navigate to="/mind-coach/login" replace />;
+  }
 
   if (loading) {
     return (

@@ -217,68 +217,69 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
             )}
           </motion.div>
 
-          {sessionSummary.key_themes?.length > 0 && (
+          {sessionSummary.quote_of_the_day && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-white rounded-2xl p-4 border border-[#E8E4DE]">
-              <p className="text-xs font-medium text-[#2C2A26]/50 uppercase mb-2">Themes Explored</p>
-              <div className="flex flex-wrap gap-2">
-                {sessionSummary.key_themes.map((theme: string, i: number) => (
-                  <span key={i} className="px-3 py-1 bg-[#6B8F71]/10 text-[#6B8F71] text-xs font-medium rounded-full">
-                    {theme}
-                  </span>
-                ))}
-              </div>
+              <p className="text-sm text-[#2C2A26]/80 italic text-center">"{sessionSummary.quote_of_the_day}"</p>
             </motion.div>
           )}
 
-          {sessionSummary.growth_moments?.length > 0 && (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-white rounded-2xl p-4 border border-[#E8E4DE]">
-              <p className="text-xs font-medium text-[#2C2A26]/50 uppercase mb-2">Growth Moments</p>
-              <ul className="space-y-2">
-                {sessionSummary.growth_moments.map((m: string, i: number) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-[#2C2A26]/80">
-                    <span className="text-[#6B8F71] mt-0.5">&#10003;</span>
-                    {m}
-                  </li>
-                ))}
-              </ul>
-            </motion.div>
-          )}
-
-          {sessionSummary.gentle_challenge && (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-[#F5F0EB] rounded-2xl p-4">
-              <p className="text-xs font-medium text-[#2C2A26]/50 uppercase mb-2">Reflection for Next Time</p>
-              <p className="text-sm text-[#2C2A26]/80 italic">{sessionSummary.gentle_challenge}</p>
-            </motion.div>
-          )}
-
-          {sessionSummary.phase_specific && (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="bg-white rounded-2xl p-4 border border-[#E8E4DE]">
-              <p className="text-xs font-medium text-[#2C2A26]/50 uppercase mb-2">Phase Progress</p>
-              <p className="text-xs font-medium text-[#6B8F71] mb-1">{sessionSummary.phase_specific.phase_name}</p>
-              <p className="text-sm text-[#2C2A26]/70">{sessionSummary.phase_specific.progress_summary}</p>
-            </motion.div>
-          )}
-
-          {sessionSummary.therapist_note && (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="bg-white rounded-2xl p-4 border border-[#E8E4DE]">
+          {sessionSummary.takeaway_task && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-[#6B8F71]/10 rounded-2xl p-4 border border-[#6B8F71]/20">
               <div className="flex items-center gap-2 mb-2">
-                <div
-                  className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-semibold"
-                  style={{ backgroundColor: meta.color }}
-                >
-                  {meta.name[0]}
-                </div>
-                <p className="text-xs font-medium text-[#2C2A26]/50">Note from {meta.name}</p>
+                <span className="text-xl">🎯</span>
+                <p className="text-xs font-semibold text-[#6B8F71] uppercase tracking-wide">Your Actionable Takeaway</p>
               </div>
-              <p className="text-sm text-[#2C2A26]/80 italic">{sessionSummary.therapist_note}</p>
+              <p className="text-sm font-medium text-[#2C2A26]">{sessionSummary.takeaway_task}</p>
             </motion.div>
           )}
 
-          {sessionSummary.mood_shift && (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} className="flex items-center justify-center gap-3 py-3">
-              <span className="text-sm text-[#2C2A26]/60">{sessionSummary.mood_shift.start}</span>
-              <span className="text-[#6B8F71]">&rarr;</span>
-              <span className="text-sm font-medium text-[#6B8F71]">{sessionSummary.mood_shift.end}</span>
+          {sessionSummary.energy_shift && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-white rounded-2xl p-4 border border-[#E8E4DE] flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-medium text-[#2C2A26]/50 uppercase mb-1">Start of Session</p>
+                <p className="text-sm font-medium text-[#2C2A26] line-through decoration-[#B4A7D6]">{sessionSummary.energy_shift.start}</p>
+              </div>
+              <div className="text-[#B4A7D6]">&rarr;</div>
+              <div className="text-right">
+                <p className="text-[10px] font-medium text-[#2C2A26]/50 uppercase mb-1">End of Session</p>
+                <p className="text-sm font-medium text-[#6B8F71]">{sessionSummary.energy_shift.end}</p>
+              </div>
+            </motion.div>
+          )}
+
+          {sessionSummary.psychological_flexibility && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="bg-white rounded-2xl p-4 border border-[#E8E4DE]">
+              <p className="text-xs font-medium text-[#2C2A26]/50 uppercase mb-3">Psychological Flexibility Profile</p>
+              <div className="space-y-3">
+                {[
+                  { label: 'Self-Awareness', value: sessionSummary.psychological_flexibility.self_awareness },
+                  { label: 'Somatic Observation', value: sessionSummary.psychological_flexibility.observation },
+                  { label: 'Physical Integration', value: sessionSummary.psychological_flexibility.physical_awareness },
+                  { label: 'Values Alignment', value: sessionSummary.psychological_flexibility.core_values },
+                ].map((stat, i) => (
+                  <div key={i}>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-[#2C2A26]/80">{stat.label}</span>
+                      <span className="font-medium text-[#2C2A26]">{stat.value}%</span>
+                    </div>
+                    <div className="h-1.5 w-full bg-[#E8E4DE] rounded-full overflow-hidden">
+                      <motion.div
+                        className="h-full bg-[#D4A574]"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${stat.value}%` }}
+                        transition={{ delay: 0.6 + i * 0.1, duration: 0.8, ease: "easeOut" }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {sessionSummary.self_compassion_score !== undefined && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="bg-[#FAF9F7] rounded-2xl p-4 text-center">
+              <p className="text-3xl font-bold text-[#6B8F71] mb-1">{sessionSummary.self_compassion_score}</p>
+              <p className="text-xs font-medium text-[#2C2A26]/50 uppercase">Self-Compassion Score</p>
             </motion.div>
           )}
         </div>

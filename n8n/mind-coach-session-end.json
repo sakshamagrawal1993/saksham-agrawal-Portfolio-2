@@ -1,0 +1,146 @@
+{
+    "name": "Mind Coach - Session End Summarizer",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "mind-coach-session-end",
+                "options": {}
+            },
+            "id": "1",
+            "name": "Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1.1,
+            "position": [
+                0,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const data = $node[\"Webhook\"].json.body;\nconst profile = data.profile || {};\nconst session = data.session || {};\nconst currentPhase = data.currentPhase || {};\nconst transcript = data.transcript || \"\";\n\nconst systemPrompt = `You are a clinical supervisor generating structured post-session documentation for an AI therapy session.\\n\\nSession context:\\n- Client name: ${profile.name || 'User'}\\n- Pathway: ${session.pathway || 'exploratory_validation'}\\n- Dynamic theme: ${session.dynamic_theme || 'Not yet identified'}\\n- Session number: ${session.session_number || 1}\\n- Current phase: ${currentPhase.name || 'Phase 1'}\\n- Phase goal: ${currentPhase.goal || 'Establish therapeutic rapport'}\\n\\nGenerate TWO outputs:\\n\\n1. CASE_NOTES: Structured clinical documentation\\n2. SESSION_SUMMARY: Client-facing session summary (rich metrics)\\n\\nReturn ONLY valid JSON.`;\n\nconst userPrompt = `Analyze this therapy transcript and generate documentation.\\n\\nTRANSCRIPT:\\n${transcript}\\n\\nReturn JSON with this EXACT schema:\\n{\\n  \"case_notes\": {\\n    \"presenting_concern\": \"string\",\\n    \"dynamic_theme\": \"string\",\\n    \"phase_progress\": \"string\",\\n    \"readiness_for_next_phase\": \"not_ready | approaching | ready\"\\n  },\\n  \"session_summary\": {\\n    \"title\": \"string - warm, non-clinical title\",\\n    \"opening_reflection\": \"string - empathetic recap\",\\n    \"takeaway_task\": \"string - a specific, small actionable task aligned with the current phase for them to do before next session\",\\n    \"quote_of_the_day\": \"string - an inspiring, short quote relevant to the session\",\\n    \"energy_shift\": { \\n      \"start\": \"string (e.g., Anxious, Tired, Overwhelmed)\", \\n      \"end\": \"string (e.g., Calm, Grounded, Heard)\" \\n    },\\n    \"psychological_flexibility\": {\\n      \"self_awareness\": \"integer 0-100\",\\n      \"observation\": \"integer 0-100\",\\n      \"physical_awareness\": \"integer 0-100\",\\n      \"core_values\": \"integer 0-100\",\\n      \"relationships\": \"integer 0-100\"\\n    },\\n    \"self_compassion_score\": \"integer 0-100 (high if they gave themselves grace, low if self-critical)\"\\n  },\\n  \"extracted_memories\": [\\n    {\\n      \"memory_text\": \"string - specific fact or preference to remember long-term\",\\n      \"memory_type\": \"fact | trigger | coping_strategy | relationship | goal\"\\n    }\\n  ]\\n}`;\n\nreturn [{ json: { systemPrompt, userPrompt } }];"
+            },
+            "id": "2",
+            "name": "Prompt Builder",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                220,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "resource": "chat",
+                "operation": "create",
+                "model": "gpt-4o-mini",
+                "messages": {
+                    "messageValues": [
+                        {
+                            "role": "system",
+                            "content": "={{ $json.systemPrompt }}"
+                        },
+                        {
+                            "role": "user",
+                            "content": "={{ $json.userPrompt }}"
+                        }
+                    ]
+                },
+                "options": {
+                    "responseFormat": {
+                        "type": "json_object"
+                    },
+                    "temperature": 0.2
+                }
+            },
+            "id": "3",
+            "name": "Summarizer LLM",
+            "type": "n8n-nodes-base.openAi",
+            "typeVersion": 1,
+            "position": [
+                440,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "let parsed = {};\ntry {\n  parsed = JSON.parse($node[\"Summarizer LLM\"].json.message.content);\n} catch(e) {\n  parsed = { error: \"Failed to parse JSON\" };\n}\nreturn [{ json: parsed }];"
+            },
+            "id": "4",
+            "name": "Format Output",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                660,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={{ $json }}",
+                "options": {}
+            },
+            "id": "5",
+            "name": "Respond to Webhook",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1,
+            "position": [
+                880,
+                300
+            ]
+        }
+    ],
+    "pinData": {},
+    "connections": {
+        "Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Prompt Builder",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Prompt Builder": {
+            "main": [
+                [
+                    {
+                        "node": "Summarizer LLM",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Summarizer LLM": {
+            "main": [
+                [
+                    {
+                        "node": "Format Output",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Format Output": {
+            "main": [
+                [
+                    {
+                        "node": "Respond to Webhook",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "active": false,
+    "settings": {
+        "executionOrder": "v1"
+    },
+    "versionId": "c1c2c3c4-d5d6-e7e8-f9f0-g1g2g3g4g5g6"
+}
