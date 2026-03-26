@@ -49,7 +49,7 @@ export type TaskType =
   | 'self_compassion'
   | 'general';
 
-export type TabId = 'home' | 'sessions' | 'assessments' | 'journal' | 'diary';
+export type TabId = 'home' | 'sessions' | 'assessments' | 'journal' | 'diary' | 'exercises';
 
 import { DynamicContentType } from '../lib/dynamicContentLibrary';
 

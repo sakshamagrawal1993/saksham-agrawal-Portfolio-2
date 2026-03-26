@@ -1,142 +1,167 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { Exercise } from '../../../store/mindCoachStore';
-import { BreathingTimer } from './BreathingTimer';
-
-const FEEDBACK_EMOJIS = ['😢', '😕', '😐', '🙂', '😊'] as const;
+import { X, Play, Pause, RotateCcw, CheckCircle2, ArrowRight } from 'lucide-react';
+import { type Exercise } from '../../../store/mindCoachStore';
+import { BreathingGuide } from './BreathingGuide';
+import { GroundingSteps } from './GroundingSteps';
 
 interface ExercisePlayerProps {
   exercise: Exercise;
-  onBack: () => void;
+  onClose: () => void;
 }
 
-export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({ exercise, onBack }) => {
-  const [phase, setPhase] = useState<'playing' | 'complete'>('playing');
-  const [stepIndex, setStepIndex] = useState(0);
-  const [secondsLeft, setSecondsLeft] = useState(exercise.steps[0]?.duration ?? 0);
-  const [feedback, setFeedback] = useState<string | null>(null);
+export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({ exercise, onClose }) => {
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [isActive, setIsActive] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(exercise.steps[0]?.duration || 0);
+  const [isCompleted, setIsCompleted] = useState(false);
 
-  const isBreathing = exercise.type === 'breathing';
-  const steps = exercise.steps;
-  const currentStep = steps[stepIndex];
+  const currentStep = exercise.steps[currentStepIndex];
 
-  const handleComplete = useCallback(() => setPhase('complete'), []);
-
-  const advance = useCallback(() => {
-    if (stepIndex < steps.length - 1) {
-      const next = stepIndex + 1;
-      setStepIndex(next);
-      setSecondsLeft(steps[next].duration);
+  const handleNext = useCallback(() => {
+    if (currentStepIndex < exercise.steps.length - 1) {
+      const nextIndex = currentStepIndex + 1;
+      setCurrentStepIndex(nextIndex);
+      setTimeLeft(exercise.steps[nextIndex].duration);
     } else {
-      handleComplete();
+      setIsActive(false);
+      setIsCompleted(true);
     }
-  }, [stepIndex, steps, handleComplete]);
+  }, [currentStepIndex, exercise.steps]);
 
   useEffect(() => {
-    if (isBreathing || phase !== 'playing') return;
-    if (secondsLeft <= 0) {
-      advance();
-      return;
+    let timer: NodeJS.Timeout;
+    if (isActive && timeLeft > 0) {
+      timer = setInterval(() => {
+        setTimeLeft((prev) => prev - 1);
+      }, 1000);
+    } else if (isActive && timeLeft === 0) {
+      handleNext();
     }
-    const id = setInterval(() => setSecondsLeft((s) => s - 1), 1000);
-    return () => clearInterval(id);
-  }, [secondsLeft, advance, isBreathing, phase]);
+    return () => clearInterval(timer);
+  }, [isActive, timeLeft, handleNext]);
 
-  const totalDuration = steps.reduce((acc, s) => acc + s.duration, 0);
-  const elapsedBefore = steps.slice(0, stepIndex).reduce((acc, s) => acc + s.duration, 0);
-  const elapsed = elapsedBefore + (currentStep ? currentStep.duration - secondsLeft : 0);
-  const progress = totalDuration > 0 ? elapsed / totalDuration : 0;
-
-  if (phase === 'complete') {
-    return (
-      <div className="flex flex-col items-center justify-center h-full px-6 text-center">
-        <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="w-16 h-16 rounded-full bg-[#6B8F71]/15 flex items-center justify-center mb-4"
-        >
-          <span className="text-3xl">✓</span>
-        </motion.div>
-        <h3 className="text-lg font-semibold text-[#2C2A26] mb-1">Session Complete</h3>
-        <p className="text-sm text-[#2C2A26]/50 mb-6">How do you feel?</p>
-        <div className="flex gap-4 mb-8">
-          {FEEDBACK_EMOJIS.map((e) => (
-            <button
-              key={e}
-              onClick={() => setFeedback(e)}
-              className={`text-2xl transition-transform ${
-                feedback === e ? 'scale-125' : 'opacity-50 hover:opacity-80'
-              }`}
-            >
-              {e}
-            </button>
-          ))}
-        </div>
-        <button
-          onClick={onBack}
-          className="px-5 py-2.5 text-sm font-medium rounded-full bg-[#6B8F71] text-white"
-        >
-          Back to Library
-        </button>
-      </div>
-    );
-  }
-
-  if (isBreathing) {
-    return (
-      <div className="flex flex-col h-full">
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-[#E8E4DE]">
-          <button onClick={onBack} className="text-[#2C2A26]/60 hover:text-[#2C2A26]">
-            <ArrowLeft size={20} />
-          </button>
-          <h3 className="text-sm font-semibold text-[#2C2A26] truncate">{exercise.title}</h3>
-        </div>
-        <BreathingTimer steps={steps} onComplete={handleComplete} />
-      </div>
-    );
-  }
+  const handleReset = () => {
+    setCurrentStepIndex(0);
+    setTimeLeft(exercise.steps[0]?.duration || 0);
+    setIsActive(false);
+    setIsCompleted(false);
+  };
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-[#E8E4DE]">
-        <button onClick={onBack} className="text-[#2C2A26]/60 hover:text-[#2C2A26]">
-          <ArrowLeft size={20} />
+    <div className="flex flex-col h-full bg-white relative overflow-hidden">
+      {/* Header */}
+      <div className="px-6 pt-6 pb-4 flex items-center justify-between border-b border-[#F5F0EB]">
+        <div>
+          <span className="text-[10px] font-bold text-[#6B8F71] uppercase tracking-[0.1em] mb-1 block">
+            {exercise.type} · {exercise.category}
+          </span>
+          <h2 className="text-xl font-bold text-[#2C2A26]">{exercise.title}</h2>
+        </div>
+        <button
+          onClick={onClose}
+          className="p-2 rounded-full hover:bg-[#F5F0EB] text-[#2C2A26]/40 transition-colors"
+        >
+          <X size={20} />
         </button>
-        <h3 className="text-sm font-semibold text-[#2C2A26] truncate flex-1">
-          {exercise.title}
-        </h3>
-        <span className="text-xs text-[#2C2A26]/40">{secondsLeft}s</span>
       </div>
 
-      <div className="w-full h-1 bg-[#E8E4DE]">
-        <motion.div
-          className="h-full bg-[#6B8F71]"
-          animate={{ width: `${progress * 100}%` }}
-          transition={{ duration: 0.3 }}
-        />
-      </div>
-
-      <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
-        <p className="text-xs text-[#2C2A26]/40 mb-2">
-          Step {stepIndex + 1} of {steps.length}
-        </p>
+      <div className="flex-1 overflow-y-auto px-6 py-8 flex flex-col items-center justify-center">
         <AnimatePresence mode="wait">
-          <motion.p
-            key={stepIndex}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="text-base font-medium text-[#2C2A26] leading-relaxed"
-          >
-            {currentStep?.instruction}
-          </motion.p>
+          {!isCompleted ? (
+            <motion.div
+              key="active"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="w-full flex flex-col items-center space-y-10"
+            >
+              {/* Specialized Content */}
+              <div className="w-full max-w-[280px] aspect-square flex items-center justify-center relative">
+                {exercise.type === 'breathing' ? (
+                  <BreathingGuide 
+                    isActive={isActive} 
+                    instruction={currentStep?.instruction} 
+                    duration={currentStep?.duration}
+                    timeLeft={timeLeft}
+                  />
+                ) : (
+                  <GroundingSteps 
+                    step={currentStep} 
+                    index={currentStepIndex} 
+                    total={exercise.steps.length} 
+                  />
+                )}
+              </div>
+
+              {/* Progress Detail */}
+              <div className="text-center space-y-2">
+                <p className="text-lg font-medium text-[#2C2A26] px-4">
+                  {currentStep?.instruction}
+                </p>
+                <div className="flex items-center justify-center gap-2 text-[#2C2A26]/40 font-mono text-sm">
+                  <span>{Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</span>
+                  <span>·</span>
+                  <span>Step {currentStepIndex + 1} of {exercise.steps.length}</span>
+                </div>
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="completed"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="text-center space-y-6"
+            >
+              <div className="w-20 h-20 bg-[#6B8F71]/10 rounded-full flex items-center justify-center mx-auto text-[#6B8F71]">
+                <CheckCircle2 size={40} />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-2xl font-bold text-[#2C2A26]">Well done!</h3>
+                <p className="text-[#2C2A26]/60 leading-relaxed max-w-[240px] mx-auto">
+                  Take a moment to notice how you feel now compared to when you started.
+                </p>
+              </div>
+              <button
+                onClick={onClose}
+                className="px-8 py-3 bg-[#6B8F71] text-white font-semibold rounded-2xl hover:bg-[#5A7D60] transition-colors"
+              >
+                Return to Chat
+              </button>
+            </motion.div>
+          )}
         </AnimatePresence>
       </div>
 
-      {exercise.description && (
-        <div className="px-6 pb-6">
-          <p className="text-xs text-[#2C2A26]/40 text-center">{exercise.description}</p>
+      {/* Controls */}
+      {!isCompleted && (
+        <div className="px-6 py-8 border-t border-[#F5F0EB] bg-[#FAFAF8]/50 flex items-center justify-between">
+          <button
+            onClick={handleReset}
+            className="flex flex-col items-center gap-1 text-[#2C2A26]/30 hover:text-[#2C2A26]/60 transition-colors"
+          >
+            <RotateCcw size={20} />
+            <span className="text-[10px] font-bold uppercase tracking-wider">Reset</span>
+          </button>
+
+          <button
+            onClick={() => setIsActive(!isActive)}
+            className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg transition-all active:scale-95 ${
+              isActive 
+                ? 'bg-[#2C2A26] text-white shadow-[#2C2A26]/20' 
+                : 'bg-[#6B8F71] text-white shadow-[#6B8F71]/20'
+            }`}
+          >
+            {isActive ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" className="ml-1" />}
+          </button>
+
+          <button
+            onClick={handleNext}
+            className="flex flex-col items-center gap-1 text-[#2C2A26]/30 hover:text-[#2C2A26]/60 transition-colors"
+          >
+            <ArrowRight size={20} />
+            <span className="text-[10px] font-bold uppercase tracking-wider">Skip</span>
+          </button>
         </div>
       )}
     </div>

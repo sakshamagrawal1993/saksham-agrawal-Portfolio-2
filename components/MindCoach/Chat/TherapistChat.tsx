@@ -689,7 +689,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
               <div className="flex-1 overflow-hidden">
                 <ExercisePlayer 
                   exercise={activeExercise} 
-                  onBack={() => setActiveExercise(null)} 
+                  onClose={() => setActiveExercise(null)} 
                 />
               </div>
             </motion.div>

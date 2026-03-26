@@ -10,6 +10,7 @@ import { SessionsScreen } from './Screens/SessionsScreen';
 import { AssessmentsScreen } from './Screens/AssessmentsScreen';
 import { JournalScreen } from './Screens/JournalScreen';
 import { DiaryScreen } from './Screens/DiaryScreen';
+import { ExercisesScreen } from './Screens/ExercisesScreen';
 import { OnboardingFlow } from './Onboarding/OnboardingFlow';
 
 function TabContent({ tab }: { tab: TabId }) {
@@ -24,6 +25,8 @@ function TabContent({ tab }: { tab: TabId }) {
       return <JournalScreen />;
     case 'diary':
       return <DiaryScreen />;
+    case 'exercises':
+      return <ExercisesScreen />;
     default:
       return null;
   }
