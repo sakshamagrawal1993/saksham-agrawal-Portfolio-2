@@ -141,7 +141,7 @@ export const HomeScreen: React.FC = () => {
   };
 
   return (
-    <div className="p-5 pb-4 space-y-5">
+    <div className="p-5 pb-20 space-y-6">
       {/* Greeting */}
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
         <h2 className="text-2xl font-semibold text-[#2C2A26]">
@@ -331,23 +331,18 @@ export const HomeScreen: React.FC = () => {
         </motion.div>
       )}
 
-      {/* Settings / Privacy */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.4 }}
-        className="pt-8 pb-12 flex flex-col items-center gap-4"
-      >
+      {/* Settings / Privacy - Made more prominent and removed delay */}
+      <div className="pt-12 pb-8 flex flex-col items-center gap-4 border-t border-[#E8E4DE]/50 mt-4">
         <button
           onClick={() => setShowConfirm(true)}
-          className="text-xs font-medium text-red-500/60 hover:text-red-500 transition-colors uppercase tracking-widest"
+          className="px-6 py-2 text-xs font-semibold text-red-500 hover:bg-red-50 rounded-full transition-all uppercase tracking-widest border border-red-200"
         >
           Forget Me
         </button>
-        <p className="text-[10px] text-[#2C2A26]/20 text-center max-w-[200px]">
+        <p className="text-[10px] text-[#2C2A26]/30 text-center max-w-[240px] px-4">
           Deleting your profile will permanently remove all chat history, journal entries, and progress.
         </p>
-      </motion.div>
+      </div>
 
       {/* Confirmation Modal */}
       <AnimatePresence>
