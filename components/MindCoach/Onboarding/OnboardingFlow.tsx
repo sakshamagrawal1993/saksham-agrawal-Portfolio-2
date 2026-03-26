@@ -106,7 +106,7 @@ function PrimaryButton({ children, onClick, disabled = false }: { children: Reac
   );
 }
 
-function StepShell({ step, onBack, children }: { step: number; onBack?: () => void; children: React.ReactNode; }) {
+function StepShell({ step, onBack, children, footer }: { step: number; onBack?: () => void; children: React.ReactNode; footer?: React.ReactNode; }) {
   return (
     <div className="flex flex-col h-full bg-[#FAFAF7]">
       <div className="px-6 pt-5 pb-3 space-y-3">
@@ -116,7 +116,8 @@ function StepShell({ step, onBack, children }: { step: number; onBack?: () => vo
           <span className="text-xs text-[#2C2A26]/40 tabular-nums">{step} of {TOTAL_STEPS}</span>
         </div>
       </div>
-      <div className="flex-1 flex flex-col px-6 pb-8 overflow-y-auto">{children}</div>
+      <div className="flex-1 flex flex-col px-6 overflow-y-auto min-h-0">{children}</div>
+      {footer && <div className="px-6 pt-2 pb-8">{footer}</div>}
     </div>
   );
 }
@@ -377,10 +378,22 @@ function JourneyPreviewStep({ concerns, name, age, gender, therapist, onBack, on
   };
 
   return (
-    <StepShell step={8} onBack={onBack}>
-      <div className="flex-1 flex flex-col items-center pt-4 space-y-8">
+    <StepShell 
+      step={8} 
+      onBack={onBack}
+      footer={
+        <button
+          onClick={handleStart}
+          disabled={saving}
+          className="w-full py-4 rounded-2xl bg-[#6B8F71] text-white font-semibold text-base hover:bg-[#5A7D60] transition-all disabled:opacity-50"
+        >
+          {saving ? 'Setting up...' : 'Start Your Journey'}
+        </button>
+      }
+    >
+      <div className="flex flex-col items-center pt-4 space-y-8">
         {/* Path Formulated Badge */}
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#E8F3E9] text-[#5B8561] text-[10px] font-bold tracking-widest uppercase">
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#E8F3E9] text-[#5B8561] text-[10px] font-bold tracking-widest uppercase shrink-0">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="20 6 9 17 4 12" />
           </svg>
@@ -388,7 +401,7 @@ function JourneyPreviewStep({ concerns, name, age, gender, therapist, onBack, on
         </div>
 
         {/* Title & Description */}
-        <div className="space-y-4 text-center max-w-[320px]">
+        <div className="space-y-4 text-center max-w-[320px] shrink-0">
           <h2 className="text-[32px] leading-tight font-serif text-[#2C2A26]">Initial Assessment Phase</h2>
           <p className="text-[#2C2A26]/60 text-[15px] leading-relaxed">
             Before we formulate a precise plan, let's take a few sessions just to unpack what's going on. I am here to listen and understand your world.
@@ -396,7 +409,7 @@ function JourneyPreviewStep({ concerns, name, age, gender, therapist, onBack, on
         </div>
 
         {/* Pathway Tag */}
-        <div className="px-4 py-1.5 rounded-full bg-[#EAE8E4] text-[#2C2A26]/40 text-[10px] font-bold tracking-widest uppercase">
+        <div className="px-4 py-1.5 rounded-full bg-[#EAE8E4] text-[#2C2A26]/40 text-[10px] font-bold tracking-widest uppercase shrink-0">
           Engagement Rapport and Assessment
         </div>
 
@@ -405,12 +418,12 @@ function JourneyPreviewStep({ concerns, name, age, gender, therapist, onBack, on
           {/* Vertical Line */}
           <div className="absolute left-[22px] top-12 bottom-0 w-[1px] bg-[#E8E4DE]" />
           
-          <div className="flex gap-4 items-start relative">
+          <div className="flex gap-4 items-start relative pb-8">
             <div className="z-10 w-11 h-11 rounded-full border border-[#E8E4DE] bg-white flex items-center justify-center shrink-0">
               <span className="text-sm font-medium text-[#2C2A26]">1</span>
             </div>
             <div className="flex-1 bg-white border border-[#F0EDEA] rounded-[24px] p-6 shadow-[0_4px_24px_rgba(0,0,0,0.03)] space-y-3">
-              <h3 className="font-bold text-[#2C2A26] text-lg">Engagement & Rapport</h3>
+              <h3 className="font-bold text-[#2C2A26] text-lg font-serif">Engagement & Rapport</h3>
               <p className="text-[#2C2A26]/60 text-sm leading-relaxed">
                 Establish trust, safe space, and baseline emotional state.
               </p>
@@ -421,18 +434,6 @@ function JourneyPreviewStep({ concerns, name, age, gender, therapist, onBack, on
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Action Button - Moved to bottom via flex-grow spacer */}
-        <div className="flex-1" />
-        <div className="w-full pt-6">
-          <button
-            onClick={handleStart}
-            disabled={saving}
-            className="w-full py-4 rounded-2xl bg-[#6B8F71] text-white font-semibold text-base hover:bg-[#5A7D60] transition-all disabled:opacity-50"
-          >
-            {saving ? 'Setting up...' : 'Start Your Journey'}
-          </button>
         </div>
       </div>
     </StepShell>
