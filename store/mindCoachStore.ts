@@ -255,6 +255,10 @@ interface MindCoachState {
   activeTab: TabId;
   setActiveTab: (tab: TabId) => void;
 
+  // Active Exercise Overlay
+  activeExercise: Exercise | null;
+  setActiveExercise: (e: Exercise | null) => void;
+
   // Computed
   completedSessionCount: () => number;
   currentPhaseSessionCount: () => number;
@@ -280,6 +284,7 @@ const initialState = {
   exercises: [],
   activeTasks: [],
   activeTab: 'home' as TabId,
+  activeExercise: null,
 };
 
 export const useMindCoachStore = create<MindCoachState>((set, get) => ({
@@ -313,6 +318,8 @@ export const useMindCoachStore = create<MindCoachState>((set, get) => ({
   setIsSessionClose: (isSessionClose) => set({ isSessionClose }),
 
   setActiveTab: (activeTab) => set({ activeTab }),
+
+  setActiveExercise: (activeExercise) => set({ activeExercise }),
 
   completedSessionCount: () =>
     get().sessions.filter((s) => s.session_state === 'completed').length,

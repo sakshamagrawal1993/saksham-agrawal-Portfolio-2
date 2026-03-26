@@ -101,10 +101,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
         pathway: 'engagement_rapport_and_assessment',
         title: 'First Steps Plan',
         phases: [
-          { name: 'Build Trust', goal: 'Take your time; this is a space to be heard.', sessions: 3 },
-          { name: 'Clarify What You Need', goal: "Name what you'd like to be different.", sessions: 3 },
-          { name: 'Choose Your Focus', goal: 'Pick one or two areas to work on first.', sessions: 3 },
-          { name: 'Next Steps', goal: 'Decide on one small next step and when to do it.', sessions: 3 },
+          { name: 'Discovery & Context', goal: 'Share your story so we can understand your concerns and identify the best clinical path forward for you.', sessions: 3 },
         ],
         current_phase_index: 0,
         sessions_completed: 0,

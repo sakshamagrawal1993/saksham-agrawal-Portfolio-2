@@ -8,6 +8,7 @@ import {
   type TherapistPersona,
 } from '../../../store/mindCoachStore';
 import { ChatMessage } from './ChatMessage';
+import { ExercisePlayer } from '../Exercises/ExercisePlayer';
 
 const THERAPIST_META: Record<
   TherapistPersona,
@@ -66,6 +67,8 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
   const isSessionClose = useMindCoachStore((s) => s.isSessionClose);
   const setIsSessionClose = useMindCoachStore((s) => s.setIsSessionClose);
   const isCrisisDetected = useMindCoachStore((s) => s.isCrisisDetected);
+  const activeExercise = useMindCoachStore((s) => s.activeExercise);
+  const setActiveExercise = useMindCoachStore((s) => s.setActiveExercise);
 
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -658,6 +661,41 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
           </button>
         </div>
       </div>
+
+      {/* Exercise Overlay Drawer */}
+      <AnimatePresence>
+        {activeExercise && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end justify-center"
+          >
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="w-full max-w-lg bg-[#FAF9F7] rounded-t-3xl overflow-hidden shadow-2xl h-[85vh] flex flex-col"
+            >
+              {/* Close Handle / Indicator */}
+              <div className="w-full pt-3 pb-1 flex justify-center shrink-0">
+                <div 
+                  className="w-10 h-1 rounded-full bg-[#2C2A26]/10 cursor-pointer" 
+                  onClick={() => setActiveExercise(null)}
+                />
+              </div>
+
+              <div className="flex-1 overflow-hidden">
+                <ExercisePlayer 
+                  exercise={activeExercise} 
+                  onBack={() => setActiveExercise(null)} 
+                />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

@@ -4,6 +4,7 @@ import type { ChatMessage as ChatMessageType } from '../../../store/mindCoachSto
 import { DynamicVideoRenderer } from '../DynamicContent/DynamicVideoRenderer';
 import { DynamicGameRenderer } from '../DynamicContent/DynamicGameRenderer';
 import { DynamicAssessmentRenderer } from '../DynamicContent/DynamicAssessmentRenderer';
+import { DynamicExerciseTrigger } from '../DynamicContent/DynamicExerciseTrigger';
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -54,6 +55,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           )}
           {message.dynamic_content.type === 'assessment' && (
             <DynamicAssessmentRenderer payload={message.dynamic_content.payload} />
+          )}
+          {message.dynamic_content.type === 'exercise' && (
+            <DynamicExerciseTrigger payload={message.dynamic_content.payload} />
           )}
         </div>
       )}
