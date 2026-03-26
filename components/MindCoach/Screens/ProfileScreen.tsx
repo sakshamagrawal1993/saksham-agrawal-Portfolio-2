@@ -92,7 +92,7 @@ export const ProfileScreen: React.FC = () => {
     setResetting(true);
     try {
       // Deleting the root profile propagates ON DELETE CASCADE to all other mind_coach_* tables.
-      await supabase.from('mind_coach_profiles').delete().eq('id', profile.id);
+      await supabase.from('mind_coach_profiles').delete().eq('user_id', profile.user_id);
       resetLocalStore();
       navigate('/project/mind-coach', { replace: true });
     } catch (e) {
