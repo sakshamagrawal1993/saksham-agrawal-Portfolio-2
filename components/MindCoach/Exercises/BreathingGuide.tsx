@@ -1,63 +1,69 @@
-import React, { useMemo } from 'react';
-import { motion } from 'framer-motion';
+import React from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface BreathingGuideProps {
-  isActive: boolean;
   instruction: string;
   duration: number;
   timeLeft: number;
+  phase: 'inhale' | 'exhale' | 'hold';
 }
 
-export const BreathingGuide: React.FC<BreathingGuideProps> = ({ 
-  isActive, 
-  instruction, 
-  duration, 
-}) => {
-  // Determine if we are expanding, holding, or contracting
-  const phase = useMemo(() => {
-    const text = instruction.toLowerCase();
-    if (text.includes('in')) return 'expand';
-    if (text.includes('out')) return 'contract';
-    return 'hold';
-  }, [instruction]);
+export const BreathingGuide: React.FC<BreathingGuideProps> = ({ instruction, duration, timeLeft, phase }) => {
+  // Calculate scale based on phase
+  // Inhale: starts small, goes large
+  // Exhale: starts large, goes small
+  // Hold: stays at current size
+  
+  const getScale = () => {
+    if (phase === 'inhale') return [1, 1.5];
+    if (phase === 'exhale') return [1.5, 1];
+    return 1; // Hold or default
+  };
+
+  const currentScale = phase === 'inhale' ? 1 + (1 - timeLeft / duration) * 0.5 :
+                       phase === 'exhale' ? 1 + (timeLeft / duration) * 0.5 : 
+                       instruction.toLowerCase().includes('empty') ? 1 : 1.5;
 
   return (
-    <div className="relative w-full h-full flex items-center justify-center">
-      {/* Background Pulse */}
-      <motion.div
-        className="absolute w-full h-full rounded-full bg-[#6B8F71]/10"
-        animate={isActive ? {
-          scale: phase === 'expand' ? [1, 1.4] : phase === 'contract' ? [1.4, 1] : 1.4,
-          opacity: [0.1, 0.2, 0.1],
-        } : { scale: 1, opacity: 0.1 }}
-        transition={{ duration: duration, ease: "easeInOut" }}
-      />
-
-      {/* Main Circle */}
-      <motion.div
-        className="relative w-32 h-32 rounded-full bg-white border-2 border-[#6B8F71] shadow-xl flex items-center justify-center z-10"
-        animate={isActive ? {
-          scale: phase === 'expand' ? [1, 1.4] : phase === 'contract' ? [1.4, 1] : 1.4,
-        } : { scale: 1 }}
-        transition={{ duration: duration, ease: "easeInOut" }}
-      >
-        <span className="text-sm font-bold text-[#6B8F71] uppercase tracking-wider">
-          {phase === 'expand' ? 'Breathe In' : phase === 'contract' ? 'Breathe Out' : 'Hold'}
-        </span>
-      </motion.div>
-
-      {/* Particle Effect (Subtle) */}
-      {isActive && phase === 'expand' && (
+    <div className="flex flex-col items-center justify-center space-y-12 py-8">
+      <div className="relative flex items-center justify-center">
+        {/* Outer pulse */}
         <motion.div
-          className="absolute inset-0 z-0"
-          initial={{ rotate: 0 }}
-          animate={{ rotate: 360 }}
-          transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+          animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.1, 0.3] }}
+          transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute w-48 h-48 rounded-full bg-[#6B8F71]/10"
+        />
+        
+        {/* Main breathing circle */}
+        <motion.div
+          animate={{ scale: currentScale }}
+          transition={{ duration: 1, ease: 'linear' }}
+          className="w-48 h-48 rounded-full bg-gradient-to-br from-[#6B8F71] to-[#5A7D60] flex flex-col items-center justify-center text-white shadow-xl z-10"
         >
-          <div className="absolute top-0 left-1/2 w-1.5 h-1.5 rounded-full bg-[#6B8F71]/30 -translate-x-1/2" />
-          <div className="absolute bottom-0 left-1/2 w-1.5 h-1.5 rounded-full bg-[#6B8F71]/30 -translate-x-1/2" />
+          <span className="text-5xl font-serif tabular-nums">{timeLeft}</span>
+          <span className="text-xs uppercase tracking-widest font-medium opacity-70 mt-1">seconds</span>
         </motion.div>
-      )}
+      </div>
+
+      <div className="text-center space-y-3">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={instruction}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="h-12 flex items-center justify-center"
+          >
+            <h4 className="text-2xl font-serif text-[#2C2A26] px-4">{instruction}</h4>
+          </motion.div>
+        </AnimatePresence>
+        
+        <div className="flex gap-2 justify-center">
+          <div className={`w-2 h-2 rounded-full transition-all duration-500 ${phase === 'inhale' ? 'bg-[#6B8F71] scale-125' : 'bg-[#E8E4DE]'}`} />
+          <div className={`w-2 h-2 rounded-full transition-all duration-500 ${phase === 'hold' ? 'bg-[#6B8F71] scale-125' : 'bg-[#E8E4DE]'}`} />
+          <div className={`w-2 h-2 rounded-full transition-all duration-500 ${phase === 'exhale' ? 'bg-[#6B8F71] scale-125' : 'bg-[#E8E4DE]'}`} />
+        </div>
+      </div>
     </div>
   );
 };

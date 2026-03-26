@@ -28,7 +28,7 @@ serve(async (req) => {
       );
     }
 
-    const n8nWebhookUrl = Deno.env.get('MC_N8N_CHAT_WEBHOOK_URL') || 'https://your-n8n-instance.com/webhook/mind-coach-chat';
+    const n8nWebhookUrl = Deno.env.get('MC_N8N_CHAT_WEBHOOK_URL') || 'https://n8n.saksham-experiments.com/webhook/mind-coach-chat';
     const n8nSecret = Deno.env.get('MC_N8N_WEBHOOK_SECRET') || 'placeholder-secret';
 
     const supabaseAdmin = createClient(
@@ -102,7 +102,7 @@ serve(async (req) => {
       supabaseAdmin
         .from('mind_coach_pathway_phases')
         .select('dynamic_prompt')
-        .eq('id', `${pathway || (journey_context?.title ? journey_context.title.toLowerCase().replace(/ /g, '_') : 'engagement_rapport_and_assessment')}_phase${journey_context?.current_phase || 1}`)
+        .eq('id', `${pathway || 'engagement_rapport_and_assessment'}_phase${journey_context?.current_phase || 1}`)
         .maybeSingle(),
       supabaseAdmin
         .from('mind_coach_profiles')

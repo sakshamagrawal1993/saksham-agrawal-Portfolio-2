@@ -1,9 +1,10 @@
 import React from 'react';
-import { Home, ClipboardList, BookOpen, BookHeart, Wind } from 'lucide-react';
+import { Home, ClipboardList, BookOpen, BookHeart, Wind, MessageCircle } from 'lucide-react';
 import { useMindCoachStore, TabId } from '../../store/mindCoachStore';
 
 const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: 'home', label: 'Home', icon: Home },
+  { id: 'sessions', label: 'Talk', icon: MessageCircle },
   { id: 'exercises', label: 'Exercises', icon: Wind },
   { id: 'assessments', label: 'Assessments', icon: ClipboardList },
   { id: 'journal', label: 'Journal', icon: BookOpen },

@@ -5,19 +5,10 @@ import { supabase } from '../../../lib/supabaseClient';
 import {
   useMindCoachStore,
   type ChatMessage as ChatMessageType,
-  type TherapistPersona,
 } from '../../../store/mindCoachStore';
 import { ChatMessage } from './ChatMessage';
 import { ExercisePlayer } from '../Exercises/ExercisePlayer';
-
-const THERAPIST_META: Record<
-  TherapistPersona,
-  { name: string; color: string; style: string }
-> = {
-  maya: { name: 'Maya', color: '#B4A7D6', style: 'Warm & Empathetic' },
-  alex: { name: 'Alex', color: '#D4A574', style: 'Direct & Solution-focused' },
-  sage: { name: 'Sage', color: '#6B8F71', style: 'Calm & Mindful' },
-};
+import { THERAPIST_CONFIG } from '../MindCoachConstants';
 
 const MOCK_REPLY =
   "I hear you. That sounds really important. Can you tell me more about how that makes you feel?";
@@ -69,12 +60,15 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
   const isCrisisDetected = useMindCoachStore((s) => s.isCrisisDetected);
   const activeExercise = useMindCoachStore((s) => s.activeExercise);
   const setActiveExercise = useMindCoachStore((s) => s.setActiveExercise);
+  const memories = useMindCoachStore((s) => s.memories);
+  const activeTasks = useMindCoachStore((s) => s.activeTasks);
+  const recentCaseNotes = useMindCoachStore((s) => s.recentCaseNotes);
 
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const persona = profile?.therapist_persona ?? 'maya';
-  const meta = THERAPIST_META[persona];
+  const meta = THERAPIST_CONFIG[persona];
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -88,33 +82,66 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
       const sendInitialGreeting = async () => {
         setIsLoading(true);
         try {
-          const { data, error } = await supabase.functions.invoke('mind-coach-chat', {
-            body: {
-              profile_id: profile?.id,
-              session_id: activeSession.id,
-              message_text: `System Alert: We are beginning the session. Introduce yourself and softly greet the user by name (${profile?.name || 'User'}) based on their context to kick off the session.`,
-              is_system_greeting: true,
-              profile: profile ? {
-                name: profile.name,
-                age: profile.age,
-                gender: profile.gender,
-                concerns: profile.concerns,
-                therapist_persona: profile.therapist_persona,
-              } : null,
-              journey_context: journey ? {
-                id: journey.id,
-                title: journey.title,
-                current_phase: journey.current_phase,
-                phases: journey.phases,
-              } : null,
-              session_state: activeSession.session_state,
-              dynamic_theme: activeSession.dynamic_theme,
-              pathway: activeSession.pathway,
-            },
+          // 1. Fetch Prompts (Coach + Phase)
+          const [personaRes, phaseRes] = await Promise.all([
+            supabase
+              .from('mind_coach_personas')
+              .select('base_prompt')
+              .eq('id', profile?.therapist_persona || 'maya')
+              .maybeSingle(),
+            supabase
+              .from('mind_coach_pathway_phases')
+              .select('dynamic_prompt')
+              .eq('id', `${activeSession.pathway || 'engagement_rapport_and_assessment'}_phase${journey?.current_phase || 1}`)
+              .maybeSingle(),
+          ]);
+
+          const coachPrompt = personaRes.data?.base_prompt || "You are an empathetic, non-judgmental mental health coach.";
+          const phasePrompt = phaseRes.data?.dynamic_prompt || "Focus on building therapeutic rapport.";
+
+          // 2. Call n8n directly
+          const n8nPayload = {
+            profile_id: profile?.id,
+            session_id: activeSession.id,
+            message_text: `System Alert: We are beginning the session. Introduce yourself and softly greet the user by name (${profile?.name || 'User'}) based on their context to kick off the session.`,
+            is_system_greeting: true,
+            profile: profile ? {
+              name: profile.name,
+              age: profile.age,
+              gender: profile.gender,
+              concerns: profile.concerns,
+              therapist_persona: profile.therapist_persona,
+            } : null,
+            journey_context: journey ? {
+              id: journey.id,
+              title: journey.title,
+              current_phase: journey.current_phase,
+              phases: journey.phases,
+            } : null,
+            session_state: activeSession.session_state,
+            dynamic_theme: activeSession.dynamic_theme,
+            pathway: activeSession.pathway,
+            messages: messages, // History
+            memories: memories.map(m => ({ text: m.memory_text, type: m.memory_type })),
+            recent_tasks_assigned: activeTasks,
+            recent_case_notes: recentCaseNotes.map(n => n.key_insight).filter(Boolean),
+            coach_prompt: coachPrompt,
+            phase_prompt: phasePrompt,
+            message_count: activeSession.message_count,
+          };
+
+          const response = await fetch('https://n8n.saksham-experiments.com/webhook/mind-coach-chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(n8nPayload),
           });
 
-          if (error || !data?.reply) throw new Error('Edge function failed');
+          if (!response.ok) throw new Error(`n8n failed with ${response.status}`);
+          const data = await response.json();
 
+          if (!data?.reply) throw new Error('No reply from n8n');
+
+          // 3. Persist assistant reply
           const assistantMsg: ChatMessageType = {
             id: crypto.randomUUID(),
             session_id: activeSession.id,
@@ -123,26 +150,32 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
             guardrail_status: data.guardrail_status ?? 'passed',
             created_at: new Date().toISOString(),
           };
-          addMessage(assistantMsg);
-          updateActiveSession({ message_count: 1 });
 
-          if (data.session_state) {
-            updateActiveSession({ session_state: data.session_state });
-          }
-          if (data.dynamic_theme) {
-            updateActiveSession({ dynamic_theme: data.dynamic_theme });
-          }
-          if (data.pathway) {
-            updateActiveSession({ pathway: data.pathway });
-          }
-          if (typeof data.pathway_confidence === 'number') {
-            updateActiveSession({ pathway_confidence: data.pathway_confidence });
-          }
-          if (data.crisis_detected) {
-            setCrisisDetected(true);
-          }
-          if (data.is_session_close) {
-            setIsSessionClose(true);
+          await supabase.from('mind_coach_messages').insert({
+            id: assistantMsg.id,
+            session_id: assistantMsg.session_id,
+            role: assistantMsg.role,
+            content: assistantMsg.content,
+            guardrail_status: assistantMsg.guardrail_status,
+          });
+
+          addMessage(assistantMsg);
+          
+          // 4. Update session
+          const sessionUpdate: any = { message_count: 1 };
+          if (data.session_state) sessionUpdate.session_state = data.session_state;
+          if (data.dynamic_theme) sessionUpdate.dynamic_theme = data.dynamic_theme;
+          if (data.pathway) sessionUpdate.pathway = data.pathway;
+          if (typeof data.pathway_confidence === 'number') sessionUpdate.pathway_confidence = data.pathway_confidence;
+
+          await supabase.from('mind_coach_sessions').update(sessionUpdate).eq('id', activeSession.id);
+          updateActiveSession(sessionUpdate);
+
+          if (data.crisis_detected) setCrisisDetected(true);
+          if (data.is_session_close) setIsSessionClose(true);
+          if (data.dynamic_in_chat_exercise) {
+            const exercise = useMindCoachStore.getState().exercises.find(e => e.id === data.dynamic_in_chat_exercise);
+            if (exercise) setActiveExercise(exercise);
           }
         } catch (err) {
           console.error('Failed to trigger initial greeting:', err);
@@ -162,45 +195,92 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
 
     setInput('');
 
+    const userMsgId = crypto.randomUUID();
     const userMsg: ChatMessageType = {
-      id: crypto.randomUUID(),
+      id: userMsgId,
       session_id: activeSession.id,
       role: 'user',
       content: text,
       guardrail_status: null,
       created_at: new Date().toISOString(),
     };
+    
+    // 1. Instantly update UI
     addMessage(userMsg);
-    updateActiveSession({ message_count: activeSession.message_count + 1 });
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('mind-coach-chat', {
-        body: {
-          profile_id: profile?.id,
-          session_id: activeSession.id,
-          message_text: text,
-          profile: profile ? {
-            name: profile.name,
-            age: profile.age,
-            gender: profile.gender,
-            concerns: profile.concerns,
-            therapist_persona: profile.therapist_persona,
-          } : null,
-          journey_context: journey ? {
-            id: journey.id,
-            title: journey.title,
-            current_phase: journey.current_phase,
-            phases: journey.phases,
-          } : null,
-          session_state: activeSession.session_state,
-          dynamic_theme: activeSession.dynamic_theme,
-          pathway: activeSession.pathway,
-        },
+      // 2. Persist user message + increment count
+      const newCount = activeSession.message_count + 1;
+      await Promise.all([
+        supabase.from('mind_coach_messages').insert({
+          id: userMsg.id,
+          session_id: userMsg.session_id,
+          role: userMsg.role,
+          content: userMsg.content,
+        }),
+        supabase.from('mind_coach_sessions').update({ message_count: newCount }).eq('id', activeSession.id),
+      ]);
+      updateActiveSession({ message_count: newCount });
+
+      // 3. Fetch Prompts (Coach + Phase)
+      const [personaRes, phaseRes] = await Promise.all([
+        supabase
+          .from('mind_coach_personas')
+          .select('base_prompt')
+          .eq('id', profile?.therapist_persona || 'maya')
+          .maybeSingle(),
+        supabase
+          .from('mind_coach_pathway_phases')
+          .select('dynamic_prompt')
+          .eq('id', `${activeSession.pathway || 'engagement_rapport_and_assessment'}_phase${journey?.current_phase || 1}`)
+          .maybeSingle(),
+      ]);
+
+      const coachPrompt = personaRes.data?.base_prompt || "You are an empathetic, non-judgmental mental health coach.";
+      const phasePrompt = phaseRes.data?.dynamic_prompt || "Focus on building therapeutic rapport.";
+
+      // 4. Call n8n directly
+      const n8nPayload = {
+        profile_id: profile?.id,
+        session_id: activeSession.id,
+        message_text: text,
+        profile: profile ? {
+          name: profile.name,
+          age: profile.age,
+          gender: profile.gender,
+          concerns: profile.concerns,
+          therapist_persona: profile.therapist_persona,
+        } : null,
+        journey_context: journey ? {
+          id: journey.id,
+          title: journey.title,
+          current_phase: journey.current_phase,
+          phases: journey.phases,
+        } : null,
+        session_state: activeSession.session_state,
+        dynamic_theme: activeSession.dynamic_theme,
+        pathway: activeSession.pathway,
+        messages: [...messages, userMsg], // History + current
+        memories: memories.map(m => ({ text: m.memory_text, type: m.memory_type })),
+        recent_tasks_assigned: activeTasks,
+        recent_case_notes: recentCaseNotes.map(n => n.key_insight).filter(Boolean),
+        coach_prompt: coachPrompt,
+        phase_prompt: phasePrompt,
+        message_count: newCount,
+      };
+
+      const response = await fetch('https://n8n.saksham-experiments.com/webhook/mind-coach-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(n8nPayload),
       });
 
-      if (error || !data?.reply) throw new Error('Edge function failed');
+      if (!response.ok) throw new Error(`n8n failed with ${response.status}`);
+      const data = await response.json();
+      if (!data?.reply) throw new Error('No reply from n8n');
 
+      // 5. Persist assistant reply
       const assistantMsg: ChatMessageType = {
         id: crypto.randomUUID(),
         session_id: activeSession.id,
@@ -209,28 +289,35 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
         guardrail_status: data.guardrail_status ?? 'passed',
         created_at: new Date().toISOString(),
       };
+      
+      await supabase.from('mind_coach_messages').insert({
+        id: assistantMsg.id,
+        session_id: assistantMsg.session_id,
+        role: assistantMsg.role,
+        content: assistantMsg.content,
+        guardrail_status: assistantMsg.guardrail_status,
+      });
       addMessage(assistantMsg);
-      updateActiveSession({ message_count: activeSession.message_count + 2 });
 
-      if (data.session_state) {
-        updateActiveSession({ session_state: data.session_state });
+      // 6. Update session count + result state
+      const finalCount = newCount + 1;
+      const sessionUpdate: any = { message_count: finalCount };
+      if (data.session_state) sessionUpdate.session_state = data.session_state;
+      if (data.dynamic_theme) sessionUpdate.dynamic_theme = data.dynamic_theme;
+      if (data.pathway) sessionUpdate.pathway = data.pathway;
+      if (typeof data.pathway_confidence === 'number') sessionUpdate.pathway_confidence = data.pathway_confidence;
+
+      await supabase.from('mind_coach_sessions').update(sessionUpdate).eq('id', activeSession.id);
+      updateActiveSession(sessionUpdate);
+
+      if (data.crisis_detected) setCrisisDetected(true);
+      if (data.is_session_close) setIsSessionClose(true);
+      if (data.dynamic_in_chat_exercise) {
+        const exercise = useMindCoachStore.getState().exercises.find(e => e.id === data.dynamic_in_chat_exercise);
+        if (exercise) setActiveExercise(exercise);
       }
-      if (data.dynamic_theme) {
-        updateActiveSession({ dynamic_theme: data.dynamic_theme });
-      }
-      if (data.pathway) {
-        updateActiveSession({ pathway: data.pathway });
-      }
-      if (typeof data.pathway_confidence === 'number') {
-        updateActiveSession({ pathway_confidence: data.pathway_confidence });
-      }
-      if (data.crisis_detected) {
-        setCrisisDetected(true);
-      }
-      if (data.is_session_close) {
-        setIsSessionClose(true);
-      }
-    } catch {
+    } catch (err) {
+      console.error('Chat error:', err);
       const fallbackMsg: ChatMessageType = {
         id: crypto.randomUUID(),
         session_id: activeSession.id,
@@ -240,7 +327,6 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
         created_at: new Date().toISOString(),
       };
       addMessage(fallbackMsg);
-      updateActiveSession({ message_count: activeSession.message_count + 2 });
     } finally {
       setIsLoading(false);
     }
@@ -528,10 +614,14 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
           <ArrowLeft size={20} />
         </button>
         <div
-          className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-semibold"
+          className="w-9 h-9 rounded-full flex items-center justify-center overflow-hidden shrink-0"
           style={{ backgroundColor: meta.color }}
         >
-          {meta.name[0]}
+          {meta.avatarUrl ? (
+            <img src={meta.avatarUrl} alt={meta.name} className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-white text-sm font-semibold">{meta.name[0]}</span>
+          )}
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-[#2C2A26]">{meta.name}</p>
@@ -598,6 +688,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
             message={msg}
             therapistColor={meta.color}
             therapistInitial={meta.name[0]}
+            avatarUrl={meta.avatarUrl}
           />
         ))}
         {isLoading && (

@@ -56,8 +56,22 @@ const MindCoachApp: React.FC = () => {
 
     // Check if this is the special 'new' route for onboarding
     if (profileId === 'new') {
-      setNeedsOnboarding(true);
-      setLoading(false);
+      // Check if user already has a profile before showing onboarding
+      supabase
+        .from('mind_coach_profiles')
+        .select('id')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data) {
+            navigate(`/mind-coach/${data.id}`, { replace: true });
+          } else {
+            setNeedsOnboarding(true);
+            setLoading(false);
+          }
+        });
       return;
     }
 

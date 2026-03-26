@@ -10,12 +10,14 @@ interface ChatMessageProps {
   message: ChatMessageType;
   therapistColor: string;
   therapistInitial: string;
+  avatarUrl?: string;
 }
 
 export const ChatMessage: React.FC<ChatMessageProps> = ({
   message,
   therapistColor,
   therapistInitial,
+  avatarUrl,
 }) => {
   const isUser = message.role === 'user';
   if (message.role === 'system') return null;
@@ -29,10 +31,14 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     >
       {!isUser && (
         <div
-          className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-semibold shrink-0 mt-1"
+          className="w-7 h-7 rounded-full flex items-center justify-center overflow-hidden shrink-0 mt-1"
           style={{ backgroundColor: therapistColor }}
         >
-          {therapistInitial}
+          {avatarUrl ? (
+            <img src={avatarUrl} alt={therapistInitial} className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-white text-xs font-semibold">{therapistInitial}</span>
+          )}
         </div>
       )}
 

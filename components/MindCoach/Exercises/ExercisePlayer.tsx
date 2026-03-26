@@ -1,169 +1,186 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Play, Pause, RotateCcw, CheckCircle2, ArrowRight } from 'lucide-react';
-import { type Exercise } from '../../../store/mindCoachStore';
+import { X, Play, Pause, RotateCcw, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { BreathingGuide } from './BreathingGuide';
 import { GroundingSteps } from './GroundingSteps';
+import { type Exercise } from '../../../store/mindCoachStore';
 
 interface ExercisePlayerProps {
   exercise: Exercise;
   onClose: () => void;
+  onComplete?: () => void;
 }
 
-export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({ exercise, onClose }) => {
+export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({ exercise, onClose, onComplete }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [isActive, setIsActive] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(exercise.steps[0]?.duration || 0);
-  const [isCompleted, setIsCompleted] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [isFinished, setIsFinished] = useState(false);
 
-  const currentStep = exercise.steps[currentStepIndex];
+  const steps = exercise.steps || [];
+  const currentStep = steps[currentStepIndex];
 
-  const handleNext = useCallback(() => {
-    if (currentStepIndex < exercise.steps.length - 1) {
-      const nextIndex = currentStepIndex + 1;
-      setCurrentStepIndex(nextIndex);
-      setTimeLeft(exercise.steps[nextIndex].duration);
-    } else {
-      setIsActive(false);
-      setIsCompleted(true);
+  // Initialize time for first step
+  useEffect(() => {
+    if (currentStep) {
+      setTimeLeft(currentStep.duration);
     }
-  }, [currentStepIndex, exercise.steps]);
+  }, [currentStepIndex, steps]);
 
+  // Timer logic
   useEffect(() => {
     let timer: NodeJS.Timeout;
-    if (isActive && timeLeft > 0) {
+    if (isPlaying && timeLeft > 0 && !isFinished) {
       timer = setInterval(() => {
         setTimeLeft((prev) => prev - 1);
       }, 1000);
-    } else if (isActive && timeLeft === 0) {
-      handleNext();
+    } else if (timeLeft === 0 && isPlaying && !isFinished) {
+      if (currentStepIndex < steps.length - 1) {
+        setCurrentStepIndex((prev) => prev + 1);
+      } else {
+        setIsFinished(true);
+        setIsPlaying(false);
+        onComplete?.();
+      }
     }
     return () => clearInterval(timer);
-  }, [isActive, timeLeft, handleNext]);
+  }, [isPlaying, timeLeft, currentStepIndex, steps.length, isFinished, onComplete]);
 
   const handleReset = () => {
+    setIsPlaying(false);
     setCurrentStepIndex(0);
-    setTimeLeft(exercise.steps[0]?.duration || 0);
-    setIsActive(false);
-    setIsCompleted(false);
+    setTimeLeft(steps[0]?.duration || 0);
+    setIsFinished(false);
+  };
+
+  const renderGuide = () => {
+    if (exercise.type === 'breathing') {
+      return (
+        <BreathingGuide
+          instruction={currentStep?.instruction}
+          duration={currentStep?.duration}
+          timeLeft={timeLeft}
+          phase={currentStep?.instruction.toLowerCase().includes('in') ? 'inhale' : 
+                 currentStep?.instruction.toLowerCase().includes('out') ? 'exhale' : 'hold'}
+        />
+      );
+    }
+    
+    if (exercise.type === 'grounding' || exercise.type === 'meditation') {
+      return (
+        <GroundingSteps
+          instruction={currentStep?.instruction}
+          stepNumber={currentStepIndex + 1}
+          totalSteps={steps.length}
+          timeLeft={timeLeft}
+        />
+      );
+    }
+
+    return (
+      <div className="text-center p-8">
+        <p className="text-[#2C2A26]/60">{currentStep?.instruction}</p>
+        <p className="text-4xl font-serif text-[#2C2A26] mt-4 tabular-nums">{timeLeft}s</p>
+      </div>
+    );
   };
 
   return (
-    <div className="flex flex-col h-full bg-white relative overflow-hidden">
-      {/* Header */}
-      <div className="px-6 pt-6 pb-4 flex items-center justify-between border-b border-[#F5F0EB]">
-        <div>
-          <span className="text-[10px] font-bold text-[#6B8F71] uppercase tracking-[0.1em] mb-1 block">
-            {exercise.type} · {exercise.category}
-          </span>
-          <h2 className="text-xl font-bold text-[#2C2A26]">{exercise.title}</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        className="relative w-full max-w-lg bg-[#FAFAF7] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col min-h-[500px]"
+      >
+        {/* Header */}
+        <div className="px-8 pt-8 pb-4 flex items-center justify-between">
+          <div className="space-y-1">
+            <h3 className="text-lg font-semibold text-[#2C2A26]">{exercise.title}</h3>
+            <p className="text-xs text-[#2C2A26]/40 uppercase tracking-widest font-medium">
+              {isFinished ? 'Exercise Complete' : `${exercise.type} • ${Math.ceil(exercise.duration_seconds / 60)} min`}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-10 h-10 rounded-full bg-white border border-[#E8E4DE] flex items-center justify-center text-[#2C2A26]/40 hover:text-[#2C2A26] transition-colors"
+          >
+            <X size={20} />
+          </button>
         </div>
-        <button
-          onClick={onClose}
-          className="p-2 rounded-full hover:bg-[#F5F0EB] text-[#2C2A26]/40 transition-colors"
-        >
-          <X size={20} />
-        </button>
-      </div>
 
-      <div className="flex-1 overflow-y-auto px-6 py-8 flex flex-col items-center justify-center">
-        <AnimatePresence mode="wait">
-          {!isCompleted ? (
-            <motion.div
-              key="active"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="w-full flex flex-col items-center space-y-10"
-            >
-              {/* Specialized Content */}
-              <div className="w-full max-w-[280px] aspect-square flex items-center justify-center relative">
-                {exercise.type === 'breathing' ? (
-                  <BreathingGuide 
-                    isActive={isActive} 
-                    instruction={currentStep?.instruction} 
-                    duration={currentStep?.duration}
-                    timeLeft={timeLeft}
-                  />
-                ) : (
-                  <GroundingSteps 
-                    step={currentStep} 
-                    index={currentStepIndex} 
-                    total={exercise.steps.length} 
-                  />
-                )}
-              </div>
-
-              {/* Progress Detail */}
-              <div className="text-center space-y-2">
-                <p className="text-lg font-medium text-[#2C2A26] px-4">
-                  {currentStep?.instruction}
-                </p>
-                <div className="flex items-center justify-center gap-2 text-[#2C2A26]/40 font-mono text-sm">
-                  <span>{Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</span>
-                  <span>·</span>
-                  <span>Step {currentStepIndex + 1} of {exercise.steps.length}</span>
-                </div>
-              </div>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="completed"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="text-center space-y-6"
-            >
-              <div className="w-20 h-20 bg-[#6B8F71]/10 rounded-full flex items-center justify-center mx-auto text-[#6B8F71]">
-                <CheckCircle2 size={40} />
-              </div>
-              <div className="space-y-2">
-                <h3 className="text-2xl font-bold text-[#2C2A26]">Well done!</h3>
-                <p className="text-[#2C2A26]/60 leading-relaxed max-w-[240px] mx-auto">
-                  Take a moment to notice how you feel now compared to when you started.
-                </p>
-              </div>
-              <button
-                onClick={onClose}
-                className="px-8 py-3 bg-[#6B8F71] text-white font-semibold rounded-2xl hover:bg-[#5A7D60] transition-colors"
+        {/* Content Area */}
+        <div className="flex-1 flex flex-col items-center justify-center px-8">
+          <AnimatePresence mode="wait">
+            {isFinished ? (
+              <motion.div
+                key="finished"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="text-center space-y-6"
               >
-                Return to Chat
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-
-      {/* Controls */}
-      {!isCompleted && (
-        <div className="px-6 py-8 border-t border-[#F5F0EB] bg-[#FAFAF8]/50 flex items-center justify-between">
-          <button
-            onClick={handleReset}
-            className="flex flex-col items-center gap-1 text-[#2C2A26]/30 hover:text-[#2C2A26]/60 transition-colors"
-          >
-            <RotateCcw size={20} />
-            <span className="text-[10px] font-bold uppercase tracking-wider">Reset</span>
-          </button>
-
-          <button
-            onClick={() => setIsActive(!isActive)}
-            className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg transition-all active:scale-95 ${
-              isActive 
-                ? 'bg-[#2C2A26] text-white shadow-[#2C2A26]/20' 
-                : 'bg-[#6B8F71] text-white shadow-[#6B8F71]/20'
-            }`}
-          >
-            {isActive ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" className="ml-1" />}
-          </button>
-
-          <button
-            onClick={handleNext}
-            className="flex flex-col items-center gap-1 text-[#2C2A26]/30 hover:text-[#2C2A26]/60 transition-colors"
-          >
-            <ArrowRight size={20} />
-            <span className="text-[10px] font-bold uppercase tracking-wider">Skip</span>
-          </button>
+                <div className="w-20 h-20 rounded-full bg-[#6B8F71]/10 flex items-center justify-center mx-auto text-[#6B8F71]">
+                  <CheckCircle2 size={40} />
+                </div>
+                <div className="space-y-2">
+                  <h4 className="text-2xl font-serif text-[#2C2A26]">Well done</h4>
+                  <p className="text-[#2C2A26]/60 max-w-[240px]">Take a moment to notice how you feel now.</p>
+                </div>
+                <button
+                  onClick={onClose}
+                  className="px-8 py-3 bg-[#2C2A26] text-white rounded-2xl font-medium hover:bg-[#2C2A26]/90 transition-all"
+                >
+                  Close
+                </button>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="active"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="w-full"
+              >
+                {renderGuide()}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
-      )}
+
+        {/* Controls */}
+        {!isFinished && (
+          <div className="px-8 pb-10 pt-4 flex items-center justify-center gap-6">
+            <button
+              onClick={handleReset}
+              className="w-12 h-12 rounded-full border border-[#E8E4DE] flex items-center justify-center text-[#2C2A26]/40 hover:text-[#2C2A26] transition-colors"
+              title="Restart"
+            >
+              <RotateCcw size={20} />
+            </button>
+
+            <button
+              onClick={() => setIsPlaying(!isPlaying)}
+              className="w-20 h-20 rounded-full bg-[#6B8F71] text-white flex items-center justify-center shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all"
+            >
+              {isPlaying ? <Pause size={32} fill="currentColor" /> : <Play size={32} fill="currentColor" className="ml-1" />}
+            </button>
+
+            <button
+              onClick={() => {
+                if (currentStepIndex < steps.length - 1) {
+                  setCurrentStepIndex((prev) => prev + 1);
+                } else {
+                  setIsFinished(true);
+                }
+              }}
+              className="w-12 h-12 rounded-full border border-[#E8E4DE] flex items-center justify-center text-[#2C2A26]/40 hover:text-[#2C2A26] transition-colors"
+              title="Next Step"
+            >
+              <ChevronRight size={24} />
+            </button>
+          </div>
+        )}
+      </motion.div>
     </div>
   );
 };
