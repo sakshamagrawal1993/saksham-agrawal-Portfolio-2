@@ -134,7 +134,7 @@ export const PROJECTS: Project[] = [
     demoUrl: '/health-twin'
   },
   {
-    id: 'p2',
+    id: 'mind-coach',
     name: 'Jivi Mind Coach',
     tagline: 'AI Therapy at scale.',
     description: 'Mental health platform with real-time conversational capabilities in 100+ languages.',

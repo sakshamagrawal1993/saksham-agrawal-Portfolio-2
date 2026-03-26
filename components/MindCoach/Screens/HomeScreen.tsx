@@ -132,7 +132,7 @@ export const HomeScreen: React.FC = () => {
 
       // Reset store and redirect
       resetStore();
-      navigate('/mind-coach', { replace: true });
+      navigate('/project/mind-coach', { replace: true });
     } catch (err) {
       console.error('Error deleting profile:', err);
       setIsDeleting(false);

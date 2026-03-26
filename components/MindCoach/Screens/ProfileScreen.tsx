@@ -94,7 +94,7 @@ export const ProfileScreen: React.FC = () => {
       // Deleting the root profile propagates ON DELETE CASCADE to all other mind_coach_* tables.
       await supabase.from('mind_coach_profiles').delete().eq('id', profile.id);
       resetLocalStore();
-      navigate('/mind-coach', { replace: true });
+      navigate('/project/mind-coach', { replace: true });
     } catch (e) {
       console.error('Failed to reset data:', e);
       alert('Failed to delete data. Please try again.');
@@ -272,7 +272,7 @@ export const ProfileScreen: React.FC = () => {
         transition={{ delay: 0.25 }}
       >
         <button
-          onClick={() => navigate('/project/p2')}
+          onClick={() => navigate('/project/mind-coach')}
           className="flex items-center gap-2 text-sm text-[#2C2A26]/40 hover:text-[#2C2A26]/60 transition-colors mx-auto"
         >
           <ArrowLeft size={14} />
