@@ -66,6 +66,7 @@ const MindCoachApp: React.FC = () => {
         .maybeSingle()
         .then(({ data }) => {
           if (data) {
+            setNeedsOnboarding(false);
             navigate(`/mind-coach/${data.id}`, { replace: true });
           } else {
             setNeedsOnboarding(true);
@@ -177,6 +178,7 @@ const MindCoachApp: React.FC = () => {
         <PhoneFrame>
           <OnboardingFlow
             onComplete={(newProfileId) => {
+              setNeedsOnboarding(false);
               useMindCoachStore.getState().setActiveTab('sessions');
               navigate(`/mind-coach/${newProfileId}`, { replace: true });
             }}
