@@ -173,8 +173,16 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
 
           if (data.crisis_detected) setCrisisDetected(true);
           if (data.is_session_close) setIsSessionClose(true);
-          if (data.dynamic_in_chat_exercise) {
-            const exercise = useMindCoachStore.getState().exercises.find(e => e.id === data.dynamic_in_chat_exercise);
+
+          // Handle dynamic content (structured or legacy slug)
+          const exerciseSlug = data.dynamic_content?.payload || data.dynamic_in_chat_exercise;
+          if (exerciseSlug) {
+            const allExercises = useMindCoachStore.getState().exercises;
+            const exercise = allExercises.find(e => 
+              e.id === exerciseSlug || 
+              e.title.toLowerCase().replace(/ /g, '_') === exerciseSlug.toLowerCase() ||
+              e.title.toLowerCase().replace(/-/g, '_') === exerciseSlug.toLowerCase()
+            );
             if (exercise) setActiveExercise(exercise);
           }
         } catch (err) {
@@ -312,8 +320,16 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
 
       if (data.crisis_detected) setCrisisDetected(true);
       if (data.is_session_close) setIsSessionClose(true);
-      if (data.dynamic_in_chat_exercise) {
-        const exercise = useMindCoachStore.getState().exercises.find(e => e.id === data.dynamic_in_chat_exercise);
+
+      // Handle dynamic content (structured or legacy slug)
+      const exerciseSlug = data.dynamic_content?.payload || data.dynamic_in_chat_exercise;
+      if (exerciseSlug) {
+        const allExercises = useMindCoachStore.getState().exercises;
+        const exercise = allExercises.find(e => 
+          e.id === exerciseSlug || 
+          e.title.toLowerCase().replace(/ /g, '_') === exerciseSlug.toLowerCase() ||
+          e.title.toLowerCase().replace(/-/g, '_') === exerciseSlug.toLowerCase()
+        );
         if (exercise) setActiveExercise(exercise);
       }
     } catch (err) {
