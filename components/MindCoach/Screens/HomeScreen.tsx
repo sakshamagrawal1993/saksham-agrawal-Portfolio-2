@@ -1,9 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowRight, Sparkles, CheckCircle2, BookOpen, Wind, Brain, Flower2, Moon, MessageCircle as MsgIcon, Shield, Target, Heart } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 import { supabase } from '../../../lib/supabaseClient';
-import { useMindCoachStore } from '../../../store/mindCoachStore';
+import { useMindCoachStore, type TaskType } from '../../../store/mindCoachStore';
 
 const QUOTES = [
   '"The wound is the place where the Light enters you." — Rumi',
@@ -36,6 +36,8 @@ export const HomeScreen: React.FC = () => {
   const moodEntries = useMindCoachStore((s) => s.moodEntries);
   const setMoodEntries = useMindCoachStore((s) => s.setMoodEntries);
   const setActiveTab = useMindCoachStore((s) => s.setActiveTab);
+  const activeTasks = useMindCoachStore((s) => s.activeTasks);
+  const setActiveTasks = useMindCoachStore((s) => s.setActiveTasks);
 
   const quote = useMemo(() => QUOTES[Math.floor(Math.random() * QUOTES.length)], []);
 
@@ -88,6 +90,28 @@ export const HomeScreen: React.FC = () => {
   };
   const therapistColor = THERAPIST_COLORS[profile?.therapist_persona ?? 'maya'];
   const therapistName = THERAPIST_NAMES[profile?.therapist_persona ?? 'maya'];
+
+  const TASK_ICONS: Record<TaskType, React.ElementType> = {
+    journaling: BookOpen,
+    grounding: Wind,
+    behavioral_activation: Target,
+    cognitive_restructuring: Brain,
+    sleep_hygiene: Moon,
+    mindfulness: Flower2,
+    communication: MsgIcon,
+    boundary_setting: Shield,
+    exposure: Target,
+    self_compassion: Heart,
+    general: Sparkles,
+  };
+
+  const handleMarkTaskDone = useCallback(async (taskId: string) => {
+    setActiveTasks(activeTasks.filter((t) => t.id !== taskId));
+    await supabase
+      .from('mind_coach_user_tasks')
+      .update({ status: 'completed' })
+      .eq('id', taskId);
+  }, [activeTasks, setActiveTasks]);
 
   return (
     <div className="p-5 pb-4 space-y-5">
@@ -216,6 +240,67 @@ export const HomeScreen: React.FC = () => {
               />
             </AreaChart>
           </ResponsiveContainer>
+        </motion.div>
+      )}
+
+      {/* Homework Tasks */}
+      {activeTasks.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+          className="space-y-2"
+        >
+          <div className="flex items-center gap-1.5">
+            <Target size={14} className="text-[#D4A574]" />
+            <p className="text-xs font-medium text-[#2C2A26]/50 uppercase tracking-wide">
+              Today's Homework
+            </p>
+          </div>
+          {activeTasks.map((task, i) => {
+            const Icon = TASK_ICONS[task.task_type as TaskType] || Sparkles;
+            const dueDate = new Date(task.task_end_date);
+            const isOverdue = dueDate < new Date();
+            return (
+              <motion.div
+                key={task.id}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 + i * 0.05 }}
+                className="bg-white rounded-2xl p-4 shadow-sm border border-[#E8E4DE]"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-[#6B8F71]/10 flex items-center justify-center shrink-0">
+                    <Icon size={18} className="text-[#6B8F71]" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-[#2C2A26]">
+                      {task.dynamic_title || task.task_name}
+                    </p>
+                    <p className="text-xs text-[#2C2A26]/50 mt-0.5 line-clamp-2">
+                      {task.dynamic_description || task.task_description}
+                    </p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                        isOverdue
+                          ? 'bg-red-50 text-red-500'
+                          : 'bg-[#6B8F71]/10 text-[#6B8F71]'
+                      }`}>
+                        {task.task_frequency} · Due {dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleMarkTaskDone(task.id)}
+                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#6B8F71]/10 transition-colors shrink-0"
+                    title="Mark as done"
+                  >
+                    <CheckCircle2 size={20} className="text-[#6B8F71]/40 hover:text-[#6B8F71]" />
+                  </button>
+                </div>
+              </motion.div>
+            );
+          })}
         </motion.div>
       )}
     </div>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Navigate } from 'react-router-dom';
+import { useParams, Navigate, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
 import { useMindCoachStore, TabId } from '../../store/mindCoachStore';
@@ -7,9 +7,10 @@ import { BottomNav } from './BottomNav';
 import { PhoneFrame } from './shared/PhoneFrame';
 import { HomeScreen } from './Screens/HomeScreen';
 import { SessionsScreen } from './Screens/SessionsScreen';
-import { JourneyScreen } from './Screens/JourneyScreen';
-import { ToolkitScreen } from './Screens/ToolkitScreen';
-import { ProfileScreen } from './Screens/ProfileScreen';
+import { AssessmentsScreen } from './Screens/AssessmentsScreen';
+import { JournalScreen } from './Screens/JournalScreen';
+import { DiaryScreen } from './Screens/DiaryScreen';
+import { OnboardingFlow } from './Onboarding/OnboardingFlow';
 
 function TabContent({ tab }: { tab: TabId }) {
   switch (tab) {
@@ -17,12 +18,12 @@ function TabContent({ tab }: { tab: TabId }) {
       return <HomeScreen />;
     case 'sessions':
       return <SessionsScreen />;
-    case 'journey':
-      return <JourneyScreen />;
-    case 'toolkit':
-      return <ToolkitScreen />;
-    case 'profile':
-      return <ProfileScreen />;
+    case 'assessments':
+      return <AssessmentsScreen />;
+    case 'journal':
+      return <JournalScreen />;
+    case 'diary':
+      return <DiaryScreen />;
     default:
       return null;
   }
@@ -30,8 +31,10 @@ function TabContent({ tab }: { tab: TabId }) {
 
 const MindCoachApp: React.FC = () => {
   const { profileId } = useParams<{ profileId: string }>();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const { user } = useAuth();
 
   const activeTab = useMindCoachStore((s) => s.activeTab);
@@ -40,11 +43,20 @@ const MindCoachApp: React.FC = () => {
   const setSessions = useMindCoachStore((s) => s.setSessions);
   const setMemories = useMindCoachStore((s) => s.setMemories);
   const setMoodEntries = useMindCoachStore((s) => s.setMoodEntries);
+  const setJournalEntries = useMindCoachStore((s) => s.setJournalEntries);
   const setExercises = useMindCoachStore((s) => s.setExercises);
+  const setActiveTasks = useMindCoachStore((s) => s.setActiveTasks);
   const reset = useMindCoachStore((s) => s.reset);
 
   useEffect(() => {
     if (!profileId) return;
+
+    // Check if this is the special 'new' route for onboarding
+    if (profileId === 'new') {
+      setNeedsOnboarding(true);
+      setLoading(false);
+      return;
+    }
 
     let cancelled = false;
 
@@ -53,7 +65,7 @@ const MindCoachApp: React.FC = () => {
       setError(null);
 
       try {
-        const [profileRes, journeyRes, sessionsRes, memoriesRes, moodRes, exercisesRes] =
+        const [profileRes, journeyRes, sessionsRes, memoriesRes, moodRes, journalRes, exercisesRes, tasksRes] =
           await Promise.all([
             supabase
               .from('mind_coach_profiles')
@@ -83,9 +95,20 @@ const MindCoachApp: React.FC = () => {
               .eq('profile_id', profileId)
               .order('created_at', { ascending: false }),
             supabase
+              .from('mind_coach_journal_entries')
+              .select('*')
+              .eq('profile_id', profileId)
+              .order('created_at', { ascending: false }),
+            supabase
               .from('mind_coach_exercises')
               .select('*')
               .order('title'),
+            supabase
+              .from('mind_coach_user_tasks')
+              .select('*')
+              .eq('profile_id', profileId)
+              .eq('status', 'active')
+              .order('created_at', { ascending: false }),
           ]);
 
         if (cancelled) return;
@@ -98,7 +121,17 @@ const MindCoachApp: React.FC = () => {
         setSessions(sessionsRes.data ?? []);
         setMemories(memoriesRes.data ?? []);
         setMoodEntries(moodRes.data ?? []);
+        setJournalEntries((journalRes.data ?? []).map((d: any) => ({
+          id: d.id,
+          profile_id: d.profile_id,
+          title: d.title,
+          content: d.content,
+          mood: d.mood_tag,
+          prompt: null,
+          created_at: d.created_at,
+        })));
         setExercises(exercisesRes.data ?? []);
+        setActiveTasks(tasksRes.data ?? []);
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : 'Failed to load data');
@@ -114,10 +147,25 @@ const MindCoachApp: React.FC = () => {
       cancelled = true;
       reset();
     };
-  }, [profileId, setProfile, setJourney, setSessions, setMemories, setMoodEntries, setExercises, reset]);
+  }, [profileId, setProfile, setJourney, setSessions, setMemories, setMoodEntries, setExercises, setActiveTasks, reset]);
 
   if (!user) {
     return <Navigate to="/mind-coach/login" replace />;
+  }
+
+  // Onboarding flow
+  if (needsOnboarding) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#E8E0D8] via-[#D6CFC6] to-[#C9C0B6] flex items-center justify-center p-4">
+        <PhoneFrame>
+          <OnboardingFlow
+            onComplete={(newProfileId) => {
+              navigate(`/mind-coach/${newProfileId}`, { replace: true });
+            }}
+          />
+        </PhoneFrame>
+      </div>
+    );
   }
 
   if (loading) {
@@ -157,7 +205,9 @@ const MindCoachApp: React.FC = () => {
           <div className="flex-1 overflow-y-auto">
             <TabContent tab={activeTab} />
           </div>
-          <BottomNav />
+          {/* Hide BottomNav when in an active chat session */}
+          {activeTab !== 'sessions' && <BottomNav />}
+          {activeTab === 'sessions' && <BottomNav />}
         </div>
       </PhoneFrame>
     </div>

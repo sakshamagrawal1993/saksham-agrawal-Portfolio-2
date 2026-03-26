@@ -40,6 +40,8 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
   const setSessions = useMindCoachStore((s) => s.setSessions);
   const sessions = useMindCoachStore((s) => s.sessions);
   const setCrisisDetected = useMindCoachStore((s) => s.setCrisisDetected);
+  const isSessionClose = useMindCoachStore((s) => s.isSessionClose);
+  const setIsSessionClose = useMindCoachStore((s) => s.setIsSessionClose);
 
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -52,6 +54,80 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  useEffect(() => {
+    // Only trigger if session is brand new
+    if (activeSession && messages.length === 0 && activeSession.message_count === 0 && !isLoading) {
+      const sendInitialGreeting = async () => {
+        setIsLoading(true);
+        try {
+          const { data, error } = await supabase.functions.invoke('mind-coach-chat', {
+            body: {
+              profile_id: profile?.id,
+              session_id: activeSession.id,
+              message_text: `System Alert: We are beginning the session. Introduce yourself and softly greet the user by name (${profile?.name || 'User'}) based on their context to kick off the session.`,
+              is_system_greeting: true,
+              profile: profile ? {
+                name: profile.name,
+                age: profile.age,
+                gender: profile.gender,
+                concerns: profile.concerns,
+                therapist_persona: profile.therapist_persona,
+              } : null,
+              journey_context: journey ? {
+                id: journey.id,
+                title: journey.title,
+                current_phase: journey.current_phase,
+                phases: journey.phases,
+              } : null,
+              session_state: activeSession.session_state,
+              dynamic_theme: activeSession.dynamic_theme,
+              pathway: activeSession.pathway,
+            },
+          });
+
+          if (error || !data?.reply) throw new Error('Edge function failed');
+
+          const assistantMsg: ChatMessageType = {
+            id: crypto.randomUUID(),
+            session_id: activeSession.id,
+            role: 'assistant',
+            content: data.reply,
+            guardrail_status: data.guardrail_status ?? 'passed',
+            created_at: new Date().toISOString(),
+          };
+          addMessage(assistantMsg);
+          updateActiveSession({ message_count: 1 });
+
+          if (data.session_state) {
+            updateActiveSession({ session_state: data.session_state });
+          }
+          if (data.dynamic_theme) {
+            updateActiveSession({ dynamic_theme: data.dynamic_theme });
+          }
+          if (data.pathway) {
+            updateActiveSession({ pathway: data.pathway });
+          }
+          if (typeof data.pathway_confidence === 'number') {
+            updateActiveSession({ pathway_confidence: data.pathway_confidence });
+          }
+          if (data.crisis_detected) {
+            setCrisisDetected(true);
+          }
+          if (data.is_session_close) {
+            setIsSessionClose(true);
+          }
+        } catch (err) {
+          console.error('Failed to trigger initial greeting:', err);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      sendInitialGreeting();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages.length, activeSession?.id]);
 
   const handleSend = async () => {
     const text = input.trim();
@@ -124,6 +200,9 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
       if (data.crisis_detected) {
         setCrisisDetected(true);
       }
+      if (data.is_session_close) {
+        setIsSessionClose(true);
+      }
     } catch {
       const fallbackMsg: ChatMessageType = {
         id: crypto.randomUUID(),
@@ -194,7 +273,10 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
     }
   };
 
-  const showEndSession = activeSession && activeSession.message_count >= 10 && activeSession.pathway !== 'engagement_rapport_and_assessment';
+  const showEndSession = activeSession && (
+    isSessionClose ||
+    (activeSession.message_count >= 10 && activeSession.pathway !== 'engagement_rapport_and_assessment')
+  );
 
   if (showSummary && sessionSummary) {
     return (
@@ -406,7 +488,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
               className="flex items-center gap-1.5 px-4 py-1.5 bg-[#2C2A26]/8 hover:bg-[#2C2A26]/15 rounded-full text-xs font-medium text-[#2C2A26]/70 transition-colors disabled:opacity-50"
             >
               <X size={12} />
-              {endingSession ? 'Wrapping up...' : 'End Session'}
+              {endingSession ? 'Wrapping up...' : isSessionClose ? '✨ View Session Summary' : 'End Session'}
             </button>
           </motion.div>
         )}

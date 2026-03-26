@@ -1,5 +1,5 @@
 {
-    "name": "Mind Coach - Session End Summarizer",
+    "name": "Mind Coach - Session End Summarizer v2",
     "nodes": [
         {
             "parameters": {
@@ -7,73 +7,60 @@
                 "path": "mind-coach-session-end",
                 "options": {}
             },
-            "id": "1",
+            "id": "node_webhook",
             "name": "Webhook",
             "type": "n8n-nodes-base.webhook",
             "typeVersion": 1.1,
-            "position": [
-                0,
-                300
-            ]
+            "position": [0, 300]
         },
         {
             "parameters": {
-                "jsCode": "const data = $node[\"Webhook\"].json.body;\nconst profile = data.profile || {};\nconst session = data.session || {};\nconst currentPhase = data.currentPhase || {};\nconst transcript = data.transcript || \"\";\n\nconst systemPrompt = `You are a clinical supervisor generating structured post-session documentation for an AI therapy session.\\n\\nSession context:\\n- Client name: ${profile.name || 'User'}\\n- Pathway: ${session.pathway || 'exploratory_validation'}\\n- Dynamic theme: ${session.dynamic_theme || 'Not yet identified'}\\n- Session number: ${session.session_number || 1}\\n- Current phase: ${currentPhase.name || 'Phase 1'}\\n- Phase goal: ${currentPhase.goal || 'Establish therapeutic rapport'}\\n\\nGenerate TWO outputs:\\n\\n1. CASE_NOTES: Structured clinical documentation\\n2. SESSION_SUMMARY: Client-facing session summary (rich metrics)\\n\\nReturn ONLY valid JSON.`;\n\nconst userPrompt = `Analyze this therapy transcript and generate documentation.\\n\\nTRANSCRIPT:\\n${transcript}\\n\\nReturn JSON with this EXACT schema:\\n{\\n  \"case_notes\": {\\n    \"presenting_concern\": \"string\",\\n    \"dynamic_theme\": \"string\",\\n    \"phase_progress\": \"string\",\\n    \"readiness_for_next_phase\": \"not_ready | approaching | ready\"\\n  },\\n  \"session_summary\": {\\n    \"title\": \"string - warm, non-clinical title\",\\n    \"opening_reflection\": \"string - empathetic recap\",\\n    \"takeaway_task\": \"string - a specific, small actionable task aligned with the current phase for them to do before next session\",\\n    \"quote_of_the_day\": \"string - an inspiring, short quote relevant to the session\",\\n    \"energy_shift\": { \\n      \"start\": \"string (e.g., Anxious, Tired, Overwhelmed)\", \\n      \"end\": \"string (e.g., Calm, Grounded, Heard)\" \\n    },\\n    \"psychological_flexibility\": {\\n      \"self_awareness\": \"integer 0-100\",\\n      \"observation\": \"integer 0-100\",\\n      \"physical_awareness\": \"integer 0-100\",\\n      \"core_values\": \"integer 0-100\",\\n      \"relationships\": \"integer 0-100\"\\n    },\\n    \"self_compassion_score\": \"integer 0-100 (high if they gave themselves grace, low if self-critical)\"\\n  },\\n  \"extracted_memories\": [\\n    {\\n      \"memory_text\": \"string - specific fact or preference to remember long-term\",\\n      \"memory_type\": \"fact | trigger | coping_strategy | relationship | goal\"\\n    }\\n  ]\\n}`;\n\nreturn [{ json: { systemPrompt, userPrompt } }];"
+                "jsCode": "const data = $node[\"Webhook\"].json.body;\nconst profile = data.profile || {};\nconst session = data.session || {};\nconst currentPhase = data.currentPhase || {};\nconst transcript = data.transcript || \"\";\n\nconst systemPrompt = `You are a clinical supervisor generating structured post-session documentation for an AI therapy session.\n\nSession context:\n- Client name: ${profile.name || 'User'}\n- Pathway: ${session.pathway || 'exploratory_validation'}\n- Dynamic theme: ${session.dynamic_theme || 'Not yet identified'}\n- Session number: ${session.session_number || 1}\n- Current phase: ${currentPhase.name || 'Phase 1'}\n- Phase goal: ${currentPhase.goal || 'Establish therapeutic rapport'}\n\nGenerate case notes, a client-facing summary, homework tasks, and long-term memories.\n\nFor tasks, you MUST pick from these categories only:\n- journaling: Written reflection exercises\n- somatic_exercise: Breathing, grounding, or movement\n- cognitive_reframing: Thought records or reframing exercises\n- behavioral_exposure: Gradually facing a feared situation\n- situational_prep: Preparing for a specific upcoming event\n- general: Any other assignment\n\nIMPORTANT: Do NOT generate any dates or timestamps. The backend will calculate all dates automatically. Only provide suggested_duration_days as a plain integer.\n\nReturn ONLY valid JSON.`;\n\nconst userPrompt = `Analyze this therapy transcript and generate documentation.\n\nTRANSCRIPT:\n${transcript}\n\nReturn JSON with this EXACT schema:\n{\n  \"case_notes\": {\n    \"presenting_concern\": \"string\",\n    \"dynamic_theme\": \"string\",\n    \"phase_progress\": \"string\",\n    \"readiness_for_next_phase\": \"not_ready | approaching | ready\"\n  },\n  \"session_summary\": {\n    \"title\": \"string - warm, non-clinical title\",\n    \"opening_reflection\": \"string - empathetic recap of the session\",\n    \"quote_of_the_day\": \"string - a short inspiring quote relevant to this session\",\n    \"energy_shift\": {\n      \"start\": \"string (e.g., Anxious, Tired, Overwhelmed)\",\n      \"end\": \"string (e.g., Calm, Grounded, Heard)\"\n    },\n    \"psychological_flexibility\": {\n      \"self_awareness\": \"integer 0-100\",\n      \"observation\": \"integer 0-100\",\n      \"physical_awareness\": \"integer 0-100\",\n      \"core_values\": \"integer 0-100\",\n      \"relationships\": \"integer 0-100\"\n    },\n    \"self_compassion_score\": \"integer 0-100 (high if they gave themselves grace, low if self-critical)\"\n  },\n  \"extracted_tasks\": [\n    {\n      \"task_type\": \"journaling | somatic_exercise | cognitive_reframing | behavioral_exposure | situational_prep | general\",\n      \"dynamic_title\": \"string - concise, personalised, action-oriented title referencing the user's specific situation\",\n      \"dynamic_description\": \"string - specific instructions tailored to this user's exact context. Mention their name, their specific trigger or situation if relevant.\",\n      \"frequency\": \"daily | weekly | situational | once\",\n      \"suggested_duration_days\": \"integer - how many days this task should run (e.g. 7 for a week, 1 for one-off)\"\n    }\n  ],\n  \"extracted_memories\": [\n    {\n      \"memory_text\": \"string - specific fact, preference, trigger, or goal to remember long-term\",\n      \"memory_type\": \"fact | trigger | coping_strategy | relationship | goal\"\n    }\n  ]\n}`;\n\nreturn [{ json: { systemPrompt, userPrompt } }];"
             },
-            "id": "2",
+            "id": "node_prompt_builder",
             "name": "Prompt Builder",
             "type": "n8n-nodes-base.code",
             "typeVersion": 2,
-            "position": [
-                220,
-                300
-            ]
+            "position": [220, 300]
         },
         {
             "parameters": {
-                "resource": "chat",
-                "operation": "create",
-                "model": "gpt-4o-mini",
-                "messages": {
-                    "messageValues": [
-                        {
-                            "role": "system",
-                            "content": "={{ $json.systemPrompt }}"
-                        },
-                        {
-                            "role": "user",
-                            "content": "={{ $json.userPrompt }}"
-                        }
-                    ]
-                },
+                "agent": "conversationalAgent",
+                "promptType": "define",
+                "text": "={{ $json.userPrompt }}",
                 "options": {
-                    "responseFormat": {
-                        "type": "json_object"
-                    },
+                    "systemMessage": "={{ $json.systemPrompt }}"
+                }
+            },
+            "id": "node_summarizer_agent",
+            "name": "Summarizer Agent",
+            "type": "@n8n/n8n-nodes-langchain.agent",
+            "typeVersion": 1.6,
+            "position": [440, 300]
+        },
+        {
+            "parameters": {
+                "model": "gpt-4o-mini",
+                "options": {
                     "temperature": 0.2
                 }
             },
-            "id": "3",
+            "id": "node_summarizer_llm",
             "name": "Summarizer LLM",
-            "type": "n8n-nodes-base.openAi",
+            "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
             "typeVersion": 1,
-            "position": [
-                440,
-                300
-            ]
+            "position": [440, 500]
         },
         {
             "parameters": {
-                "jsCode": "let parsed = {};\ntry {\n  parsed = JSON.parse($node[\"Summarizer LLM\"].json.message.content);\n} catch(e) {\n  parsed = { error: \"Failed to parse JSON\" };\n}\nreturn [{ json: parsed }];"
+                "schemaType": "manual",
+                "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"case_notes\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"presenting_concern\": { \"type\": \"string\" },\n        \"dynamic_theme\": { \"type\": \"string\" },\n        \"phase_progress\": { \"type\": \"string\" },\n        \"readiness_for_next_phase\": { \"type\": \"string\", \"enum\": [\"not_ready\", \"approaching\", \"ready\"] }\n      },\n      \"required\": [\"presenting_concern\", \"dynamic_theme\", \"phase_progress\", \"readiness_for_next_phase\"]\n    },\n    \"session_summary\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"title\": { \"type\": \"string\" },\n        \"opening_reflection\": { \"type\": \"string\" },\n        \"quote_of_the_day\": { \"type\": \"string\" },\n        \"energy_shift\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"start\": { \"type\": \"string\" },\n            \"end\": { \"type\": \"string\" }\n          },\n          \"required\": [\"start\", \"end\"]\n        },\n        \"psychological_flexibility\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"self_awareness\": { \"type\": \"integer\", \"minimum\": 0, \"maximum\": 100 },\n            \"observation\": { \"type\": \"integer\", \"minimum\": 0, \"maximum\": 100 },\n            \"physical_awareness\": { \"type\": \"integer\", \"minimum\": 0, \"maximum\": 100 },\n            \"core_values\": { \"type\": \"integer\", \"minimum\": 0, \"maximum\": 100 },\n            \"relationships\": { \"type\": \"integer\", \"minimum\": 0, \"maximum\": 100 }\n          },\n          \"required\": [\"self_awareness\", \"observation\", \"physical_awareness\", \"core_values\", \"relationships\"]\n        },\n        \"self_compassion_score\": { \"type\": \"integer\", \"minimum\": 0, \"maximum\": 100 }\n      },\n      \"required\": [\"title\", \"opening_reflection\", \"quote_of_the_day\", \"energy_shift\", \"psychological_flexibility\", \"self_compassion_score\"]\n    },\n    \"extracted_tasks\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"task_type\": { \"type\": \"string\", \"enum\": [\"journaling\", \"somatic_exercise\", \"cognitive_reframing\", \"behavioral_exposure\", \"situational_prep\", \"general\"] },\n          \"dynamic_title\": { \"type\": \"string\" },\n          \"dynamic_description\": { \"type\": \"string\" },\n          \"frequency\": { \"type\": \"string\", \"enum\": [\"daily\", \"weekly\", \"situational\", \"once\"] },\n          \"suggested_duration_days\": { \"type\": \"integer\", \"minimum\": 1, \"maximum\": 90 }\n        },\n        \"required\": [\"task_type\", \"dynamic_title\", \"dynamic_description\", \"frequency\", \"suggested_duration_days\"]\n      }\n    },\n    \"extracted_memories\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"memory_text\": { \"type\": \"string\" },\n          \"memory_type\": { \"type\": \"string\", \"enum\": [\"fact\", \"trigger\", \"coping_strategy\", \"relationship\", \"goal\"] }\n        },\n        \"required\": [\"memory_text\", \"memory_type\"]\n      }\n    }\n  },\n  \"required\": [\"case_notes\", \"session_summary\", \"extracted_tasks\", \"extracted_memories\"]\n}"
             },
-            "id": "4",
-            "name": "Format Output",
-            "type": "n8n-nodes-base.code",
-            "typeVersion": 2,
-            "position": [
-                660,
-                300
-            ]
+            "id": "node_output_parser",
+            "name": "Structured Output Parser",
+            "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+            "typeVersion": 1.2,
+            "position": [440, 680]
         },
         {
             "parameters": {
@@ -81,60 +68,38 @@
                 "responseBody": "={{ $json }}",
                 "options": {}
             },
-            "id": "5",
+            "id": "node_respond",
             "name": "Respond to Webhook",
             "type": "n8n-nodes-base.respondToWebhook",
             "typeVersion": 1,
-            "position": [
-                880,
-                300
-            ]
+            "position": [660, 300]
         }
     ],
     "pinData": {},
     "connections": {
         "Webhook": {
             "main": [
-                [
-                    {
-                        "node": "Prompt Builder",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
+                [{ "node": "Prompt Builder", "type": "main", "index": 0 }]
             ]
         },
         "Prompt Builder": {
             "main": [
-                [
-                    {
-                        "node": "Summarizer LLM",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
+                [{ "node": "Summarizer Agent", "type": "main", "index": 0 }]
+            ]
+        },
+        "Summarizer Agent": {
+            "main": [
+                [{ "node": "Respond to Webhook", "type": "main", "index": 0 }]
             ]
         },
         "Summarizer LLM": {
-            "main": [
-                [
-                    {
-                        "node": "Format Output",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
+            "ai_languageModel": [
+                [{ "node": "Summarizer Agent", "type": "ai_languageModel", "index": 0 }]
             ]
         },
-        "Format Output": {
-            "main": [
-                [
-                    {
-                        "node": "Respond to Webhook",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
+        "Structured Output Parser": {
+            "ai_outputParser": [
+                [{ "node": "Summarizer Agent", "type": "ai_outputParser", "index": 0 }]
             ]
         }
     },
@@ -142,5 +107,5 @@
     "settings": {
         "executionOrder": "v1"
     },
-    "versionId": "c1c2c3c4-d5d6-e7e8-f9f0-g1g2g3g4g5g6"
+    "versionId": "d2e3f4a5-b6c7-8d9e-0f1a-2b3c4d5e6f7a"
 }

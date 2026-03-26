@@ -1,13 +1,12 @@
 import React from 'react';
-import { Home, MessageCircle, Map, Sparkles, User } from 'lucide-react';
+import { Home, ClipboardList, BookOpen, BookHeart } from 'lucide-react';
 import { useMindCoachStore, TabId } from '../../store/mindCoachStore';
 
 const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: 'home', label: 'Home', icon: Home },
-  { id: 'sessions', label: 'Sessions', icon: MessageCircle },
-  { id: 'journey', label: 'Journey', icon: Map },
-  { id: 'toolkit', label: 'Toolkit', icon: Sparkles },
-  { id: 'profile', label: 'Profile', icon: User },
+  { id: 'assessments', label: 'Assessments', icon: ClipboardList },
+  { id: 'journal', label: 'Journal', icon: BookOpen },
+  { id: 'diary', label: 'Diary', icon: BookHeart },
 ];
 
 export const BottomNav: React.FC = () => {

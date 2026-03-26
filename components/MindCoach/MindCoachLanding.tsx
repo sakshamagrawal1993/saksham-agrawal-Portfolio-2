@@ -39,6 +39,7 @@ interface TherapistOption {
   color: string;
   bgColor: string;
   sample: string;
+  avatarUrl?: string;
 }
 
 const THERAPISTS: TherapistOption[] = [
@@ -51,6 +52,7 @@ const THERAPISTS: TherapistOption[] = [
     bgColor: 'bg-[#B4A7D6]/15',
     sample:
       "I hear you, and I want you to know — what you're feeling makes complete sense.",
+    avatarUrl: "https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/guide-avatars/maya.png",
   },
   {
     id: 'alex',
@@ -61,6 +63,7 @@ const THERAPISTS: TherapistOption[] = [
     bgColor: 'bg-[#D4A574]/15',
     sample:
       "Let's break this down together and find practical steps you can take today.",
+    avatarUrl: "https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/guide-avatars/alex.png",
   },
   {
     id: 'sage',
@@ -71,6 +74,7 @@ const THERAPISTS: TherapistOption[] = [
     bgColor: 'bg-[#6B8F71]/15',
     sample:
       "What if we explored what's underneath that feeling? There might be something important there.",
+    avatarUrl: "https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/guide-avatars/sage.png",
   },
 ];
 
@@ -528,12 +532,20 @@ function TherapistStep({
                   }`}
               >
                 <div className="flex items-start gap-3">
-                  <div
-                    className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-white font-semibold text-sm"
-                    style={{ backgroundColor: t.color }}
-                  >
-                    {t.name[0]}
-                  </div>
+                  {t.avatarUrl ? (
+                    <img
+                      src={t.avatarUrl}
+                      alt={t.name}
+                      className="w-12 h-12 rounded-full flex-shrink-0 object-cover border border-[#E8E4DE]"
+                    />
+                  ) : (
+                    <div
+                      className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-white font-semibold text-sm"
+                      style={{ backgroundColor: t.color }}
+                    >
+                      {t.name[0]}
+                    </div>
+                  )}
                   <div className="flex-1 min-w-0 space-y-1">
                     <div className="flex items-baseline gap-2">
                       <span className="font-semibold text-[#2C2A26]">{t.name}</span>
@@ -749,7 +761,29 @@ function JourneyPreviewStep({
 
       if (journeyError) throw journeyError;
 
-      setStoreJourney(journeyData as MindCoachJourney);
+      const newJourney = journeyData as MindCoachJourney;
+      setStoreJourney(newJourney);
+
+      // Create initial session automatically
+      const { data: sessionData, error: sessionError } = await supabase
+        .from('mind_coach_sessions')
+        .insert({
+          profile_id: newProfile.id,
+          journey_id: newJourney.id,
+          phase_number: 1,
+          session_number: 1,
+          session_state: 'intake',
+          message_count: 0,
+        })
+        .select()
+        .single();
+        
+      if (!sessionError && sessionData) {
+        useMindCoachStore.getState().setActiveSession(sessionData);
+        useMindCoachStore.getState().setSessions([sessionData]);
+        useMindCoachStore.getState().setMessages([]);
+      }
+
       navigate(`/mind-coach/${newProfile.id}`);
     } catch (err) {
       console.error('Failed to create profile:', err);
@@ -760,73 +794,130 @@ function JourneyPreviewStep({
   return (
     <StepShell step={8} onBack={loading ? undefined : onBack}>
       {loading ? (
-        <div className="flex-1 flex flex-col items-center justify-center text-center space-y-6">
-          <div className="relative w-16 h-16">
+        <div className="flex-1 flex flex-col items-center justify-center text-center space-y-8">
+          <div className="relative w-24 h-24">
             <motion.div
-              className="absolute inset-0 rounded-full border-2 border-[#6B8F71]/20"
-              animate={{ scale: [1, 1.3, 1], opacity: [0.4, 0, 0.4] }}
+              className="absolute inset-0 rounded-full border border-[#6B8F71]/20"
+              animate={{ scale: [1, 1.5, 1], opacity: [0.5, 0, 0.5] }}
               transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
             />
-            <div className="absolute inset-0 rounded-full border-2 border-t-[#6B8F71] border-r-transparent border-b-transparent border-l-transparent animate-spin" />
+            <motion.div
+              className="absolute inset-2 rounded-full border border-[#6B8F71]/40"
+              animate={{ scale: [1, 1.2, 1], opacity: [0.8, 0, 0.8] }}
+              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut', delay: 0.2 }}
+            />
+            <div className="absolute inset-4 rounded-full border-2 border-t-[#6B8F71] border-r-transparent border-b-transparent border-l-transparent animate-spin" />
             <div className="absolute inset-0 flex items-center justify-center">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6B8F71" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#6B8F71" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 2a7 7 0 0 1 7 7c0 3-1.5 5.5-4 7.5V19a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-2.5C6.5 14.5 5 12 5 9a7 7 0 0 1 7-7z" />
               </svg>
             </div>
           </div>
-          <div className="space-y-2">
-            <p className="text-lg font-medium text-[#2C2A26]">
-              Crafting your personalized path&hellip;
-            </p>
-            <p className="text-sm text-[#2C2A26]/40">
-              Tailoring sessions to your unique needs
-            </p>
+          <div className="space-y-3">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              <h3 className="text-xl font-semibold text-[#2C2A26]">
+                Crafting your personalized path&hellip;
+              </h3>
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3, duration: 0.5 }}
+            >
+              <p className="text-sm text-[#2C2A26]/50">
+                Tailoring sessions to your unique needs
+              </p>
+            </motion.div>
           </div>
         </div>
       ) : journey ? (
-        <div className="flex-1 flex flex-col max-w-sm mx-auto w-full space-y-6">
-          <div className="space-y-2 pt-2">
-            <h2 className="text-2xl font-semibold text-[#2C2A26]">
+        <motion.div 
+          initial={{ opacity: 0 }} 
+          animate={{ opacity: 1 }} 
+          className="flex-1 flex flex-col max-w-md mx-auto w-full space-y-8 pb-4"
+        >
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, duration: 0.5 }}
+            className="text-center space-y-4 pt-2"
+          >
+            <div className="inline-flex items-center gap-2 bg-gradient-to-r from-[#6B8F71]/15 to-[#6B8F71]/5 px-4 py-1.5 rounded-full mb-1">
+               <svg className="w-3.5 h-3.5 text-[#6B8F71]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+               </svg>
+               <span className="text-xs font-semibold text-[#6B8F71] tracking-wide uppercase">Your Path Formulated</span>
+            </div>
+            <h2 className="text-3xl font-bold text-[#2C2A26] tracking-tight">
               {journey.title}
             </h2>
-            <p className="text-sm text-[#2C2A26]/50">{journey.description}</p>
+            <p className="text-[15px] text-[#2C2A26]/60 max-w-[320px] mx-auto leading-relaxed">
+              {journey.description}
+            </p>
             {routedPathway && (
-              <span className="inline-block text-xs px-2.5 py-1 bg-[#6B8F71]/10 text-[#6B8F71] font-medium rounded-full">
+              <span className="inline-block text-[11px] px-3 py-1 bg-[#2C2A26]/5 text-[#2C2A26]/50 font-medium rounded-full uppercase tracking-wider mt-2">
                 {routedPathway.replace(/_/g, ' ')}
               </span>
             )}
-          </div>
+          </motion.div>
 
-          <div className="space-y-3 flex-1">
+          <div className="space-y-0 flex-1 relative mt-2">
+            <div className="absolute left-[23px] top-6 bottom-6 w-0.5 bg-gradient-to-b from-[#6B8F71]/30 via-[#6B8F71]/10 to-transparent rounded-full" />
+            
             {journey.phases.map((phase, idx) => (
-              <div
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: idx * 0.15 + 0.3, duration: 0.5, type: 'spring', stiffness: 100 }}
                 key={phase.phase_number}
-                className="flex gap-3"
+                className="relative flex gap-5 items-start mb-6 last:mb-0 group"
               >
-                <div className="flex flex-col items-center">
-                  <div className="w-8 h-8 rounded-full bg-[#6B8F71]/10 flex items-center justify-center text-xs font-semibold text-[#6B8F71]">
+                <div className="relative z-10 flex flex-col items-center mt-1">
+                  <div className="w-12 h-12 rounded-2xl bg-white border-2 border-[#E8E4DE] group-hover:border-[#6B8F71]/50 group-hover:shadow-md transition-all duration-300 flex items-center justify-center text-sm font-bold text-[#2C2A26] group-hover:text-[#6B8F71]">
                     {phase.phase_number}
                   </div>
-                  {idx < journey.phases.length - 1 && (
-                    <div className="w-px flex-1 bg-[#E8E4DE] my-1" />
-                  )}
                 </div>
-                <div className="pb-4 flex-1">
-                  <p className="font-medium text-sm text-[#2C2A26]">
-                    {phase.title}
-                  </p>
-                  <p className="text-xs text-[#2C2A26]/50 mt-0.5">
+
+                <div className="flex-1 bg-white p-5 rounded-3xl border border-[#E8E4DE] shadow-sm group-hover:shadow-md group-hover:border-[#6B8F71]/20 transition-all duration-300">
+                  <div className="flex items-start justify-between mb-2">
+                    <p className="font-semibold text-[#2C2A26] text-base group-hover:text-[#6B8F71] transition-colors">
+                      {phase.title}
+                    </p>
+                  </div>
+                  <p className="text-sm text-[#2C2A26]/60 leading-relaxed">
                     {phase.goal}
                   </p>
+                  
+                  {/* Small dots representing sessions */}
+                  <div className="flex gap-1.5 mt-4">
+                    {phase.sessions.map((session) => (
+                      <div 
+                        key={session.session_number} 
+                        className="w-1.5 h-1.5 rounded-full bg-[#E8E4DE] group-hover:bg-[#6B8F71]/40 transition-colors"
+                        title={session.topic} 
+                      />
+                    ))}
+                  </div>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
 
-          <PrimaryButton onClick={handleStart} disabled={saving}>
-            {saving ? 'Setting up...' : 'Start Your Journey'}
-          </PrimaryButton>
-        </div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: journey.phases.length * 0.15 + 0.4, duration: 0.5 }}
+            className="pt-4"
+          >
+            <PrimaryButton onClick={handleStart} disabled={saving}>
+              {saving ? 'Setting up...' : 'Start Your Journey'}
+            </PrimaryButton>
+          </motion.div>
+        </motion.div>
       ) : null}
     </StepShell>
   );

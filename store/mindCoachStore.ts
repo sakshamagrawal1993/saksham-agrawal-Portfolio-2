@@ -36,7 +36,20 @@ export type MemoryType =
   | 'life_context'
   | 'preference';
 
-export type TabId = 'home' | 'sessions' | 'journey' | 'toolkit' | 'profile';
+export type TaskType =
+  | 'journaling'
+  | 'grounding'
+  | 'behavioral_activation'
+  | 'cognitive_restructuring'
+  | 'sleep_hygiene'
+  | 'mindfulness'
+  | 'communication'
+  | 'boundary_setting'
+  | 'exposure'
+  | 'self_compassion'
+  | 'general';
+
+export type TabId = 'home' | 'sessions' | 'assessments' | 'journal' | 'diary';
 
 import { DynamicContentType } from '../lib/dynamicContentLibrary';
 
@@ -161,6 +174,22 @@ export interface Exercise {
   created_at: string;
 }
 
+export interface UserTask {
+  id: string;
+  profile_id: string;
+  session_id: string;
+  task_type: TaskType;
+  dynamic_title: string;
+  dynamic_description: string;
+  task_name: string;
+  task_description: string;
+  task_frequency: 'daily' | 'weekly' | 'once';
+  task_start_date: string;
+  task_end_date: string;
+  status: 'active' | 'completed' | 'skipped';
+  created_at: string;
+}
+
 // Feature unlock gates per phase
 export const UNLOCK_MAP: Record<number, string[]> = {
   1: ['chat'],
@@ -214,6 +243,14 @@ interface MindCoachState {
   exercises: Exercise[];
   setExercises: (e: Exercise[]) => void;
 
+  // Tasks
+  activeTasks: UserTask[];
+  setActiveTasks: (t: UserTask[]) => void;
+
+  // Session close
+  isSessionClose: boolean;
+  setIsSessionClose: (close: boolean) => void;
+
   // UI
   activeTab: TabId;
   setActiveTab: (tab: TabId) => void;
@@ -235,11 +272,13 @@ const initialState = {
   messages: [],
   isLoading: false,
   isCrisisDetected: false,
+  isSessionClose: false,
   memories: [],
   recentCaseNotes: [],
   journalEntries: [],
   moodEntries: [],
   exercises: [],
+  activeTasks: [],
   activeTab: 'home' as TabId,
 };
 
@@ -270,6 +309,8 @@ export const useMindCoachStore = create<MindCoachState>((set, get) => ({
   setJournalEntries: (journalEntries) => set({ journalEntries }),
   setMoodEntries: (moodEntries) => set({ moodEntries }),
   setExercises: (exercises) => set({ exercises }),
+  setActiveTasks: (activeTasks) => set({ activeTasks }),
+  setIsSessionClose: (isSessionClose) => set({ isSessionClose }),
 
   setActiveTab: (activeTab) => set({ activeTab }),
 

@@ -1,327 +1,279 @@
 {
-    "name": "Mind Coach - Therapist Chat & Discovery",
+    "name": "Mind Coach - Therapist Chat & Discovery (v5 Agents)",
     "nodes": [
         {
-            "parameters": {
-                "httpMethod": "POST",
-                "path": "mind-coach-chat",
-                "options": {}
-            },
-            "id": "1",
+            "id": "webhook",
             "name": "Webhook",
             "type": "n8n-nodes-base.webhook",
             "typeVersion": 1.1,
-            "position": [
-                0,
-                300
-            ]
-        },
-        {
+            "position": [0, 400],
             "parameters": {
-                "resource": "chat",
-                "operation": "create",
-                "model": "gpt-4o-mini",
-                "messages": {
-                    "messageValues": [
-                        {
-                            "role": "system",
-                            "content": "You are an AI crisis detector for a mental health application.\nAnalyze the user's message. If it contains immediate threat to life, self-harm, or severe abuse, respond with JSON:\n{ \"crisis_detected\": true, \"reply\": \"I want to make sure you are safe. Please consider reaching out to a crisis line immediately.\" }\nOtherwise respond with:\n{ \"crisis_detected\": false }"
-                        },
-                        {
-                            "role": "user",
-                            "content": "={{ $json.body.message_text }}"
-                        }
-                    ]
-                },
+                "httpMethod": "POST",
+                "path": "mind-coach-chat",
+                "options": { "responseMode": "responseNode" }
+            }
+        },
+
+        {
+            "id": "crisis_agent",
+            "name": "Crisis Screening Agent",
+            "type": "@n8n/n8n-nodes-langchain.agent",
+            "typeVersion": 1.7,
+            "position": [280, 400],
+            "parameters": {
+                "text": "={{ $json.body.message_text }}",
+                "hasOutputParser": true,
                 "options": {
-                    "responseFormat": {
-                        "type": "json_object"
-                    },
-                    "temperature": 0
+                    "systemMessage": "You are a crisis safety screening AI for a mental health application.\n\nAnalyze ONLY the user's latest message for immediate risk signals:\n- Suicidal ideation with concrete intent or plan\n- Active self-harm behavior\n- Imminent danger to self or others\n\nDo NOT flag:\n- General sadness, hopelessness, or vague distress\n- Expressions like 'I want to disappear' or 'I can't take this anymore' without concrete intent\n- Past tense descriptions of difficult experiences\n\nYou must return a structured JSON response."
                 }
-            },
-            "id": "2",
-            "name": "Crisis Engine",
-            "type": "n8n-nodes-base.openAi",
-            "typeVersion": 1,
-            "position": [
-                220,
-                300
-            ]
+            }
         },
         {
+            "id": "crisis_model",
+            "name": "Crisis Model (GPT-4o-mini)",
+            "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+            "typeVersion": 1,
+            "position": [180, 620],
             "parameters": {
-                "dataType": "boolean",
-                "value1": "={{ JSON.parse($json.message.content).crisis_detected }}",
-                "rules": {
-                    "rules": [
-                        {
-                            "value2": true
-                        }
-                    ]
-                }
-            },
-            "id": "3",
+                "model": "gpt-4o-mini",
+                "options": { "temperature": 0 }
+            }
+        },
+        {
+            "id": "crisis_parser",
+            "name": "Crisis Output Parser",
+            "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+            "typeVersion": 1.2,
+            "position": [380, 620],
+            "parameters": {
+                "schemaType": "fromJson",
+                "jsonSchemaExample": "{\n  \"crisis_detected\": false,\n  \"crisis_type\": \"none\",\n  \"reply\": \"\"\n}"
+            }
+        },
+
+        {
+            "id": "is_crisis",
             "name": "Is Crisis?",
             "type": "n8n-nodes-base.switch",
             "typeVersion": 1,
-            "position": [
-                440,
-                300
-            ]
-        },
-        {
+            "position": [560, 400],
             "parameters": {
-                "respondWith": "json",
-                "responseBody": "={{ JSON.parse($node[\"Crisis Engine\"].json.message.content) }}",
-                "options": {}
-            },
-            "id": "4",
+                "dataType": "boolean",
+                "value1": "={{ $json.output.crisis_detected }}",
+                "rules": { "rules": [{ "value2": true }] }
+            }
+        },
+
+        {
+            "id": "return_crisis",
             "name": "Return Crisis Alert",
             "type": "n8n-nodes-base.respondToWebhook",
             "typeVersion": 1,
-            "position": [
-                660,
-                100
-            ]
-        },
-        {
+            "position": [800, 160],
             "parameters": {
-                "jsCode": "const data = $node[\"Webhook\"].json.body;\nconst persona = data.profile.therapist_persona || \"Empathetic Listener\";\nconst theme = data.dynamic_theme || \"Unknown\";\nconst memories = (data.memories || []).map(m => `- ${m.type}: ${m.text}`).join('\\n');\nconst currentPhase = data.journey_context ? data.journey_context.current_phase : 1;\nconst pathwayTitle = data.journey_context ? data.journey_context.title : data.pathway;\nconst messageCount = data.message_count || 1;\n\n// Format up to the last 20 messages for short-term memory context\nconst transcript = (data.messages || []).slice(-20).map(m => `${m.role === 'user' ? 'Client' : 'Therapist'}: ${m.content}`).join('\\n');\n\nlet pacingInstruction = \"\";\nif (messageCount >= 13 && messageCount < 18) {\n  pacingInstruction = `The session is in the Synthesis phase. Begin to transition the conversation toward a closing insight aligned with Phase ${currentPhase}. Help the user identify one small, actionable 'Takeaway Task' based on today's discussion.`;\n} else if (messageCount >= 18) {\n  pacingInstruction = `The session is nearing its end. Synthesize today's insight, clearly state their specific uniquely tailored 'Takeaway Task' aligned with Phase ${currentPhase}, and gently encourage them to click the 'End Session' button at the bottom of the screen.`;\n}\n\nlet phaseInstruction = \"\";\nif (currentPhase === 1) phaseInstruction = \"Focus purely on somatic grounding, safety, and symptom relief.\";\nelse if (currentPhase === 2) phaseInstruction = \"Focus on identifying the environmental or cognitive triggers of their issue.\";\nelse if (currentPhase === 3) phaseInstruction = \"Actively challenge the cognitive distortion or behavioral pattern using CBT frameworks.\";\nelse if (currentPhase === 4) phaseInstruction = \"Focus on resilience, celebrating wins, and planning for future setbacks.\";\n\nconst systemPrompt = `You are a mental health coach.\\nYour persona is: ${persona}\\nCurrent clinical theme: ${theme}\\nThe user is currently in Phase ${currentPhase} of the \"${pathwayTitle}\" therapeutic pathway.\\nPhase Goal: ${phaseInstruction}\\n\\nLong-term Client Context (Facts, Triggers, Goals):\\n${memories}\\n\\nRecent Session Transcript (Short-term Memory):\\n${transcript}\\n\\nINSTRUCTIONS:\\nRespond empathetically in a single short message. You MUST seamlessly continue the conversation based on the transcript above.\\n\\n${pacingInstruction}\\n\\nYou also have the ability to inject dynamic tools into the chat. If the user exhibits acute panic or high emotional distress, inject a grounding exercise ('box_breathing' or 'senses_54321'). If they struggle with sleep or physical tension, inject a video ('meditation_sleep' or 'somatic_tension'). If they mention persistent anxiety/worry (GAD-7), stress (PSS-4), or depression (PHQ-9) and you haven't assessed them recently, inject an assessment.\\n\\nReturn ONLY valid JSON in this exact format:\\n{\\n  \"reply\": \"<Your empathetic conversational response>\",\\n  \"dynamic_content\": {\\n    \"type\": \"video|game|assessment\",\\n    \"payload\": \"<id_of_tool>\"\\n  }\\n}\\n\\n(Omit the dynamic_content key entirely if no tool is needed).`;\n\nreturn [{ json: { systemPrompt } }];"
-            },
-            "id": "5",
+                "respondWith": "json",
+                "responseBody": "={{ { crisis_detected: true, crisis_type: $json.output.crisis_type, reply: $json.output.reply || 'I hear how much pain you are in right now. Your safety matters deeply to me. Please reach out to a crisis line — iCall: 9152987821 or iCall chat at icallhelpline.org. I am here with you.' } }}",
+                "options": {}
+            }
+        },
+
+        {
+            "id": "prompt_builder",
             "name": "Prompt Builder",
             "type": "n8n-nodes-base.code",
             "typeVersion": 2,
-            "position": [
-                660,
-                420
-            ]
-        },
-        {
+            "position": [800, 520],
             "parameters": {
-                "resource": "chat",
-                "operation": "create",
-                "model": "gpt-4o",
-                "messages": {
-                    "messageValues": [
-                        {
-                            "role": "system",
-                            "content": "={{ $json.systemPrompt }}"
-                        },
-                        {
-                            "role": "user",
-                            "content": "={{ $node[\"Webhook\"].json.body.message_text }}"
-                        }
-                    ]
-                },
+                "jsCode": "const data = $node[\"Webhook\"].json.body;\n\n// ── 1. RAW CONTEXT FROM SUPABASE ──────────────────────────────────\nconst pd           = data.profile || {};\nconst memories     = data.memories || [];\nconst assessments  = data.assessments || [];\nconst activeTasks  = data.recent_tasks_assigned || [];\nconst caseNotes    = data.recent_case_notes || [];\nconst messages     = data.messages || [];\n\nconst coachPrompt  = data.coach_prompt  || 'You are an empathetic, non-judgmental mental health coach.';\nconst phasePrompt  = data.phase_prompt  || 'Focus on building therapeutic rapport and gathering clinical context.';\nconst pathway      = data.pathway       || 'engagement_rapport_and_assessment';\nconst theme        = data.dynamic_theme || 'Not yet identified';\nconst messageCount = data.message_count || 1;\nconst currentPhase = data.journey_context?.current_phase || 1;\nconst profileId    = data.profile_id    || '';\nconst sessionId    = data.session_id    || '';\nconst isGreeting   = data.is_system_greeting || false;\n\n// ── 2. STRINGIFY CONTEXT SECTIONS ────────────────────────────────\nconst personalDetails = [\n  `Name: ${pd.name || 'Unknown'}`,\n  `Age: ${pd.age || 'Unknown'}`,\n  `Gender: ${pd.gender || 'Unknown'}`,\n  `Presenting Concerns: ${(pd.concerns || []).join(', ') || 'Not specified'}`,\n].join('\\n');\n\nconst memoriesStr = memories.length\n  ? memories.map(m => `  [${(m.type || 'fact').toUpperCase()}] ${m.text}`).join('\\n')\n  : '  None recorded yet.';\n\nconst assessmentsStr = assessments.length\n  ? assessments.map(a => `  ${a.assessment_type}: ${a.score} (${new Date(a.created_at).toLocaleDateString()})`).join('\\n')\n  : '  No formal assessments completed yet.';\n\nconst tasksStr = activeTasks.length\n  ? activeTasks.map(t => `  - ${t.dynamic_title || t.task_name} (${t.task_frequency})\\n    -> ${t.dynamic_description || t.task_description}`).join('\\n')\n  : '  No active homework assigned.';\n\nconst notesStr = caseNotes.length\n  ? caseNotes.map((n, i) => `  Session -${i+1}: Concern: \"${n.presenting_concern}\" | Progress: ${n.phase_progress} | Readiness: ${n.readiness_for_next_phase}`).join('\\n')\n  : '  No prior session notes.';\n\nconst transcript = messages.slice(-20)\n  .map(m => `  ${m.role === 'user' ? 'Client' : 'Therapist'}: ${m.content}`)\n  .join('\\n');\n\n// ── 3. PACING / OVERRIDE INSTRUCTION ─────────────────────────────\n// Priority order: highest turn threshold first (50 > 24 > 18 > 15 > 13)\nlet pacingInstruction = '';\nlet shouldRunDiscovery = false;\n\nif (isGreeting) {\n  // GREETING — first message of the session\n  pacingInstruction = `\\n[GREETING]\\nThis is the very first message of the session. Generate a warm, personalised opening greeting.\\n- Address the client by name (${pd.name || 'there'}).\\n- Briefly reflect their stated concerns (${(pd.concerns || []).join(', ')}) back with empathy and warmth.\\n- If this is a returning session, reference a relevant memory or past session theme.\\n- Do NOT ask a question yet — just make them feel heard and welcome.\\n- Set is_session_close to false.`;\n} else if (messageCount >= 50) {\n  // HARD CLOSE — extended session\n  pacingInstruction = `\\n[EXTENDED SESSION OVERRIDE — TURN ${messageCount}]\\nThis session has exceeded 50 messages. You MUST bring this session to a close within 2-3 messages maximum.\\nUse the session-close phrase: \"I'm really glad we took this time together today, ${pd.name || 'there'}. You've shared something really important. I'll carry this with you into our next conversation. Take good care of yourself. 💙\"\\nSet is_session_close to true in your JSON response.`;\n} else if (messageCount >= 24) {\n  // SOFT CLOSE — use closing phrase\n  pacingInstruction = `\\n[SESSION CLOSING — TURN ${messageCount}]\\nThis session is at its natural closing point. Use your session-close phrase now:\\n\"I'm really glad we took this time together today, ${pd.name || 'there'}. You've shared something really important. Before you go — I'd love for you to try [mention a relevant task] this week. Take good care of yourself. 💙\"\\nSet is_session_close to true in your JSON response.`;\n} else if (messageCount >= 18) {\n  // SYNTHESIS — begin wrapping up\n  pacingInstruction = `\\n[SYNTHESIS PHASE — TURN ${messageCount}]\\nBegin transitioning toward a closing insight. Help the client articulate one small, concrete Takeaway Task rooted in Phase ${currentPhase}'s therapeutic goals.\\nDo NOT close yet. Set is_session_close to false.`;\n} else if (pathway === 'engagement_rapport_and_assessment' && messageCount >= 15 && messageCount % 5 === 0) {\n  // PATHWAY CHECK — runs at turns 15, 20, 25, 30...\n  pacingInstruction = `\\n[SYSTEM OVERRIDE - PATHWAY DECISION REQUIRED — TURN ${messageCount}]\\nYou have gathered ${messageCount} messages of exploratory context. It is now clinically appropriate to move toward a pathway decision.\\nBased on everything shared, identify the 2 most clinically relevant pathways from the 20 available options.\\nPresent them warmly and collaboratively to the client. Ask which resonates more. Avoid clinical jargon.\\nSet is_session_close to false.`;\n  shouldRunDiscovery = true;\n} else if (messageCount >= 13) {\n  // PRE-SYNTHESIS\n  pacingInstruction = `\\n[SYNTHESIS PHASE — TURN ${messageCount}]\\nBegin transitioning toward a closing insight. Help the client articulate one small, concrete Takeaway Task rooted in Phase ${currentPhase}'s therapeutic goals.\\nSet is_session_close to false.`;\n}\n\n// Discovery Agent should also run on every 5th turn during assessment for background classification\nif (pathway === 'engagement_rapport_and_assessment' && messageCount >= 15 && messageCount % 5 === 0) {\n  shouldRunDiscovery = true;\n}\n\n// ── 4. FINAL ASSEMBLED SYSTEM PROMPT ─────────────────────────────\nconst systemPrompt = `${coachPrompt}\\n\\n${phasePrompt}\\n\\n[CLIENT PROFILE]\\n${personalDetails}\\n\\n[CURRENT CLINICAL THEME]\\n${theme}\\n\\n[ASSESSMENT SCORES]\\n${assessmentsStr}\\n\\n[ACTIVE HOMEWORK / TASKS ASSIGNED]\\n${tasksStr}\\n\\n[PAST SESSION CASE NOTES]\\n${notesStr}\\n\\n[LONG-TERM MEMORIES]\\n${memoriesStr}\\n\\n[SESSION TRANSCRIPT (last 20 messages)]\\n${transcript}\\n\\n[INSTRUCTIONS]\\n- Respond in ONE empathetic, conversational message. Never bullet points, never clinical language.\\n- You MUST acknowledge the client's last statement before moving forward.\\n- If the client has active tasks above, naturally check in on their progress before moving to new topics.\\n- You may inject ONE dynamic tool per message if clinically warranted:\\n    Grounding game: 'box_breathing' or 'senses_54321' -> use if client shows acute panic/distress\\n    Video: 'meditation_sleep' or 'somatic_tension' -> use if client mentions poor sleep or physical tension\\n    Assessment: 'gad7' | 'phq9' | 'pss4' -> use if a matching condition is mentioned and not recently assessed\\n    Do NOT inject tools in every message. Only when genuinely clinically useful.\\n\\n[is_session_close FIELD]\\nYour output has an is_session_close boolean field. Set it to true ONLY when you use the session-close phrase to end the session. Otherwise always set it to false.\\n${pacingInstruction}\\n\\n[MEMORY TOOL]\\nYou have access to a 'Save Memory' Postgres tool. Use it to INSERT a new row into the mind_coach_memories table whenever the client reveals an important, persistent fact about themselves that should be remembered long-term across sessions.\\nExamples of what to save: triggers, coping strategies, relationships, goals, preferences, significant life events.\\nDo NOT save: transient emotions, session logistics, or things already in the memories list above.\\nWhen saving, use profile_id='${profileId}' and session_id='${sessionId}'.\\n\\nYou must return a structured JSON response.`;\n\nreturn [{ json: { systemPrompt, userMessage: data.message_text || '', profileId, sessionId, shouldRunDiscovery, messageCount } }];"
+            }
+        },
+
+        {
+            "id": "therapist_agent",
+            "name": "Therapist Agent",
+            "type": "@n8n/n8n-nodes-langchain.agent",
+            "typeVersion": 1.7,
+            "position": [1080, 520],
+            "parameters": {
+                "text": "={{ $json.userMessage }}",
+                "hasOutputParser": true,
                 "options": {
-                    "responseFormat": {
-                        "type": "json_object"
-                    },
-                    "temperature": 0.5
+                    "systemMessage": "={{ $json.systemPrompt }}"
                 }
-            },
-            "id": "6",
-            "name": "Therapist LLM",
-            "type": "n8n-nodes-base.openAi",
-            "typeVersion": 1,
-            "position": [
-                880,
-                420
-            ]
+            }
         },
         {
+            "id": "therapist_model",
+            "name": "Therapist Model (GPT-4o)",
+            "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+            "typeVersion": 1,
+            "position": [940, 740],
             "parameters": {
-                "dataType": "string",
-                "value1": "={{ $node[\"Webhook\"].json.body.pathway }}",
-                "rules": {
-                    "rules": [
-                        {
-                            "value2": "engagement_rapport_and_assessment"
-                        }
-                    ]
-                }
+                "model": "gpt-4o",
+                "options": { "temperature": 0.55, "maxTokens": 400 }
+            }
+        },
+        {
+            "id": "therapist_parser",
+            "name": "Therapist Output Parser",
+            "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+            "typeVersion": 1.2,
+            "position": [1100, 740],
+            "parameters": {
+                "schemaType": "fromJson",
+                "jsonSchemaExample": "{\n  \"reply\": \"I completely understand that feeling of tightness. Were you able to capture any of those moments in your Daily Trigger Log this week?\",\n  \"is_session_close\": false,\n  \"dynamic_content\": {\n    \"type\": \"game\",\n    \"payload\": \"box_breathing\"\n  }\n}"
+            }
+        },
+        {
+            "id": "save_memory_tool",
+            "name": "Save Memory (Postgres)",
+            "type": "n8n-nodes-base.postgresTool",
+            "typeVersion": 1,
+            "position": [1260, 740],
+            "parameters": {
+                "operation": "insert",
+                "schema": "public",
+                "table": "mind_coach_memories",
+                "columns": "profile_id, session_id, memory_text, memory_type",
+                "description": "Use this tool to save a new long-term memory about the client. Call this when the client reveals an important, persistent fact (a trigger, coping strategy, relationship, goal, or preference) that should be remembered across future sessions. Parameters: profile_id (UUID of the client), session_id (UUID of the current session), memory_text (the specific fact to remember), memory_type (one of: fact, trigger, coping_strategy, relationship, goal)."
             },
-            "id": "7",
+            "credentials": {
+                "postgres": {
+                    "id": "SUPABASE_POSTGRES_CREDENTIAL_ID",
+                    "name": "Supabase Postgres"
+                }
+            }
+        },
+
+        {
+            "id": "is_assessment",
             "name": "Is Assessment Phase?",
             "type": "n8n-nodes-base.switch",
             "typeVersion": 1,
-            "position": [
-                1100,
-                420
-            ]
-        },
-        {
+            "position": [1360, 520],
             "parameters": {
-                "resource": "chat",
-                "operation": "create",
-                "model": "gpt-4o-mini",
-                "messages": {
-                    "messageValues": [
-                        {
-                            "role": "system",
-                            "content": "You are a clinical AI evaluating an intake session.\\nBased on the user's latest message and the therapist's reply, return JSON:\\n{\\n  \"dynamic_theme\": \"<3-5 words>\",\\n  \"suggested_pathway\": \"<one of the 20 pathway strings>\",\\n  \"pathway_confidence\": <integer 0-100>\\n}"
-                        },
-                        {
-                            "role": "user",
-                            "content": "Therapist said: {{ $node[\"Therapist LLM\"].json.message.content }}"
-                        }
-                    ]
-                },
+                "dataType": "boolean",
+                "value1": "={{ $node[\"Prompt Builder\"].json.shouldRunDiscovery }}",
+                "rules": { "rules": [{ "value2": true }] }
+            }
+        },
+
+        {
+            "id": "discovery_agent",
+            "name": "Discovery Agent",
+            "type": "@n8n/n8n-nodes-langchain.agent",
+            "typeVersion": 1.7,
+            "position": [1640, 340],
+            "parameters": {
+                "text": "={{ 'Full session transcript:\\n' + ($node['Webhook'].json.body.messages || []).slice(-20).map(m => (m.role === 'user' ? 'Client' : 'Therapist') + ': ' + m.content).join('\\n') + '\\n\\nTherapist latest reply: ' + ($json.output?.reply || $json.output || '') }}",
+                "hasOutputParser": true,
                 "options": {
-                    "responseFormat": {
-                        "type": "json_object"
-                    },
-                    "temperature": 0.1
+                    "systemMessage": "You are a silent clinical intake classifier for a mental health AI. You do NOT speak to the client. Your job is to silently analyze the conversation and determine the most likely clinical pathway.\n\nAvailable pathway IDs (choose EXACTLY ONE from this list):\n- engagement_rapport_and_assessment\n- family_conflict_and_dynamics\n- crisis_intervention_and_suicide_prevention\n- sleep_and_insomnia\n- overthinking_rumination_and_cognitive_restructuring\n- depression_and_behavioral_activation\n- social_anxiety_and_isolation\n- panic_and_physical_anxiety_symptoms\n- abuse_and_safety\n- relationship_conflict_and_interpersonal\n- emotion_regulation_and_distress_tolerance\n- self_worth_and_self_esteem\n- anger_management\n- trauma_processing_and_ptsd\n- grief_and_loss_processing\n- health_anxiety_and_somatic_symptoms\n- identity_and_self_concept\n- anxiety_and_stress_management\n- boundary_setting_and_assertiveness\n- life_transition_and_adjustment\n\nIMPORTANT: You MUST return a pathway ID from the above list EXACTLY as written. Do not invent new IDs.\n\nConfidence scoring rubric:\n- Below 30: user is deflecting, off-topic, or the clinical topic is completely unclear\n- 30-69: emerging clinical pattern, continue gathering information\n- 70-84: strong signal detected, almost ready to assign pathway\n- 85+: high confidence, safe to assign this pathway permanently\n\nReturn a structured JSON response."
                 }
-            },
-            "id": "8",
-            "name": "Discovery LLM",
-            "type": "n8n-nodes-base.openAi",
-            "typeVersion": 1,
-            "position": [
-                1320,
-                300
-            ]
+            }
         },
         {
+            "id": "discovery_model",
+            "name": "Discovery Model (GPT-4o-mini)",
+            "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+            "typeVersion": 1,
+            "position": [1540, 560],
             "parameters": {
-                "jsCode": "let chatOutput = {};\ntry {\n  chatOutput = JSON.parse($node[\"Therapist LLM\"].json.message.content);\n} catch (e) {\n  chatOutput = { reply: $node[\"Therapist LLM\"].json.message.content };\n}\n\nlet merged = {\n  reply: chatOutput.reply,\n  dynamic_content: chatOutput.dynamic_content,\n  guardrail_status: \"passed\",\n  crisis_detected: false\n};\n\n// If they went through Discovery node\nif ($node[\"Discovery LLM\"]) {\n  try {\n    const discovery = JSON.parse($node[\"Discovery LLM\"].json.message.content);\n    merged.dynamic_theme = discovery.dynamic_theme;\n    merged.suggested_pathway = discovery.suggested_pathway;\n    merged.pathway_confidence = discovery.pathway_confidence;\n  } catch (e) {}\n}\n\nreturn [{ json: merged }];"
-            },
-            "id": "9",
-            "name": "Format JSON Reply",
+                "model": "gpt-4o-mini",
+                "options": { "temperature": 0.1 }
+            }
+        },
+        {
+            "id": "discovery_parser",
+            "name": "Discovery Output Parser",
+            "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+            "typeVersion": 1.2,
+            "position": [1740, 560],
+            "parameters": {
+                "schemaType": "fromJson",
+                "jsonSchemaExample": "{\n  \"dynamic_theme\": \"Workplace Anxiety & Burnout\",\n  \"suggested_pathway\": \"anxiety_and_stress_management\",\n  \"pathway_confidence\": 72\n}"
+            }
+        },
+
+        {
+            "id": "format_reply",
+            "name": "Format Final Response",
             "type": "n8n-nodes-base.code",
             "typeVersion": 2,
-            "position": [
-                1540,
-                420
-            ]
+            "position": [1920, 520],
+            "parameters": {
+                "jsCode": "// Grab the Therapist Agent's parsed output\nconst therapistOutput = $node[\"Therapist Agent\"].json.output || {};\n\nconst finalResponse = {\n  reply: therapistOutput.reply || '',\n  is_session_close: therapistOutput.is_session_close || false,\n  guardrail_status: 'passed',\n  crisis_detected: false\n};\n\n// Only include dynamic_content if structurally valid\nif (therapistOutput.dynamic_content?.type && therapistOutput.dynamic_content?.payload) {\n  finalResponse.dynamic_content = therapistOutput.dynamic_content;\n}\n\n// Merge Discovery Agent output if it ran (assessment phase only)\ntry {\n  const discoveryOutput = $node[\"Discovery Agent\"].json.output || {};\n  if (discoveryOutput.suggested_pathway) {\n    finalResponse.dynamic_theme      = discoveryOutput.dynamic_theme;\n    finalResponse.suggested_pathway  = discoveryOutput.suggested_pathway;\n    finalResponse.pathway_confidence = discoveryOutput.pathway_confidence;\n  }\n} catch (e) {\n  // Non-assessment pathway: no discovery fields needed\n}\n\nreturn [{ json: finalResponse }];"
+            }
         },
+
         {
+            "id": "respond_webhook",
+            "name": "Respond to Webhook",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1,
+            "position": [2160, 520],
             "parameters": {
                 "respondWith": "json",
                 "responseBody": "={{ $json }}",
                 "options": {}
-            },
-            "id": "10",
-            "name": "Respond to Webhook (Success)",
-            "type": "n8n-nodes-base.respondToWebhook",
-            "typeVersion": 1,
-            "position": [
-                1760,
-                420
-            ]
+            }
         }
     ],
     "pinData": {},
     "connections": {
         "Webhook": {
-            "main": [
-                [
-                    {
-                        "node": "Crisis Engine",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
+            "main": [[{ "node": "Crisis Screening Agent", "type": "main", "index": 0 }]]
         },
-        "Crisis Engine": {
-            "main": [
-                [
-                    {
-                        "node": "Is Crisis?",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
+        "Crisis Model (GPT-4o-mini)": {
+            "ai_languageModel": [[{ "node": "Crisis Screening Agent", "type": "ai_languageModel", "index": 0 }]]
+        },
+        "Crisis Output Parser": {
+            "ai_outputParser": [[{ "node": "Crisis Screening Agent", "type": "ai_outputParser", "index": 0 }]]
+        },
+        "Crisis Screening Agent": {
+            "main": [[{ "node": "Is Crisis?", "type": "main", "index": 0 }]]
         },
         "Is Crisis?": {
             "main": [
-                [
-                    {
-                        "node": "Return Crisis Alert",
-                        "type": "main",
-                        "index": 0
-                    }
-                ],
-                [
-                    {
-                        "node": "Prompt Builder",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
+                [{ "node": "Return Crisis Alert", "type": "main", "index": 0 }],
+                [{ "node": "Prompt Builder", "type": "main", "index": 0 }]
             ]
         },
         "Prompt Builder": {
-            "main": [
-                [
-                    {
-                        "node": "Therapist LLM",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
+            "main": [[{ "node": "Therapist Agent", "type": "main", "index": 0 }]]
         },
-        "Therapist LLM": {
-            "main": [
-                [
-                    {
-                        "node": "Is Assessment Phase?",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
+        "Therapist Model (GPT-4o)": {
+            "ai_languageModel": [[{ "node": "Therapist Agent", "type": "ai_languageModel", "index": 0 }]]
+        },
+        "Therapist Output Parser": {
+            "ai_outputParser": [[{ "node": "Therapist Agent", "type": "ai_outputParser", "index": 0 }]]
+        },
+        "Save Memory (Postgres)": {
+            "ai_tool": [[{ "node": "Therapist Agent", "type": "ai_tool", "index": 0 }]]
+        },
+        "Therapist Agent": {
+            "main": [[{ "node": "Is Assessment Phase?", "type": "main", "index": 0 }]]
         },
         "Is Assessment Phase?": {
             "main": [
-                [
-                    {
-                        "node": "Discovery LLM",
-                        "type": "main",
-                        "index": 0
-                    }
-                ],
-                [
-                    {
-                        "node": "Format JSON Reply",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
+                [{ "node": "Discovery Agent", "type": "main", "index": 0 }],
+                [{ "node": "Format Final Response", "type": "main", "index": 0 }]
             ]
         },
-        "Discovery LLM": {
-            "main": [
-                [
-                    {
-                        "node": "Format JSON Reply",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
+        "Discovery Model (GPT-4o-mini)": {
+            "ai_languageModel": [[{ "node": "Discovery Agent", "type": "ai_languageModel", "index": 0 }]]
         },
-        "Format JSON Reply": {
-            "main": [
-                [
-                    {
-                        "node": "Respond to Webhook (Success)",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
+        "Discovery Output Parser": {
+            "ai_outputParser": [[{ "node": "Discovery Agent", "type": "ai_outputParser", "index": 0 }]]
+        },
+        "Discovery Agent": {
+            "main": [[{ "node": "Format Final Response", "type": "main", "index": 0 }]]
+        },
+        "Format Final Response": {
+            "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
         }
     },
     "active": false,
-    "settings": {
-        "executionOrder": "v1"
-    },
-    "versionId": "b1b2b3b4-c5c6-d7d8-e9e0-f1f2f3f4f5f6"
+    "settings": { "executionOrder": "v1" },
+    "versionId": "mc-chat-v5-all-gaps-fixed-2026-03-26"
 }

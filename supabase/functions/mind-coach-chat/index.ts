@@ -18,9 +18,10 @@ serve(async (req) => {
       session_state,
       dynamic_theme,
       pathway,
+      is_system_greeting,
     } = payload;
 
-    if (!session_id || !profile_id || !message_text) {
+    if (!session_id || !profile_id || (!message_text && !is_system_greeting)) {
       return new Response(
         JSON.stringify({ error: 'Missing required: session_id, profile_id, message_text' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
@@ -36,13 +37,16 @@ serve(async (req) => {
     );
 
     // 1. Persist user message
-    const userMessageId = crypto.randomUUID();
-    await supabaseAdmin.from('mind_coach_messages').insert({
-      id: userMessageId,
-      session_id,
-      role: 'user',
-      content: message_text,
-    });
+    let userMessageId = null;
+    if (!is_system_greeting) {
+      userMessageId = crypto.randomUUID();
+      await supabaseAdmin.from('mind_coach_messages').insert({
+        id: userMessageId,
+        session_id,
+        role: 'user',
+        content: message_text,
+      });
+    }
 
     // 2. Update session message count
     const { data: sessionData } = await supabaseAdmin
@@ -51,14 +55,14 @@ serve(async (req) => {
       .eq('id', session_id)
       .single();
 
-    const newCount = (sessionData?.message_count ?? 0) + 1;
+    const newCount = (sessionData?.message_count ?? 0) + (is_system_greeting ? 0 : 1);
     await supabaseAdmin
       .from('mind_coach_sessions')
       .update({ message_count: newCount })
       .eq('id', session_id);
 
     // 3. Fetch context for the n8n workflow
-    const [messagesRes, memoriesRes, caseNotesRes] = await Promise.all([
+    const [messagesRes, memoriesRes, caseNotesRes, activeTasksRes, assessmentsRes, personaPromptRes, phasePromptRes, authenticProfileRes] = await Promise.all([
       supabaseAdmin
         .from('mind_coach_messages')
         .select('role,content')
@@ -73,11 +77,38 @@ serve(async (req) => {
         .limit(20),
       supabaseAdmin
         .from('mind_coach_sessions')
-        .select('case_notes,dynamic_theme,pathway')
+        .select('case_notes,dynamic_theme,pathway,summary_data')
         .eq('profile_id', profile_id)
         .eq('session_state', 'completed')
         .order('ended_at', { ascending: false })
         .limit(5),
+      supabaseAdmin
+        .from('mind_coach_user_tasks')
+        .select('*')
+        .eq('profile_id', profile_id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false }),
+      supabaseAdmin
+        .from('mind_coach_assessments')
+        .select('assessment_type,score,created_at')
+        .eq('profile_id', profile_id)
+        .order('created_at', { ascending: false })
+        .limit(5),
+      supabaseAdmin
+        .from('mind_coach_personas')
+        .select('base_prompt')
+        .eq('id', profile?.therapist_persona || 'maya')
+        .maybeSingle(),
+      supabaseAdmin
+        .from('mind_coach_pathway_phases')
+        .select('dynamic_prompt')
+        .eq('id', `${pathway || (journey_context?.title ? journey_context.title.toLowerCase().replace(/ /g, '_') : 'engagement_rapport_and_assessment')}_phase${journey_context?.current_phase || 1}`)
+        .maybeSingle(),
+      supabaseAdmin
+        .from('mind_coach_profiles')
+        .select('name,age,gender,concerns,therapist_persona')
+        .eq('id', profile_id)
+        .single(),
     ]);
 
     // 4. Forward to n8n
@@ -97,7 +128,7 @@ serve(async (req) => {
           profile_id,
           message_text,
           user_message_id: userMessageId,
-          profile,
+          profile: authenticProfileRes.data || profile, // Use authentic DB profile, fallback to client payload if critically missing
           journey_context,
           session_state: session_state || 'intake',
           dynamic_theme,
@@ -108,7 +139,12 @@ serve(async (req) => {
             type: m.memory_type,
           })),
           recent_case_notes: (caseNotesRes.data || []).map((s: any) => s.case_notes).filter(Boolean),
+          recent_tasks_assigned: activeTasksRes.data || [],
+          assessments: assessmentsRes.data || [],
+          coach_prompt: personaPromptRes.data?.base_prompt || "You are an empathetic, non-judgmental mental health coach.",
+          phase_prompt: phasePromptRes.data?.dynamic_prompt || "Focus on gathering context and building therapeutic rapport.",
           message_count: newCount,
+          is_system_greeting,
         }),
         signal: controller.signal,
       });
@@ -160,6 +196,8 @@ serve(async (req) => {
     const guardrailStatus = result.guardrail_status || 'passed';
     const crisisDetected = result.crisis_detected || false;
     const dynamicContent = result.dynamic_content || null;
+    const isSessionClose = result.is_session_close || false;
+    const suggestedPathway = result.suggested_pathway || null;
 
     // 6. Persist assistant reply
     if (assistantReply) {
@@ -173,7 +211,7 @@ serve(async (req) => {
 
     // 7. Update session state if changed
     const sessionUpdate: Record<string, any> = {
-      message_count: newCount + 1,
+      message_count: newCount,
     };
     if (updatedSessionState !== session_state) sessionUpdate.session_state = updatedSessionState;
     if (updatedTheme) sessionUpdate.dynamic_theme = updatedTheme;
@@ -206,9 +244,11 @@ serve(async (req) => {
         reply: assistantReply,
         session_id,
         session_state: updatedSessionState,
+        is_session_close: isSessionClose,
         dynamic_theme: updatedTheme,
         pathway: updatedPathway,
         pathway_confidence: pathwayConfidence,
+        suggested_pathway: suggestedPathway,
         guardrail_status: guardrailStatus,
         crisis_detected: crisisDetected,
         dynamic_content: dynamicContent,

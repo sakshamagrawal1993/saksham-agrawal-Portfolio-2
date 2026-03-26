@@ -1,0 +1,383 @@
+import React, { useEffect, useState, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ClipboardList, TrendingUp, Clock, ChevronRight, ArrowLeft, Check } from 'lucide-react';
+import { supabase } from '../../../lib/supabaseClient';
+import { useMindCoachStore } from '../../../store/mindCoachStore';
+
+interface AssessmentQuestion {
+  id: string;
+  assessment_type: string;
+  assessment_name: string;
+  question_number: number;
+  question_text: string;
+  answer_options: { value: number; label: string }[];
+}
+
+interface AssessmentScore {
+  id: string;
+  profile_id: string;
+  assessment_type: string;
+  total_score: number;
+  severity: string | null;
+  created_at: string;
+}
+
+const ASSESSMENT_INFO: Record<string, { name: string; maxScore: number; description: string; emoji: string }> = {
+  gad7: { name: 'GAD-7', maxScore: 21, description: 'Anxiety severity', emoji: '💭' },
+  phq9: { name: 'PHQ-9', maxScore: 27, description: 'Depression screening', emoji: '🌧️' },
+  pss4: { name: 'PSS-4', maxScore: 16, description: 'Perceived stress', emoji: '⚡' },
+};
+
+const getSeverityInfo = (type: string, score: number): { label: string; color: string } => {
+  const info = ASSESSMENT_INFO[type];
+  if (!info) return { label: 'Unknown', color: '#2C2A26' };
+  const pct = score / info.maxScore;
+  if (pct < 0.25) return { label: 'Minimal', color: '#6B8F71' };
+  if (pct < 0.5) return { label: 'Mild', color: '#D4A574' };
+  if (pct < 0.75) return { label: 'Moderate', color: '#E0976F' };
+  return { label: 'Severe', color: '#C75B5B' };
+};
+
+const getSeverityLabel = (type: string, score: number): string => {
+  if (type === 'gad7') {
+    if (score <= 4) return 'minimal';
+    if (score <= 9) return 'mild';
+    if (score <= 14) return 'moderate';
+    return 'severe';
+  }
+  if (type === 'phq9') {
+    if (score <= 4) return 'minimal';
+    if (score <= 9) return 'mild';
+    if (score <= 14) return 'moderate';
+    if (score <= 19) return 'moderately_severe';
+    return 'severe';
+  }
+  if (type === 'pss4') {
+    if (score <= 4) return 'low';
+    if (score <= 8) return 'moderate';
+    return 'high';
+  }
+  return 'unknown';
+};
+
+export const AssessmentsScreen: React.FC = () => {
+  const profile = useMindCoachStore((s) => s.profile);
+  const [scores, setScores] = useState<AssessmentScore[]>([]);
+  const [questions, setQuestions] = useState<AssessmentQuestion[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Assessment-taking state
+  const [activeAssessment, setActiveAssessment] = useState<string | null>(null);
+  const [currentQ, setCurrentQ] = useState(0);
+  const [answers, setAnswers] = useState<Record<number, number>>({});
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!profile) return;
+    (async () => {
+      const [scoresRes, questionsRes] = await Promise.all([
+        supabase
+          .from('mind_coach_assessment_scores')
+          .select('*')
+          .eq('profile_id', profile.id)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('mind_coach_assessment_questions')
+          .select('*')
+          .order('assessment_type, question_number'),
+      ]);
+      setScores(scoresRes.data ?? []);
+      setQuestions(questionsRes.data ?? []);
+      setLoading(false);
+    })();
+  }, [profile]);
+
+  // Group scores by type → latest
+  const latestByType: Record<string, AssessmentScore> = {};
+  const historyByType: Record<string, AssessmentScore[]> = {};
+  scores.forEach((s) => {
+    if (!latestByType[s.assessment_type]) latestByType[s.assessment_type] = s;
+    if (!historyByType[s.assessment_type]) historyByType[s.assessment_type] = [];
+    historyByType[s.assessment_type].push(s);
+  });
+
+  const startAssessment = (type: string) => {
+    setActiveAssessment(type);
+    setCurrentQ(0);
+    setAnswers({});
+  };
+
+  const activeQuestions = questions.filter((q) => q.assessment_type === activeAssessment);
+
+  const handleAnswer = useCallback((questionNumber: number, value: number) => {
+    setAnswers((prev) => ({ ...prev, [questionNumber]: value }));
+    // Auto-advance after a short delay
+    setTimeout(() => {
+      if (currentQ < activeQuestions.length - 1) {
+        setCurrentQ((prev) => prev + 1);
+      }
+    }, 300);
+  }, [currentQ, activeQuestions.length]);
+
+  const handleSubmit = useCallback(async () => {
+    if (!profile || !activeAssessment || submitting) return;
+    setSubmitting(true);
+
+    const totalScore = Object.values(answers).reduce((acc, v) => acc + v, 0);
+    const severity = getSeverityLabel(activeAssessment, totalScore);
+
+    const answersArray = Object.entries(answers).map(([qn, val]) => ({
+      question_number: parseInt(qn),
+      value: val,
+    }));
+
+    const { data } = await supabase
+      .from('mind_coach_assessment_scores')
+      .insert({
+        profile_id: profile.id,
+        assessment_type: activeAssessment,
+        answers: answersArray,
+        total_score: totalScore,
+        severity,
+      })
+      .select()
+      .single();
+
+    if (data) {
+      setScores([data, ...scores]);
+    }
+
+    setSubmitting(false);
+    setActiveAssessment(null);
+  }, [profile, activeAssessment, answers, scores, submitting]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-6 h-6 border-2 border-[#6B8F71] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Assessment-taking UI
+  if (activeAssessment && activeQuestions.length > 0) {
+    const q = activeQuestions[currentQ];
+    const info = ASSESSMENT_INFO[activeAssessment];
+    const allAnswered = activeQuestions.every((aq) => answers[aq.question_number] !== undefined);
+
+    return (
+      <div className="flex flex-col h-full bg-[#FAFAF7]">
+        {/* Header */}
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-[#E8E4DE] shrink-0">
+          <button onClick={() => setActiveAssessment(null)} className="text-[#2C2A26]/60 hover:text-[#2C2A26]">
+            <ArrowLeft size={20} />
+          </button>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-[#2C2A26]">{info.name}</p>
+            <p className="text-[10px] text-[#2C2A26]/40">
+              Question {currentQ + 1} of {activeQuestions.length}
+            </p>
+          </div>
+        </div>
+
+        {/* Progress */}
+        <div className="px-4 pt-3">
+          <div className="flex gap-1">
+            {activeQuestions.map((_, i) => (
+              <div
+                key={i}
+                className="h-1 flex-1 rounded-full transition-colors duration-300"
+                style={{
+                  backgroundColor: answers[activeQuestions[i].question_number] !== undefined
+                    ? '#6B8F71'
+                    : i === currentQ ? '#6B8F71' + '40' : '#E8E4DE',
+                }}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Question */}
+        <div className="flex-1 overflow-y-auto px-5 py-6">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentQ}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-6"
+            >
+              <p className="text-xs text-[#2C2A26]/40 uppercase tracking-wide font-medium">
+                Over the last 2 weeks, how often have you been bothered by:
+              </p>
+              <p className="text-base font-medium text-[#2C2A26] leading-relaxed">
+                {q.question_text}
+              </p>
+
+              <div className="space-y-2">
+                {q.answer_options.map((opt) => {
+                  const selected = answers[q.question_number] === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      onClick={() => handleAnswer(q.question_number, opt.value)}
+                      className={`w-full text-left px-4 py-3 rounded-xl border transition-all text-sm ${
+                        selected
+                          ? 'bg-[#6B8F71] text-white border-[#6B8F71]'
+                          : 'bg-white text-[#2C2A26] border-[#E8E4DE] hover:border-[#6B8F71]/30'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span>{opt.label}</span>
+                        {selected && <Check size={16} />}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        {/* Navigation */}
+        <div className="px-5 py-4 shrink-0 flex gap-2">
+          {currentQ > 0 && (
+            <button
+              onClick={() => setCurrentQ(currentQ - 1)}
+              className="px-4 py-2.5 text-sm font-medium text-[#2C2A26]/60 border border-[#E8E4DE] rounded-xl hover:border-[#2C2A26]/20"
+            >
+              Previous
+            </button>
+          )}
+          <div className="flex-1" />
+          {currentQ < activeQuestions.length - 1 ? (
+            <button
+              onClick={() => setCurrentQ(currentQ + 1)}
+              disabled={answers[q.question_number] === undefined}
+              className="px-6 py-2.5 text-sm font-medium bg-[#6B8F71] text-white rounded-xl hover:bg-[#5A7D60] disabled:opacity-40 transition-colors"
+            >
+              Next
+            </button>
+          ) : (
+            <button
+              onClick={handleSubmit}
+              disabled={!allAnswered || submitting}
+              className="px-6 py-2.5 text-sm font-medium bg-[#2C2A26] text-white rounded-xl hover:bg-[#2C2A26]/90 disabled:opacity-40 transition-colors"
+            >
+              {submitting ? 'Submitting…' : 'Complete'}
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Assessment list UI
+  return (
+    <div className="p-5 space-y-5">
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+        <h2 className="text-xl font-semibold text-[#2C2A26]">Assessments</h2>
+        <p className="text-xs text-[#2C2A26]/40 mt-1">Track your mental health scores over time</p>
+      </motion.div>
+
+      <div className="space-y-3">
+        {Object.entries(ASSESSMENT_INFO).map(([type, info], i) => {
+          const latest = latestByType[type];
+          const history = historyByType[type] || [];
+          const severity = latest ? getSeverityInfo(type, latest.total_score) : null;
+
+          return (
+            <motion.div
+              key={type}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05 }}
+              className="bg-white rounded-2xl p-4 shadow-sm border border-[#E8E4DE]"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#F5F0EB] flex items-center justify-center text-lg shrink-0">
+                  {info.emoji}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-[#2C2A26]">{info.name}</p>
+                    {latest && severity && (
+                      <span
+                        className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
+                        style={{ backgroundColor: severity.color + '15', color: severity.color }}
+                      >
+                        {severity.label}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-[#2C2A26]/50">{info.description}</p>
+                </div>
+              </div>
+
+              {latest ? (
+                <div className="mt-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp size={12} className="text-[#6B8F71]" />
+                      <span className="text-sm font-medium text-[#2C2A26]">
+                        Score: {latest.total_score}/{info.maxScore}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 text-xs text-[#2C2A26]/40">
+                      <Clock size={10} />
+                      {new Date(latest.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      {history.length > 1 && (
+                        <span className="ml-1 text-[#6B8F71]">· {history.length} total</span>
+                      )}
+                    </div>
+                  </div>
+                  {/* Progress bar */}
+                  <div className="w-full h-1.5 bg-[#F5F0EB] rounded-full overflow-hidden mb-3">
+                    <motion.div
+                      className="h-full rounded-full"
+                      style={{ backgroundColor: severity!.color }}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${(latest.total_score / info.maxScore) * 100}%` }}
+                      transition={{ duration: 0.6, delay: 0.2 + i * 0.1 }}
+                    />
+                  </div>
+                  <button
+                    onClick={() => startAssessment(type)}
+                    className="text-xs font-medium text-[#6B8F71] hover:text-[#5A7D60] transition-colors"
+                  >
+                    Retake Assessment →
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => startAssessment(type)}
+                  className="mt-3 flex items-center justify-between w-full group"
+                >
+                  <span className="text-xs text-[#6B8F71] font-medium group-hover:text-[#5A7D60] transition-colors">
+                    Take Assessment
+                  </span>
+                  <ChevronRight size={14} className="text-[#6B8F71]/40 group-hover:text-[#6B8F71] transition-colors" />
+                </button>
+              )}
+            </motion.div>
+          );
+        })}
+      </div>
+
+      {scores.length === 0 && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="text-center py-6"
+        >
+          <div className="w-14 h-14 rounded-full bg-[#F5F0EB] flex items-center justify-center mx-auto mb-3">
+            <ClipboardList size={24} className="text-[#2C2A26]/25" />
+          </div>
+          <p className="text-sm text-[#2C2A26]/50">No assessments completed yet</p>
+          <p className="text-xs text-[#2C2A26]/30 mt-1">Take one above to track your progress</p>
+        </motion.div>
+      )}
+    </div>
+  );
+};
