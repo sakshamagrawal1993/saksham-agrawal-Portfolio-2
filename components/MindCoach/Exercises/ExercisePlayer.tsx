@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Play, Pause, RotateCcw, ChevronRight, CheckCircle2 } from 'lucide-react';
-import { BreathingGuide } from './BreathingGuide';
-import { GroundingSteps } from './GroundingSteps';
+import { BreathingGuide } from './BreathingGuide.tsx';
+import { GroundingSteps } from './GroundingSteps.tsx';
 import { type Exercise } from '../../../store/mindCoachStore';
 
 interface ExercisePlayerProps {

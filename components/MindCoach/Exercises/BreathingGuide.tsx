@@ -14,11 +14,6 @@ export const BreathingGuide: React.FC<BreathingGuideProps> = ({ instruction, dur
   // Exhale: starts large, goes small
   // Hold: stays at current size
   
-  const getScale = () => {
-    if (phase === 'inhale') return [1, 1.5];
-    if (phase === 'exhale') return [1.5, 1];
-    return 1; // Hold or default
-  };
 
   const currentScale = phase === 'inhale' ? 1 + (1 - timeLeft / duration) * 0.5 :
                        phase === 'exhale' ? 1 + (timeLeft / duration) * 0.5 : 
