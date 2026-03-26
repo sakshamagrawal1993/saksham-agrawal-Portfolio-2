@@ -408,10 +408,8 @@ function JourneyPreviewStep({ concerns, name, age, gender, therapist, onBack, on
           </p>
         </div>
 
-        {/* Pathway Tag */}
-        <div className="px-4 py-1.5 rounded-full bg-[#EAE8E4] text-[#2C2A26]/40 text-[10px] font-bold tracking-widest uppercase shrink-0">
-          Engagement Rapport and Assessment
-        </div>
+
+        {/* Timeline View */}
 
         {/* Timeline View */}
         <div className="w-full relative py-2">
