@@ -1,5 +1,6 @@
-import React, { useMemo, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import React, { useMemo, useCallback, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, Sparkles, CheckCircle2, BookOpen, Wind, Brain, Flower2, Moon, MessageCircle as MsgIcon, Shield, Target, Heart } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 import { supabase } from '../../../lib/supabaseClient';
@@ -38,6 +39,10 @@ export const HomeScreen: React.FC = () => {
   const setActiveTab = useMindCoachStore((s) => s.setActiveTab);
   const activeTasks = useMindCoachStore((s) => s.activeTasks);
   const setActiveTasks = useMindCoachStore((s) => s.setActiveTasks);
+  const resetStore = useMindCoachStore((s) => s.reset);
+  const navigate = useNavigate();
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const quote = useMemo(() => QUOTES[Math.floor(Math.random() * QUOTES.length)], []);
 
@@ -112,6 +117,28 @@ export const HomeScreen: React.FC = () => {
       .update({ status: 'completed' })
       .eq('id', taskId);
   }, [activeTasks, setActiveTasks]);
+
+  const handleForgetMe = async () => {
+    if (!profile) return;
+    setIsDeleting(true);
+    try {
+      // Deleting the profile will cascade delete journeys, sessions, messages, etc.
+      const { error } = await supabase
+        .from('mind_coach_profiles')
+        .delete()
+        .eq('id', profile.id);
+      
+      if (error) throw error;
+
+      // Reset store and redirect
+      resetStore();
+      navigate('/mind-coach', { replace: true });
+    } catch (err) {
+      console.error('Error deleting profile:', err);
+      setIsDeleting(false);
+      alert('Failed to delete profile. Please try again.');
+    }
+  };
 
   return (
     <div className="p-5 pb-4 space-y-5">
@@ -303,6 +330,64 @@ export const HomeScreen: React.FC = () => {
           })}
         </motion.div>
       )}
+
+      {/* Settings / Privacy */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.4 }}
+        className="pt-8 pb-12 flex flex-col items-center gap-4"
+      >
+        <button
+          onClick={() => setShowConfirm(true)}
+          className="text-xs font-medium text-red-500/60 hover:text-red-500 transition-colors uppercase tracking-widest"
+        >
+          Forget Me
+        </button>
+        <p className="text-[10px] text-[#2C2A26]/20 text-center max-w-[200px]">
+          Deleting your profile will permanently remove all chat history, journal entries, and progress.
+        </p>
+      </motion.div>
+
+      {/* Confirmation Modal */}
+      <AnimatePresence>
+        {showConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-[#2C2A26]/20 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl space-y-6"
+            >
+              <div className="space-y-2 text-center">
+                <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Shield size={24} className="text-red-500" />
+                </div>
+                <h3 className="text-xl font-semibold text-[#2C2A26]">Are you absolutely sure?</h3>
+                <p className="text-sm text-[#2C2A26]/60 leading-relaxed">
+                  This will permanently delete your Mind Coach profile and all your data. This action cannot be undone.
+                </p>
+              </div>
+              <div className="space-y-3">
+                <button
+                  disabled={isDeleting}
+                  onClick={handleForgetMe}
+                  className="w-full py-3.5 rounded-2xl bg-red-500 text-white font-medium hover:bg-red-600 active:scale-[0.98] transition-all disabled:opacity-50"
+                >
+                  {isDeleting ? 'Deleting...' : 'Yes, Delete Everything'}
+                </button>
+                <button
+                  disabled={isDeleting}
+                  onClick={() => setShowConfirm(false)}
+                  className="w-full py-3.5 rounded-2xl bg-[#F5F0EB] text-[#2C2A26] font-medium hover:bg-[#E8E4DE] active:scale-[0.98] transition-all"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
