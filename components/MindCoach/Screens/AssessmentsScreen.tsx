@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ClipboardList, TrendingUp, Clock, ChevronRight, ArrowLeft, Check } from 'lucide-react';
+import { ClipboardList, TrendingUp, Clock, ChevronRight, ArrowLeft, Check, BookOpen } from 'lucide-react';
 import { supabase } from '../../../lib/supabaseClient';
 import { useMindCoachStore } from '../../../store/mindCoachStore';
 
@@ -54,14 +54,36 @@ const getSeverityLabel = (type: string, score: number): string => {
   }
   if (type === 'pss4') {
     if (score <= 4) return 'low';
-    if (score <= 8) return 'moderate';
+    if (score <= 10) return 'moderate';
     return 'high';
   }
   return 'unknown';
 };
 
+const ASSESSMENT_INTERPRETATIONS: Record<string, Record<string, { meaning: string; advice: string }>> = {
+  gad7: {
+    minimal: { meaning: "You are experiencing minimal anxiety levels.", advice: "Keep practicing mindfulness and self-care to maintain your emotional balance." },
+    mild: { meaning: "You are experiencing mild anxiety. This is a common level of worry.", advice: "Try a 5-minute grounding exercise or journal about your current worries." },
+    moderate: { meaning: "Your anxiety levels are moderate. You may often feel restless or on edge.", advice: "Let's talk to Maya about these feelings. We can work on cognitive reframing together." },
+    severe: { meaning: "You are experiencing severe anxiety. It may feel overwhelming at times.", advice: "Please reach out for support. Let's practice a deep breathing exercise together right now." },
+  },
+  phq9: {
+    minimal: { meaning: "You are experiencing minimal or no depressive symptoms.", advice: "Focus on gratitude and daily physical activity to keep your spirits high." },
+    mild: { meaning: "You are experiencing mild depression.", advice: "A short walk or a small daily goal could help boost your energy and mood." },
+    moderate: { meaning: "Your depression symptoms are moderate.", advice: "Let's discuss behavioral activation strategies with Alex to help re-engage with your values." },
+    moderately_severe: { meaning: "Your depression symptoms are moderately severe.", advice: "It's important to talk about these feelings. Let's schedule a dedicated session to process this." },
+    severe: { meaning: "Your depression symptoms are severe.", advice: "Please prioritize your well-being and reach out to a mental health professional for additional support." },
+  },
+  pss4: {
+    low: { meaning: "Your perceived stress levels are low.", advice: "You're handling current pressures well. Continue your current self-care routines." },
+    moderate: { meaning: "You are experiencing moderate stress.", advice: "Take a few minutes to unplug and breathe. A brief meditation could help you reset." },
+    high: { meaning: "Your perceived stress levels are high.", advice: "Your plate feels very full. Let's find a grounding technique that works for you right now." },
+  },
+};
+
 export const AssessmentsScreen: React.FC = () => {
   const profile = useMindCoachStore((s) => s.profile);
+  const setActiveTab = useMindCoachStore((s) => s.setActiveTab);
   const [scores, setScores] = useState<AssessmentScore[]>([]);
   const [questions, setQuestions] = useState<AssessmentQuestion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,6 +93,7 @@ export const AssessmentsScreen: React.FC = () => {
   const [currentQ, setCurrentQ] = useState(0);
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [showResult, setShowResult] = useState<{ type: string; score: number; severity: string } | null>(null);
 
   useEffect(() => {
     if (!profile) return;
@@ -103,6 +126,7 @@ export const AssessmentsScreen: React.FC = () => {
 
   const startAssessment = (type: string) => {
     setActiveAssessment(type);
+    setShowResult(null);
     setCurrentQ(0);
     setAnswers({});
   };
@@ -145,6 +169,7 @@ export const AssessmentsScreen: React.FC = () => {
 
     if (data) {
       setScores([data, ...scores]);
+      setShowResult({ type: activeAssessment, score: totalScore, severity });
     }
 
     setSubmitting(false);
@@ -155,6 +180,101 @@ export const AssessmentsScreen: React.FC = () => {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="w-6 h-6 border-2 border-[#6B8F71] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Result View UI
+  if (showResult) {
+    const info = ASSESSMENT_INFO[showResult.type];
+    const severityInfo = getSeverityInfo(showResult.type, showResult.score);
+    const interpretation = ASSESSMENT_INTERPRETATIONS[showResult.type]?.[showResult.severity] || {
+      meaning: "Your assessment is complete.",
+      advice: "Practicing self-reflection is a great step forward."
+    };
+
+    return (
+      <div className="p-5 flex flex-col h-full bg-[#FAFAF7]">
+        <div className="flex-1 overflow-y-auto space-y-6">
+          <div className="text-center space-y-2 py-4">
+            <div className="w-16 h-16 rounded-full bg-[#6B8F71]/10 flex items-center justify-center mx-auto mb-2">
+              <Check size={32} className="text-[#6B8F71]" />
+            </div>
+            <h3 className="text-lg font-bold text-[#2C2A26]">Assessment Complete</h3>
+            <p className="text-xs text-[#2C2A26]/40 uppercase tracking-widest font-bold">Your {info.name} Results</p>
+          </div>
+
+          {/* Score Card */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-3xl p-6 shadow-sm border border-[#E8E4DE] text-center"
+          >
+            <div className="inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide mb-3"
+                 style={{ backgroundColor: severityInfo.color + '15', color: severityInfo.color }}>
+              {severityInfo.label}
+            </div>
+            <div className="text-5xl font-bold text-[#2C2A26] mb-1">
+              {showResult.score}
+              <span className="text-xl text-[#2C2A26]/20">/{info.maxScore}</span>
+            </div>
+            <p className="text-xs text-[#2C2A26]/40">Total Score</p>
+          </motion.div>
+
+          {/* Meaning Card */}
+          <div className="bg-white rounded-3xl p-6 shadow-sm border border-[#E8E4DE] space-y-4">
+            <h4 className="text-sm font-bold text-[#2C2A26] flex items-center gap-2">
+              <ClipboardList size={16} className="text-[#6B8F71]" />
+              Meaning of your score
+            </h4>
+            <div className="space-y-3">
+              <p className="text-sm text-[#2C2A26]/70 leading-relaxed font-medium">
+                {interpretation.meaning}
+              </p>
+              <div className="p-4 bg-[#F5F0EB] rounded-2xl">
+                <p className="text-xs text-[#2C2A26]/60 leading-relaxed italic">
+                  "{interpretation.advice}"
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Cards */}
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => setActiveTab('journal')}
+              className="bg-white p-4 rounded-2xl border border-[#E8E4DE] text-left hover:border-[#6B8F71]/30 transition-colors group"
+            >
+              <BookOpen size={16} className="text-[#6B8F71] mb-2 group-hover:scale-110 transition-transform" />
+              <p className="text-[10px] font-bold text-[#2C2A26] uppercase mb-0.5">Journal</p>
+              <p className="text-[10px] text-[#2C2A26]/40">Reflect on these feelings</p>
+            </button>
+            <button
+              onClick={() => setActiveTab('home')}
+              className="bg-white p-4 rounded-2xl border border-[#E8E4DE] text-left hover:border-[#6B8F71]/30 transition-colors group"
+            >
+              <TrendingUp size={16} className="text-[#D4A574] mb-2 group-hover:scale-110 transition-transform" />
+              <p className="text-[10px] font-bold text-[#2C2A26] uppercase mb-0.5">Track</p>
+              <p className="text-[10px] text-[#2C2A26]/40">View your progress</p>
+            </button>
+          </div>
+        </div>
+
+        {/* Action Button */}
+        <div className="pt-4 space-y-3">
+          <button
+            onClick={() => setActiveTab('home')}
+            className="w-full py-4 bg-[#2C2A26] text-white text-sm font-bold rounded-2xl shadow-lg shadow-[#2C2A26]/10 active:scale-95 transition-all"
+          >
+            Discuss with your Therapist
+          </button>
+          <button
+            onClick={() => setShowResult(null)}
+            className="w-full text-center py-2 text-[10px] font-bold text-[#2C2A26]/30 uppercase tracking-widest hover:text-[#2C2A26]"
+          >
+            Back to Assessments
+          </button>
+        </div>
       </div>
     );
   }
