@@ -160,6 +160,7 @@ const MindCoachApp: React.FC = () => {
         <PhoneFrame>
           <OnboardingFlow
             onComplete={(newProfileId) => {
+              useMindCoachStore.getState().setActiveTab('sessions');
               navigate(`/mind-coach/${newProfileId}`, { replace: true });
             }}
           />

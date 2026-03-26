@@ -726,6 +726,39 @@ function JourneyPreviewStep({
     try {
       // If profile + journey already created by the routing step, just navigate
       if (profile && storeJourney) {
+        // 1. Set active tab to sessions
+        useMindCoachStore.getState().setActiveTab('sessions');
+
+        // 2. Ensure at least one session exists
+        const { data: existingSessions } = await supabase
+          .from('mind_coach_sessions')
+          .select('*')
+          .eq('profile_id', profile.id)
+          .limit(1);
+
+        if (!existingSessions || existingSessions.length === 0) {
+          const { data: sessionData } = await supabase
+            .from('mind_coach_sessions')
+            .insert({
+              profile_id: profile.id,
+              journey_id: storeJourney.id,
+              phase_number: 1,
+              session_number: 1,
+              session_state: 'intake',
+              message_count: 0,
+            })
+            .select()
+            .single();
+
+          if (sessionData) {
+            useMindCoachStore.getState().setActiveSession(sessionData);
+            useMindCoachStore.getState().setSessions([sessionData]);
+          }
+        } else {
+          useMindCoachStore.getState().setActiveSession(existingSessions[0]);
+          useMindCoachStore.getState().setSessions(existingSessions);
+        }
+
         navigate(`/mind-coach/${profile.id}`);
         return;
       }
