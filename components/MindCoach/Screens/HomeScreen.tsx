@@ -172,39 +172,69 @@ export const HomeScreen: React.FC = () => {
         </div>
       </motion.div>
 
-      {/* Journey Progress */}
+      {/* Hero Journey Widget */}
       {journey && (
         <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.1 }}
-          className="bg-white rounded-2xl p-4 shadow-sm border border-[#E8E4DE]"
+          className="relative overflow-hidden bg-white rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-[#F0EDEA]"
         >
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-medium text-[#2C2A26]/50 uppercase tracking-wide">
-              Phase {currentPhase}
-            </p>
-            <span className="text-xs text-[#6B8F71] font-medium">
-              {completedInPhase}/{totalInPhase} sessions
-            </span>
+          {/* Decorative background element */}
+          <div 
+            className="absolute -right-12 -top-12 w-48 h-48 rounded-full opacity-[0.03] pointer-events-none"
+            style={{ backgroundColor: therapistColor }}
+          />
+
+          <div className="relative space-y-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div 
+                  className="w-2 h-2 rounded-full animate-pulse" 
+                  style={{ backgroundColor: therapistColor }}
+                />
+                <span className="text-[10px] font-bold tracking-[0.1em] text-[#2C2A26]/40 uppercase">
+                  Active Journey
+                </span>
+              </div>
+              <span className="text-[11px] font-medium text-[#6B8F71] bg-[#6B8F71]/5 px-2.5 py-1 rounded-full">
+                Phase {currentPhase} of {phases.length || 4}
+              </span>
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="text-2xl font-serif text-[#2C2A26] leading-tight">
+                {currentPhaseData?.title || 'Engagement & Rapport'}
+              </h3>
+              <p className="text-sm text-[#2C2A26]/50 leading-relaxed max-w-[240px]">
+                {currentPhaseData?.goal || 'Establishing trust and baseline emotional state.'}
+              </p>
+            </div>
+
+            <div className="space-y-3 pt-1">
+              <div className="flex items-center justify-between text-[11px] font-medium">
+                <span className="text-[#2C2A26]/40">Progress</span>
+                <span className="text-[#2C2A26]">{progressPct}%</span>
+              </div>
+              <div className="h-1.5 w-full bg-[#FAFAF7] rounded-full overflow-hidden border border-[#F0EDEA]">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${progressPct}%` }}
+                  transition={{ duration: 1, ease: 'easeOut' }}
+                  className="h-full rounded-full"
+                  style={{ backgroundColor: '#6B8F71' }}
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={() => setActiveTab('sessions')}
+              className="w-full py-3.5 rounded-2xl bg-[#6B8F71] text-white font-semibold text-sm hover:bg-[#5A7D60] active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#6B8F71]/20"
+            >
+              Continue My Journey
+              <ArrowRight size={16} />
+            </button>
           </div>
-          <p className="text-sm font-semibold text-[#2C2A26] mb-3">
-            {currentPhaseData?.title ?? 'Your Journey'}
-          </p>
-          <div className="w-full h-2 bg-[#F5F0EB] rounded-full overflow-hidden">
-            <motion.div
-              className="h-full bg-[#6B8F71] rounded-full"
-              initial={{ width: 0 }}
-              animate={{ width: `${progressPct}%` }}
-              transition={{ duration: 0.6, ease: 'easeOut' }}
-            />
-          </div>
-          <button
-            onClick={() => setActiveTab('sessions')}
-            className="flex items-center gap-1 mt-3 text-sm font-medium text-[#6B8F71] hover:text-[#5A7D60] transition-colors"
-          >
-            Continue Session <ArrowRight size={14} />
-          </button>
         </motion.div>
       )}
 
