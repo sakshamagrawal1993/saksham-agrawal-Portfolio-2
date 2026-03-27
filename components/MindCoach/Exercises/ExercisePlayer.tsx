@@ -107,9 +107,27 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({ exercise, onClos
   };
 
   const renderGuide = () => {
-    const isBreathing = exercise.type === 'breathing' || 
-                       exercise.title.toLowerCase().includes('breathing') ||
-                       steps.some(s => s.instruction.toLowerCase().includes('breathe'));
+    // Grounding / meditation first so steps mentioning "breaths" (e.g. Body Scan) do not use the breathing circle.
+    if (exercise.type === 'grounding' || exercise.type === 'meditation') {
+      return (
+        <GroundingSteps
+          instruction={currentStep?.instruction}
+          stepNumber={currentStepIndex + 1}
+          totalSteps={steps.length}
+          timeLeft={timeLeft}
+          durationSeconds={currentStep?.duration ?? 60}
+          compact={isInline}
+        />
+      );
+    }
+
+    const mentionsRhythmicBreathing = (text: string) =>
+      /\bbreathe\b/i.test(text) || /\bbreathing\b/i.test(text);
+
+    const isBreathing =
+      exercise.type === 'breathing' ||
+      /\bbreathing\b/i.test(exercise.title) ||
+      steps.some((s) => mentionsRhythmicBreathing(s.instruction));
 
     if (isBreathing) {
       return (
@@ -120,17 +138,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({ exercise, onClos
           phase={currentStep?.instruction.toLowerCase().includes('in') ? 'inhale' : 
                  currentStep?.instruction.toLowerCase().includes('out') ? 'exhale' : 'hold'}
           isPlaying={isPlaying}
-        />
-      );
-    }
-    
-    if (exercise.type === 'grounding' || exercise.type === 'meditation') {
-      return (
-        <GroundingSteps
-          instruction={currentStep?.instruction}
-          stepNumber={currentStepIndex + 1}
-          totalSteps={steps.length}
-          timeLeft={timeLeft}
+          compact={isInline}
         />
       );
     }

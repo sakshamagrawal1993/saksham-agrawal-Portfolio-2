@@ -1,6 +1,7 @@
 import React from 'react';
 import { Play } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { findExerciseByPayload } from '../../../lib/mindCoachExerciseResolve';
 import { useMindCoachStore } from '../../../store/mindCoachStore';
 import { ExercisePlayer } from '../Exercises/ExercisePlayer';
 
@@ -16,10 +17,7 @@ export const DynamicExerciseTrigger: React.FC<DynamicExerciseTriggerProps> = ({ 
   const setActiveExercise = useMindCoachStore((s) => s.setActiveExercise);
   const setActiveExerciseMessageId = useMindCoachStore((s) => s.setActiveExerciseMessageId);
 
-  // Normalize payload to match seeded IDs or titles
-  const exercise = exercises.find(
-    (e) => e.id === payload || e.title.toLowerCase().replace(/ /g, '_') === payload.toLowerCase()
-  );
+  const exercise = findExerciseByPayload(exercises, payload);
 
   // If this specific message is active, show the player in-line
   if (activeExerciseMessageId === messageId && activeExercise) {

@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { ArrowLeft, Send } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { findExerciseByPayload } from '../../../lib/mindCoachExerciseResolve';
 import { supabase } from '../../../lib/supabaseClient';
 import {
   useMindCoachStore,
@@ -225,11 +226,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
           const exerciseSlug = data.dynamic_content?.payload || data.dynamic_in_chat_exercise;
           if (exerciseSlug) {
             const allExercises = useMindCoachStore.getState().exercises;
-            const exercise = allExercises.find(e => 
-              e.id === exerciseSlug || 
-              e.title.toLowerCase().replace(/ /g, '_') === exerciseSlug.toLowerCase() ||
-              e.title.toLowerCase().replace(/-/g, '_') === exerciseSlug.toLowerCase()
-            );
+            const exercise = findExerciseByPayload(allExercises, String(exerciseSlug));
             if (exercise) {
               setActiveExercise(exercise);
               setActiveExerciseMessageId(assistantMsg.id);
@@ -374,11 +371,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
       const exerciseSlug = data.dynamic_content?.payload || data.dynamic_in_chat_exercise;
       if (exerciseSlug) {
         const allExercises = useMindCoachStore.getState().exercises;
-        const exercise = allExercises.find(e => 
-          e.id === exerciseSlug || 
-          e.title.toLowerCase().replace(/ /g, '_') === exerciseSlug.toLowerCase() ||
-          e.title.toLowerCase().replace(/-/g, '_') === exerciseSlug.toLowerCase()
-        );
+        const exercise = findExerciseByPayload(allExercises, String(exerciseSlug));
         if (exercise) {
           setActiveExercise(exercise);
           setActiveExerciseMessageId(assistantMsg.id);

@@ -7,9 +7,18 @@ interface BreathingGuideProps {
   timeLeft: number;
   phase: 'inhale' | 'exhale' | 'hold';
   isPlaying: boolean;
+  /** Smaller circle for in-chat / narrow layouts */
+  compact?: boolean;
 }
 
-export const BreathingGuide: React.FC<BreathingGuideProps> = ({ instruction, duration, timeLeft, phase, isPlaying }) => {
+export const BreathingGuide: React.FC<BreathingGuideProps> = ({
+  instruction,
+  duration,
+  timeLeft,
+  phase,
+  isPlaying,
+  compact = false,
+}) => {
   // Determine start/end scales for the current phase
   // Inhale: 1.0 -> 1.5
   // Exhale: 1.5 -> 1.0
@@ -19,9 +28,14 @@ export const BreathingGuide: React.FC<BreathingGuideProps> = ({ instruction, dur
   const startScale = phase === 'inhale' ? 1.0 : phase === 'exhale' ? 1.5 : (isHoldEmpty ? 1.0 : 1.5);
   const endScale = phase === 'inhale' ? 1.5 : phase === 'exhale' ? 1.0 : (isHoldEmpty ? 1.0 : 1.5);
 
+  const circlePx = compact ? 120 : 180;
+  const pulseCls = compact ? 'w-28 h-28' : 'w-40 h-40';
+  const timerCls = compact ? 'text-4xl' : 'text-6xl';
+  const haloMargin = compact ? '-m-2' : '-m-4';
+
   return (
-    <div className="flex flex-col items-center justify-center space-y-8 py-4 w-full">
-      <div className="relative flex items-center justify-center">
+    <div className={`flex flex-col items-center justify-center w-full ${compact ? 'space-y-5 py-2' : 'space-y-8 py-4'}`}>
+      <div className="relative flex items-center justify-center shrink-0" style={{ width: circlePx + 32, height: circlePx + 32 }}>
         {/* Outer pulse - organic soft shadow */}
         <AnimatePresence>
           {isPlaying && (
@@ -33,7 +47,7 @@ export const BreathingGuide: React.FC<BreathingGuideProps> = ({ instruction, dur
               }}
               exit={{ opacity: 0 }}
               transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-              className="absolute w-40 h-40 rounded-full bg-[#6B8F71]/20 blur-xl"
+              className={`absolute rounded-full bg-[#6B8F71]/20 blur-xl ${pulseCls}`}
             />
           )}
         </AnimatePresence>
@@ -47,10 +61,10 @@ export const BreathingGuide: React.FC<BreathingGuideProps> = ({ instruction, dur
             duration: isPlaying ? duration : 0, 
             ease: "easeInOut" 
           }}
-          className="relative rounded-full flex flex-col items-center justify-center text-white shadow-2xl z-30 border-4 border-white/40"
+          className="relative rounded-full flex flex-col items-center justify-center text-white shadow-2xl z-30 border-2 sm:border-4 border-white/40"
           style={{
-            width: '180px',
-            height: '180px',
+            width: circlePx,
+            height: circlePx,
             background: 'linear-gradient(135deg, #6B8F71 0%, #4A6D50 100%)',
             backgroundColor: '#6B8F71',
             boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
@@ -59,7 +73,7 @@ export const BreathingGuide: React.FC<BreathingGuideProps> = ({ instruction, dur
           <motion.span 
             initial={{ opacity: 0.5, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="text-6xl font-serif tabular-nums font-medium"
+            className={`${timerCls} font-serif tabular-nums font-medium`}
             style={{ color: '#FFFFFF', textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
           >
             {timeLeft}
@@ -79,25 +93,25 @@ export const BreathingGuide: React.FC<BreathingGuideProps> = ({ instruction, dur
             rotate: { duration: 10, repeat: Infinity, ease: "linear" },
             scale: { duration: 2, repeat: Infinity, ease: "easeInOut" }
           }}
-          className="absolute inset-0 rounded-full border border-[#6B8F71]/10 -m-4"
+          className={`absolute inset-0 rounded-full border border-[#6B8F71]/10 ${haloMargin}`}
         />
       </div>
 
-      <div className="text-center space-y-4 w-full px-4">
+      <div className={`text-center w-full px-2 sm:px-4 ${compact ? 'space-y-3' : 'space-y-4'}`}>
         <AnimatePresence mode="wait">
           <motion.div
             key={instruction}
             initial={{ opacity: 0, y: 5 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -5 }}
-            className="h-12 flex items-center justify-center"
+            className={`flex items-center justify-center ${compact ? 'min-h-0 py-1' : 'h-12'}`}
           >
-            <h4 className="text-xl font-serif text-[#2C2A26] leading-tight">
+            <h4 className={`font-serif text-[#2C2A26] leading-snug ${compact ? 'text-base sm:text-lg' : 'text-xl leading-tight'}`}>
               {instruction}
             </h4>
           </motion.div>
         </AnimatePresence>
-        
+
         {/* Phase Indicators */}
         <div className="flex gap-3 justify-center">
           <div className={`h-1.5 rounded-full transition-all duration-500 ${phase === 'inhale' ? 'w-8 bg-[#6B8F71]' : 'w-2 bg-[#E8E4DE]'}`} />
