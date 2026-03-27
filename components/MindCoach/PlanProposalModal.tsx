@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
+import { X } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
+import { MIND_COACH_PROPOSAL_DRAWER_IMAGE } from './MindCoachConstants';
 import {
     useMindCoachStore,
-    type Pathway,
     type JourneyPhase,
 } from '../../store/mindCoachStore';
 
@@ -271,66 +272,99 @@ export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, o
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div
-                className="absolute inset-0 bg-[#2C2A26]/40 backdrop-blur-sm"
+        <div className="fixed inset-0 z-[60] flex flex-col justify-end md:justify-center md:items-center md:p-4">
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 bg-[#2C2A26]/45 backdrop-blur-[2px]"
                 onClick={onClose}
+                aria-hidden
             />
             <motion.div
-                initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                className="relative bg-[#FAFAF7] w-full max-w-md rounded-3xl overflow-hidden shadow-xl max-h-[90vh] flex flex-col"
+                initial={{ y: '100%' }}
+                animate={{ y: 0 }}
+                exit={{ y: '100%' }}
+                transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+                className="relative w-full max-w-lg max-h-[88vh] md:max-h-[85vh] rounded-t-[1.75rem] md:rounded-3xl bg-[#FAFAF7] shadow-2xl overflow-hidden flex flex-col border border-[#E8E4DE]/80"
+                onClick={(e) => e.stopPropagation()}
             >
-                <div className="p-6 bg-white border-b border-[#E8E4DE] shrink-0">
-                    <p className="text-xs font-semibold text-[#6B8F71] uppercase tracking-wide mb-2">Therapy Proposal</p>
-                    <h2 className="text-2xl font-serif text-[#2C2A26] leading-tight mb-3">
+                <div className="flex justify-center pt-2 pb-1 md:hidden shrink-0">
+                    <div className="w-10 h-1 rounded-full bg-[#2C2A26]/15" aria-hidden />
+                </div>
+
+                <button
+                    type="button"
+                    onClick={onClose}
+                    disabled={saving}
+                    className="absolute top-3 right-3 z-10 w-9 h-9 rounded-full bg-white/90 border border-[#E8E4DE] flex items-center justify-center text-[#2C2A26]/50 hover:text-[#2C2A26] shadow-sm transition-colors disabled:opacity-40"
+                    aria-label="Close"
+                >
+                    <X size={18} />
+                </button>
+
+                <div className="relative h-36 shrink-0 bg-[#E8E4DE]">
+                    <img
+                        src={MIND_COACH_PROPOSAL_DRAWER_IMAGE}
+                        alt=""
+                        className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#FAFAF7] via-transparent to-transparent pointer-events-none" />
+                </div>
+
+                <div className="px-5 pt-2 pb-4 bg-[#FAFAF7] shrink-0 -mt-6 relative">
+                    <p className="text-[10px] font-bold text-[#6B8F71] uppercase tracking-widest mb-1.5">Therapy proposal</p>
+                    <h2 className="text-xl font-serif text-[#2C2A26] leading-snug mb-2">
                         {playbook.name}
                     </h2>
                     <p className="text-sm text-[#2C2A26]/70 leading-relaxed">
-                        Based on our conversation about <strong>"{activeSession?.dynamic_theme || 'your experiences'}"</strong>, I've designed a specialized clinical approach for us to move forward.
+                        Based on what you&apos;ve shared about{' '}
+                        <span className="font-medium text-[#2C2A26]">
+                            {activeSession?.dynamic_theme || 'your experiences'}
+                        </span>
+                        , here is a gentle, structured path we could take together—only if it feels right for you.
                     </p>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-6 bg-[#FAF9F7] space-y-4">
-                    <p className="text-xs font-semibold text-[#2C2A26]/50 uppercase tracking-wide">
-                        Your 4-Phase Plan
+                <div className="flex-1 overflow-y-auto px-5 pb-4 space-y-3 min-h-0 bg-[#FAF9F7]">
+                    <p className="text-[10px] font-semibold text-[#2C2A26]/45 uppercase tracking-wide">
+                        Four phases
                     </p>
-                    <div className="space-y-3">
+                    <div className="space-y-2.5">
                         {playbook.phases.map((phase, i) => (
-                            <div key={i} className="bg-white border border-[#E8E4DE] p-4 rounded-2xl flex gap-4">
-                                <div className="shrink-0 flex flex-col items-center">
-                                    <div className="w-6 h-6 rounded-full bg-[#6B8F71]/10 flex items-center justify-center text-xs font-bold text-[#6B8F71]">
-                                        {i + 1}
-                                    </div>
-                                    {i < 3 && <div className="w-0.5 h-full bg-[#E8E4DE] my-1" />}
+                            <div
+                                key={i}
+                                className="bg-white border border-[#E8E4DE] p-3.5 rounded-2xl flex gap-3"
+                            >
+                                <div className="shrink-0 w-7 h-7 rounded-full bg-[#6B8F71]/12 flex items-center justify-center text-xs font-bold text-[#6B8F71]">
+                                    {i + 1}
                                 </div>
                                 <div>
-                                    <h4 className="text-sm font-semibold text-[#2C2A26] mb-1">{phase.name}</h4>
-                                    <p className="text-sm text-[#2C2A26]/60 leading-relaxed">{phase.goal}</p>
+                                    <h4 className="text-sm font-semibold text-[#2C2A26] mb-0.5">{phase.name}</h4>
+                                    <p className="text-xs text-[#2C2A26]/60 leading-relaxed">{phase.goal}</p>
                                 </div>
                             </div>
                         ))}
                     </div>
                 </div>
 
-                <div className="p-5 bg-white border-t border-[#E8E4DE] shrink-0 space-y-3">
-                    <p className="text-xs text-center text-[#2C2A26]/50 mb-2">
-                        Does this path feel right to you? You are the expert on your own life.
+                <div className="p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-white border-t border-[#E8E4DE] shrink-0 space-y-2.5">
+                    <p className="text-[11px] text-center text-[#2C2A26]/45 leading-snug px-1">
+                        You can keep chatting for as long as you need—or step into this pathway when you feel ready.
                     </p>
                     <button
                         onClick={handleAcceptProposal}
                         disabled={saving}
-                        className="w-full py-3.5 bg-[#6B8F71] text-white font-medium rounded-xl hover:bg-[#5A7D60] focus:ring-4 focus:ring-[#6B8F71]/20 transition-all disabled:opacity-50"
+                        className="w-full py-3.5 bg-[#6B8F71] text-white text-sm font-semibold rounded-2xl hover:bg-[#5A7D60] transition-colors disabled:opacity-50 shadow-sm"
                     >
-                        {saving ? 'Creating your plan...' : 'Yes, let\'s start this plan'}
+                        {saving ? 'Preparing your plan…' : 'Follow this pathway'}
                     </button>
                     <button
                         onClick={onClose}
                         disabled={saving}
-                        className="w-full py-3.5 bg-transparent border border-[#E8E4DE] text-[#2C2A26]/70 font-medium rounded-xl hover:bg-[#F5F0EB] transition-all disabled:opacity-50"
+                        className="w-full py-3 text-sm font-medium text-[#2C2A26]/70 rounded-2xl hover:bg-[#F5F0EB] transition-colors disabled:opacity-50 border border-transparent hover:border-[#E8E4DE]"
                     >
-                        Actually, I want to talk about something else
+                        I&apos;d like to talk more first
                     </button>
                 </div>
             </motion.div>

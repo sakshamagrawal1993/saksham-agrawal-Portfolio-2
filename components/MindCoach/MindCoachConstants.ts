@@ -1,5 +1,12 @@
 import { TherapistPersona } from '../../store/mindCoachStore';
 
+/** Total chat messages (user + assistant) in session before we emphasize the therapy pathway proposal in UI. Aligns with n8n discovery pacing when using the v6 workflow (≥30 and every 5 messages). */
+export const THERAPY_PROPOSAL_MIN_MESSAGE_COUNT = 30;
+
+/** Hero image for the therapy proposal bottom drawer (Supabase public storage). */
+export const MIND_COACH_PROPOSAL_DRAWER_IMAGE =
+  'https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/mind%20coach/Generated_image.jpg';
+
 interface TherapistConfig {
   name: string;
   color: string;

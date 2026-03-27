@@ -191,7 +191,7 @@ if (isGreeting) {
     "\\n[GREETING]\\nGreet " +
     (pd.name || "there") +
     " warmly. Introduce yourself. Reference their concerns. Set is_session_close to false.";
-} else if (messageCount >= 3 && messageCount % 5 === 0) {
+} else if (messageCount >= 30 && messageCount % 5 === 0) {
   pacingInstruction =
     "\\n[SYSTEM] Turn " +
     messageCount +

@@ -7,7 +7,7 @@ import {
   type ChatMessage as ChatMessageType,
 } from '../../../store/mindCoachStore';
 import { ChatMessage } from './ChatMessage';
-import { THERAPIST_CONFIG } from '../MindCoachConstants';
+import { THERAPIST_CONFIG, THERAPY_PROPOSAL_MIN_MESSAGE_COUNT } from '../MindCoachConstants';
 
 const MOCK_REPLY =
   "I hear you. That sounds really important. Can you tell me more about how that makes you feel?";
@@ -409,10 +409,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
     }
   };
 
-  const showEndSession = activeSession && (
-    isSessionClose ||
-    (activeSession.message_count >= 10 && activeSession.pathway !== 'engagement_rapport_and_assessment')
-  );
+  const showEndSession = Boolean(activeSession && !isCrisisDetected);
 
   if (showSummary && sessionSummary) {
     const tasks: any[] = Array.isArray(sessionSummary.extracted_tasks)
@@ -650,6 +647,14 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
           <p className="text-sm font-semibold text-[#2C2A26]">{meta.name}</p>
           <p className="text-xs text-[#6B8F71]">Online</p>
         </div>
+        <button
+          type="button"
+          onClick={handleEndSession}
+          disabled={endingSession}
+          className="shrink-0 text-xs font-medium text-[#2C2A26]/45 hover:text-[#2C2A26] disabled:opacity-50 py-1.5 px-2 rounded-lg hover:bg-[#F5F0EB] transition-colors"
+        >
+          {endingSession ? 'Ending…' : 'End session'}
+        </button>
       </div>
 
       {/* Assessment/Thematic Compass UI */}
@@ -677,7 +682,8 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
             <span className="font-medium">{activeSession.dynamic_theme || 'Understanding your story...'}</span>
           </div>
 
-          {(activeSession.pathway_confidence !== undefined && activeSession.pathway_confidence >= 80) || activeSession.message_count >= 10 ? (
+          {(activeSession.pathway_confidence !== undefined && activeSession.pathway_confidence >= 80) ||
+          activeSession.message_count >= THERAPY_PROPOSAL_MIN_MESSAGE_COUNT ? (
             <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className="pt-2 border-t border-[#E8E4DE]">
               <p className="text-sm text-[#2C2A26]/80 mb-2">
                 I have gathered enough context to propose a highly personalized therapy plan for you.
