@@ -51,7 +51,7 @@ Tracked in PRD §9.4 only.
 
 ## Completion notes
 
-- **E5:** Journal, Exercises, and Assessments screens gate on `UNLOCK_MAP` + `journey.current_phase` (reactive); `firstPhaseWhereFeatureUnlocks` drives copy. Toolkit hub uses the same map so cards re-render when phase changes.
+- **E5:** Journal, Exercises, and Assessments gate on `UNLOCK_MAP` + phase; when locked, **`FeaturePreviewLockOverlay`** shows the real UI dimmed with a frosted lock card (phase hint). Home shortcuts always show Journal / Assessments / Exercises with a pill overlay when locked. Toolkit hub unchanged (grid cards + lock layer).
 - **E6:** `syncDiscoveryFromN8n` updates Zustand and `mind_coach_journeys.discovery_state` via Supabase.
 - **E2:** `TherapistChat` amber alert for failures; no silent mock assistant reply; Retry for greeting, n8n-only, or assistant-save-only paths; user message rolled back if persist fails.
 - **E11:** Module `greetingAttemptedForSession` prevents duplicate greeting for the same `session_id`; Retry clears the lock and bumps `greetingRetryToken`.
