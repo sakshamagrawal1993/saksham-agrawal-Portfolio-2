@@ -248,13 +248,17 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
             created_at: new Date().toISOString(),
           };
 
-          await supabase.from('mind_coach_messages').insert({
+          const { error: greetSaveErr } = await supabase.from('mind_coach_messages').insert({
             id: assistantMsg.id,
             session_id: assistantMsg.session_id,
             role: assistantMsg.role,
             content: assistantMsg.content,
+            guardrail_status: assistantMsg.guardrail_status,
             dynamic_content: assistantMsg.dynamic_content,
           });
+          if (greetSaveErr) {
+            console.error('Failed to save greeting message:', greetSaveErr);
+          }
 
           addMessage(assistantMsg);
           
@@ -393,13 +397,17 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
         created_at: new Date().toISOString(),
       };
       
-      await supabase.from('mind_coach_messages').insert({
+      const { error: assistantSaveErr } = await supabase.from('mind_coach_messages').insert({
         id: assistantMsg.id,
         session_id: assistantMsg.session_id,
+        role: assistantMsg.role,
         content: assistantMsg.content,
         guardrail_status: assistantMsg.guardrail_status,
         dynamic_content: assistantMsg.dynamic_content,
       });
+      if (assistantSaveErr) {
+        console.error('Failed to save assistant message:', assistantSaveErr);
+      }
       addMessage(assistantMsg);
 
       // 6. Update session count + result state
