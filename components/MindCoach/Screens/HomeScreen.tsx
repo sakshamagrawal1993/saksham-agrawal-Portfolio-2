@@ -1,13 +1,14 @@
 import React, { useMemo, useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, Sparkles, CheckCircle2, BookOpen, Wind, Brain, Flower2, Moon, MessageCircle as MsgIcon, Shield, Target, Heart } from 'lucide-react';
+import { ArrowRight, Sparkles, CheckCircle2, BookOpen, Wind, Brain, Flower2, Moon, MessageCircle as MsgIcon, Shield, Target, Heart, Lock } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 import { supabase } from '../../../lib/supabaseClient';
 import {
   useMindCoachStore,
   type TaskType,
   UNLOCK_MAP,
+  firstPhaseWhereFeatureUnlocks,
   type TabId,
 } from '../../../store/mindCoachStore';
 
@@ -54,14 +55,15 @@ export const HomeScreen: React.FC = () => {
   const currentPhase = journey?.current_phase ?? 1;
   const unlockedTabs =
     UNLOCK_MAP[Math.min(Math.max(currentPhase, 1), 4)] ?? UNLOCK_MAP[1];
-  const toolkitShortcuts = useMemo(() => {
-    const items: { feature: string; label: string; tab: TabId }[] = [
-      { feature: 'journal', label: 'Journal', tab: 'journal' },
-      { feature: 'assessments', label: 'Assessments', tab: 'assessments' },
-      { feature: 'exercises', label: 'Exercises', tab: 'exercises' },
-    ];
-    return items.filter((i) => unlockedTabs.includes(i.feature));
-  }, [unlockedTabs]);
+  const toolkitShortcutItems = useMemo(
+    () =>
+      [
+        { feature: 'journal', label: 'Journal', tab: 'journal' as const },
+        { feature: 'assessments', label: 'Assessments', tab: 'assessments' as const },
+        { feature: 'exercises', label: 'Exercises', tab: 'exercises' as const },
+      ] as const,
+    [],
+  );
   const phases = journey?.phases ?? [];
   const currentPhaseData = phases[currentPhase - 1];
   const completedInPhase = sessions.filter(
@@ -200,16 +202,39 @@ export const HomeScreen: React.FC = () => {
         >
           Toolkit
         </button>
-        {toolkitShortcuts.map(({ label, tab }) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setActiveTab(tab)}
-            className="px-3.5 py-2 rounded-full text-xs font-medium bg-white border border-[#E8E4DE] text-[#2C2A26]/70 hover:border-[#6B8F71]/35 hover:text-[#2C2A26] transition-colors"
-          >
-            {label}
-          </button>
-        ))}
+        {toolkitShortcutItems.map(({ feature, label, tab }) => {
+          const isOpen = unlockedTabs.includes(feature);
+          const needPhase = firstPhaseWhereFeatureUnlocks(feature);
+          return (
+            <button
+              key={tab}
+              type="button"
+              disabled={!isOpen}
+              onClick={() => setActiveTab(tab)}
+              aria-label={
+                isOpen ? label : `${label}, unlocks in phase ${needPhase}. Complete sessions in your current phase.`
+              }
+              className={`relative overflow-hidden px-3.5 py-2 rounded-full text-xs font-medium border transition-colors disabled:opacity-100 ${
+                isOpen
+                  ? 'bg-white border-[#E8E4DE] text-[#2C2A26]/70 hover:border-[#6B8F71]/35 hover:text-[#2C2A26] enabled:cursor-pointer'
+                  : 'bg-white border-[#E8E4DE]/90 text-[#2C2A26]/45 cursor-default'
+              }`}
+            >
+              <span className={isOpen ? '' : 'opacity-45'}>{label}</span>
+              {!isOpen && (
+                <span
+                  className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 rounded-full bg-white/72 backdrop-blur-[2px] border border-[#E8E4DE]/60"
+                  aria-hidden
+                >
+                  <Lock size={11} className="text-[#6B8F71]" strokeWidth={2.5} />
+                  <span className="text-[8px] font-bold uppercase tracking-wide text-[#2C2A26]/50">
+                    Phase {needPhase}
+                  </span>
+                </span>
+              )}
+            </button>
+          );
+        })}
       </motion.div>
 
       {/* Hero Journey Widget */}

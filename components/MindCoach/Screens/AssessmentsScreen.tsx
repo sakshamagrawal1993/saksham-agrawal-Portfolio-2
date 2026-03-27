@@ -7,7 +7,7 @@ import {
   UNLOCK_MAP,
   firstPhaseWhereFeatureUnlocks,
 } from '../../../store/mindCoachStore';
-import { FeatureLockedPlaceholder } from '../shared/FeatureLockedPlaceholder';
+import { FeaturePreviewLockOverlay } from '../shared/FeaturePreviewLockOverlay';
 
 interface AssessmentQuestion {
   id: string;
@@ -85,6 +85,127 @@ const ASSESSMENT_INTERPRETATIONS: Record<string, Record<string, { meaning: strin
     high: { meaning: "Your perceived stress levels are high.", advice: "Your plate feels very full. Let's find a grounding technique that works for you right now." },
   },
 };
+
+function AssessmentCatalogSection({
+  latestByType,
+  historyByType,
+  onStartAssessment,
+  allScores,
+}: {
+  latestByType: Record<string, AssessmentScore>;
+  historyByType: Record<string, AssessmentScore[]>;
+  onStartAssessment: (type: string) => void;
+  allScores: AssessmentScore[];
+}) {
+  return (
+    <div className="p-5 space-y-5">
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+        <h2 className="text-xl font-semibold text-[#2C2A26]">Assessments</h2>
+        <p className="text-xs text-[#2C2A26]/40 mt-1">Track your mental health scores over time</p>
+      </motion.div>
+
+      <div className="space-y-3">
+        {Object.entries(ASSESSMENT_INFO).map(([type, info], i) => {
+          const latest = latestByType[type];
+          const history = historyByType[type] || [];
+          const severity = latest ? getSeverityInfo(type, latest.total_score) : null;
+
+          return (
+            <motion.div
+              key={type}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05 }}
+              className="bg-white rounded-2xl p-4 shadow-sm border border-[#E8E4DE]"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#F5F0EB] flex items-center justify-center text-lg shrink-0">
+                  {info.emoji}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-[#2C2A26]">{info.name}</p>
+                    {latest && severity && (
+                      <span
+                        className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
+                        style={{ backgroundColor: severity.color + '15', color: severity.color }}
+                      >
+                        {severity.label}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-[#2C2A26]/50">{info.description}</p>
+                </div>
+              </div>
+
+              {latest ? (
+                <div className="mt-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp size={12} className="text-[#6B8F71]" />
+                      <span className="text-sm font-medium text-[#2C2A26]">
+                        Score: {latest.total_score}/{info.maxScore}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 text-xs text-[#2C2A26]/40">
+                      <Clock size={10} />
+                      {new Date(latest.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      {history.length > 1 && (
+                        <span className="ml-1 text-[#6B8F71]">· {history.length} total</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="w-full h-1.5 bg-[#F5F0EB] rounded-full overflow-hidden mb-3">
+                    <motion.div
+                      className="h-full rounded-full"
+                      style={{ backgroundColor: severity!.color }}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${(latest.total_score / info.maxScore) * 100}%` }}
+                      transition={{ duration: 0.6, delay: 0.2 + i * 0.1 }}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onStartAssessment(type)}
+                    className="text-xs font-medium text-[#6B8F71] hover:text-[#5A7D60] transition-colors"
+                  >
+                    Retake Assessment →
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => onStartAssessment(type)}
+                  className="mt-3 flex items-center justify-between w-full group"
+                >
+                  <span className="text-xs text-[#6B8F71] font-medium group-hover:text-[#5A7D60] transition-colors">
+                    Take Assessment
+                  </span>
+                  <ChevronRight size={14} className="text-[#6B8F71]/40 group-hover:text-[#6B8F71] transition-colors" />
+                </button>
+              )}
+            </motion.div>
+          );
+        })}
+      </div>
+
+      {allScores.length === 0 && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="text-center py-6"
+        >
+          <div className="w-14 h-14 rounded-full bg-[#F5F0EB] flex items-center justify-center mx-auto mb-3">
+            <ClipboardList size={24} className="text-[#2C2A26]/25" />
+          </div>
+          <p className="text-sm text-[#2C2A26]/50">No assessments completed yet</p>
+          <p className="text-xs text-[#2C2A26]/30 mt-1">Take one above to track your progress</p>
+        </motion.div>
+      )}
+    </div>
+  );
+}
 
 export const AssessmentsScreen: React.FC = () => {
   const profile = useMindCoachStore((s) => s.profile);
@@ -197,11 +318,20 @@ export const AssessmentsScreen: React.FC = () => {
 
   if (!assessmentsUnlocked) {
     return (
-      <FeatureLockedPlaceholder
-        title="Assessments"
-        description="Screening tools unlock in phase 2. Continue your journey with your coach to track mood and stress over time."
-        unlockPhase={firstPhaseWhereFeatureUnlocks('assessments')}
-      />
+      <div className="flex flex-col h-full min-h-0 bg-[#FAFAF7]">
+        <FeaturePreviewLockOverlay
+          unlockPhase={firstPhaseWhereFeatureUnlocks('assessments')}
+          featureLabel="Assessments"
+          hint="GAD-7, PHQ-9, and PSS-4 unlock in phase 2. Here is what you will use—complete this phase to take them."
+        >
+          <AssessmentCatalogSection
+            latestByType={{}}
+            historyByType={{}}
+            onStartAssessment={() => {}}
+            allScores={[]}
+          />
+        </FeaturePreviewLockOverlay>
+      </div>
     );
   }
 
@@ -423,110 +553,11 @@ export const AssessmentsScreen: React.FC = () => {
 
   // Assessment list UI
   return (
-    <div className="p-5 space-y-5">
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-        <h2 className="text-xl font-semibold text-[#2C2A26]">Assessments</h2>
-        <p className="text-xs text-[#2C2A26]/40 mt-1">Track your mental health scores over time</p>
-      </motion.div>
-
-      <div className="space-y-3">
-        {Object.entries(ASSESSMENT_INFO).map(([type, info], i) => {
-          const latest = latestByType[type];
-          const history = historyByType[type] || [];
-          const severity = latest ? getSeverityInfo(type, latest.total_score) : null;
-
-          return (
-            <motion.div
-              key={type}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05 }}
-              className="bg-white rounded-2xl p-4 shadow-sm border border-[#E8E4DE]"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#F5F0EB] flex items-center justify-center text-lg shrink-0">
-                  {info.emoji}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-[#2C2A26]">{info.name}</p>
-                    {latest && severity && (
-                      <span
-                        className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
-                        style={{ backgroundColor: severity.color + '15', color: severity.color }}
-                      >
-                        {severity.label}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-[#2C2A26]/50">{info.description}</p>
-                </div>
-              </div>
-
-              {latest ? (
-                <div className="mt-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <TrendingUp size={12} className="text-[#6B8F71]" />
-                      <span className="text-sm font-medium text-[#2C2A26]">
-                        Score: {latest.total_score}/{info.maxScore}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1 text-xs text-[#2C2A26]/40">
-                      <Clock size={10} />
-                      {new Date(latest.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      {history.length > 1 && (
-                        <span className="ml-1 text-[#6B8F71]">· {history.length} total</span>
-                      )}
-                    </div>
-                  </div>
-                  {/* Progress bar */}
-                  <div className="w-full h-1.5 bg-[#F5F0EB] rounded-full overflow-hidden mb-3">
-                    <motion.div
-                      className="h-full rounded-full"
-                      style={{ backgroundColor: severity!.color }}
-                      initial={{ width: 0 }}
-                      animate={{ width: `${(latest.total_score / info.maxScore) * 100}%` }}
-                      transition={{ duration: 0.6, delay: 0.2 + i * 0.1 }}
-                    />
-                  </div>
-                  <button
-                    onClick={() => startAssessment(type)}
-                    className="text-xs font-medium text-[#6B8F71] hover:text-[#5A7D60] transition-colors"
-                  >
-                    Retake Assessment →
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => startAssessment(type)}
-                  className="mt-3 flex items-center justify-between w-full group"
-                >
-                  <span className="text-xs text-[#6B8F71] font-medium group-hover:text-[#5A7D60] transition-colors">
-                    Take Assessment
-                  </span>
-                  <ChevronRight size={14} className="text-[#6B8F71]/40 group-hover:text-[#6B8F71] transition-colors" />
-                </button>
-              )}
-            </motion.div>
-          );
-        })}
-      </div>
-
-      {scores.length === 0 && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-          className="text-center py-6"
-        >
-          <div className="w-14 h-14 rounded-full bg-[#F5F0EB] flex items-center justify-center mx-auto mb-3">
-            <ClipboardList size={24} className="text-[#2C2A26]/25" />
-          </div>
-          <p className="text-sm text-[#2C2A26]/50">No assessments completed yet</p>
-          <p className="text-xs text-[#2C2A26]/30 mt-1">Take one above to track your progress</p>
-        </motion.div>
-      )}
-    </div>
+    <AssessmentCatalogSection
+      latestByType={latestByType}
+      historyByType={historyByType}
+      onStartAssessment={startAssessment}
+      allScores={scores}
+    />
   );
 };

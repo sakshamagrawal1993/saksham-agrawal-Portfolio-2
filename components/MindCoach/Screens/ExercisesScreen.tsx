@@ -8,7 +8,7 @@ import {
   firstPhaseWhereFeatureUnlocks,
 } from '../../../store/mindCoachStore';
 import { ExercisePlayer } from '../Exercises/ExercisePlayer';
-import { FeatureLockedPlaceholder } from '../shared/FeatureLockedPlaceholder';
+import { FeaturePreviewLockOverlay } from '../shared/FeaturePreviewLockOverlay';
 
 export const ExercisesScreen: React.FC = () => {
   const phase = useMindCoachStore((s) => s.journey?.current_phase ?? 1);
@@ -29,22 +29,12 @@ export const ExercisesScreen: React.FC = () => {
     return matchesSearch && matchesCategory;
   });
 
-  if (!exercisesUnlocked) {
-    return (
-      <div className="flex flex-col h-full bg-[#FAFAF7]">
-        <FeatureLockedPlaceholder
-          title="Wellness library"
-          description="Guided exercises unlock in phase 3. Keep progressing with your plan to access practices here."
-          unlockPhase={firstPhaseWhereFeatureUnlocks('exercises')}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col h-full bg-[#FAFAF7]">
-      {/* Header */}
-      <div className="px-6 pt-8 pb-6 space-y-6 bg-white/50 backdrop-blur-sm sticky top-0 z-20 border-b border-[#E8E4DE]/50">
+  const headerEl = (
+      <div
+        className={`px-6 pt-8 pb-6 space-y-6 bg-white/50 backdrop-blur-sm border-b border-[#E8E4DE]/50 ${
+          exercisesUnlocked ? 'sticky top-0 z-20' : 'pointer-events-none opacity-95'
+        }`}
+      >
         <div className="flex items-center justify-between">
           <div className="space-y-1">
             <h2 className="text-2xl font-serif text-[#2C2A26]">Wellness Library</h2>
@@ -91,9 +81,10 @@ export const ExercisesScreen: React.FC = () => {
           </div>
         </div>
       </div>
+  );
 
-      {/* Grid */}
-      <div className="flex-1 overflow-y-auto px-6 py-6">
+  const gridEl = (
+      <div className={exercisesUnlocked ? 'flex-1 overflow-y-auto px-6 py-6' : 'px-6 py-6'}>
         <div className="grid grid-cols-1 gap-4">
           {filteredExercises.map((ex, idx) => (
             <motion.div
@@ -101,8 +92,12 @@ export const ExercisesScreen: React.FC = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.05 }}
               key={ex.id}
-              onClick={() => setActiveExercise(ex)}
-              className="group relative bg-white p-5 rounded-[2rem] border border-[#E8E4DE] hover:border-[#6B8F71]/30 hover:shadow-lg transition-all cursor-pointer overflow-hidden"
+              onClick={() => exercisesUnlocked && setActiveExercise(ex)}
+              className={`group relative bg-white p-5 rounded-[2rem] border border-[#E8E4DE] overflow-hidden ${
+                exercisesUnlocked
+                  ? 'hover:border-[#6B8F71]/30 hover:shadow-lg transition-all cursor-pointer'
+                  : ''
+              }`}
             >
               {/* Decorative background shape */}
               <div className="absolute top-0 right-0 -mr-4 -mt-4 w-24 h-24 rounded-full bg-[#F5F2EB] group-hover:bg-[#6B8F71]/5 transition-colors -z-0" />
@@ -142,20 +137,38 @@ export const ExercisesScreen: React.FC = () => {
           </div>
         )}
       </div>
+  );
 
-      {/* Player Overlay */}
-      <AnimatePresence>
-        {activeExercise && (
-          <ExercisePlayer
-            exercise={activeExercise}
-            onClose={() => setActiveExercise(null)}
-            onComplete={() => {
-              // Maybe add points or update activity log
-              console.log('Exercise complete:', activeExercise.title);
-            }}
-          />
-        )}
-      </AnimatePresence>
+  return (
+    <div className="flex flex-col h-full bg-[#FAFAF7]">
+      {!exercisesUnlocked ? (
+        <FeaturePreviewLockOverlay
+          unlockPhase={firstPhaseWhereFeatureUnlocks('exercises')}
+          featureLabel="Wellness library"
+          hint="Guided practices unlock in phase 3. Here is a preview of your library—keep going with your sessions to start one."
+        >
+          <>
+            {headerEl}
+            {gridEl}
+          </>
+        </FeaturePreviewLockOverlay>
+      ) : (
+        <>
+          {headerEl}
+          {gridEl}
+          <AnimatePresence>
+            {activeExercise && (
+              <ExercisePlayer
+                exercise={activeExercise}
+                onClose={() => setActiveExercise(null)}
+                onComplete={() => {
+                  console.log('Exercise complete:', activeExercise.title);
+                }}
+              />
+            )}
+          </AnimatePresence>
+        </>
+      )}
     </div>
   );
 };
