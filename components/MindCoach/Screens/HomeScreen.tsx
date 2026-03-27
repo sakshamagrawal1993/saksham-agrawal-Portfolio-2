@@ -187,25 +187,30 @@ export const HomeScreen: React.FC = () => {
         </div>
       </motion.div>
 
-      {toolkitShortcuts.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.08 }}
-          className="flex flex-wrap gap-2"
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.08 }}
+        className="flex flex-wrap gap-2"
+      >
+        <button
+          type="button"
+          onClick={() => setActiveTab('toolkit')}
+          className="px-3.5 py-2 rounded-full text-xs font-medium bg-[#6B8F71]/8 border border-[#6B8F71]/25 text-[#5a7a5f] hover:border-[#6B8F71]/40 hover:text-[#2C2A26] transition-colors"
         >
-          {toolkitShortcuts.map(({ label, tab }) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setActiveTab(tab)}
-              className="px-3.5 py-2 rounded-full text-xs font-medium bg-white border border-[#E8E4DE] text-[#2C2A26]/70 hover:border-[#6B8F71]/35 hover:text-[#2C2A26] transition-colors"
-            >
-              {label}
-            </button>
-          ))}
-        </motion.div>
-      )}
+          Toolkit
+        </button>
+        {toolkitShortcuts.map(({ label, tab }) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => setActiveTab(tab)}
+            className="px-3.5 py-2 rounded-full text-xs font-medium bg-white border border-[#E8E4DE] text-[#2C2A26]/70 hover:border-[#6B8F71]/35 hover:text-[#2C2A26] transition-colors"
+          >
+            {label}
+          </button>
+        ))}
+      </motion.div>
 
       {/* Hero Journey Widget */}
       {journey && (

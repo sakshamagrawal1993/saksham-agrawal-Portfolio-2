@@ -2,7 +2,7 @@
 
 Tracker for **Engineering** and **UX** items from `MIND_COACH_PRD.md`. Status: `todo` | `in_progress` | `done` | `blocked` | `deferred`.
 
-_Last updated: 2026-03-27 — statuses reconciled with implementation in repo._
+_Last updated: 2026-03-28 — see also [`MIND_COACH_GAPS.md`](./MIND_COACH_GAPS.md) for prioritised gap narrative._
 
 ---
 
@@ -23,7 +23,7 @@ _Last updated: 2026-03-27 — statuses reconciled with implementation in repo._
 
 | ID | Job | Status |
 |----|-----|--------|
-| E9 | Toolkit vs bottom-nav — single IA | `deferred` |
+| E9 | Toolkit hub reachable without a 7th bottom-nav tab (Home **Toolkit** + `toolkit` tab + ← Home) | `done` |
 | E10 | Rate limit n8n | `deferred` |
 | E11 | Greeting idempotency (no double greeting on strict remount) | `done` |
 | E11b | Edge `mind-coach-chat`: persist `dynamic_content` on assistant insert | `done` |
@@ -38,7 +38,7 @@ _Last updated: 2026-03-27 — statuses reconciled with implementation in repo._
 | U2 | Empty state: sessions list when no sessions | `done` |
 | U3 | Post-accept pathway note in `PlanProposalModal` / after accept | `done` |
 | U4 | Diary: show completed sessions even without `summary_data` | `done` |
-| U5 | Plan progress bar plain-language legend (30 messages / confidence) | `done` |
+| U5 | Plan progress: product uses short label only (“Your plan unlocks with the conversation”); long legend deferred — align PRD / [`MIND_COACH_GAPS.md`](./MIND_COACH_GAPS.md) G-P2-07 | `done` (short label) |
 | U6 | Landing: short disclaimer before spinner (Mind Coach ≠ therapy) | `done` |
 | U7 | Home: respect phase unlock for toolkit-style shortcuts | `done` |
 | U8 | Onboarding save failure: in-flow error + retry | `done` |
@@ -58,7 +58,9 @@ Tracked in PRD §9.4 only.
 - **E11b:** Edge `mind-coach-chat` inserts `dynamic_content` on assistant rows (matches client).
 - **U3:** `PlanProposalModal` shows a short post-accept note and **Continue** before `onAccept`.
 - **U4:** `DiaryScreen` lists completed sessions without requiring `summary_data`; fallback title/preview.
-- **U5:** Plan progress strip includes plain-language legend (30 messages / confidence / 90% rule).
+- **U5:** Chat discovery strip uses the short unlock line only; extended legend tracked in gaps doc if product wants it back.
+- **E9:** `toolkit` tab + `ToolkitScreen` in `MindCoachApp`; Home pill opens hub; bottom nav unchanged (six tabs).
+- **MindCoachApp:** Journey load effect no longer calls `reset()` on cleanup — only on real `profileId` change.
 - **U6:** `MindCoachLanding` disclaimer + 988 before spinner.
 - **U7:** `HomeScreen` phase-aware shortcuts to Journal / Assessments / Exercises.
 - **U8:** `JourneyPreviewStep` inline save error + Try again; `finally` clears saving state.

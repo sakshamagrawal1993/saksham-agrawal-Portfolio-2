@@ -168,6 +168,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
   const updateActiveSession = useMindCoachStore((s) => s.updateActiveSession);
   const setActiveSession = useMindCoachStore((s) => s.setActiveSession);
   const setSessions = useMindCoachStore((s) => s.setSessions);
+  const setJourney = useMindCoachStore((s) => s.setJourney);
   const sessions = useMindCoachStore((s) => s.sessions);
   const setCrisisDetected = useMindCoachStore((s) => s.setCrisisDetected);
   const setIsSessionClose = useMindCoachStore((s) => s.setIsSessionClose);
@@ -750,9 +751,19 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
     }
   };
 
-  const handleCloseSummary = () => {
+  const handleCloseSummary = async () => {
     setShowSummary(false);
     setSessionSummary(null);
+    if (profile?.id) {
+      const { data } = await supabase
+        .from('mind_coach_journeys')
+        .select('*')
+        .eq('profile_id', profile.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (data) setJourney(data);
+    }
     if (onReturnHome) {
       onReturnHome();
     } else {
@@ -952,6 +963,23 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
               Please reach out to a trained crisis counsellor who can support you through this.
             </p>
           </motion.div>
+          <p className="text-[11px] text-[#2C2A26]/45 leading-relaxed max-w-sm">
+            If you are in the US or Canada, you can call or text{' '}
+            <a href="tel:988" className="font-semibold text-red-600 underline-offset-2 hover:underline">
+              988
+            </a>{' '}
+            (Suicide & Crisis Lifeline). In India, iCall is below.
+          </p>
+          <motion.a
+            href="tel:988"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="w-full py-4 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-2xl text-center transition-colors flex flex-col items-center gap-0.5"
+          >
+            <span className="text-base">📞 Call or text 988</span>
+            <span className="text-xs font-normal opacity-90">US & Canada · 24/7</span>
+          </motion.a>
           <motion.a
             href="tel:9152987821"
             initial={{ opacity: 0, y: 10 }}
@@ -959,7 +987,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
             transition={{ delay: 0.2 }}
             className="w-full py-4 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-2xl text-center transition-colors flex flex-col items-center gap-0.5"
           >
-            <span className="text-base">📞 Call iCall</span>
+            <span className="text-base">📞 Call iCall (India)</span>
             <span className="text-xs font-normal opacity-80">9152987821 · Free · Confidential</span>
           </motion.a>
           <motion.a
@@ -1006,7 +1034,12 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-[#2C2A26]">{meta.name}</p>
-          <p className="text-xs text-[#6B8F71]">Online</p>
+          <p
+            className={`text-xs ${isLoading ? 'text-[#6B8F71]/90 italic' : 'text-[#6B8F71]'}`}
+            aria-live="polite"
+          >
+            {isLoading ? 'Writing a reply…' : 'Online'}
+          </p>
         </div>
         <button
           type="button"

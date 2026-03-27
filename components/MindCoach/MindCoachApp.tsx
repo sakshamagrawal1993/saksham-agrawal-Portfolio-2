@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, Navigate, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
@@ -11,9 +11,12 @@ import { AssessmentsScreen } from './Screens/AssessmentsScreen';
 import { JournalScreen } from './Screens/JournalScreen';
 import { DiaryScreen } from './Screens/DiaryScreen';
 import { ExercisesScreen } from './Screens/ExercisesScreen';
+import { ToolkitScreen } from './Screens/ToolkitScreen';
 import { OnboardingFlow } from './Onboarding/OnboardingFlow';
 
 function TabContent({ tab }: { tab: TabId }) {
+  const setActiveTab = useMindCoachStore((s) => s.setActiveTab);
+
   switch (tab) {
     case 'home':
       return <HomeScreen />;
@@ -27,6 +30,24 @@ function TabContent({ tab }: { tab: TabId }) {
       return <DiaryScreen />;
     case 'exercises':
       return <ExercisesScreen />;
+    case 'toolkit':
+      return (
+        <div className="flex flex-col h-full min-h-0">
+          <div className="shrink-0 flex items-center gap-2 px-4 py-2.5 border-b border-[#E8E4DE] bg-white/80">
+            <button
+              type="button"
+              onClick={() => setActiveTab('home')}
+              className="text-xs text-[#6B8F71] font-medium hover:text-[#5a7a5f]"
+            >
+              ← Home
+            </button>
+            <span className="text-xs font-semibold text-[#2C2A26]/50 uppercase tracking-wide">Toolkit</span>
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <ToolkitScreen />
+          </div>
+        </div>
+      );
     default:
       return null;
   }
@@ -50,6 +71,7 @@ const MindCoachApp: React.FC = () => {
   const setExercises = useMindCoachStore((s) => s.setExercises);
   const setActiveTasks = useMindCoachStore((s) => s.setActiveTasks);
   const reset = useMindCoachStore((s) => s.reset);
+  const prevProfileIdRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     if (!profileId) return;
@@ -75,6 +97,11 @@ const MindCoachApp: React.FC = () => {
         });
       return;
     }
+
+    const switchingProfile =
+      prevProfileIdRef.current !== undefined && prevProfileIdRef.current !== profileId;
+    prevProfileIdRef.current = profileId;
+    if (switchingProfile) reset();
 
     let cancelled = false;
 
@@ -163,7 +190,6 @@ const MindCoachApp: React.FC = () => {
 
     return () => {
       cancelled = true;
-      reset();
     };
   }, [profileId, setProfile, setJourney, setSessions, setMemories, setMoodEntries, setExercises, setActiveTasks, reset]);
 

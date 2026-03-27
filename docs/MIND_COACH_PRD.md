@@ -4,7 +4,7 @@
 **Audience:** Engineering, Clinical / Safety, UX / Product  
 **Scope:** In-repo Mind Coach experience (`/mind-coach/*`), Supabase data layer, n8n orchestration, and documented gaps.
 
-**Implementation tracker:** Detailed job IDs and statuses live in [`MIND_COACH_JOBS.md`](./MIND_COACH_JOBS.md). Section §9 below summarizes **done vs still open** as of the last PRD sync.
+**Implementation tracker:** Job IDs in [`MIND_COACH_JOBS.md`](./MIND_COACH_JOBS.md); **prioritised gap review** in [`MIND_COACH_GAPS.md`](./MIND_COACH_GAPS.md). Section §9 below summarizes **done vs still open** as of the last PRD sync.
 
 ---
 
@@ -95,7 +95,7 @@ Mind Coach is a **web-based, AI-assisted mental wellness companion** embedded in
 - **Active tasks** from `mind_coach_user_tasks` (hybrid task model).  
 - Links to tabs; **account deletion** flow (wipes profile-related data — verify RLS/cascade with Engineering).
 
-**UX (partially addressed in v1.1):** Home shows **phase-aware shortcuts** (Journal / Assessments / Exercises) only when those features are unlocked for the current journey phase. Dedicated tabs (**Journal, Exercises, Assessments**) use the same `UNLOCK_MAP` rules with a locked placeholder when closed. Remaining IA nuance: Toolkit hub vs bottom-nav duplication (see §9, E9).
+**UX (partially addressed in v1.1):** Home shows **phase-aware shortcuts** (Journal / Assessments / Exercises) only when those features are unlocked for the current journey phase. Dedicated tabs (**Journal, Exercises, Assessments**) use the same `UNLOCK_MAP` rules with a locked placeholder when closed. **Toolkit** opens from a Home pill into a dedicated **`toolkit`** view (no extra bottom-nav slot); see §9.0 **E9**.
 
 ---
 
@@ -294,7 +294,12 @@ This section is split into **completed work** (synced with the repo and [`MIND_C
 | **U2** | Sessions empty state | Empty state when there are no sessions (`SessionsScreen`). |
 | **U3** | Post-accept note | `PlanProposalModal`: short “what’s next” + **Continue** after successful accept. |
 | **U4** | Diary without `summary_data` | Completed sessions listed with fallback title/preview. |
-| **U5** | Progress bar legend | Plain-language explanation under discovery progress (30 messages, 80% confidence, 90% rule). |
+| **U5** | Plan unlock line (discovery chat) | Short label under the progress bar (“Your plan unlocks with the conversation”). Long legend is optional — see [`MIND_COACH_GAPS.md`](./MIND_COACH_GAPS.md) G-P2-07. |
+| **E9** | Toolkit entry | Home **Toolkit** pill + full-screen hub (`ToolkitScreen`); **← Home**; bottom nav unchanged. |
+| **—** | Chat header while waiting | Subtitle **Writing a reply…** when a response is loading (see §9.2 note). |
+| **—** | Journey after session end | On summary **Done**, client **refetches** latest `mind_coach_journeys` row so Home progress matches server. |
+| **—** | Load-effect store reset | `MindCoachApp` no longer calls `reset()` on effect **cleanup** (avoids Strict Mode / dependency churn wiping chat); `reset` only on real **profileId** change. |
+| **—** | Crisis overlay | **988** (US/CA) primary CTA + India **iCall** retained (partial regional matrix — §9.3). |
 | **U6** | Landing disclaimer | Not-therapy disclaimer + **988** before spinner on `MindCoachLanding`. |
 | **U7** | Home + unlock | Phase-aware shortcuts to unlocked tools only. |
 | **U8** | Onboarding save failure | Inline error + **Try again** on final step. |
@@ -308,7 +313,6 @@ This section is split into **completed work** (synced with the repo and [`MIND_C
 | **E4** | Journey advancement vs `session-end` | **Deferred** — needs agreed product rules. |
 | **E7** | E2E: onboarding → message → reload | **Deferred** — no Playwright (or equivalent) in repo yet. |
 | **E8** | Structured observability | **Deferred** — needs logging stack / dashboards. |
-| **E9** | Single IA: Toolkit vs bottom-nav | **Deferred** — reduce duplicate entry points. |
 | **E10** | Rate limit / abuse protection on n8n | **Deferred**. |
 | **E12** | WebSocket / streaming | **Deferred**. |
 | **E13** | i18n / a11y audit | **Deferred**. |
@@ -316,14 +320,15 @@ This section is split into **completed work** (synced with the repo and [`MIND_C
 ### 9.2 UX — still open (not fully covered by jobs above)
 
 - **Empty / edge states:** e.g. **failed summary** UX beyond Diary listing, **proposal declined** path, sessions list polish if gaps remain.  
-- **Typing indicator** in chat header (persona name) during wait.  
 - **Reload** — document or improve restoration of ephemeral UI state.  
 - Broader **data use / consent** copy and optional **checkbox + timestamp** in DB (see §4.2 clinical gaps).
+
+**Recently closed (2026-03-28):** Chat header shows **Writing a reply…** while the assistant response is loading; journey row refetched after closing session summary.
 
 ### 9.3 Clinical / policy — priority
 
 - Disclaimers and **terms of use** specific to AI coaching.  
-- **Regional crisis** matrix.  
+- **Regional crisis** matrix — in-app overlay now surfaces **988** (US/CA) and **iCall** (India); full locale matrix still open.  
 - **Severe** assessment band: mandatory **external help** CTA + optional **check-in** task.  
 - Review **task library** and **pathway phases** content for clinical accuracy.
 
@@ -376,4 +381,4 @@ This section is split into **completed work** (synced with the repo and [`MIND_C
 
 ---
 
-*PRD v1.1 synced with implementation backlog in `docs/MIND_COACH_JOBS.md` (2026-03-27). Update version and sections when major flows or compliance posture change.*
+*PRD v1.1 synced with `docs/MIND_COACH_JOBS.md` and `docs/MIND_COACH_GAPS.md` (2026-03-28). Update version and sections when major flows or compliance posture change.*
