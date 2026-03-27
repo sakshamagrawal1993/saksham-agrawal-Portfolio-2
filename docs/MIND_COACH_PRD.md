@@ -112,7 +112,7 @@ Mind Coach is a **web-based, AI-assisted mental wellness companion** embedded in
 
 - “Clinical insight” strip: dynamic theme, pathway confidence bands (Listening / Connecting / Formulating).  
 - **Progress bar** toward plan reveal: linear to **20 messages**; if confidence &lt; 80 at 20, bar **90%** then +2% per **5** further messages until 100%.
-- **Therapy proposal** CTA when confidence ≥ 80 **or** message count ≥ 20 → opens `PlanProposalModal` (bottom drawer).
+- **Therapy proposal** CTA only after the workflow returns pathway details and the client persists **`journey.discovery_state`** (`suggested_pathway` ≠ engagement + numeric `confidence`, same contract as **`syncDiscoveryFromN8n`**) — **not** tied to message count alone. Opens `PlanProposalModal` (bottom drawer).
 - **End session** → `mind-coach-session-end` edge function (n8n summarizer) or **dummy summary** + client completes session if edge fails.
 
 **Crisis:** `TherapistChat` can set crisis state from n8n flags → **full-screen overlay** with **iCall** (India) phone + web — **not localized** for other regions.
@@ -236,8 +236,8 @@ Mind Coach is a **web-based, AI-assisted mental wellness companion** embedded in
 
 ### 6.5 Constants (product tuning)
 
-- `THERAPY_PROPOSAL_MIN_MESSAGE_COUNT` = 20  
-- `THERAPY_PROPOSAL_CONFIDENCE_READY` = 80  
+- `THERAPY_PROPOSAL_MIN_MESSAGE_COUNT` = 20 (progress bar pacing only; **proposal CTA** uses `discovery_state` from n8n)  
+- `THERAPY_PROPOSAL_CONFIDENCE_READY` = 80 (Clinical insight badge bands: Listening / Connecting / Formulating)  
 - Proposal hero image: Supabase public URL in `MindCoachConstants.ts`
 
 ---

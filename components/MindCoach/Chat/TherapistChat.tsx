@@ -211,6 +211,17 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
     journey?.discovery_state?.confidence,
   ]);
 
+  /** Show proposal only after workflow returns pathway details (same contract as syncDiscoveryFromN8n). */
+  const canViewTherapyProposal = useMemo(() => {
+    const ds = journey?.discovery_state;
+    return (
+      !!ds &&
+      typeof ds.suggested_pathway === 'string' &&
+      ds.suggested_pathway !== 'engagement_rapport_and_assessment' &&
+      typeof ds.confidence === 'number'
+    );
+  }, [journey?.discovery_state?.suggested_pathway, journey?.discovery_state?.confidence]);
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -1137,9 +1148,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
             <span className="font-medium">{activeSession.dynamic_theme || 'Understanding your story...'}</span>
           </div>
 
-          {(activeSession.pathway_confidence !== undefined &&
-            activeSession.pathway_confidence >= THERAPY_PROPOSAL_CONFIDENCE_READY) ||
-          activeSession.message_count >= THERAPY_PROPOSAL_MIN_MESSAGE_COUNT ? (
+          {canViewTherapyProposal ? (
             <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className="pt-2 border-t border-[#E8E4DE]">
               <p className="text-sm text-[#2C2A26]/80 mb-2">
                 I have gathered enough context to propose a highly personalized therapy plan for you.
