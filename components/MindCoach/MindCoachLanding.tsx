@@ -38,7 +38,15 @@ const MindCoachLanding: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAFAF7] flex items-center justify-center">
+    <div className="min-h-screen bg-[#FAFAF7] flex flex-col items-center justify-center px-6">
+      <p className="max-w-sm text-center text-[11px] text-[#2C2A26]/45 leading-relaxed mb-6">
+        Mind Coach is a self-help and coaching experience, not therapy or medical care. If you are in crisis,
+        contact local emergency services or a crisis line (in the US and Canada:{' '}
+        <a href="tel:988" className="text-[#6B8F71] font-medium underline-offset-2 hover:underline">
+          988
+        </a>
+        ).
+      </p>
       <div className="flex flex-col items-center gap-4">
         <div className="w-10 h-10 border-2 border-[#6B8F71] border-t-transparent rounded-full animate-spin" />
         <p className="text-sm text-[#2C2A26]/40 font-medium">Entering Mind Coach...</p>

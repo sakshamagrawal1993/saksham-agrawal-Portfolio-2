@@ -4,7 +4,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, Sparkles, CheckCircle2, BookOpen, Wind, Brain, Flower2, Moon, MessageCircle as MsgIcon, Shield, Target, Heart } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 import { supabase } from '../../../lib/supabaseClient';
-import { useMindCoachStore, type TaskType } from '../../../store/mindCoachStore';
+import {
+  useMindCoachStore,
+  type TaskType,
+  UNLOCK_MAP,
+  type TabId,
+} from '../../../store/mindCoachStore';
 
 const QUOTES = [
   '"The wound is the place where the Light enters you." — Rumi',
@@ -47,6 +52,16 @@ export const HomeScreen: React.FC = () => {
   const quote = useMemo(() => QUOTES[Math.floor(Math.random() * QUOTES.length)], []);
 
   const currentPhase = journey?.current_phase ?? 1;
+  const unlockedTabs =
+    UNLOCK_MAP[Math.min(Math.max(currentPhase, 1), 4)] ?? UNLOCK_MAP[1];
+  const toolkitShortcuts = useMemo(() => {
+    const items: { feature: string; label: string; tab: TabId }[] = [
+      { feature: 'journal', label: 'Journal', tab: 'journal' },
+      { feature: 'assessments', label: 'Assessments', tab: 'assessments' },
+      { feature: 'exercises', label: 'Exercises', tab: 'exercises' },
+    ];
+    return items.filter((i) => unlockedTabs.includes(i.feature));
+  }, [unlockedTabs]);
   const phases = journey?.phases ?? [];
   const currentPhaseData = phases[currentPhase - 1];
   const completedInPhase = sessions.filter(
@@ -171,6 +186,26 @@ export const HomeScreen: React.FC = () => {
           ))}
         </div>
       </motion.div>
+
+      {toolkitShortcuts.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.08 }}
+          className="flex flex-wrap gap-2"
+        >
+          {toolkitShortcuts.map(({ label, tab }) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className="px-3.5 py-2 rounded-full text-xs font-medium bg-white border border-[#E8E4DE] text-[#2C2A26]/70 hover:border-[#6B8F71]/35 hover:text-[#2C2A26] transition-colors"
+            >
+              {label}
+            </button>
+          ))}
+        </motion.div>
+      )}
 
       {/* Hero Journey Widget */}
       {journey && (

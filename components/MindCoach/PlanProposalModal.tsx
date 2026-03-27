@@ -212,6 +212,8 @@ export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, o
     const updateActiveSession = useMindCoachStore((s) => s.updateActiveSession);
 
     const [saving, setSaving] = useState(false);
+    const [showPostAccept, setShowPostAccept] = useState(false);
+    const [acceptError, setAcceptError] = useState<string | null>(null);
     const [dbPhases, setDbPhases] = useState<PathwayPhaseRow[] | null>(null);
 
     const suggestedPathwayId = useMemo(() => {
@@ -263,6 +265,7 @@ export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, o
     const handleAcceptProposal = async () => {
         if (!profile || !journey || saving) return;
         setSaving(true);
+        setAcceptError(null);
 
         try {
             await supabase
@@ -321,9 +324,11 @@ export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, o
             }
 
             setJourney(routeData as any);
-            onAccept();
+            setShowPostAccept(true);
         } catch (err) {
             console.error('Failed to accept proposal', err);
+            setAcceptError('We could not save your new pathway. Check your connection and try again.');
+        } finally {
             setSaving(false);
         }
     };
@@ -406,23 +411,46 @@ export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, o
                 </div>
 
                 <div className="p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-white border-t border-[#E8E4DE] shrink-0 space-y-2.5">
-                    <p className="text-[11px] text-center text-[#2C2A26]/45 leading-snug px-1">
-                        You can keep chatting for as long as you need—or step into this pathway when you feel ready.
-                    </p>
-                    <button
-                        onClick={handleAcceptProposal}
-                        disabled={saving}
-                        className="w-full py-3.5 bg-[#6B8F71] text-white text-sm font-semibold rounded-2xl hover:bg-[#5A7D60] transition-colors disabled:opacity-50 shadow-sm"
-                    >
-                        {saving ? 'Preparing your plan…' : 'Follow this pathway'}
-                    </button>
-                    <button
-                        onClick={onClose}
-                        disabled={saving}
-                        className="w-full py-3 text-sm font-medium text-[#2C2A26]/70 rounded-2xl hover:bg-[#F5F0EB] transition-colors disabled:opacity-50 border border-transparent hover:border-[#E8E4DE]"
-                    >
-                        I&apos;d like to talk more first
-                    </button>
+                    {acceptError && (
+                        <p className="text-xs text-center text-red-700/90 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
+                            {acceptError}
+                        </p>
+                    )}
+                    {showPostAccept ? (
+                        <>
+                            <p className="text-sm text-[#2C2A26]/75 leading-relaxed text-center px-1">
+                                Your new pathway is active. Upcoming sessions will follow these phases; journal and tools
+                                unlock as you progress through each phase on Home.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={() => onAccept()}
+                                className="w-full py-3.5 bg-[#2C2A26] text-white text-sm font-semibold rounded-2xl hover:bg-[#2C2A26]/90 transition-colors shadow-sm"
+                            >
+                                Continue
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <p className="text-[11px] text-center text-[#2C2A26]/45 leading-snug px-1">
+                                You can keep chatting for as long as you need—or step into this pathway when you feel ready.
+                            </p>
+                            <button
+                                onClick={handleAcceptProposal}
+                                disabled={saving}
+                                className="w-full py-3.5 bg-[#6B8F71] text-white text-sm font-semibold rounded-2xl hover:bg-[#5A7D60] transition-colors disabled:opacity-50 shadow-sm"
+                            >
+                                {saving ? 'Preparing your plan…' : 'Follow this pathway'}
+                            </button>
+                            <button
+                                onClick={onClose}
+                                disabled={saving}
+                                className="w-full py-3 text-sm font-medium text-[#2C2A26]/70 rounded-2xl hover:bg-[#F5F0EB] transition-colors disabled:opacity-50 border border-transparent hover:border-[#E8E4DE]"
+                            >
+                                I&apos;d like to talk more first
+                            </button>
+                        </>
+                    )}
                 </div>
             </motion.div>
         </div>

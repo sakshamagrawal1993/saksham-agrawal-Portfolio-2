@@ -206,6 +206,7 @@ serve(async (req) => {
         role: 'assistant',
         content: assistantReply,
         guardrail_status: guardrailStatus,
+        dynamic_content: dynamicContent,
       });
     }
 

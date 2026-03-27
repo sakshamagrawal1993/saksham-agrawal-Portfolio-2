@@ -18,14 +18,21 @@ export const DiaryScreen: React.FC = () => {
 
   const entries = useMemo(() => {
     const sEntries: DiaryEntry[] = sessions
-      .filter((s) => s.session_state === 'completed' && s.summary_data)
+      .filter((s) => s.session_state === 'completed')
       .map((s) => {
-        const data = s.summary_data as any;
+        const data = (s.summary_data ?? null) as Record<string, unknown> | null;
+        const title =
+          (typeof data?.title === 'string' && data.title) ||
+          s.dynamic_theme ||
+          'Session';
+        const preview =
+          (typeof data?.opening_reflection === 'string' && data.opening_reflection) ||
+          (s.ended_at ? 'Session completed — summary will appear when available.' : 'Session completed');
         return {
           id: s.id,
           type: 'session' as const,
-          title: data?.title || s.dynamic_theme || 'Session Summary',
-          preview: data?.opening_reflection || 'Session completed',
+          title,
+          preview,
           date: s.ended_at || s.started_at,
         };
       });

@@ -2,7 +2,12 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ClipboardList, TrendingUp, Clock, ChevronRight, ArrowLeft, Check, BookOpen } from 'lucide-react';
 import { supabase } from '../../../lib/supabaseClient';
-import { useMindCoachStore } from '../../../store/mindCoachStore';
+import {
+  useMindCoachStore,
+  UNLOCK_MAP,
+  firstPhaseWhereFeatureUnlocks,
+} from '../../../store/mindCoachStore';
+import { FeatureLockedPlaceholder } from '../shared/FeatureLockedPlaceholder';
 
 interface AssessmentQuestion {
   id: string;
@@ -83,10 +88,15 @@ const ASSESSMENT_INTERPRETATIONS: Record<string, Record<string, { meaning: strin
 
 export const AssessmentsScreen: React.FC = () => {
   const profile = useMindCoachStore((s) => s.profile);
+  const phase = useMindCoachStore((s) => s.journey?.current_phase ?? 1);
+  const unlocked =
+    UNLOCK_MAP[Math.min(Math.max(phase, 1), 4)] ?? UNLOCK_MAP[1];
+  const assessmentsUnlocked = unlocked.includes('assessments');
+
   const setActiveTab = useMindCoachStore((s) => s.setActiveTab);
   const [scores, setScores] = useState<AssessmentScore[]>([]);
   const [questions, setQuestions] = useState<AssessmentQuestion[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(assessmentsUnlocked);
 
   // Assessment-taking state
   const [activeAssessment, setActiveAssessment] = useState<string | null>(null);
@@ -96,7 +106,12 @@ export const AssessmentsScreen: React.FC = () => {
   const [showResult, setShowResult] = useState<{ type: string; score: number; severity: string } | null>(null);
 
   useEffect(() => {
-    if (!profile) return;
+    if (!assessmentsUnlocked || !profile) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
     (async () => {
       const [scoresRes, questionsRes] = await Promise.all([
         supabase
@@ -109,11 +124,15 @@ export const AssessmentsScreen: React.FC = () => {
           .select('*')
           .order('assessment_type, question_number'),
       ]);
+      if (cancelled) return;
       setScores(scoresRes.data ?? []);
       setQuestions(questionsRes.data ?? []);
       setLoading(false);
     })();
-  }, [profile]);
+    return () => {
+      cancelled = true;
+    };
+  }, [profile, assessmentsUnlocked]);
 
   // Group scores by type → latest
   const latestByType: Record<string, AssessmentScore> = {};
@@ -175,6 +194,16 @@ export const AssessmentsScreen: React.FC = () => {
     setSubmitting(false);
     setActiveAssessment(null);
   }, [profile, activeAssessment, answers, scores, submitting]);
+
+  if (!assessmentsUnlocked) {
+    return (
+      <FeatureLockedPlaceholder
+        title="Assessments"
+        description="Screening tools unlock in phase 2. Continue your journey with your coach to track mood and stress over time."
+        unlockPhase={firstPhaseWhereFeatureUnlocks('assessments')}
+      />
+    );
+  }
 
   if (loading) {
     return (

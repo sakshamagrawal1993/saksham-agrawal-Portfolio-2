@@ -1,12 +1,33 @@
 import React, { useState } from 'react';
 import { Plus } from 'lucide-react';
-import { type JournalEntry } from '../../../store/mindCoachStore';
+import {
+  useMindCoachStore,
+  type JournalEntry,
+  UNLOCK_MAP,
+  firstPhaseWhereFeatureUnlocks,
+} from '../../../store/mindCoachStore';
 import { JournalList } from '../Journal/JournalList';
 import { JournalEditor } from '../Journal/JournalEditor';
+import { FeatureLockedPlaceholder } from '../shared/FeatureLockedPlaceholder';
 
 export const JournalScreen: React.FC = () => {
+  const phase = useMindCoachStore((s) => s.journey?.current_phase ?? 1);
+  const unlocked =
+    UNLOCK_MAP[Math.min(Math.max(phase, 1), 4)] ?? UNLOCK_MAP[1];
+  const journalUnlocked = unlocked.includes('journal');
+
   const [mode, setMode] = useState<'list' | 'new' | 'edit'>('list');
   const [editingEntry, setEditingEntry] = useState<JournalEntry | undefined>(undefined);
+
+  if (!journalUnlocked) {
+    return (
+      <FeatureLockedPlaceholder
+        title="Journal"
+        description="Private reflections unlock in phase 2. Complete your coach sessions in the current phase to open journaling."
+        unlockPhase={firstPhaseWhereFeatureUnlocks('journal')}
+      />
+    );
+  }
 
   if (mode === 'new' || mode === 'edit') {
     return (

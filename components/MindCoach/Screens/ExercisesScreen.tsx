@@ -1,11 +1,21 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Play, Clock, Sparkles } from 'lucide-react';
-import { useMindCoachStore, type Exercise } from '../../../store/mindCoachStore';
+import {
+  useMindCoachStore,
+  type Exercise,
+  UNLOCK_MAP,
+  firstPhaseWhereFeatureUnlocks,
+} from '../../../store/mindCoachStore';
 import { ExercisePlayer } from '../Exercises/ExercisePlayer';
+import { FeatureLockedPlaceholder } from '../shared/FeatureLockedPlaceholder';
 
 export const ExercisesScreen: React.FC = () => {
+  const phase = useMindCoachStore((s) => s.journey?.current_phase ?? 1);
   const exercises = useMindCoachStore((s) => s.exercises);
+  const unlocked =
+    UNLOCK_MAP[Math.min(Math.max(phase, 1), 4)] ?? UNLOCK_MAP[1];
+  const exercisesUnlocked = unlocked.includes('exercises');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [activeExercise, setActiveExercise] = useState<Exercise | null>(null);
@@ -18,6 +28,18 @@ export const ExercisesScreen: React.FC = () => {
     const matchesCategory = !selectedCategory || e.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
+
+  if (!exercisesUnlocked) {
+    return (
+      <div className="flex flex-col h-full bg-[#FAFAF7]">
+        <FeatureLockedPlaceholder
+          title="Wellness library"
+          description="Guided exercises unlock in phase 3. Keep progressing with your plan to access practices here."
+          unlockPhase={firstPhaseWhereFeatureUnlocks('exercises')}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full bg-[#FAFAF7]">

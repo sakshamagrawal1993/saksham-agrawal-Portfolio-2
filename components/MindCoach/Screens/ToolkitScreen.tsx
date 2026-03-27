@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { BookOpen, Wind, Brain, Lock, BarChart3 } from 'lucide-react';
-import { useMindCoachStore, JournalEntry } from '../../../store/mindCoachStore';
+import { useMindCoachStore, JournalEntry, UNLOCK_MAP } from '../../../store/mindCoachStore';
 import { JournalList } from '../Journal/JournalList';
 import { JournalEditor } from '../Journal/JournalEditor';
 import { ExerciseLibrary } from '../Exercises/ExerciseLibrary';
@@ -61,13 +61,14 @@ const TOOLKIT_CARDS: ToolkitCard[] = [
 ];
 
 export const ToolkitScreen: React.FC = () => {
-  const unlockedFeatures = useMindCoachStore((s) => s.unlockedFeatures);
+  const phase = useMindCoachStore((s) => s.journey?.current_phase ?? 1);
   const moodEntries = useMindCoachStore((s) => s.moodEntries);
 
   const [section, setSection] = useState<Section>('hub');
   const [editEntry, setEditEntry] = useState<JournalEntry | undefined>(undefined);
 
-  const unlocked = unlockedFeatures();
+  const unlocked =
+    UNLOCK_MAP[Math.min(Math.max(phase, 1), 4)] ?? UNLOCK_MAP[1];
 
   const backToHub = () => setSection('hub');
 

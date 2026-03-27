@@ -193,10 +193,18 @@ export interface UserTask {
 // Feature unlock gates per phase
 export const UNLOCK_MAP: Record<number, string[]> = {
   1: ['chat'],
-  2: ['chat', 'journal'],
-  3: ['chat', 'journal', 'exercises'],
-  4: ['chat', 'journal', 'exercises', 'meditation'],
+  2: ['chat', 'journal', 'assessments'],
+  3: ['chat', 'journal', 'assessments', 'exercises'],
+  4: ['chat', 'journal', 'assessments', 'exercises', 'meditation'],
 };
+
+/** Smallest journey phase number (1–4) where a feature key appears in `UNLOCK_MAP`. */
+export function firstPhaseWhereFeatureUnlocks(feature: string): number {
+  for (let p = 1; p <= 4; p++) {
+    if ((UNLOCK_MAP[p] ?? []).includes(feature)) return p;
+  }
+  return 4;
+}
 
 // ── State ──────────────────────────────────────────────────────────────────
 
@@ -220,6 +228,7 @@ interface MindCoachState {
   messages: ChatMessage[];
   setMessages: (m: ChatMessage[]) => void;
   addMessage: (m: ChatMessage) => void;
+  removeMessageById: (id: string) => void;
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
   isCrisisDetected: boolean;
@@ -308,6 +317,8 @@ export const useMindCoachStore = create<MindCoachState>((set, get) => ({
   setMessages: (messages) => set({ messages }),
   addMessage: (msg) =>
     set((state) => ({ messages: [...state.messages, msg] })),
+  removeMessageById: (id) =>
+    set((state) => ({ messages: state.messages.filter((m) => m.id !== id) })),
   setIsLoading: (isLoading) => set({ isLoading }),
   setCrisisDetected: (isCrisisDetected) => set({ isCrisisDetected }),
 

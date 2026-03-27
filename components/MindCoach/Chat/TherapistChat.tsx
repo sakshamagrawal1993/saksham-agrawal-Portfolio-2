@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useMemo, useState } from 'react';
+import React, { useRef, useEffect, useMemo, useState, useCallback } from 'react';
 import { ArrowLeft, Send } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { findExerciseByPayload } from '../../../lib/mindCoachExerciseResolve';
@@ -48,21 +48,24 @@ function applyN8nSessionFields(data: Record<string, any>, patch: Record<string, 
   if (typeof data.pathway_confidence === 'number') patch.pathway_confidence = data.pathway_confidence;
 }
 
-function syncDiscoveryFromN8n(data: Record<string, any>) {
+async function syncDiscoveryFromN8n(data: Record<string, any>) {
   if (data.suggested_pathway == null || typeof data.pathway_confidence !== 'number') return;
   const j = useMindCoachStore.getState().journey;
   if (!j) return;
-  useMindCoachStore.getState().setJourney({
-    ...j,
-    discovery_state: {
-      suggested_pathway: data.suggested_pathway,
-      confidence: data.pathway_confidence,
-    },
-  });
+  const discovery_state = {
+    suggested_pathway: data.suggested_pathway,
+    confidence: data.pathway_confidence,
+  };
+  useMindCoachStore.getState().setJourney({ ...j, discovery_state });
+  const { error } = await supabase
+    .from('mind_coach_journeys')
+    .update({ discovery_state })
+    .eq('id', j.id);
+  if (error) console.error('Persist discovery_state failed:', error);
 }
 
-const MOCK_REPLY =
-  "I hear you. That sounds really important. Can you tell me more about how that makes you feel?";
+/** Prevents duplicate n8n greeting on React strict remount / effect re-entry for the same session. */
+const greetingAttemptedForSession = new Set<string>();
 
 /**
  * Progress 0–100% toward surfacing the therapy plan. Linear to 100% by message N; if confidence
@@ -127,6 +130,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
   const messages = useMindCoachStore((s) => s.messages);
   const isLoading = useMindCoachStore((s) => s.isLoading);
   const addMessage = useMindCoachStore((s) => s.addMessage);
+  const removeMessageById = useMindCoachStore((s) => s.removeMessageById);
   const setIsLoading = useMindCoachStore((s) => s.setIsLoading);
   const updateActiveSession = useMindCoachStore((s) => s.updateActiveSession);
   const setActiveSession = useMindCoachStore((s) => s.setActiveSession);
@@ -142,7 +146,16 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
   const recentCaseNotes = useMindCoachStore((s) => s.recentCaseNotes);
 
   const [input, setInput] = useState('');
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [greetingRetryToken, setGreetingRetryToken] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  /** When n8n succeeded but assistant row failed — retry uses this bundle. */
+  const pendingAfterN8nRef = useRef<{
+    assistantMsg: ChatMessageType;
+    sessionUpdate: Record<string, unknown>;
+    n8nData: Record<string, any>;
+  } | null>(null);
+  const sendRetryModeRef = useRef<'none' | 'n8n_only' | 'assistant_only'>('none');
 
   const persona = profile?.therapist_persona ?? 'maya';
   const meta = THERAPIST_CONFIG[persona];
@@ -172,134 +185,174 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
     }
   }, [messages, isLoading]);
 
-  useEffect(() => {
-    // Only trigger if session is brand new
-    if (activeSession && messages.length === 0 && activeSession.message_count === 0 && !isLoading) {
-      const sendInitialGreeting = async () => {
-        setIsLoading(true);
-        try {
-          // 1. Fetch Prompts (Coach + Phase)
-          const [personaRes, phaseRes] = await Promise.all([
-            supabase
-              .from('mind_coach_personas')
-              .select('base_prompt')
-              .eq('id', profile?.therapist_persona || 'maya')
-              .maybeSingle(),
-            supabase
-              .from('mind_coach_pathway_phases')
-              .select('dynamic_prompt')
-              .eq('id', `${activeSession.pathway || 'engagement_rapport_and_assessment'}_phase${journey?.current_phase || 1}`)
-              .maybeSingle(),
-          ]);
+  const runInitialGreeting = useCallback(async () => {
+    const st = useMindCoachStore.getState();
+    const sess = st.activeSession;
+    const prof = st.profile;
+    const j = st.journey;
+    if (!sess) return;
 
-          const coachPrompt = personaRes.data?.base_prompt || "You are an empathetic, non-judgmental mental health coach.";
-          const phasePrompt = phaseRes.data?.dynamic_prompt || "Focus on building therapeutic rapport.";
+    const [personaRes, phaseRes] = await Promise.all([
+      supabase
+        .from('mind_coach_personas')
+        .select('base_prompt')
+        .eq('id', prof?.therapist_persona || 'maya')
+        .maybeSingle(),
+      supabase
+        .from('mind_coach_pathway_phases')
+        .select('dynamic_prompt')
+        .eq(
+          'id',
+          `${sess.pathway || 'engagement_rapport_and_assessment'}_phase${j?.current_phase || 1}`,
+        )
+        .maybeSingle(),
+    ]);
 
-          // 2. Call n8n directly
-          const n8nPayload = {
-            profile_id: profile?.id,
-            session_id: activeSession.id,
-            message_text: `System Alert: We are beginning the session. Introduce yourself and softly greet the user by name (${profile?.name || 'User'}) based on their context to kick off the session.`,
-            is_system_greeting: true,
-            profile: profile ? {
-              name: profile.name,
-              age: profile.age,
-              gender: profile.gender,
-              concerns: profile.concerns,
-              therapist_persona: profile.therapist_persona,
-            } : null,
-            journey_context: journey ? {
-              id: journey.id,
-              title: journey.title,
-              current_phase: journey.current_phase,
-              phases: journey.phases,
-            } : null,
-            session_state: activeSession.session_state,
-            dynamic_theme: activeSession.dynamic_theme,
-            pathway: activeSession.pathway,
-            messages: messages, // History
-            memories: memories.map(m => ({ text: m.memory_text, type: m.memory_type })),
-            recent_tasks_assigned: activeTasks,
-            recent_case_notes: recentCaseNotes.map(n => n.key_insight).filter(Boolean),
-            coach_prompt: coachPrompt,
-            phase_prompt: phasePrompt,
-            message_count: activeSession.message_count,
-          };
+    const coachPrompt =
+      personaRes.data?.base_prompt || 'You are an empathetic, non-judgmental mental health coach.';
+    const phasePrompt = phaseRes.data?.dynamic_prompt || 'Focus on building therapeutic rapport.';
 
-          const response = await fetch('https://n8n.saksham-experiments.com/webhook/mind-coach-chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(n8nPayload),
-          });
-
-          if (!response.ok) throw new Error(`n8n failed with ${response.status}`);
-          const data = normalizeN8nChatPayload(await response.json());
-
-          if (!data?.reply) throw new Error('No reply from n8n');
-
-          // 3. Persist assistant reply
-          const assistantMsg: ChatMessageType = {
-            id: crypto.randomUUID(),
-            session_id: activeSession.id,
-            role: 'assistant',
-            content: data.reply,
-            guardrail_status: data.guardrail_status ?? 'passed',
-            dynamic_content: data.dynamic_content,
-            created_at: new Date().toISOString(),
-          };
-
-          const { error: greetSaveErr } = await supabase.from('mind_coach_messages').insert({
-            id: assistantMsg.id,
-            session_id: assistantMsg.session_id,
-            role: assistantMsg.role,
-            content: assistantMsg.content,
-            guardrail_status: assistantMsg.guardrail_status,
-            dynamic_content: assistantMsg.dynamic_content,
-          });
-          if (greetSaveErr) {
-            console.error('Failed to save greeting message:', greetSaveErr);
+    const n8nPayload = {
+      profile_id: prof?.id,
+      session_id: sess.id,
+      message_text: `System Alert: We are beginning the session. Introduce yourself and softly greet the user by name (${prof?.name || 'User'}) based on their context to kick off the session.`,
+      is_system_greeting: true,
+      profile: prof
+        ? {
+            name: prof.name,
+            age: prof.age,
+            gender: prof.gender,
+            concerns: prof.concerns,
+            therapist_persona: prof.therapist_persona,
           }
-
-          addMessage(assistantMsg);
-          
-          // 4. Update session
-          const sessionUpdate: Record<string, unknown> = { message_count: 1 };
-          applyN8nSessionFields(data, sessionUpdate);
-          syncDiscoveryFromN8n(data);
-
-          await supabase.from('mind_coach_sessions').update(sessionUpdate).eq('id', activeSession.id);
-          updateActiveSession(sessionUpdate);
-
-          if (data.crisis_detected) setCrisisDetected(true);
-          if (data.is_session_close) setIsSessionClose(true);
-
-          // Handle dynamic content (structured or legacy slug)
-          const exerciseSlug = data.dynamic_content?.payload || data.dynamic_in_chat_exercise;
-          if (exerciseSlug) {
-            const allExercises = useMindCoachStore.getState().exercises;
-            const exercise = findExerciseByPayload(allExercises, String(exerciseSlug));
-            if (exercise) {
-              setActiveExercise(exercise);
-              setActiveExerciseMessageId(assistantMsg.id);
-            }
+        : null,
+      journey_context: j
+        ? {
+            id: j.id,
+            title: j.title,
+            current_phase: j.current_phase,
+            phases: j.phases,
           }
-        } catch (err) {
-          console.error('Failed to trigger initial greeting:', err);
-        } finally {
-          setIsLoading(false);
-        }
-      };
+        : null,
+      session_state: sess.session_state,
+      dynamic_theme: sess.dynamic_theme,
+      pathway: sess.pathway,
+      messages: st.messages,
+      memories: st.memories.map((m) => ({ text: m.memory_text, type: m.memory_type })),
+      recent_tasks_assigned: st.activeTasks,
+      recent_case_notes: st.recentCaseNotes.map((n) => n.key_insight).filter(Boolean),
+      coach_prompt: coachPrompt,
+      phase_prompt: phasePrompt,
+      message_count: sess.message_count,
+    };
 
-      sendInitialGreeting();
+    const response = await fetch('https://n8n.saksham-experiments.com/webhook/mind-coach-chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(n8nPayload),
+    });
+
+    if (!response.ok) throw new Error(`Coach service unreachable (${response.status}). Try again.`);
+    const data = normalizeN8nChatPayload(await response.json());
+
+    if (!data?.reply) throw new Error('No reply from coach. Try again.');
+
+    const assistantMsg: ChatMessageType = {
+      id: crypto.randomUUID(),
+      session_id: sess.id,
+      role: 'assistant',
+      content: data.reply,
+      guardrail_status: data.guardrail_status ?? 'passed',
+      dynamic_content: data.dynamic_content,
+      created_at: new Date().toISOString(),
+    };
+
+    const { error: greetSaveErr } = await supabase.from('mind_coach_messages').insert({
+      id: assistantMsg.id,
+      session_id: assistantMsg.session_id,
+      role: assistantMsg.role,
+      content: assistantMsg.content,
+      guardrail_status: assistantMsg.guardrail_status,
+      dynamic_content: assistantMsg.dynamic_content,
+    });
+    if (greetSaveErr) throw new Error('Could not save the greeting. Check your connection and try again.');
+
+    st.addMessage(assistantMsg);
+
+    const sessionUpdate: Record<string, unknown> = { message_count: 1 };
+    applyN8nSessionFields(data, sessionUpdate);
+    await syncDiscoveryFromN8n(data);
+
+    await supabase.from('mind_coach_sessions').update(sessionUpdate).eq('id', sess.id);
+    st.updateActiveSession(sessionUpdate);
+
+    if (data.crisis_detected) st.setCrisisDetected(true);
+    if (data.is_session_close) st.setIsSessionClose(true);
+
+    const exerciseSlug = data.dynamic_content?.payload || data.dynamic_in_chat_exercise;
+    if (exerciseSlug) {
+      const allExercises = st.exercises;
+      const exercise = findExerciseByPayload(allExercises, String(exerciseSlug));
+      if (exercise) {
+        st.setActiveExercise(exercise);
+        st.setActiveExerciseMessageId(assistantMsg.id);
+      }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages.length, activeSession?.id]);
+  }, []);
+
+  useEffect(() => {
+    if (!activeSession || messages.length !== 0 || (activeSession.message_count ?? 0) > 0) {
+      return;
+    }
+    if (greetingAttemptedForSession.has(activeSession.id)) return;
+    greetingAttemptedForSession.add(activeSession.id);
+
+    let cancelled = false;
+    (async () => {
+      setIsLoading(true);
+      setChatError(null);
+      try {
+        await runInitialGreeting();
+      } catch (err) {
+        if (cancelled) return;
+        console.error('Failed to trigger initial greeting:', err);
+        setChatError(
+          err instanceof Error
+            ? err.message
+            : 'Could not start your session. Check your connection and tap Retry.',
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [messages.length, activeSession?.id, activeSession?.message_count, greetingRetryToken, runInitialGreeting, setIsLoading]);
+
+  const applyDynamicExerciseFromN8n = useCallback(
+    (data: Record<string, any>, assistantMsgId: string) => {
+      const exerciseSlug = data.dynamic_content?.payload || data.dynamic_in_chat_exercise;
+      if (!exerciseSlug) return;
+      const allExercises = useMindCoachStore.getState().exercises;
+      const exercise = findExerciseByPayload(allExercises, String(exerciseSlug));
+      if (exercise) {
+        setActiveExercise(exercise);
+        setActiveExerciseMessageId(assistantMsgId);
+      }
+    },
+    [setActiveExercise, setActiveExerciseMessageId],
+  );
 
   const handleSend = async () => {
     const text = input.trim();
     if (!text || !activeSession || isLoading) return;
 
     setInput('');
+    setChatError(null);
+    pendingAfterN8nRef.current = null;
+    sendRetryModeRef.current = 'none';
 
     const userMsgId = crypto.randomUUID();
     const userMsg: ChatMessageType = {
@@ -310,26 +363,34 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
       guardrail_status: null,
       created_at: new Date().toISOString(),
     };
-    
-    // 1. Instantly update UI
+
     addMessage(userMsg);
     setIsLoading(true);
 
     try {
-      // 2. Persist user message + increment count
-      const newCount = activeSession.message_count + 1;
-      await Promise.all([
-        supabase.from('mind_coach_messages').insert({
-          id: userMsg.id,
-          session_id: userMsg.session_id,
-          role: userMsg.role,
-          content: userMsg.content,
-        }),
-        supabase.from('mind_coach_sessions').update({ message_count: newCount }).eq('id', activeSession.id),
-      ]);
+      const { error: userInsertErr } = await supabase.from('mind_coach_messages').insert({
+        id: userMsg.id,
+        session_id: userMsg.session_id,
+        role: userMsg.role,
+        content: userMsg.content,
+      });
+      if (userInsertErr) {
+        removeMessageById(userMsgId);
+        throw new Error('We could not save your message. Check your connection and try again.');
+      }
+
+      const newCount = (activeSession.message_count ?? 0) + 1;
+      const { error: sessionErr } = await supabase
+        .from('mind_coach_sessions')
+        .update({ message_count: newCount })
+        .eq('id', activeSession.id);
+      if (sessionErr) {
+        await supabase.from('mind_coach_messages').delete().eq('id', userMsgId);
+        removeMessageById(userMsgId);
+        throw new Error('We could not update your session. Please try sending again.');
+      }
       updateActiveSession({ message_count: newCount });
 
-      // 3. Fetch Prompts (Coach + Phase)
       const [personaRes, phaseRes] = await Promise.all([
         supabase
           .from('mind_coach_personas')
@@ -339,38 +400,46 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
         supabase
           .from('mind_coach_pathway_phases')
           .select('dynamic_prompt')
-          .eq('id', `${activeSession.pathway || 'engagement_rapport_and_assessment'}_phase${journey?.current_phase || 1}`)
+          .eq(
+            'id',
+            `${activeSession.pathway || 'engagement_rapport_and_assessment'}_phase${journey?.current_phase || 1}`,
+          )
           .maybeSingle(),
       ]);
 
-      const coachPrompt = personaRes.data?.base_prompt || "You are an empathetic, non-judgmental mental health coach.";
-      const phasePrompt = phaseRes.data?.dynamic_prompt || "Focus on building therapeutic rapport.";
+      const coachPrompt =
+        personaRes.data?.base_prompt || 'You are an empathetic, non-judgmental mental health coach.';
+      const phasePrompt = phaseRes.data?.dynamic_prompt || 'Focus on building therapeutic rapport.';
 
-      // 4. Call n8n directly
+      const history = [...useMindCoachStore.getState().messages];
       const n8nPayload = {
         profile_id: profile?.id,
         session_id: activeSession.id,
         message_text: text,
-        profile: profile ? {
-          name: profile.name,
-          age: profile.age,
-          gender: profile.gender,
-          concerns: profile.concerns,
-          therapist_persona: profile.therapist_persona,
-        } : null,
-        journey_context: journey ? {
-          id: journey.id,
-          title: journey.title,
-          current_phase: journey.current_phase,
-          phases: journey.phases,
-        } : null,
+        profile: profile
+          ? {
+              name: profile.name,
+              age: profile.age,
+              gender: profile.gender,
+              concerns: profile.concerns,
+              therapist_persona: profile.therapist_persona,
+            }
+          : null,
+        journey_context: journey
+          ? {
+              id: journey.id,
+              title: journey.title,
+              current_phase: journey.current_phase,
+              phases: journey.phases,
+            }
+          : null,
         session_state: activeSession.session_state,
         dynamic_theme: activeSession.dynamic_theme,
         pathway: activeSession.pathway,
-        messages: [...messages, userMsg], // History + current
-        memories: memories.map(m => ({ text: m.memory_text, type: m.memory_type })),
+        messages: history,
+        memories: memories.map((m) => ({ text: m.memory_text, type: m.memory_type })),
         recent_tasks_assigned: activeTasks,
-        recent_case_notes: recentCaseNotes.map(n => n.key_insight).filter(Boolean),
+        recent_case_notes: recentCaseNotes.map((n) => n.key_insight).filter(Boolean),
         coach_prompt: coachPrompt,
         phase_prompt: phasePrompt,
         message_count: newCount,
@@ -382,11 +451,16 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
         body: JSON.stringify(n8nPayload),
       });
 
-      if (!response.ok) throw new Error(`n8n failed with ${response.status}`);
+      if (!response.ok) {
+        sendRetryModeRef.current = 'n8n_only';
+        throw new Error(`Coach unreachable (${response.status}). Tap Retry to fetch a reply.`);
+      }
       const data = normalizeN8nChatPayload(await response.json());
-      if (!data?.reply) throw new Error('No reply from n8n');
+      if (!data?.reply) {
+        sendRetryModeRef.current = 'n8n_only';
+        throw new Error('No reply from coach. Tap Retry.');
+      }
 
-      // 5. Persist assistant reply
       const assistantMsg: ChatMessageType = {
         id: crypto.randomUUID(),
         session_id: activeSession.id,
@@ -396,7 +470,11 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
         dynamic_content: data.dynamic_content,
         created_at: new Date().toISOString(),
       };
-      
+
+      const finalCount = newCount + 1;
+      const sessionUpdate: Record<string, unknown> = { message_count: finalCount };
+      applyN8nSessionFields(data, sessionUpdate);
+
       const { error: assistantSaveErr } = await supabase.from('mind_coach_messages').insert({
         id: assistantMsg.id,
         session_id: assistantMsg.session_id,
@@ -406,15 +484,13 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
         dynamic_content: assistantMsg.dynamic_content,
       });
       if (assistantSaveErr) {
-        console.error('Failed to save assistant message:', assistantSaveErr);
+        pendingAfterN8nRef.current = { assistantMsg, sessionUpdate, n8nData: data };
+        sendRetryModeRef.current = 'assistant_only';
+        throw new Error('Reply received but could not be saved. Tap Retry.');
       }
-      addMessage(assistantMsg);
 
-      // 6. Update session count + result state
-      const finalCount = newCount + 1;
-      const sessionUpdate: Record<string, unknown> = { message_count: finalCount };
-      applyN8nSessionFields(data, sessionUpdate);
-      syncDiscoveryFromN8n(data);
+      addMessage(assistantMsg);
+      await syncDiscoveryFromN8n(data);
 
       await supabase.from('mind_coach_sessions').update(sessionUpdate).eq('id', activeSession.id);
       updateActiveSession(sessionUpdate);
@@ -422,27 +498,164 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
       if (data.crisis_detected) setCrisisDetected(true);
       if (data.is_session_close) setIsSessionClose(true);
 
-      // Handle dynamic content (structured or legacy slug)
-      const exerciseSlug = data.dynamic_content?.payload || data.dynamic_in_chat_exercise;
-      if (exerciseSlug) {
-        const allExercises = useMindCoachStore.getState().exercises;
-        const exercise = findExerciseByPayload(allExercises, String(exerciseSlug));
-        if (exercise) {
-          setActiveExercise(exercise);
-          setActiveExerciseMessageId(assistantMsg.id);
-        }
-      }
+      applyDynamicExerciseFromN8n(data, assistantMsg.id);
+      sendRetryModeRef.current = 'none';
     } catch (err) {
       console.error('Chat error:', err);
-      const fallbackMsg: ChatMessageType = {
-        id: crypto.randomUUID(),
-        session_id: activeSession.id,
-        role: 'assistant',
-        content: MOCK_REPLY,
-        guardrail_status: null,
-        created_at: new Date().toISOString(),
-      };
-      addMessage(fallbackMsg);
+      setChatError(err instanceof Error ? err.message : 'Something went wrong. Try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRetrySend = async () => {
+    if (!activeSession || isLoading) return;
+    setChatError(null);
+    setIsLoading(true);
+    try {
+      if (sendRetryModeRef.current === 'assistant_only' && pendingAfterN8nRef.current) {
+        const { assistantMsg, sessionUpdate, n8nData } = pendingAfterN8nRef.current;
+        const { error: assistantSaveErr } = await supabase.from('mind_coach_messages').insert({
+          id: assistantMsg.id,
+          session_id: assistantMsg.session_id,
+          role: assistantMsg.role,
+          content: assistantMsg.content,
+          guardrail_status: assistantMsg.guardrail_status,
+          dynamic_content: assistantMsg.dynamic_content,
+        });
+        if (assistantSaveErr) {
+          throw new Error('Still could not save the reply. Try again.');
+        }
+        addMessage(assistantMsg);
+        await syncDiscoveryFromN8n(n8nData);
+        await supabase.from('mind_coach_sessions').update(sessionUpdate).eq('id', activeSession.id);
+        updateActiveSession(sessionUpdate);
+        if (n8nData.crisis_detected) setCrisisDetected(true);
+        if (n8nData.is_session_close) setIsSessionClose(true);
+        applyDynamicExerciseFromN8n(n8nData, assistantMsg.id);
+        pendingAfterN8nRef.current = null;
+        sendRetryModeRef.current = 'none';
+        return;
+      }
+
+      if (sendRetryModeRef.current === 'n8n_only') {
+        const st = useMindCoachStore.getState();
+        const sess = st.activeSession;
+        const prof = st.profile;
+        const j = st.journey;
+        const msgs = st.messages;
+        if (!sess) return;
+
+        const [personaRes, phaseRes] = await Promise.all([
+          supabase
+            .from('mind_coach_personas')
+            .select('base_prompt')
+            .eq('id', prof?.therapist_persona || 'maya')
+            .maybeSingle(),
+          supabase
+            .from('mind_coach_pathway_phases')
+            .select('dynamic_prompt')
+            .eq(
+              'id',
+              `${sess.pathway || 'engagement_rapport_and_assessment'}_phase${j?.current_phase || 1}`,
+            )
+            .maybeSingle(),
+        ]);
+
+        const coachPrompt =
+          personaRes.data?.base_prompt || 'You are an empathetic, non-judgmental mental health coach.';
+        const phasePrompt = phaseRes.data?.dynamic_prompt || 'Focus on building therapeutic rapport.';
+
+        const lastUser = [...msgs].reverse().find((m) => m.role === 'user');
+        const messageText = lastUser?.content ?? '';
+        const messageCount = sess.message_count ?? 0;
+
+        const n8nPayload = {
+          profile_id: prof?.id,
+          session_id: sess.id,
+          message_text: messageText,
+          profile: prof
+            ? {
+                name: prof.name,
+                age: prof.age,
+                gender: prof.gender,
+                concerns: prof.concerns,
+                therapist_persona: prof.therapist_persona,
+              }
+            : null,
+          journey_context: j
+            ? {
+                id: j.id,
+                title: j.title,
+                current_phase: j.current_phase,
+                phases: j.phases,
+              }
+            : null,
+          session_state: sess.session_state,
+          dynamic_theme: sess.dynamic_theme,
+          pathway: sess.pathway,
+          messages: msgs,
+          memories: st.memories.map((m) => ({ text: m.memory_text, type: m.memory_type })),
+          recent_tasks_assigned: st.activeTasks,
+          recent_case_notes: st.recentCaseNotes.map((n) => n.key_insight).filter(Boolean),
+          coach_prompt: coachPrompt,
+          phase_prompt: phasePrompt,
+          message_count: messageCount,
+        };
+
+        const response = await fetch('https://n8n.saksham-experiments.com/webhook/mind-coach-chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(n8nPayload),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Coach unreachable (${response.status}). Try again.`);
+        }
+        const data = normalizeN8nChatPayload(await response.json());
+        if (!data?.reply) throw new Error('No reply from coach. Try again.');
+
+        const assistantMsg: ChatMessageType = {
+          id: crypto.randomUUID(),
+          session_id: sess.id,
+          role: 'assistant',
+          content: data.reply,
+          guardrail_status: data.guardrail_status ?? 'passed',
+          dynamic_content: data.dynamic_content,
+          created_at: new Date().toISOString(),
+        };
+
+        const newCount = messageCount;
+        const finalCount = newCount + 1;
+        const sessionUpdate: Record<string, unknown> = { message_count: finalCount };
+        applyN8nSessionFields(data, sessionUpdate);
+
+        const { error: assistantSaveErr } = await supabase.from('mind_coach_messages').insert({
+          id: assistantMsg.id,
+          session_id: assistantMsg.session_id,
+          role: assistantMsg.role,
+          content: assistantMsg.content,
+          guardrail_status: assistantMsg.guardrail_status,
+          dynamic_content: assistantMsg.dynamic_content,
+        });
+        if (assistantSaveErr) {
+          pendingAfterN8nRef.current = { assistantMsg, sessionUpdate, n8nData: data };
+          sendRetryModeRef.current = 'assistant_only';
+          throw new Error('Reply received but could not be saved. Tap Retry.');
+        }
+
+        addMessage(assistantMsg);
+        await syncDiscoveryFromN8n(data);
+        await supabase.from('mind_coach_sessions').update(sessionUpdate).eq('id', sess.id);
+        updateActiveSession(sessionUpdate);
+        if (data.crisis_detected) setCrisisDetected(true);
+        if (data.is_session_close) setIsSessionClose(true);
+        applyDynamicExerciseFromN8n(data, assistantMsg.id);
+        sendRetryModeRef.current = 'none';
+      }
+    } catch (err) {
+      console.error('Retry chat error:', err);
+      setChatError(err instanceof Error ? err.message : 'Retry failed.');
     } finally {
       setIsLoading(false);
     }
@@ -794,6 +1007,39 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
         </button>
       </div>
 
+      {chatError && (
+        <div
+          role="alert"
+          className="shrink-0 px-3 py-2.5 bg-amber-50 border-b border-amber-100/80 flex flex-wrap items-center gap-2"
+        >
+          <p className="flex-1 min-w-[200px] text-xs text-amber-950/90 leading-relaxed">{chatError}</p>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                if (messages.length === 0 && (activeSession?.message_count ?? 0) === 0) {
+                  if (activeSession) greetingAttemptedForSession.delete(activeSession.id);
+                  setGreetingRetryToken((t) => t + 1);
+                } else if (sendRetryModeRef.current !== 'none') {
+                  void handleRetrySend();
+                }
+                setChatError(null);
+              }}
+              className="text-xs font-semibold text-amber-900 underline-offset-2 hover:underline"
+            >
+              Retry
+            </button>
+            <button
+              type="button"
+              onClick={() => setChatError(null)}
+              className="text-xs font-medium text-amber-800/70 hover:text-amber-900"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
       {isEngagementDiscovery && (
         <div className="shrink-0 w-full border-b border-[#E8E4DE] bg-white/80">
           <div className="h-1 w-full bg-[#E8E4DE]/90 overflow-hidden">
@@ -807,6 +1053,11 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
           </div>
           <p className="px-4 py-1 text-[9px] uppercase tracking-[0.14em] text-[#2C2A26]/40 font-semibold">
             Your plan unlocks with the conversation
+          </p>
+          <p className="px-4 pb-2 text-[10px] text-[#2C2A26]/45 leading-relaxed">
+            Progress rises steadily for the first {THERAPY_PROPOSAL_MIN_MESSAGE_COUNT} messages (user and coach).
+            After that, the bar stays at 90% until pathway confidence reaches {THERAPY_PROPOSAL_CONFIDENCE_READY}
+            %, then completes — or it inches forward about every five messages while confidence catches up.
           </p>
         </div>
       )}

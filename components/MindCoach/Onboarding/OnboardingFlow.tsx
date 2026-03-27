@@ -334,12 +334,14 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
 
 function JourneyPreviewStep({ concerns, name, age, gender, therapist, onBack, onComplete }: any) {
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const { user } = useAuth();
   const { setProfile, setJourney } = useMindCoachStore();
 
   const handleStart = async () => {
     if (saving || !user?.id) return;
     setSaving(true);
+    setSaveError(null);
     try {
       // 1. Create profile
       const { data: profile, error: pErr } = await supabase.from('mind_coach_profiles')
@@ -373,6 +375,10 @@ function JourneyPreviewStep({ concerns, name, age, gender, therapist, onBack, on
       onComplete(profile.id);
     } catch (err) {
       console.error(err);
+      setSaveError(
+        'We could not finish setup. Check your connection and try again. If this keeps happening, sign out and back in.',
+      );
+    } finally {
       setSaving(false);
     }
   };
@@ -382,13 +388,20 @@ function JourneyPreviewStep({ concerns, name, age, gender, therapist, onBack, on
       step={8} 
       onBack={onBack}
       footer={
-        <button
-          onClick={handleStart}
-          disabled={saving}
-          className="w-full py-4 rounded-2xl bg-[#6B8F71] text-white font-semibold text-base hover:bg-[#5A7D60] transition-all disabled:opacity-50"
-        >
-          {saving ? 'Setting up...' : 'Start Your Journey'}
-        </button>
+        <div className="w-full space-y-3">
+          {saveError && (
+            <p className="text-xs text-center text-red-700/90 bg-red-50 border border-red-100 rounded-xl px-3 py-2 leading-relaxed">
+              {saveError}
+            </p>
+          )}
+          <button
+            onClick={handleStart}
+            disabled={saving}
+            className="w-full py-4 rounded-2xl bg-[#6B8F71] text-white font-semibold text-base hover:bg-[#5A7D60] transition-all disabled:opacity-50"
+          >
+            {saving ? 'Setting up...' : saveError ? 'Try again' : 'Start Your Journey'}
+          </button>
+        </div>
       }
     >
       <div className="flex flex-col items-center pt-4 space-y-8">
