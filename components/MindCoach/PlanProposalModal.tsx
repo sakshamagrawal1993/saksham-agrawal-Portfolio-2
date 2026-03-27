@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
@@ -196,6 +196,14 @@ interface PlanProposalModalProps {
     onAccept: () => void;
 }
 
+type PathwayPhaseRow = {
+    pathway_name: string;
+    pathway_description: string | null;
+    phase_number: number;
+    phase_name: string;
+    phase_description: string | null;
+};
+
 export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, onAccept }) => {
     const profile = useMindCoachStore((s) => s.profile);
     const activeSession = useMindCoachStore((s) => s.activeSession);
@@ -204,44 +212,94 @@ export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, o
     const updateActiveSession = useMindCoachStore((s) => s.updateActiveSession);
 
     const [saving, setSaving] = useState(false);
+    const [dbPhases, setDbPhases] = useState<PathwayPhaseRow[] | null>(null);
 
-    // Fallback to exploratory validation if no pathway was routed
-    const suggestedPathwayId = activeSession?.pathway === 'engagement_rapport_and_assessment'
-        ? 'exploratory_validation' // Fallback mapping
-        : (activeSession?.pathway || 'exploratory_validation');
+    const suggestedPathwayId = useMemo(() => {
+        if (activeSession?.pathway && activeSession.pathway !== 'engagement_rapport_and_assessment') {
+            return activeSession.pathway;
+        }
+        return journey?.discovery_state?.suggested_pathway ?? 'engagement_rapport_and_assessment';
+    }, [activeSession?.pathway, journey?.discovery_state?.suggested_pathway]);
 
-    const playbook = PATHWAY_PLAYBOOKS[suggestedPathwayId] || PATHWAY_PLAYBOOKS.engagement_rapport_and_assessment;
+    const playbookDirect = PATHWAY_PLAYBOOKS[suggestedPathwayId];
+    const playbook = playbookDirect || PATHWAY_PLAYBOOKS.engagement_rapport_and_assessment;
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            const { data, error } = await supabase
+                .from('mind_coach_pathway_phases')
+                .select(
+                    'pathway_name, pathway_description, phase_number, phase_name, phase_description',
+                )
+                .eq('pathway_name', suggestedPathwayId)
+                .order('phase_number', { ascending: true });
+            if (cancelled) return;
+            if (error || !data?.length) {
+                setDbPhases([]);
+                return;
+            }
+            setDbPhases(data as PathwayPhaseRow[]);
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [suggestedPathwayId]);
+
+    const displayPhases =
+        dbPhases && dbPhases.length > 0
+            ? dbPhases.map((r) => ({
+                  name: r.phase_name,
+                  goal: r.phase_description || '',
+              }))
+            : playbook.phases.map((p) => ({ name: p.name, goal: p.goal }));
+
+    const planTitle =
+        playbookDirect?.name ||
+        (dbPhases && dbPhases.length > 0 && dbPhases[0].pathway_description
+            ? dbPhases[0].pathway_description
+            : playbook.name);
 
     const handleAcceptProposal = async () => {
         if (!profile || !journey || saving) return;
         setSaving(true);
 
         try {
-            // 1. Mark existing journey as inactive
             await supabase
                 .from('mind_coach_journeys')
                 .update({ active: false })
                 .eq('id', journey.id);
 
-            // 2. Format phases
-            const customPhases: JourneyPhase[] = playbook.phases.map((p, i) => ({
+            const phasesForJourney =
+                dbPhases && dbPhases.length > 0
+                    ? dbPhases.map((r) => ({
+                          title: r.phase_name,
+                          goal: r.phase_description || '',
+                          sessions: 3,
+                      }))
+                    : playbook.phases.map((p) => ({
+                          title: p.name,
+                          goal: p.goal,
+                          sessions: p.sessions,
+                      }));
+
+            const customPhases: JourneyPhase[] = phasesForJourney.map((p, i) => ({
                 phase_number: i + 1,
-                title: p.name,
+                title: p.title,
                 goal: p.goal,
                 sessions: Array.from({ length: p.sessions }, (_, si) => ({
-                    session_number: i * 3 + si + 1,
-                    topic: `Session ${i * 3 + si + 1}`,
+                    session_number: i * p.sessions + si + 1,
+                    topic: `Session ${i * p.sessions + si + 1}`,
                     description: p.goal,
                 })),
             }));
 
-            // 3. Create NEW journey for the correct pathway
             const { data: routeData, error: err } = await supabase
                 .from('mind_coach_journeys')
                 .insert({
                     profile_id: profile.id,
                     pathway: suggestedPathwayId,
-                    title: playbook.name,
+                    title: planTitle,
                     phases: customPhases,
                     current_phase: 1,
                     current_phase_index: 0,
@@ -254,7 +312,6 @@ export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, o
 
             if (err) throw err;
 
-            // 4. End the current Assessment session so the user can start a targeted session
             if (activeSession) {
                 await supabase
                     .from('mind_coach_sessions')
@@ -315,7 +372,7 @@ export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, o
                 <div className="px-5 pt-2 pb-4 bg-[#FAFAF7] shrink-0 -mt-6 relative">
                     <p className="text-[10px] font-bold text-[#6B8F71] uppercase tracking-widest mb-1.5">Therapy proposal</p>
                     <h2 className="text-xl font-serif text-[#2C2A26] leading-snug mb-2">
-                        {playbook.name}
+                        {planTitle}
                     </h2>
                     <p className="text-sm text-[#2C2A26]/70 leading-relaxed">
                         Based on what you&apos;ve shared about{' '}
@@ -331,7 +388,7 @@ export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, o
                         Four phases
                     </p>
                     <div className="space-y-2.5">
-                        {playbook.phases.map((phase, i) => (
+                        {displayPhases.map((phase, i) => (
                             <div
                                 key={i}
                                 className="bg-white border border-[#E8E4DE] p-3.5 rounded-2xl flex gap-3"

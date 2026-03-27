@@ -1,13 +1,63 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { ArrowLeft, Send, X } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowLeft, Send } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { supabase } from '../../../lib/supabaseClient';
 import {
   useMindCoachStore,
   type ChatMessage as ChatMessageType,
 } from '../../../store/mindCoachStore';
 import { ChatMessage } from './ChatMessage';
-import { THERAPIST_CONFIG, THERAPY_PROPOSAL_MIN_MESSAGE_COUNT } from '../MindCoachConstants';
+import {
+  MIND_COACH_DUMMY_SESSION_SUMMARY,
+  THERAPIST_CONFIG,
+  THERAPY_PROPOSAL_MIN_MESSAGE_COUNT,
+} from '../MindCoachConstants';
+
+function normalizeN8nChatPayload(raw: unknown): Record<string, any> {
+  const base = (Array.isArray(raw) ? raw[0] : raw) as Record<string, any> | null;
+  if (!base || typeof base !== 'object') return {};
+  const merged: Record<string, any> = { ...base };
+  const inner = base.output && typeof base.output === 'object' ? (base.output as Record<string, any>) : null;
+  if (inner) {
+    for (const key of [
+      'suggested_pathway',
+      'pathway',
+      'pathway_confidence',
+      'dynamic_theme',
+      'session_state',
+      'reply',
+      'guardrail_status',
+      'crisis_detected',
+      'is_session_close',
+      'dynamic_content',
+      'dynamic_in_chat_exercise',
+    ]) {
+      if (merged[key] == null && inner[key] != null) merged[key] = inner[key];
+    }
+  }
+  return merged;
+}
+
+function applyN8nSessionFields(data: Record<string, any>, patch: Record<string, any>) {
+  if (data.session_state) patch.session_state = data.session_state;
+  if (data.dynamic_theme) patch.dynamic_theme = data.dynamic_theme;
+  if (data.pathway) patch.pathway = data.pathway;
+  else if (data.suggested_pathway) patch.pathway = data.suggested_pathway;
+  if (typeof data.pathway_confidence === 'number') patch.pathway_confidence = data.pathway_confidence;
+}
+
+function syncDiscoveryFromN8n(data: Record<string, any>) {
+  if (data.suggested_pathway == null || typeof data.pathway_confidence !== 'number') return;
+  const j = useMindCoachStore.getState().journey;
+  if (!j) return;
+  useMindCoachStore.getState().setJourney({
+    ...j,
+    discovery_state: {
+      suggested_pathway: data.suggested_pathway,
+      confidence: data.pathway_confidence,
+    },
+  });
+}
 
 const MOCK_REPLY =
   "I hear you. That sounds really important. Can you tell me more about how that makes you feel?";
@@ -54,7 +104,6 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
   const setSessions = useMindCoachStore((s) => s.setSessions);
   const sessions = useMindCoachStore((s) => s.sessions);
   const setCrisisDetected = useMindCoachStore((s) => s.setCrisisDetected);
-  const isSessionClose = useMindCoachStore((s) => s.isSessionClose);
   const setIsSessionClose = useMindCoachStore((s) => s.setIsSessionClose);
   const isCrisisDetected = useMindCoachStore((s) => s.isCrisisDetected);
   const setActiveExercise = useMindCoachStore((s) => s.setActiveExercise);
@@ -136,7 +185,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
           });
 
           if (!response.ok) throw new Error(`n8n failed with ${response.status}`);
-          const data = await response.json();
+          const data = normalizeN8nChatPayload(await response.json());
 
           if (!data?.reply) throw new Error('No reply from n8n');
 
@@ -162,11 +211,9 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
           addMessage(assistantMsg);
           
           // 4. Update session
-          const sessionUpdate: any = { message_count: 1 };
-          if (data.session_state) sessionUpdate.session_state = data.session_state;
-          if (data.dynamic_theme) sessionUpdate.dynamic_theme = data.dynamic_theme;
-          if (data.pathway) sessionUpdate.pathway = data.pathway;
-          if (typeof data.pathway_confidence === 'number') sessionUpdate.pathway_confidence = data.pathway_confidence;
+          const sessionUpdate: Record<string, unknown> = { message_count: 1 };
+          applyN8nSessionFields(data, sessionUpdate);
+          syncDiscoveryFromN8n(data);
 
           await supabase.from('mind_coach_sessions').update(sessionUpdate).eq('id', activeSession.id);
           updateActiveSession(sessionUpdate);
@@ -288,7 +335,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
       });
 
       if (!response.ok) throw new Error(`n8n failed with ${response.status}`);
-      const data = await response.json();
+      const data = normalizeN8nChatPayload(await response.json());
       if (!data?.reply) throw new Error('No reply from n8n');
 
       // 5. Persist assistant reply
@@ -313,11 +360,9 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
 
       // 6. Update session count + result state
       const finalCount = newCount + 1;
-      const sessionUpdate: any = { message_count: finalCount };
-      if (data.session_state) sessionUpdate.session_state = data.session_state;
-      if (data.dynamic_theme) sessionUpdate.dynamic_theme = data.dynamic_theme;
-      if (data.pathway) sessionUpdate.pathway = data.pathway;
-      if (typeof data.pathway_confidence === 'number') sessionUpdate.pathway_confidence = data.pathway_confidence;
+      const sessionUpdate: Record<string, unknown> = { message_count: finalCount };
+      applyN8nSessionFields(data, sessionUpdate);
+      syncDiscoveryFromN8n(data);
 
       await supabase.from('mind_coach_sessions').update(sessionUpdate).eq('id', activeSession.id);
       updateActiveSession(sessionUpdate);
@@ -362,6 +407,35 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
   const handleEndSession = async () => {
     if (!activeSession || !profile || endingSession) return;
     setEndingSession(true);
+    const endedAt = new Date().toISOString();
+
+    const dummySummaryWithContext = (): Record<string, unknown> => {
+      const summary = { ...MIND_COACH_DUMMY_SESSION_SUMMARY };
+      const fromSession =
+        activeSession.pathway && activeSession.pathway !== 'engagement_rapport_and_assessment'
+          ? activeSession.pathway
+          : null;
+      const fromDiscovery = journey?.discovery_state?.suggested_pathway ?? null;
+      summary.suggested_pathway = fromSession || fromDiscovery;
+      return summary;
+    };
+
+    const finalizeLocal = (
+      summary: Record<string, unknown>,
+      caseNotes: unknown,
+    ) => {
+      const updated = {
+        ...activeSession,
+        session_state: 'completed' as const,
+        ended_at: endedAt,
+        case_notes: caseNotes ?? null,
+        summary_data: summary,
+      };
+      setSessions(sessions.map((s) => (s.id === updated.id ? updated : s)));
+      updateActiveSession(updated);
+      setSessionSummary(summary);
+      setShowSummary(true);
+    };
 
     try {
       const { data, error } = await supabase.functions.invoke('mind-coach-session-end', {
@@ -370,30 +444,47 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
           profile_id: profile.id,
         },
       });
+      const payload = data as Record<string, unknown> | null;
+      const serverError =
+        error ||
+        (payload &&
+          typeof payload === 'object' &&
+          'error' in payload &&
+          payload.error != null);
+      const rawSummary = payload?.session_summary;
+      const serverSummary =
+        rawSummary && typeof rawSummary === 'object' && !Array.isArray(rawSummary)
+          ? (rawSummary as Record<string, unknown>)
+          : null;
 
-      if (!error && data?.session_summary) {
-        setSessionSummary(data.session_summary);
-        setShowSummary(true);
+      if (!serverError) {
+        const summary = serverSummary ?? dummySummaryWithContext();
+        finalizeLocal(summary, payload?.case_notes ?? null);
+      } else {
+        const summary = dummySummaryWithContext();
+        await supabase
+          .from('mind_coach_sessions')
+          .update({
+            session_state: 'completed',
+            ended_at: endedAt,
+            summary_data: summary,
+          })
+          .eq('id', activeSession.id);
+        finalizeLocal(summary, null);
       }
-
-      const updated = {
-        ...activeSession,
-        session_state: 'completed' as const,
-        ended_at: new Date().toISOString(),
-        case_notes: data?.case_notes ?? null,
-        summary_data: data?.session_summary ?? null,
-      };
-      setSessions(sessions.map((s) => (s.id === updated.id ? updated : s)));
-      setActiveSession(null);
-    } catch {
-      const updated = {
-        ...activeSession,
-        session_state: 'completed' as const,
-        ended_at: new Date().toISOString(),
-      };
-      setSessions(sessions.map((s) => (s.id === updated.id ? updated : s)));
-      setActiveSession(null);
-      onBack();
+    } catch (err) {
+      console.error('Session end failed:', err);
+      const summary = dummySummaryWithContext();
+      await supabase
+        .from('mind_coach_sessions')
+        .update({
+          session_state: 'completed',
+          ended_at: endedAt,
+          summary_data: summary,
+        })
+        .eq('id', activeSession.id)
+        .catch(() => {});
+      finalizeLocal(summary, null);
     } finally {
       setEndingSession(false);
     }
@@ -408,8 +499,6 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
       onBack();
     }
   };
-
-  const showEndSession = Boolean(activeSession && !isCrisisDetected);
 
   if (showSummary && sessionSummary) {
     const tasks: any[] = Array.isArray(sessionSummary.extracted_tasks)
@@ -738,27 +827,6 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
           </div>
         )}
       </div>
-
-      {/* End Session Pill */}
-      <AnimatePresence>
-        {showEndSession && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            className="flex justify-center pb-2"
-          >
-            <button
-              onClick={handleEndSession}
-              disabled={endingSession}
-              className="flex items-center gap-1.5 px-4 py-1.5 bg-[#2C2A26]/8 hover:bg-[#2C2A26]/15 rounded-full text-xs font-medium text-[#2C2A26]/70 transition-colors disabled:opacity-50"
-            >
-              <X size={12} />
-              {endingSession ? 'Wrapping up...' : isSessionClose ? '✨ View Session Summary' : 'End Session'}
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Input */}
       <div className="px-3 py-3 border-t border-[#E8E4DE] bg-white shrink-0">

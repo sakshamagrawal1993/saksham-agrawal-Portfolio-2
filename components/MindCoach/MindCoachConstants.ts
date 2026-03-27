@@ -7,6 +7,15 @@ export const THERAPY_PROPOSAL_MIN_MESSAGE_COUNT = 30;
 export const MIND_COACH_PROPOSAL_DRAWER_IMAGE =
   'https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/mind%20coach/Generated_image.jpg';
 
+/** Placeholder summary when session-end / summarizer workflow is unavailable. */
+export const MIND_COACH_DUMMY_SESSION_SUMMARY: Record<string, unknown> = {
+  title: 'Session wrap-up',
+  opening_reflection:
+    'Thank you for being here today. This is a gentle placeholder summary until your automated session wrap-up is connected. You might still jot down what felt meaningful from our conversation.',
+  takeaway_task: 'Take one minute to note one word for how you feel right now.',
+  suggested_pathway: null,
+};
+
 interface TherapistConfig {
   name: string;
   color: string;
