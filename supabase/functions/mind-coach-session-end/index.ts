@@ -117,15 +117,27 @@ serve(async (req) => {
       })
       .eq('id', session_id);
 
-    // 4. Store extracted memories
-    if (extracted_memories?.length > 0) {
-      const memoryRows = extracted_memories.map((m: any) => ({
-        profile_id,
-        session_id,
-        memory_text: m.memory_text,
-        memory_type: m.memory_type || 'fact',
-      }));
-      await supabaseAdmin.from('mind_coach_memories').insert(memoryRows);
+    // 4. Consolidate memory into a single per-profile blob (upsert on profile_id)
+    let memoriesStored = 0;
+    if (Array.isArray(extracted_memories) && extracted_memories.length > 0) {
+      const candidate = extracted_memories.find(
+        (m: any) => m && typeof m.memory_text === 'string' && m.memory_text.trim().length > 0,
+      );
+      if (candidate) {
+        const { error: memoryErr } = await supabaseAdmin
+          .from('mind_coach_memories')
+          .upsert(
+            {
+              profile_id,
+              session_id,
+              memory_text: String(candidate.memory_text).trim(),
+              // Consolidated memory architecture uses one long-term context block.
+              memory_type: 'life_context',
+            },
+            { onConflict: 'profile_id' },
+          );
+        if (!memoryErr) memoriesStored = 1;
+      }
     }
 
     // 4.5. Store extracted tasks (Hybrid model: LLM picks type + writes content,
@@ -231,7 +243,7 @@ serve(async (req) => {
       JSON.stringify({
         case_notes,
         session_summary,
-        memories_stored: extracted_memories?.length || 0,
+        memories_stored: memoriesStored,
         tasks_stored: extracted_tasks?.length || 0,
         session_id,
         phase_transition_result: phaseTransitionResult,
