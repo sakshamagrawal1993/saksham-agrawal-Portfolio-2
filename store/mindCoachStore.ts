@@ -88,6 +88,8 @@ export interface MindCoachJourney {
   current_phase_index: number;
   sessions_completed: number;
   active: boolean;
+  /** Clinical pathway for this journey (DB column `pathway` on `mind_coach_journeys`). */
+  pathway?: Pathway | null;
   discovery_state?: { suggested_pathway: Pathway; confidence: number; };
   version: number;
   created_at: string;

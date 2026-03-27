@@ -11,7 +11,7 @@ WHERE id = 'engagement_rapport_and_assessment_phase1';
 
 -- Optional: Clean up task library for this pathway to focus on intake
 UPDATE public.mind_coach_task_library
-SET 
-  dynamic_title = 'Morning Reflection: Setting My Intention',
-  dynamic_description = 'Take 2 minutes this morning to name how you would like to feel today. No judgment, just noticing.'
-WHERE pathway_id = 'engagement_rapport_and_assessment' AND phase_number = 1 AND task_type = 'journaling';
+SET
+  title = 'Morning Reflection: Setting My Intention',
+  description = 'Take 2 minutes this morning to name how you would like to feel today. No judgment, just noticing.'
+WHERE pathway = 'engagement_rapport_and_assessment' AND phase = 1 AND task_type = 'journaling';
