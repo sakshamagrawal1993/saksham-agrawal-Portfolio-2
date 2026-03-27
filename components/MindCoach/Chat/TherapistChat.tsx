@@ -1,11 +1,12 @@
 import React, { useRef, useEffect, useMemo, useState, useCallback } from 'react';
 import { ArrowLeft, Send } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { findExerciseByPayload } from '../../../lib/mindCoachExerciseResolve';
 import { supabase } from '../../../lib/supabaseClient';
 import {
   useMindCoachStore,
   type ChatMessage as ChatMessageType,
+  type MindCoachSession,
+  type MindCoachJourney,
 } from '../../../store/mindCoachStore';
 import { ChatMessage } from './ChatMessage';
 import {
@@ -66,6 +67,38 @@ async function syncDiscoveryFromN8n(data: Record<string, any>) {
 
 /** Prevents duplicate n8n greeting on React strict remount / effect re-entry for the same session. */
 const greetingAttemptedForSession = new Set<string>();
+
+function fallbackSessionSummary(
+  activeSession: MindCoachSession | null,
+  journey: MindCoachJourney | null,
+): Record<string, unknown> {
+  const summary = { ...MIND_COACH_DUMMY_SESSION_SUMMARY };
+  const fromSession =
+    activeSession?.pathway && activeSession.pathway !== 'engagement_rapport_and_assessment'
+      ? activeSession.pathway
+      : null;
+  const fromDiscovery = journey?.discovery_state?.suggested_pathway ?? null;
+  summary.suggested_pathway = fromSession || fromDiscovery;
+  return summary;
+}
+
+/** Edge / n8n may return session_summary as object or JSON string. */
+function normalizeServerSessionSummary(raw: unknown): Record<string, unknown> | null {
+  if (raw == null) return null;
+  if (typeof raw === 'string') {
+    const t = raw.trim();
+    if (!t) return null;
+    try {
+      const p = JSON.parse(t) as unknown;
+      if (p && typeof p === 'object' && !Array.isArray(p)) return p as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+    return null;
+  }
+  if (typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, unknown>;
+  return null;
+}
 
 /**
  * Progress 0–100% toward surfacing the therapy plan. Linear to 100% by message N; if confidence
@@ -139,8 +172,6 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
   const setCrisisDetected = useMindCoachStore((s) => s.setCrisisDetected);
   const setIsSessionClose = useMindCoachStore((s) => s.setIsSessionClose);
   const isCrisisDetected = useMindCoachStore((s) => s.isCrisisDetected);
-  const setActiveExercise = useMindCoachStore((s) => s.setActiveExercise);
-  const setActiveExerciseMessageId = useMindCoachStore((s) => s.setActiveExerciseMessageId);
   const memories = useMindCoachStore((s) => s.memories);
   const activeTasks = useMindCoachStore((s) => s.activeTasks);
   const recentCaseNotes = useMindCoachStore((s) => s.recentCaseNotes);
@@ -288,16 +319,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
 
     if (data.crisis_detected) st.setCrisisDetected(true);
     if (data.is_session_close) st.setIsSessionClose(true);
-
-    const exerciseSlug = data.dynamic_content?.payload || data.dynamic_in_chat_exercise;
-    if (exerciseSlug) {
-      const allExercises = st.exercises;
-      const exercise = findExerciseByPayload(allExercises, String(exerciseSlug));
-      if (exercise) {
-        st.setActiveExercise(exercise);
-        st.setActiveExerciseMessageId(assistantMsg.id);
-      }
-    }
+    // Exercise stays on the teaser card until the user taps Start Activity (DynamicExerciseTrigger).
   }, []);
 
   useEffect(() => {
@@ -330,20 +352,6 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
       cancelled = true;
     };
   }, [messages.length, activeSession?.id, activeSession?.message_count, greetingRetryToken, runInitialGreeting, setIsLoading]);
-
-  const applyDynamicExerciseFromN8n = useCallback(
-    (data: Record<string, any>, assistantMsgId: string) => {
-      const exerciseSlug = data.dynamic_content?.payload || data.dynamic_in_chat_exercise;
-      if (!exerciseSlug) return;
-      const allExercises = useMindCoachStore.getState().exercises;
-      const exercise = findExerciseByPayload(allExercises, String(exerciseSlug));
-      if (exercise) {
-        setActiveExercise(exercise);
-        setActiveExerciseMessageId(assistantMsgId);
-      }
-    },
-    [setActiveExercise, setActiveExerciseMessageId],
-  );
 
   const handleSend = async () => {
     const text = input.trim();
@@ -498,7 +506,6 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
       if (data.crisis_detected) setCrisisDetected(true);
       if (data.is_session_close) setIsSessionClose(true);
 
-      applyDynamicExerciseFromN8n(data, assistantMsg.id);
       sendRetryModeRef.current = 'none';
     } catch (err) {
       console.error('Chat error:', err);
@@ -532,7 +539,6 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
         updateActiveSession(sessionUpdate);
         if (n8nData.crisis_detected) setCrisisDetected(true);
         if (n8nData.is_session_close) setIsSessionClose(true);
-        applyDynamicExerciseFromN8n(n8nData, assistantMsg.id);
         pendingAfterN8nRef.current = null;
         sendRetryModeRef.current = 'none';
         return;
@@ -650,7 +656,6 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
         updateActiveSession(sessionUpdate);
         if (data.crisis_detected) setCrisisDetected(true);
         if (data.is_session_close) setIsSessionClose(true);
-        applyDynamicExerciseFromN8n(data, assistantMsg.id);
         sendRetryModeRef.current = 'none';
       }
     } catch (err) {
@@ -669,17 +674,6 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
     if (!activeSession || !profile || endingSession) return;
     setEndingSession(true);
     const endedAt = new Date().toISOString();
-
-    const dummySummaryWithContext = (): Record<string, unknown> => {
-      const summary = { ...MIND_COACH_DUMMY_SESSION_SUMMARY };
-      const fromSession =
-        activeSession.pathway && activeSession.pathway !== 'engagement_rapport_and_assessment'
-          ? activeSession.pathway
-          : null;
-      const fromDiscovery = journey?.discovery_state?.suggested_pathway ?? null;
-      summary.suggested_pathway = fromSession || fromDiscovery;
-      return summary;
-    };
 
     const finalizeLocal = (
       summary: Record<string, unknown>,
@@ -705,24 +699,29 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
           profile_id: profile.id,
         },
       });
-      const payload = data as Record<string, unknown> | null;
+      let payload = data as Record<string, unknown> | null;
+      const inner =
+        payload?.output && typeof payload.output === 'object' && !Array.isArray(payload.output)
+          ? (payload.output as Record<string, unknown>)
+          : null;
+      if (inner && payload?.session_summary == null && inner.session_summary != null) {
+        payload = { ...payload, session_summary: inner.session_summary };
+      }
+
       const serverError =
         error ||
         (payload &&
           typeof payload === 'object' &&
           'error' in payload &&
           payload.error != null);
-      const rawSummary = payload?.session_summary;
-      const serverSummary =
-        rawSummary && typeof rawSummary === 'object' && !Array.isArray(rawSummary)
-          ? (rawSummary as Record<string, unknown>)
-          : null;
+
+      const serverSummary = normalizeServerSessionSummary(payload?.session_summary);
 
       if (!serverError) {
-        const summary = serverSummary ?? dummySummaryWithContext();
+        const summary = serverSummary ?? fallbackSessionSummary(activeSession, journey);
         finalizeLocal(summary, payload?.case_notes ?? null);
       } else {
-        const summary = dummySummaryWithContext();
+        const summary = fallbackSessionSummary(activeSession, journey);
         await supabase
           .from('mind_coach_sessions')
           .update({
@@ -735,7 +734,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
       }
     } catch (err) {
       console.error('Session end failed:', err);
-      const summary = dummySummaryWithContext();
+      const summary = fallbackSessionSummary(activeSession, journey);
       await supabase
         .from('mind_coach_sessions')
         .update({
@@ -761,14 +760,15 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
     }
   };
 
-  if (showSummary && sessionSummary) {
-    const tasks: any[] = Array.isArray(sessionSummary.extracted_tasks)
-      ? sessionSummary.extracted_tasks
-      : sessionSummary.takeaway_task
-        ? [{ dynamic_title: 'Your Takeaway', dynamic_description: sessionSummary.takeaway_task, task_type: 'general' }]
+  if (showSummary) {
+    const summaryView = sessionSummary ?? fallbackSessionSummary(activeSession, journey);
+    const tasks: any[] = Array.isArray(summaryView.extracted_tasks)
+      ? summaryView.extracted_tasks
+      : summaryView.takeaway_task
+        ? [{ dynamic_title: 'Your Takeaway', dynamic_description: summaryView.takeaway_task, task_type: 'general' }]
         : [];
 
-    const suggestedPathway = sessionSummary.suggested_pathway || activeSession?.pathway;
+    const suggestedPathway = summaryView.suggested_pathway || activeSession?.pathway;
     const isNewPathway = suggestedPathway && suggestedPathway !== 'engagement_rapport_and_assessment';
 
     return (
@@ -788,48 +788,48 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
           {/* Title + Reflection */}
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
             <h3 className="text-lg font-semibold text-[#2C2A26] mb-1">
-              {sessionSummary.title || 'Session Summary'}
+              {summaryView.title || 'Session Summary'}
             </h3>
-            {sessionSummary.opening_reflection && (
+            {summaryView.opening_reflection && (
               <p className="text-sm text-[#2C2A26]/70 leading-relaxed">
-                {sessionSummary.opening_reflection}
+                {summaryView.opening_reflection}
               </p>
             )}
           </motion.div>
 
           {/* Quote */}
-          {sessionSummary.quote_of_the_day && (
+          {summaryView.quote_of_the_day && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-white rounded-2xl p-4 border border-[#E8E4DE]">
-              <p className="text-sm text-[#2C2A26]/80 italic text-center">"{sessionSummary.quote_of_the_day}"</p>
+              <p className="text-sm text-[#2C2A26]/80 italic text-center">"{summaryView.quote_of_the_day}"</p>
             </motion.div>
           )}
 
           {/* Energy Shift */}
-          {sessionSummary.energy_shift && (
+          {summaryView.energy_shift && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-white rounded-2xl p-4 border border-[#E8E4DE] flex items-center justify-between">
               <div>
                 <p className="text-[10px] font-medium text-[#2C2A26]/50 uppercase mb-1">Start of Session</p>
-                <p className="text-sm font-medium text-[#2C2A26] line-through decoration-[#B4A7D6]">{sessionSummary.energy_shift.start}</p>
+                <p className="text-sm font-medium text-[#2C2A26] line-through decoration-[#B4A7D6]">{summaryView.energy_shift.start}</p>
               </div>
               <div className="text-[#B4A7D6]">&rarr;</div>
               <div className="text-right">
                 <p className="text-[10px] font-medium text-[#2C2A26]/50 uppercase mb-1">End of Session</p>
-                <p className="text-sm font-medium text-[#6B8F71]">{sessionSummary.energy_shift.end}</p>
+                <p className="text-sm font-medium text-[#6B8F71]">{summaryView.energy_shift.end}</p>
               </div>
             </motion.div>
           )}
 
           {/* Psych Flexibility */}
-          {sessionSummary.psychological_flexibility && (
+          {summaryView.psychological_flexibility && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-white rounded-2xl p-4 border border-[#E8E4DE]">
               <p className="text-xs font-medium text-[#2C2A26]/50 uppercase mb-3">Psychological Flexibility Profile</p>
               <div className="space-y-3">
                 {[
-                  { label: 'Self-Awareness', value: sessionSummary.psychological_flexibility.self_awareness },
-                  { label: 'Somatic Observation', value: sessionSummary.psychological_flexibility.observation },
-                  { label: 'Physical Integration', value: sessionSummary.psychological_flexibility.physical_awareness },
-                  { label: 'Values Alignment', value: sessionSummary.psychological_flexibility.core_values },
-                  { label: 'Relationships', value: sessionSummary.psychological_flexibility.relationships },
+                  { label: 'Self-Awareness', value: summaryView.psychological_flexibility.self_awareness },
+                  { label: 'Somatic Observation', value: summaryView.psychological_flexibility.observation },
+                  { label: 'Physical Integration', value: summaryView.psychological_flexibility.physical_awareness },
+                  { label: 'Values Alignment', value: summaryView.psychological_flexibility.core_values },
+                  { label: 'Relationships', value: summaryView.psychological_flexibility.relationships },
                 ].filter(s => s.value !== undefined).map((stat, i) => (
                   <div key={i}>
                     <div className="flex justify-between text-xs mb-1">
@@ -851,9 +851,9 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
           )}
 
           {/* Self-Compassion */}
-          {sessionSummary.self_compassion_score !== undefined && (
+          {summaryView.self_compassion_score !== undefined && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="bg-[#FAF9F7] rounded-2xl p-4 text-center">
-              <p className="text-3xl font-bold text-[#6B8F71] mb-1">{sessionSummary.self_compassion_score}</p>
+              <p className="text-3xl font-bold text-[#6B8F71] mb-1">{summaryView.self_compassion_score}</p>
               <p className="text-xs font-medium text-[#2C2A26]/50 uppercase">Self-Compassion Score</p>
             </motion.div>
           )}
@@ -912,6 +912,17 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
             </motion.div>
           )}
         </div>
+      </div>
+    );
+  }
+
+  // ── End session: full-screen loader while edge / n8n runs ───────────────
+  if (endingSession) {
+    return (
+      <div className="flex flex-col h-full bg-[#F9F6F2] items-center justify-center px-8">
+        <div className="w-11 h-11 border-2 border-[#6B8F71] border-t-transparent rounded-full animate-spin" />
+        <p className="mt-5 text-sm font-medium text-[#2C2A26]/70 text-center">Wrapping up your session…</p>
+        <p className="mt-2 text-xs text-[#2C2A26]/45 text-center">Generating your summary…</p>
       </div>
     );
   }
@@ -1042,22 +1053,28 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
 
       {isEngagementDiscovery && (
         <div className="shrink-0 w-full border-b border-[#E8E4DE] bg-white/80">
-          <div className="h-1 w-full bg-[#E8E4DE]/90 overflow-hidden">
-            <motion.div
-              aria-hidden
-              className="h-full bg-[#6B8F71] rounded-none"
-              initial={false}
-              animate={{ width: `${planRevealProgress}%` }}
-              transition={{ type: 'spring', stiffness: 140, damping: 22 }}
-            />
+          <div
+            className="px-4 pt-2"
+            role="progressbar"
+            aria-valuenow={Math.round(planRevealProgress)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-labelledby="mind-coach-plan-unlock-label"
+          >
+            <div className="h-1 w-full bg-[#E8E4DE]/90 overflow-hidden rounded-full">
+              <motion.div
+                className="h-full bg-[#6B8F71] rounded-full"
+                initial={false}
+                animate={{ width: `${planRevealProgress}%` }}
+                transition={{ type: 'spring', stiffness: 140, damping: 22 }}
+              />
+            </div>
           </div>
-          <p className="px-4 py-1 text-[9px] uppercase tracking-[0.14em] text-[#2C2A26]/40 font-semibold">
+          <p
+            id="mind-coach-plan-unlock-label"
+            className="px-4 py-1 text-[9px] uppercase tracking-[0.14em] text-[#2C2A26]/40 font-semibold"
+          >
             Your plan unlocks with the conversation
-          </p>
-          <p className="px-4 pb-2 text-[10px] text-[#2C2A26]/45 leading-relaxed">
-            Progress rises steadily for the first {THERAPY_PROPOSAL_MIN_MESSAGE_COUNT} messages (user and coach).
-            After that, the bar stays at 90% until pathway confidence reaches {THERAPY_PROPOSAL_CONFIDENCE_READY}
-            %, then completes — or it inches forward about every five messages while confidence catches up.
           </p>
         </div>
       )}
