@@ -98,6 +98,19 @@ export interface MindCoachJourney {
   /** Clinical pathway for this journey (DB column `pathway` on `mind_coach_journeys`). */
   pathway?: Pathway | null;
   discovery_state?: { suggested_pathway: Pathway; confidence: number; };
+  phase_transition_result?: {
+    advanced: boolean;
+    previous_phase_index: number;
+    new_phase_index: number;
+    completed_in_phase: number;
+    min_sessions_required: number;
+    max_sessions_fallback: number;
+    readiness_signal: 'ready' | 'continue' | string;
+    used_max_sessions_fallback: boolean;
+    blocked_by_risk: boolean;
+    progression_enabled?: boolean;
+    evaluated_at: string;
+  } | null;
   version: number;
   created_at: string;
   updated_at: string;
@@ -215,6 +228,19 @@ export function firstPhaseWhereFeatureUnlocks(feature: string): number {
   return 4;
 }
 
+/** Resolve current phase from source-of-truth index and keep legacy field aligned. */
+export function normalizeJourneyPhaseState(journey: MindCoachJourney): MindCoachJourney {
+  const phaseCount = Array.isArray(journey.phases) ? journey.phases.length : 0;
+  const fallbackIndex = Math.max(0, Number(journey.current_phase ?? 1) - 1);
+  const rawIndex = Number.isFinite(journey.current_phase_index) ? journey.current_phase_index : fallbackIndex;
+  const clampedIndex = phaseCount > 0 ? Math.min(Math.max(rawIndex, 0), phaseCount - 1) : Math.max(rawIndex, 0);
+  return {
+    ...journey,
+    current_phase_index: clampedIndex,
+    current_phase: clampedIndex + 1,
+  };
+}
+
 // ── State ──────────────────────────────────────────────────────────────────
 
 interface MindCoachState {
@@ -280,6 +306,7 @@ interface MindCoachState {
   setActiveExerciseMessageId: (id: string | null) => void;
 
   // Computed
+  currentPhaseNumber: () => number;
   completedSessionCount: () => number;
   currentPhaseSessionCount: () => number;
   unlockedFeatures: () => string[];
@@ -312,7 +339,7 @@ export const useMindCoachStore = create<MindCoachState>((set, get) => ({
   ...initialState,
 
   setProfile: (profile) => set({ profile }),
-  setJourney: (journey) => set({ journey }),
+  setJourney: (journey) => set({ journey: journey ? normalizeJourneyPhaseState(journey) : null }),
 
   setSessions: (sessions) => set({ sessions }),
   setActiveSession: (activeSession) => set({ activeSession }),
@@ -345,22 +372,29 @@ export const useMindCoachStore = create<MindCoachState>((set, get) => ({
   setActiveExercise: (activeExercise) => set({ activeExercise }),
   setActiveExerciseMessageId: (activeExerciseMessageId) => set({ activeExerciseMessageId }),
 
+  currentPhaseNumber: () => {
+    const { journey } = get();
+    if (!journey) return 1;
+    return normalizeJourneyPhaseState(journey).current_phase;
+  },
+
   completedSessionCount: () =>
     get().sessions.filter((s) => s.session_state === 'completed').length,
 
   currentPhaseSessionCount: () => {
     const { sessions, journey } = get();
     if (!journey) return 0;
+    const normalized = normalizeJourneyPhaseState(journey);
     return sessions.filter(
       (s) =>
         s.session_state === 'completed' &&
-        s.phase_number === journey.current_phase
+        s.phase_number === normalized.current_phase
     ).length;
   },
 
   unlockedFeatures: () => {
     const { journey } = get();
-    const phase = journey?.current_phase ?? 1;
+    const phase = journey ? normalizeJourneyPhaseState(journey).current_phase : 1;
     const completedPhase = Math.max(1, phase);
     return UNLOCK_MAP[Math.min(completedPhase, 4)] ?? UNLOCK_MAP[1];
   },

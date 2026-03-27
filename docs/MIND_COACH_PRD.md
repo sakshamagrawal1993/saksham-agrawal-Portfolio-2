@@ -91,7 +91,7 @@ Mind Coach is a **web-based, AI-assisted mental wellness companion** embedded in
 
 - Greeting, **random static quote** (not personalized).  
 - **Mood** 1–5 tap → `mind_coach_mood_entries`.  
-- **Journey progress** derived from `journey.phases[current_phase]` and **completed sessions** in that phase.  
+- **Journey progress** includes: current phase title/goal, phase circles (completed/current/future), per-phase session counts, and a short “journey ahead” preview.  
 - **Active tasks** from `mind_coach_user_tasks` (hybrid task model).  
 - Links to tabs; **account deletion** flow (wipes profile-related data — verify RLS/cascade with Engineering).
 
@@ -114,6 +114,13 @@ Mind Coach is a **web-based, AI-assisted mental wellness companion** embedded in
 - **Progress bar** toward plan reveal: linear to **20 messages**; if confidence &lt; 80 at 20, bar **90%** then +2% per **5** further messages until 100%.
 - **Therapy proposal** CTA only after the workflow returns pathway details and the client persists **`journey.discovery_state`** (`suggested_pathway` ≠ engagement + numeric `confidence`, same contract as **`syncDiscoveryFromN8n`**) — **not** tied to message count alone. Opens `PlanProposalModal` (bottom drawer).
 - **End session** → `mind-coach-session-end` edge function (n8n summarizer) or **dummy summary** + client completes session if edge fails.
+
+**Pathway phase UI (post-accept, non-engagement pathways):**
+
+- Chat renders a compact `PhaseProgressStepper` with phase circles and in-phase session dots.
+- `mind-coach-session-end` is the source of truth for phase advancement.
+- Hybrid gate in edge function: advance when **readiness = ready** and `completedInPhase >= minSessions` (from phase session scaffold), or when max-session fallback is reached without major risk signals.
+- Discovery flow is isolated: these progression rules do not change engagement/proposal gating.
 
 **Crisis:** `TherapistChat` can set crisis state from n8n flags → **full-screen overlay** with **iCall** (India) phone + web — **not localized** for other regions.
 
@@ -310,7 +317,7 @@ This section is split into **completed work** (synced with the repo and [`MIND_C
 |----|------|----------------|
 | **E1** | Route chat through **`mind-coach-chat`** edge | **Deferred** — optional env e.g. `VITE_MIND_COACH_USE_CHAT_EDGE`; align double-persist with edge. |
 | **E3** | Migration hygiene (`pathway_id` task library, prod push) | **Deferred** — ops / reconcile migrations. |
-| **E4** | Journey advancement vs `session-end` | **Deferred** — needs agreed product rules. |
+| **E4** | Journey advancement vs `session-end` | **Done (2026-03-28)** — edge uses hybrid gate (`minSessions + readiness`, max-session fallback) and writes `phase_transition_result` for UI messaging. |
 | **E7** | E2E: onboarding → message → reload | **Deferred** — no Playwright (or equivalent) in repo yet. |
 | **E8** | Structured observability | **Deferred** — needs logging stack / dashboards. |
 | **E10** | Rate limit / abuse protection on n8n | **Deferred**. |

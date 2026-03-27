@@ -40,6 +40,7 @@ export const HomeScreen: React.FC = () => {
   const profile = useMindCoachStore((s) => s.profile);
   const journey = useMindCoachStore((s) => s.journey);
   const sessions = useMindCoachStore((s) => s.sessions);
+  const currentPhase = useMindCoachStore((s) => s.currentPhaseNumber());
   const moodEntries = useMindCoachStore((s) => s.moodEntries);
   const setMoodEntries = useMindCoachStore((s) => s.setMoodEntries);
   const setActiveTab = useMindCoachStore((s) => s.setActiveTab);
@@ -52,7 +53,6 @@ export const HomeScreen: React.FC = () => {
 
   const quote = useMemo(() => QUOTES[Math.floor(Math.random() * QUOTES.length)], []);
 
-  const currentPhase = journey?.current_phase ?? 1;
   const unlockedTabs =
     UNLOCK_MAP[Math.min(Math.max(currentPhase, 1), 4)] ?? UNLOCK_MAP[1];
   const toolkitShortcutItems = useMemo(
@@ -66,6 +66,18 @@ export const HomeScreen: React.FC = () => {
   );
   const phases = journey?.phases ?? [];
   const currentPhaseData = phases[currentPhase - 1];
+  const phaseProgress = useMemo(
+    () =>
+      phases.map((phase, idx) => {
+        const phaseNumber = phase.phase_number || idx + 1;
+        const completed = sessions.filter(
+          (s) => s.session_state === 'completed' && s.phase_number === phaseNumber,
+        ).length;
+        const total = Math.max(1, phase.sessions?.length ?? 3);
+        return { phaseNumber, phase, completed, total };
+      }),
+    [phases, sessions],
+  );
   const completedInPhase = sessions.filter(
     (s) => s.session_state === 'completed' && s.phase_number === currentPhase
   ).length;
@@ -73,6 +85,7 @@ export const HomeScreen: React.FC = () => {
   const progressPct = Math.round((completedInPhase / totalInPhase) * 100);
 
   const nextSessionTopic = currentPhaseData?.sessions?.[completedInPhase];
+  const nextPhasePreviews = phaseProgress.filter((p) => p.phaseNumber > currentPhase).slice(0, 2);
 
   const moodChartData = useMemo(() => {
     const last7 = [...moodEntries].reverse().slice(-7);
@@ -274,21 +287,102 @@ export const HomeScreen: React.FC = () => {
               <p className="text-sm text-[#2C2A26]/50 leading-relaxed max-w-[240px]">
                 {currentPhaseData?.goal || 'Establishing trust and baseline emotional state.'}
               </p>
+              {journey.phase_transition_result && journey.phase_transition_result.progression_enabled !== false && (
+                <p className="text-[11px] text-[#6B8F71] font-medium">
+                  {journey.phase_transition_result.advanced
+                    ? `Phase ${journey.phase_transition_result.new_phase_index + 1} unlocked`
+                    : `${journey.phase_transition_result.completed_in_phase}/${journey.phase_transition_result.min_sessions_required} sessions completed in this phase`}
+                </p>
+              )}
             </div>
 
             <div className="space-y-3 pt-1">
+              <div className="flex items-center gap-1.5">
+                {phaseProgress.map((p, idx) => {
+                  const isCompleted = p.phaseNumber < currentPhase;
+                  const isCurrent = p.phaseNumber === currentPhase;
+                  const isLast = idx === phaseProgress.length - 1;
+                  return (
+                    <React.Fragment key={p.phaseNumber}>
+                      <span
+                        className={`w-6 h-6 rounded-full border flex items-center justify-center text-[10px] font-bold ${
+                          isCompleted
+                            ? 'bg-[#6B8F71] border-[#6B8F71] text-white'
+                            : isCurrent
+                              ? 'bg-white border-[#6B8F71] text-[#6B8F71]'
+                              : 'bg-[#F5F0EB] border-[#E8E4DE] text-[#2C2A26]/35'
+                        }`}
+                      >
+                        {p.phaseNumber}
+                      </span>
+                      {!isLast && (
+                        <span
+                          className={`flex-1 h-[2px] rounded-full ${
+                            isCompleted ? 'bg-[#6B8F71]' : 'bg-[#E8E4DE]'
+                          }`}
+                        />
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </div>
               <div className="flex items-center justify-between text-[11px] font-medium">
-                <span className="text-[#2C2A26]/40">Progress</span>
+                <span className="text-[#2C2A26]/40">Sessions in this phase</span>
+                <span className="text-[#2C2A26]">
+                  {completedInPhase}/{totalInPhase}
+                </span>
+              </div>
+              <div className="flex gap-1.5">
+                {Array.from({ length: totalInPhase }, (_, idx) => (
+                  <span
+                    key={idx}
+                    className={`h-1.5 flex-1 rounded-full ${
+                      idx < completedInPhase ? 'bg-[#6B8F71]' : 'bg-[#E8E4DE]'
+                    }`}
+                  />
+                ))}
+              </div>
+              <div className="flex items-center justify-between text-[11px] font-medium">
+                <span className="text-[#2C2A26]/40">Overall progress</span>
                 <span className="text-[#2C2A26]">{progressPct}%</span>
               </div>
-              <div className="h-1.5 w-full bg-[#FAFAF7] rounded-full overflow-hidden border border-[#F0EDEA]">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${progressPct}%` }}
-                  transition={{ duration: 1, ease: 'easeOut' }}
-                  className="h-full rounded-full"
-                  style={{ backgroundColor: '#6B8F71' }}
-                />
+              {nextPhasePreviews.length > 0 && (
+                <div className="pt-1">
+                  <p className="text-[10px] uppercase tracking-wide text-[#2C2A26]/40 mb-1.5">
+                    Journey ahead
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {nextPhasePreviews.map((next) => (
+                      <span
+                        key={next.phaseNumber}
+                        className="text-[10px] px-2 py-1 rounded-full bg-[#F5F0EB] border border-[#E8E4DE] text-[#2C2A26]/60"
+                      >
+                        Phase {next.phaseNumber}: {next.phase.title}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="pt-1">
+                <p className="text-[10px] uppercase tracking-wide text-[#2C2A26]/40 mb-1.5">
+                  Sessions by phase
+                </p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {phaseProgress.map((p) => (
+                    <span
+                      key={p.phaseNumber}
+                      className={`text-[10px] px-2 py-1 rounded-lg border ${
+                        p.phaseNumber === currentPhase
+                          ? 'bg-[#6B8F71]/10 border-[#6B8F71]/20 text-[#6B8F71]'
+                          : p.phaseNumber < currentPhase
+                            ? 'bg-white border-[#E8E4DE] text-[#2C2A26]/60'
+                            : 'bg-[#F5F0EB] border-[#E8E4DE] text-[#2C2A26]/45'
+                      }`}
+                    >
+                      P{p.phaseNumber}: {Math.min(p.completed, p.total)}/{p.total}
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
 

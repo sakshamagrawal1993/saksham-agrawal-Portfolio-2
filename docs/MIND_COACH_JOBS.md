@@ -13,7 +13,7 @@ _Last updated: 2026-03-28 — see also [`MIND_COACH_GAPS.md`](./MIND_COACH_GAPS.
 | E1 | Route chat through `mind-coach-chat` edge (optional `VITE_MIND_COACH_USE_CHAT_EDGE`); align double-persist with edge | `deferred` |
 | E2 | User-visible errors on message save failures + n8n/chat failures (no silent drift) | `done` |
 | E3 | Migration hygiene / prod `pathway_id` task library — **ops**; document only in PRD | `deferred` |
-| E4 | Journey advancement client vs `session-end` — needs product spec | `deferred` |
+| E4 | Journey advancement centralized in `mind-coach-session-end` (minSessions + readiness, max fallback, transition payload) | `done` |
 | E5 | Enforce `unlockedFeatures()` on Journal, Exercises, Assessments (lock UI + copy) | `done` |
 | E6 | Persist `discovery_state` to `mind_coach_journeys` when n8n returns pathway signal | `done` |
 | E7 | E2E: onboarding → message → reload — **deferred** (no Playwright in repo yet) | `deferred` |
@@ -56,6 +56,8 @@ Tracked in PRD §9.4 only.
 - **E2:** `TherapistChat` amber alert for failures; no silent mock assistant reply; Retry for greeting, n8n-only, or assistant-save-only paths; user message rolled back if persist fails.
 - **E11:** Module `greetingAttemptedForSession` prevents duplicate greeting for the same `session_id`; Retry clears the lock and bumps `greetingRetryToken`.
 - **E11b:** Edge `mind-coach-chat` inserts `dynamic_content` on assistant rows (matches client).
+- **E4:** `mind-coach-session-end` now computes phase progression server-side (deterministic counts + readiness gate + max-session fallback) and stores `phase_transition_result` on `mind_coach_journeys`.
+- **Discovery isolation:** Proposal/discovery remains gated by `journey.discovery_state`; pathway phase stepper renders only outside engagement discovery mode.
 - **U3:** `PlanProposalModal` shows a short post-accept note and **Continue** before `onAccept`.
 - **U4:** `DiaryScreen` lists completed sessions without requiring `summary_data`; fallback title/preview.
 - **U5:** Chat discovery strip uses the short unlock line only; extended legend tracked in gaps doc if product wants it back.

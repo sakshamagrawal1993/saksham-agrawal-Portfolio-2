@@ -2,6 +2,22 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import { corsHeaders } from '../_shared/cors.ts';
 
+const DEFAULT_MIN_SESSIONS_PER_PHASE = 3;
+const DEFAULT_MAX_SESSIONS_PER_PHASE = 5;
+
+function getRequiredSessionsForPhase(phase: any): number {
+  if (!phase || !Array.isArray(phase.sessions)) return DEFAULT_MIN_SESSIONS_PER_PHASE;
+  return Math.max(1, phase.sessions.length || DEFAULT_MIN_SESSIONS_PER_PHASE);
+}
+
+function hasMajorRiskSignals(caseNotes: any, sessionSummary: any): boolean {
+  const riskLevel = String(caseNotes?.risk_level ?? caseNotes?.risk ?? '').toLowerCase();
+  if (riskLevel === 'high' || riskLevel === 'critical') return true;
+  if (caseNotes?.crisis_detected === true || caseNotes?.requires_escalation === true) return true;
+  if (sessionSummary?.crisis_detected === true || sessionSummary?.requires_escalation === true) return true;
+  return false;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -145,16 +161,65 @@ serve(async (req) => {
       await supabaseAdmin.from('mind_coach_user_tasks').insert(taskRows);
     }
 
-    // 5. Update journey progress
+    // 5. Update journey progress (pathway progression only; discovery flow remains unchanged)
+    let phaseTransitionResult: Record<string, unknown> | null = null;
     if (journey) {
-      const newSessionCount = (journey.sessions_completed || 0) + 1;
+      const currentPhaseIndex = Number.isFinite(journey.current_phase_index)
+        ? journey.current_phase_index
+        : Math.max(0, (journey.current_phase || 1) - 1);
+      const phases = Array.isArray(journey.phases) ? journey.phases : [];
+      const phaseCount = phases.length;
+      const hasNextPhase = currentPhaseIndex < phaseCount - 1;
+      const progressionEnabled = (journey.pathway || session.pathway) !== 'engagement_rapport_and_assessment';
+      const currentPhaseNumber = currentPhaseIndex + 1;
+      const currentPhase = phases[currentPhaseIndex] ?? null;
+
+      const { count: completedInPhase } = await supabaseAdmin
+        .from('mind_coach_sessions')
+        .select('id', { count: 'exact', head: true })
+        .eq('journey_id', journey.id)
+        .eq('phase_number', currentPhaseNumber)
+        .eq('session_state', 'completed');
+
+      const { count: completedInJourney } = await supabaseAdmin
+        .from('mind_coach_sessions')
+        .select('id', { count: 'exact', head: true })
+        .eq('journey_id', journey.id)
+        .eq('session_state', 'completed');
+
+      const completedInCurrentPhase = completedInPhase ?? 0;
+      const newSessionCount = completedInJourney ?? ((journey.sessions_completed || 0) + 1);
+      const minSessionsForPhase = getRequiredSessionsForPhase(currentPhase);
+      const maxSessionsForPhase = Math.max(minSessionsForPhase, DEFAULT_MAX_SESSIONS_PER_PHASE);
+      const readinessSignal = String(case_notes?.readiness_for_next_phase ?? '').toLowerCase() === 'ready';
+      const majorRisk = hasMajorRiskSignals(case_notes, session_summary);
+      const readyGatePassed = readinessSignal && completedInCurrentPhase >= minSessionsForPhase;
+      const maxSessionsFallbackPassed = completedInCurrentPhase >= maxSessionsForPhase && !majorRisk;
+      const shouldAdvance = progressionEnabled && hasNextPhase && (readyGatePassed || maxSessionsFallbackPassed);
+
       const journeyUpdate: Record<string, any> = {
         sessions_completed: newSessionCount,
       };
 
-      if (case_notes?.readiness_for_next_phase === 'ready' && journey.current_phase_index < (journey.phases?.length || 0) - 1) {
-        journeyUpdate.current_phase_index = journey.current_phase_index + 1;
+      if (shouldAdvance) {
+        journeyUpdate.current_phase_index = currentPhaseIndex + 1;
+        // Keep legacy compatibility where UI reads current_phase.
+        journeyUpdate.current_phase = currentPhaseIndex + 2;
       }
+      phaseTransitionResult = {
+        advanced: shouldAdvance,
+        previous_phase_index: currentPhaseIndex,
+        new_phase_index: shouldAdvance ? currentPhaseIndex + 1 : currentPhaseIndex,
+        completed_in_phase: completedInCurrentPhase,
+        min_sessions_required: minSessionsForPhase,
+        max_sessions_fallback: maxSessionsForPhase,
+        readiness_signal: readinessSignal ? 'ready' : 'continue',
+        used_max_sessions_fallback: !readyGatePassed && maxSessionsFallbackPassed,
+        blocked_by_risk: majorRisk && completedInCurrentPhase >= maxSessionsForPhase,
+        progression_enabled: progressionEnabled,
+        evaluated_at: new Date().toISOString(),
+      };
+      journeyUpdate.phase_transition_result = phaseTransitionResult;
 
       await supabaseAdmin
         .from('mind_coach_journeys')
@@ -169,6 +234,7 @@ serve(async (req) => {
         memories_stored: extracted_memories?.length || 0,
         tasks_stored: extracted_tasks?.length || 0,
         session_id,
+        phase_transition_result: phaseTransitionResult,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );

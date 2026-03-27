@@ -19,11 +19,11 @@ export const SessionsScreen: React.FC = () => {
   const setSessions = useMindCoachStore((s) => s.setSessions);
   const setMessages = useMindCoachStore((s) => s.setMessages);
   const setActiveTab = useMindCoachStore((s) => s.setActiveTab);
+  const currentPhase = useMindCoachStore((s) => s.currentPhaseNumber());
   const [starting, setStarting] = useState(false);
   const [showProposal, setShowProposal] = useState(false);
 
   const completedSessions = sessions.filter((s) => s.session_state === 'completed');
-  const currentPhase = journey?.current_phase ?? 1;
 
   const handleStartSession = useCallback(async () => {
     if (!profile || starting) return;

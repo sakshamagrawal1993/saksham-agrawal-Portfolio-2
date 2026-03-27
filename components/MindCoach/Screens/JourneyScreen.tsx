@@ -13,8 +13,8 @@ export const JourneyScreen: React.FC = () => {
   const journey = useMindCoachStore((s) => s.journey);
   const sessions = useMindCoachStore((s) => s.sessions);
   const setActiveTab = useMindCoachStore((s) => s.setActiveTab);
+  const currentPhase = useMindCoachStore((s) => s.currentPhaseNumber());
 
-  const currentPhase = journey?.current_phase ?? 1;
   const phases = journey?.phases ?? [];
 
   if (!journey || phases.length === 0) {
@@ -33,6 +33,13 @@ export const JourneyScreen: React.FC = () => {
     <div className="p-5 pb-4">
       <h2 className="text-xl font-semibold text-[#2C2A26] mb-1">Your Journey</h2>
       <p className="text-sm text-[#2C2A26]/40 mb-6">{journey.title}</p>
+      {journey.phase_transition_result && journey.phase_transition_result.progression_enabled !== false && (
+        <div className="mb-4 p-3 rounded-xl border border-[#E8E4DE] bg-white text-xs text-[#2C2A26]/65">
+          {journey.phase_transition_result.advanced
+            ? `Nice work. You moved to Phase ${journey.phase_transition_result.new_phase_index + 1}.`
+            : `Keep going in this phase. ${journey.phase_transition_result.completed_in_phase}/${journey.phase_transition_result.min_sessions_required} sessions completed.`}
+        </div>
+      )}
 
       <div className="relative">
         {phases.map((phase, idx) => {

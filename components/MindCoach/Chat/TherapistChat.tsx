@@ -15,6 +15,7 @@ import {
   THERAPY_PROPOSAL_CONFIDENCE_READY,
   THERAPY_PROPOSAL_MIN_MESSAGE_COUNT,
 } from '../MindCoachConstants';
+import { PhaseProgressStepper } from './PhaseProgressStepper';
 
 function normalizeN8nChatPayload(raw: unknown): Record<string, any> {
   const base = (Array.isArray(raw) ? raw[0] : raw) as Record<string, any> | null;
@@ -166,7 +167,6 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
   const removeMessageById = useMindCoachStore((s) => s.removeMessageById);
   const setIsLoading = useMindCoachStore((s) => s.setIsLoading);
   const updateActiveSession = useMindCoachStore((s) => s.updateActiveSession);
-  const setActiveSession = useMindCoachStore((s) => s.setActiveSession);
   const setSessions = useMindCoachStore((s) => s.setSessions);
   const setJourney = useMindCoachStore((s) => s.setJourney);
   const sessions = useMindCoachStore((s) => s.sessions);
@@ -1061,6 +1061,10 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
           {endingSession ? 'Ending…' : 'End session'}
         </button>
       </div>
+
+      {!isEngagementDiscovery && journey && (
+        <PhaseProgressStepper journey={journey} sessions={sessions} />
+      )}
 
       {chatError && (
         <div
