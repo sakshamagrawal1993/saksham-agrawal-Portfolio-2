@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Send } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { findExerciseByPayload } from '../../../lib/mindCoachExerciseResolve';
@@ -11,6 +11,7 @@ import { ChatMessage } from './ChatMessage';
 import {
   MIND_COACH_DUMMY_SESSION_SUMMARY,
   THERAPIST_CONFIG,
+  THERAPY_PROPOSAL_CONFIDENCE_READY,
   THERAPY_PROPOSAL_MIN_MESSAGE_COUNT,
 } from '../MindCoachConstants';
 
@@ -62,6 +63,33 @@ function syncDiscoveryFromN8n(data: Record<string, any>) {
 
 const MOCK_REPLY =
   "I hear you. That sounds really important. Can you tell me more about how that makes you feel?";
+
+/**
+ * Progress 0–100% toward surfacing the therapy plan. Linear to 100% by message N; if confidence
+ * is still below ready at N, snap to 90% then +2% every 5 messages until 100%.
+ */
+function planRevealProgressPercent(
+  messageCount: number,
+  pathwayConfidence: number | undefined,
+  discoveryConfidence: number | undefined,
+): number {
+  const N = THERAPY_PROPOSAL_MIN_MESSAGE_COUNT;
+  const conf =
+    pathwayConfidence !== undefined
+      ? pathwayConfidence
+      : discoveryConfidence;
+  const highConf = conf !== undefined && conf >= THERAPY_PROPOSAL_CONFIDENCE_READY;
+
+  if (messageCount < N) {
+    return Math.min(100, (messageCount / N) * 100);
+  }
+  if (highConf) {
+    return 100;
+  }
+  const beyond = Math.max(0, messageCount - N);
+  const steps = Math.floor(beyond / 5);
+  return Math.min(100, 90 + steps * 2);
+}
 
 interface TherapistChatProps {
   onBack: () => void;
@@ -119,11 +147,30 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
   const persona = profile?.therapist_persona ?? 'maya';
   const meta = THERAPIST_CONFIG[persona];
 
+  const isEngagementDiscovery = activeSession?.pathway === 'engagement_rapport_and_assessment';
+
+  const planRevealProgress = useMemo(() => {
+    if (!isEngagementDiscovery || !activeSession) return 0;
+    const mc = Math.max(activeSession.message_count ?? 0, messages.length);
+    return planRevealProgressPercent(
+      mc,
+      activeSession.pathway_confidence,
+      journey?.discovery_state?.confidence,
+    );
+  }, [
+    isEngagementDiscovery,
+    activeSession?.id,
+    activeSession?.message_count,
+    activeSession?.pathway_confidence,
+    messages.length,
+    journey?.discovery_state?.confidence,
+  ]);
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, isLoading]);
 
   useEffect(() => {
     // Only trigger if session is brand new
@@ -739,6 +786,23 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
         </button>
       </div>
 
+      {isEngagementDiscovery && (
+        <div className="shrink-0 w-full border-b border-[#E8E4DE] bg-white/80">
+          <div className="h-1 w-full bg-[#E8E4DE]/90 overflow-hidden">
+            <motion.div
+              aria-hidden
+              className="h-full bg-[#6B8F71] rounded-none"
+              initial={false}
+              animate={{ width: `${planRevealProgress}%` }}
+              transition={{ type: 'spring', stiffness: 140, damping: 22 }}
+            />
+          </div>
+          <p className="px-4 py-1 text-[9px] uppercase tracking-[0.14em] text-[#2C2A26]/40 font-semibold">
+            Your plan unlocks with the conversation
+          </p>
+        </div>
+      )}
+
       {/* Assessment/Thematic Compass UI */}
       {activeSession?.pathway === 'engagement_rapport_and_assessment' && (
         <div className="bg-[#FAF9F7] border-b border-[#E8E4DE] px-4 py-3 shrink-0">
@@ -753,7 +817,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
             {activeSession.pathway_confidence !== undefined && (
               <span className="text-[10px] uppercase font-bold text-[#6B8F71] bg-[#6B8F71]/10 px-2 py-0.5 rounded-full">
                 {activeSession.pathway_confidence < 40 ? 'Listening' :
-                  activeSession.pathway_confidence < 80 ? 'Connecting' :
+                  activeSession.pathway_confidence < THERAPY_PROPOSAL_CONFIDENCE_READY ? 'Connecting' :
                     'Formulating'}
               </span>
             )}
@@ -764,7 +828,8 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
             <span className="font-medium">{activeSession.dynamic_theme || 'Understanding your story...'}</span>
           </div>
 
-          {(activeSession.pathway_confidence !== undefined && activeSession.pathway_confidence >= 80) ||
+          {(activeSession.pathway_confidence !== undefined &&
+            activeSession.pathway_confidence >= THERAPY_PROPOSAL_CONFIDENCE_READY) ||
           activeSession.message_count >= THERAPY_PROPOSAL_MIN_MESSAGE_COUNT ? (
             <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className="pt-2 border-t border-[#E8E4DE]">
               <p className="text-sm text-[#2C2A26]/80 mb-2">
@@ -828,15 +893,21 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter' || e.shiftKey) return;
+              e.preventDefault();
+              if (!isLoading) handleSend();
+            }}
             placeholder="Type a message…"
             className="flex-1 px-4 py-2.5 text-sm bg-[#F5F0EB] rounded-full outline-none placeholder:text-[#2C2A26]/30 text-[#2C2A26]"
-            disabled={isLoading}
           />
           <button
+            type="button"
             onClick={handleSend}
             disabled={!input.trim() || isLoading}
-            className="w-9 h-9 flex items-center justify-center rounded-full bg-[#6B8F71] text-white disabled:opacity-40 transition-opacity"
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-[#6B8F71] text-white disabled:opacity-40 transition-opacity shrink-0"
+            aria-busy={isLoading}
+            title={isLoading ? 'Wait for reply…' : 'Send'}
           >
             <Send size={16} />
           </button>
