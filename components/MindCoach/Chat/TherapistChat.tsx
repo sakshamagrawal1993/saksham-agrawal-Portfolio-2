@@ -7,7 +7,6 @@ import {
   type ChatMessage as ChatMessageType,
 } from '../../../store/mindCoachStore';
 import { ChatMessage } from './ChatMessage';
-import { ExercisePlayer } from '../Exercises/ExercisePlayer';
 import { THERAPIST_CONFIG } from '../MindCoachConstants';
 
 const MOCK_REPLY =
@@ -58,8 +57,8 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
   const isSessionClose = useMindCoachStore((s) => s.isSessionClose);
   const setIsSessionClose = useMindCoachStore((s) => s.setIsSessionClose);
   const isCrisisDetected = useMindCoachStore((s) => s.isCrisisDetected);
-  const activeExercise = useMindCoachStore((s) => s.activeExercise);
   const setActiveExercise = useMindCoachStore((s) => s.setActiveExercise);
+  const setActiveExerciseMessageId = useMindCoachStore((s) => s.setActiveExerciseMessageId);
   const memories = useMindCoachStore((s) => s.memories);
   const activeTasks = useMindCoachStore((s) => s.activeTasks);
   const recentCaseNotes = useMindCoachStore((s) => s.recentCaseNotes);
@@ -148,6 +147,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
             role: 'assistant',
             content: data.reply,
             guardrail_status: data.guardrail_status ?? 'passed',
+            dynamic_content: data.dynamic_content,
             created_at: new Date().toISOString(),
           };
 
@@ -156,7 +156,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
             session_id: assistantMsg.session_id,
             role: assistantMsg.role,
             content: assistantMsg.content,
-            guardrail_status: assistantMsg.guardrail_status,
+            dynamic_content: assistantMsg.dynamic_content,
           });
 
           addMessage(assistantMsg);
@@ -183,7 +183,10 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
               e.title.toLowerCase().replace(/ /g, '_') === exerciseSlug.toLowerCase() ||
               e.title.toLowerCase().replace(/-/g, '_') === exerciseSlug.toLowerCase()
             );
-            if (exercise) setActiveExercise(exercise);
+            if (exercise) {
+              setActiveExercise(exercise);
+              setActiveExerciseMessageId(assistantMsg.id);
+            }
           }
         } catch (err) {
           console.error('Failed to trigger initial greeting:', err);
@@ -295,15 +298,16 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
         role: 'assistant',
         content: data.reply,
         guardrail_status: data.guardrail_status ?? 'passed',
+        dynamic_content: data.dynamic_content,
         created_at: new Date().toISOString(),
       };
       
       await supabase.from('mind_coach_messages').insert({
         id: assistantMsg.id,
         session_id: assistantMsg.session_id,
-        role: assistantMsg.role,
         content: assistantMsg.content,
         guardrail_status: assistantMsg.guardrail_status,
+        dynamic_content: assistantMsg.dynamic_content,
       });
       addMessage(assistantMsg);
 
@@ -330,7 +334,10 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
           e.title.toLowerCase().replace(/ /g, '_') === exerciseSlug.toLowerCase() ||
           e.title.toLowerCase().replace(/-/g, '_') === exerciseSlug.toLowerCase()
         );
-        if (exercise) setActiveExercise(exercise);
+        if (exercise) {
+          setActiveExercise(exercise);
+          setActiveExerciseMessageId(assistantMsg.id);
+        }
       }
     } catch (err) {
       console.error('Chat error:', err);
@@ -769,40 +776,6 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
         </div>
       </div>
 
-      {/* Exercise Overlay Drawer */}
-      <AnimatePresence>
-        {activeExercise && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end justify-center"
-          >
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="w-full max-w-lg bg-[#FAF9F7] rounded-t-3xl overflow-hidden shadow-2xl h-[85vh] flex flex-col"
-            >
-              {/* Close Handle / Indicator */}
-              <div className="w-full pt-3 pb-1 flex justify-center shrink-0">
-                <div 
-                  className="w-10 h-1 rounded-full bg-[#2C2A26]/10 cursor-pointer" 
-                  onClick={() => setActiveExercise(null)}
-                />
-              </div>
-
-              <div className="flex-1 overflow-hidden">
-                <ExercisePlayer 
-                  exercise={activeExercise} 
-                  onClose={() => setActiveExercise(null)} 
-                />
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 };

@@ -63,7 +63,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
             <DynamicAssessmentRenderer payload={message.dynamic_content.payload} />
           )}
           {message.dynamic_content.type === 'exercise' && (
-            <DynamicExerciseTrigger payload={message.dynamic_content.payload} />
+            <DynamicExerciseTrigger 
+              payload={message.dynamic_content.payload} 
+              messageId={message.id}
+            />
           )}
         </div>
       )}
