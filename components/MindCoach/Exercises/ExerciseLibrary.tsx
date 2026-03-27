@@ -16,7 +16,7 @@ export const ExerciseLibrary: React.FC = () => {
   const filtered = exercises.filter((e) => e.type === 'breathing' || e.type === 'grounding');
 
   if (activeExercise) {
-    return <ExercisePlayer exercise={activeExercise} onBack={() => setActiveExercise(null)} />;
+    return <ExercisePlayer exercise={activeExercise} onClose={() => setActiveExercise(null)} />;
   }
 
   return (

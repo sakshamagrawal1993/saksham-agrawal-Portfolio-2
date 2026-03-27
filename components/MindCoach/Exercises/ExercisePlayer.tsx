@@ -5,6 +5,32 @@ import { BreathingGuide } from './BreathingGuide.tsx';
 import { GroundingSteps } from './GroundingSteps.tsx';
 import { type Exercise } from '../../../store/mindCoachStore';
 
+const EMPTY_STEPS: Exercise['steps'] = [];
+
+interface ExercisePlayerShellProps {
+  isInline: boolean;
+  containerClassName: string;
+  children: React.ReactNode;
+}
+
+function ExercisePlayerShell({ isInline, containerClassName, children }: ExercisePlayerShellProps) {
+  if (isInline) {
+    return <div className={containerClassName}>{children}</div>;
+  }
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        className={containerClassName}
+      >
+        {children}
+      </motion.div>
+    </div>
+  );
+}
+
 interface ExercisePlayerProps {
   exercise: Exercise;
   onClose: () => void;
@@ -18,7 +44,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({ exercise, onClos
   const [timeLeft, setTimeLeft] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
 
-  const steps = exercise.steps || [];
+  const steps = exercise.steps?.length ? exercise.steps : EMPTY_STEPS;
   const currentStep = steps[currentStepIndex];
 
   const timerRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -65,7 +91,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({ exercise, onClos
         setTimeLeft(steps[0].duration);
       }
     }
-  }, [timeLeft, isPlaying, isFinished, currentStepIndex, steps]);
+  }, [timeLeft, isPlaying, isFinished, currentStepIndex, exercise.id, steps.length]);
 
   const handleReset = () => {
     setIsPlaying(false);
@@ -121,24 +147,8 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({ exercise, onClos
     ? "w-full bg-[#FAFAF7] rounded-3xl border border-[#E8E4DE] overflow-hidden flex flex-col min-h-[400px]"
     : "relative w-full max-w-lg bg-[#FAFAF7] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col min-h-[500px]";
 
-  const PlayerWrapper = ({ children }: { children: React.ReactNode }) => {
-    if (isInline) return <div className={containerClasses}>{children}</div>;
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className={containerClasses}
-        >
-          {children}
-        </motion.div>
-      </div>
-    );
-  };
-
   return (
-    <PlayerWrapper>
+    <ExercisePlayerShell isInline={isInline} containerClassName={containerClasses}>
         {/* Header */}
         <div className={`px-6 pt-6 pb-2 flex items-center justify-between ${isInline ? 'bg-white/50 backdrop-blur-sm sticky top-0 z-20' : ''}`}>
           <div className="space-y-1">
@@ -235,6 +245,6 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({ exercise, onClos
             </button>
           </div>
         )}
-    </PlayerWrapper>
+    </ExercisePlayerShell>
   );
 };

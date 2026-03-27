@@ -22,6 +22,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   const isUser = message.role === 'user';
   if (message.role === 'system') return null;
 
+  const bubbleTone = isUser
+    ? 'bg-[#6B8F71] text-white rounded-br-md'
+    : 'bg-white text-[#2C2A26] border border-[#E8E4DE] rounded-bl-md';
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -42,31 +46,37 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
         </div>
       )}
 
-      <div
-        className={`max-w-[75%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${isUser
-            ? 'bg-[#6B8F71] text-white rounded-br-md'
-            : 'bg-white text-[#2C2A26] border border-[#E8E4DE] rounded-bl-md'
-          }`}
-      >
-        {message.content}
-      </div>
-
-      {!isUser && message.dynamic_content && (
-        <div className="w-full mt-1 mb-2">
-          {message.dynamic_content.type === 'video' && (
-            <DynamicVideoRenderer payload={message.dynamic_content.payload} />
-          )}
-          {message.dynamic_content.type === 'game' && (
-            <DynamicGameRenderer payload={message.dynamic_content.payload} />
-          )}
-          {message.dynamic_content.type === 'assessment' && (
-            <DynamicAssessmentRenderer payload={message.dynamic_content.payload} />
-          )}
-          {message.dynamic_content.type === 'exercise' && (
-            <DynamicExerciseTrigger 
-              payload={message.dynamic_content.payload} 
-              messageId={message.id}
-            />
+      {isUser ? (
+        <div
+          className={`max-w-[75%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${bubbleTone}`}
+        >
+          {message.content}
+        </div>
+      ) : (
+        <div className="flex min-w-0 max-w-[75%] flex-col gap-4">
+          <div
+            className={`w-fit max-w-full rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${bubbleTone}`}
+          >
+            {message.content}
+          </div>
+          {message.dynamic_content && (
+            <div className="w-full">
+              {message.dynamic_content.type === 'video' && (
+                <DynamicVideoRenderer payload={message.dynamic_content.payload} />
+              )}
+              {message.dynamic_content.type === 'game' && (
+                <DynamicGameRenderer payload={message.dynamic_content.payload} />
+              )}
+              {message.dynamic_content.type === 'assessment' && (
+                <DynamicAssessmentRenderer payload={message.dynamic_content.payload} />
+              )}
+              {(message.dynamic_content.type === 'exercise' || message.dynamic_content.type === 'exercise_card') && (
+                <DynamicExerciseTrigger
+                  payload={message.dynamic_content.payload}
+                  messageId={message.id}
+                />
+              )}
+            </div>
           )}
         </div>
       )}

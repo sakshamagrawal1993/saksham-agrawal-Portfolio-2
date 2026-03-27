@@ -1,0 +1,586 @@
+{
+  "name": "Mind Coach - Therapist Chat & Discovery (v6 Robust)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mind-coach-chat",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "f3c103ff-9ff8-4463-9aa9-78050eff76f3",
+      "name": "Webhook1",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [
+        256,
+        10784
+      ],
+      "webhookId": "47cb2cec-3dba-4015-a306-22faf01c6988"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=\n# Current User Message\n{{ $json.message_text }}\n\n# Previous Transcript\n{{ $json.messages }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a crisis safety screening AI for a mental health application.\n\nAnalyze the user's latest message for immediate risk signals:\n- Suicidal ideation with concrete intent or plan\n- Active self-harm behavior\n- Imminent danger to self or others\n\nDo NOT flag:\n- General sadness, hopelessness, or vague distress\n- Expressions like 'I want to disappear' or 'I can't take this anymore' without concrete intent\n- Past tense descriptions of difficult experiences\n\n- Use the transcript for getting additional context, if required\n\nYou must return a structured JSON response. You should give a reply in case crisis is detected. "
+        }
+      },
+      "id": "1dc3ac82-3dc2-46a7-9c1f-78e04f7b45cc",
+      "name": "Crisis Screening Agent1",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        544,
+        10784
+      ]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "options": {
+          "temperature": 0
+        }
+      },
+      "id": "64be1728-ade9-402e-9f94-7d3de68d7cd0",
+      "name": "Crisis Model (GPT-4o-mini)1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [
+        448,
+        11008
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "F8K5WXRWzmnY0vcZ",
+          "name": "Saksham OpenAI Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"crisis_detected\": false,\n  \"crisis_type\": \"none\",\n  \"reply\": \"I feel you are facing a crisis. Let me guide you to reach out helplines near you\"\n}"
+      },
+      "id": "38933196-c357-4355-bd49-7cf9e3492b4d",
+      "name": "Crisis Output Parser1",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        640,
+        11008
+      ]
+    },
+    {
+      "parameters": {
+        "dataType": "boolean",
+        "value1": "={{ $json.output.crisis_detected }}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "={{ true }}"
+            }
+          ]
+        },
+        "fallbackOutput": 1
+      },
+      "id": "3ac10c91-4cc6-4588-8d0e-1601b1f82ac3",
+      "name": "Is Crisis?1",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        816,
+        10784
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { crisis_detected: true, crisis_type: $json.output.crisis_type, reply: $json.output.reply || 'I hear how much pain you are in right now. Your safety matters deeply to me. Please reach out to a crisis line — iCall: 9152987821 or iCall chat at icallhelpline.org. I am here with you.' } }}",
+        "options": {}
+      },
+      "id": "deac62b3-8170-479b-9b75-daca338684ff",
+      "name": "Return Crisis Alert1",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1056,
+        10544
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * PROMPT BUILDER (v6)\n * Fixes invalid JS from v5; adds strict JSON rules for structured parser.\n */\n\nconst webhookNode = $(\"Webhook1\").first();\nif (!webhookNode) throw new Error(\"Webhook node not found.\");\n\nconst data = webhookNode.json.body || webhookNode.json || {};\n\nconst pd = data.profile || {};\nconst memories = data.memories || [];\nconst activeTasks = data.recent_tasks_assigned || [];\nconst messages = data.messages || [];\n\nconst coachPrompt = data.coach_prompt || \"You are an empathetic, non-judgmental mental health coach.\";\nconst phasePrompt = data.phase_prompt || \"Focus on building therapeutic rapport.\";\nconst theme = data.dynamic_theme || \"Not yet identified\";\nconst messageCount = data.message_count || 1;\nconst profileId = data.profile_id || \"\";\nconst sessionId = data.session_id || \"\";\nconst isGreeting = data.is_system_greeting || false;\n\nconst personalDetails = [\n  \"Name: \" + (pd.name || \"Unknown\"),\n  \"Age: \" + (pd.age || \"Unknown\"),\n  \"Gender: \" + (pd.gender || \"Unknown\"),\n  \"Concerns: \" + (Array.isArray(pd.concerns) ? pd.concerns.join(\", \") : pd.concerns || \"Not specified\"),\n].join(\"\\n\");\n\nconst mem0 = memories[0];\nconst memoriesStr = mem0\n  ? String(mem0.memory_text || mem0.text || \"\")\n  : \"  None recorded.\";\n\nconst transcript = messages\n  .slice(-15)\n  .map(\n    (m) =>\n      \"  \" + (m.role === \"user\" ? \"Client\" : \"Therapist\") + \": \" + String(m.content || \"\")\n  )\n  .join(\"\\n\");\n\nlet pacingInstruction = \"\";\nlet shouldRunDiscovery = false;\n\nif (isGreeting) {\n  pacingInstruction =\n    \"\\n[GREETING]\\nGreet \" +\n    (pd.name || \"there\") +\n    \" warmly. Introduce yourself. Reference their concerns. Set is_session_close to false.\";\n} else if (messageCount >= 3 && messageCount % 5 === 0) {\n  pacingInstruction =\n    \"\\n[SYSTEM] Turn \" +\n    messageCount +\n    \". Recommend a clinical pathway. Set is_session_close to false.\";\n  shouldRunDiscovery = true;\n}\n\nconst systemPrompt = [\n  coachPrompt,\n  \"\",\n  phasePrompt,\n  \"\",\n  \"### MEMORY (CRITICAL)\",\n  \"1. Keep one consolidated clinical memory for the client.\",\n  \"2. When the client shares a significant persistent fact, update that memory.\",\n  '3. Call \"Save Clinical Memory\" with the FULL merged memory_text, profile_id, source_session_id, memory_type \"life_context\".',\n  \"\",\n  \"[CLIENT PROFILE]\",\n  personalDetails,\n  \"\",\n  \"[CONSOLIDATED CLINICAL MEMORY]\",\n  memoriesStr,\n  \"\",\n  \"[CURRENT CLINICAL THEME]\",\n  theme,\n  \"\",\n  \"[DYNAMIC EXERCISE LIBRARY]\",\n  \"- Breathing: box_breathing, 4_7_8_breathing, diaphragmatic_breathing\",\n  \"- Grounding: 5_4_3_2_1_senses, body_scan, progressive_muscle_relaxation\",\n  \"- Meditation: calm_mind, focus_anchor, sleep_wind_down, gratitude_reflection\",\n  \"\",\n  \"### EXERCISE TRIGGER\",\n  \"For acute anxiety/panic/stress, suggest a relevant exercise.\",\n  'Set dynamic_in_chat_exercise to the EXERCISE_ID or JSON null.',\n  'If you include dynamic_content, use type \"exercise\" or \"exercise_card\" and payload = same id.',\n  \"\",\n  \"[SESSION TRANSCRIPT (last 15)]\",\n  transcript,\n  \"\",\n  pacingInstruction,\n  \"\",\n  \"### STRICT STRUCTURED OUTPUT (READ CAREFULLY)\",\n  \"After any tool calls, your FINAL assistant message must be valid JSON ONLY (no markdown fences, no prose outside JSON).\",\n  \"Either:\",\n  \"  A) Top-level keys: reply (string), is_session_close (boolean), dynamic_in_chat_exercise (string or null). Optional dynamic_content: { type, payload }.\",\n  \"  OR B) One top-level key \\\"output\\\" whose value is that same object.\",\n  'dynamic_content.type must be exactly \\\"exercise\\\" or \\\"exercise_card\\\".',\n  \"Use JSON null for dynamic_in_chat_exercise when no exercise (not the string \\\"null\\\").\",\n  \"\",\n  \"### OPERATIONAL PROTOCOL\",\n  \"1. Detect new significant facts.\",\n  '2. If needed, CALL \"Save Clinical Memory\" first.',\n  \"3. Then emit ONLY the final JSON as specified above.\",\n].join(\"\\n\");\n\nreturn [\n  {\n    json: {\n      systemPrompt,\n      userMessage: data.message_text || \"\",\n      profileId,\n      sessionId,\n      shouldRunDiscovery,\n      messageCount,\n    },\n  },\n];"
+      },
+      "id": "9e7b15dc-78e6-4efa-9acc-7501750af34d",
+      "name": "Prompt Builder1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1056,
+        10912
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.userMessage }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "={{ $json.systemPrompt }}"
+        }
+      },
+      "id": "ba69e608-72f1-4504-8d64-ffe4f29103c9",
+      "name": "Therapist Agent1",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        1344,
+        10912
+      ]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4.1",
+        "options": {
+          "maxTokens": 1200,
+          "temperature": 0.45
+        }
+      },
+      "id": "86dc074f-7d86-45b9-a35d-32a281a9ed61",
+      "name": "Therapist Model (GPT-4o)1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        11136
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "F8K5WXRWzmnY0vcZ",
+          "name": "Saksham OpenAI Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"oneOf\": [\n    {\n      \"type\": \"object\",\n      \"additionalProperties\": true,\n      \"properties\": {\n        \"reply\": {\n          \"type\": \"string\",\n          \"description\": \"Single conversational paragraph; therapeutic tone; ends with a gentle reflection or question.\"\n        },\n        \"is_session_close\": {\n          \"type\": \"boolean\"\n        },\n        \"dynamic_in_chat_exercise\": {\n          \"description\": \"Catalog exercise id (e.g. box_breathing) or JSON null when no exercise.\",\n          \"anyOf\": [\n            {\n              \"type\": \"string\"\n            },\n            {\n              \"type\": \"null\"\n            }\n          ]\n        },\n        \"dynamic_content\": {\n          \"type\": \"object\",\n          \"additionalProperties\": false,\n          \"properties\": {\n            \"type\": {\n              \"type\": \"string\",\n              \"enum\": [\n                \"exercise\",\n                \"exercise_card\"\n              ]\n            },\n            \"payload\": {\n              \"type\": \"string\"\n            }\n          },\n          \"required\": [\n            \"type\",\n            \"payload\"\n          ]\n        }\n      },\n      \"required\": [\n        \"reply\",\n        \"is_session_close\",\n        \"dynamic_in_chat_exercise\"\n      ]\n    },\n    {\n      \"type\": \"object\",\n      \"additionalProperties\": true,\n      \"properties\": {\n        \"output\": {\n          \"type\": \"object\",\n          \"additionalProperties\": true,\n          \"properties\": {\n            \"reply\": {\n              \"type\": \"string\"\n            },\n            \"is_session_close\": {\n              \"type\": \"boolean\"\n            },\n            \"dynamic_in_chat_exercise\": {\n              \"anyOf\": [\n                {\n                  \"type\": \"string\"\n                },\n                {\n                  \"type\": \"null\"\n                }\n              ]\n            },\n            \"dynamic_content\": {\n              \"type\": \"object\",\n              \"properties\": {\n                \"type\": {\n                  \"type\": \"string\",\n                  \"enum\": [\n                    \"exercise\",\n                    \"exercise_card\"\n                  ]\n                },\n                \"payload\": {\n                  \"type\": \"string\"\n                }\n              },\n              \"required\": [\n                \"type\",\n                \"payload\"\n              ]\n            }\n          },\n          \"required\": [\n            \"reply\",\n            \"is_session_close\",\n            \"dynamic_in_chat_exercise\"\n          ]\n        }\n      },\n      \"required\": [\n        \"output\"\n      ]\n    }\n  ]\n}"
+      },
+      "id": "85b6ca62-a478-49aa-9937-33f9677cd2f9",
+      "name": "Therapist Output Parser1",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        1584,
+        11152
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "=rules",
+        "dataType": "boolean",
+        "value1": "={{ $node[\"Prompt Builder1\"].json.shouldRunDiscovery }}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "={{ true }}"
+            }
+          ]
+        },
+        "fallbackOutput": 1
+      },
+      "id": "05cf885d-ee7d-4bc5-b809-148c18ba91fb",
+      "name": "Is Assessment Phase?1",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        1616,
+        10912
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ 'Full session transcript:\\n' + ($('Webhook1').item.json.body?.messages || $('Webhook1').item.json.messages || []).slice(-20).map(m => (m.role === 'user' ? 'Client' : 'Therapist') + ': ' + m.content).join('\\n') + '\\n\\nTherapist latest reply: ' + ($json.output?.reply || $json.output?.output?.reply || (typeof $json.output === 'string' ? $json.output : '')) }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a silent clinical intake classifier for a mental health AI. You do NOT speak to the client. Your job is to silently analyze the conversation and determine the most likely clinical pathway.\n\nAvailable pathway IDs (choose EXACTLY ONE from this list):\n- engagement_rapport_and_assessment\n- family_conflict_and_dynamics\n- crisis_intervention_and_suicide_prevention\n- sleep_and_insomnia\n- overthinking_rumination_and_cognitive_restructuring\n- depression_and_behavioral_activation\n- social_anxiety_and_isolation\n- panic_and_physical_anxiety_symptoms\n- abuse_and_safety\n- relationship_conflict_and_interpersonal\n- emotion_regulation_and_distress_tolerance\n- self_worth_and_self_esteem\n- anger_management\n- trauma_processing_and_ptsd\n- grief_and_loss_processing\n- health_anxiety_and_somatic_symptoms\n- identity_and_self_concept\n- anxiety_and_stress_management\n- boundary_setting_and_assertiveness\n- life_transition_and_adjustment\n\nIMPORTANT: You MUST return a pathway ID from the above list EXACTLY as written. Do not invent new IDs.\n\nConfidence scoring rubric:\n- Below 30: user is deflecting, off-topic, or the clinical topic is completely unclear\n- 30-69: emerging clinical pattern, continue gathering information\n- 70-84: strong signal detected, almost ready to assign pathway\n- 85+: high confidence, safe to assign this pathway permanently\n\nReturn a structured JSON response."
+        }
+      },
+      "id": "acb5d7b1-eed2-4a65-8423-08f03b70661b",
+      "name": "Discovery Agent1",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        1904,
+        10576
+      ]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "options": {
+          "temperature": 0.1
+        }
+      },
+      "id": "fba28bd4-7fc1-4838-8584-4bca95da22bd",
+      "name": "Discovery Model (GPT-4o-mini)1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [
+        1856,
+        10800
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "F8K5WXRWzmnY0vcZ",
+          "name": "Saksham OpenAI Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"dynamic_theme\": \"Workplace Anxiety & Burnout\",\n  \"suggested_pathway\": \"anxiety_and_stress_management\",\n  \"pathway_confidence\": 72\n}"
+      },
+      "id": "81767af5-6187-49a4-b564-facf634a7ee6",
+      "name": "Discovery Output Parser1",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        2000,
+        10800
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * FORMAT FINAL RESPONSE (v6)\n * Unwraps therapist parser output whether flat or nested under \"output\".\n * Normalizes dynamic_content.type exercise_card -> exercise for API consistency.\n */\n\nconst webhookNode = $(\"Webhook1\").first();\nconst therapistNode = $(\"Therapist Agent1\").first();\nif (!therapistNode) throw new Error(\"Therapist Agent output not found.\");\n\nconst data = webhookNode.json.body || webhookNode.json || {};\nconst rawOutput = therapistNode.json.output;\n\nfunction unwrapTherapist(o) {\n  if (o == null || typeof o !== \"object\") return {};\n  if (typeof o.reply === \"string\" || typeof o.is_session_close === \"boolean\") return o;\n  if (o.output && typeof o.output === \"object\") {\n    const inner = o.output;\n    if (typeof inner.reply === \"string\" || typeof inner.is_session_close === \"boolean\") return inner;\n  }\n  return o;\n}\n\nlet therapistOutput = unwrapTherapist(rawOutput);\nif (typeof rawOutput === \"string\") {\n  therapistOutput = { reply: rawOutput };\n}\n\nconst reply =\n  therapistOutput.reply || (typeof rawOutput === \"string\" ? rawOutput : \"\");\n\nlet dynamicContent = therapistOutput.dynamic_content || null;\nif (dynamicContent && dynamicContent.type === \"exercise_card\") {\n  dynamicContent = { ...dynamicContent, type: \"exercise\" };\n}\n\nconst slug =\n  therapistOutput.dynamic_in_chat_exercise ?? dynamicContent?.payload ?? null;\n\nconst finalResponse = {\n  reply,\n  session_state: data.session_state || \"active\",\n  pathway: data.pathway || \"engagement_rapport_and_assessment\",\n  is_session_close: therapistOutput.is_session_close === true,\n  dynamic_in_chat_exercise: slug,\n  guardrail_status: \"passed\",\n  crisis_detected: false,\n};\n\nif (dynamicContent) {\n  finalResponse.dynamic_content = dynamicContent;\n}\n\ntry {\n  const discoveryNode = $(\"Discovery Agent1\").first();\n  if (discoveryNode?.json?.output && typeof discoveryNode.json.output === \"object\") {\n    const disc = discoveryNode.json.output;\n    if (disc.dynamic_theme != null) finalResponse.dynamic_theme = disc.dynamic_theme;\n    if (disc.suggested_pathway != null) finalResponse.suggested_pathway = disc.suggested_pathway;\n    if (typeof disc.pathway_confidence === \"number\")\n      finalResponse.pathway_confidence = disc.pathway_confidence;\n  }\n} catch (e) {}\n\nreturn [{ json: finalResponse }];"
+      },
+      "id": "0159b424-b8b3-4373-a2b0-6cbed1fa9556",
+      "name": "Format Final Response1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2176,
+        10912
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $item(0).$json }}",
+        "options": {}
+      },
+      "id": "4c629dd1-a0b3-44d3-ae52-e3b45b5eb429",
+      "name": "Respond to Webhook1",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        2416,
+        10912
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": "mind_coach_memories"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "memory_text": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('memory_text', ``, 'string') }}",
+            "memory_type": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('memory_type', ``, 'string') }}",
+            "source_session_id": "={{ $json.sessionId }}",
+            "profile_id": "={{ $json.profileId }}",
+            "id": "={{ $json.profileId }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "profile_id",
+              "displayName": "profile_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "removed": false
+            },
+            {
+              "id": "memory_text",
+              "displayName": "memory_text",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "removed": false
+            },
+            {
+              "id": "memory_type",
+              "displayName": "memory_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "removed": false
+            },
+            {
+              "id": "source_session_id",
+              "displayName": "source_session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "removed": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [
+        1440,
+        11136
+      ],
+      "id": "2a594244-4f9e-4e35-8346-f07486ec72e3",
+      "name": "Save Clinical Memory",
+      "description": "Upserts the user's consolidated clinical memory block in mind_coach_memories. Call this whenever the client shares a significant, persistent fact. Pass the FULL merged memory_text (not just the new fact), the profile_id, and the source_session_id.",
+      "credentials": {
+        "postgres": {
+          "id": "TzhNsURks708nQk6",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook1": {
+      "main": [
+        [
+          {
+            "node": "Crisis Screening Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crisis Screening Agent1": {
+      "main": [
+        [
+          {
+            "node": "Is Crisis?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crisis Model (GPT-4o-mini)1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Crisis Screening Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crisis Output Parser1": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Crisis Screening Agent1",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Crisis?1": {
+      "main": [
+        [
+          {
+            "node": "Return Crisis Alert1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prompt Builder1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prompt Builder1": {
+      "main": [
+        [
+          {
+            "node": "Therapist Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Therapist Agent1": {
+      "main": [
+        [
+          {
+            "node": "Is Assessment Phase?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Therapist Model (GPT-4o)1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Therapist Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Therapist Output Parser1": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Therapist Agent1",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Assessment Phase?1": {
+      "main": [
+        [
+          {
+            "node": "Discovery Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Final Response1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Discovery Agent1": {
+      "main": [
+        [
+          {
+            "node": "Format Final Response1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Discovery Model (GPT-4o-mini)1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Discovery Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Discovery Output Parser1": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Discovery Agent1",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Final Response1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Clinical Memory": {
+      "ai_tool": [
+        [
+          {
+            "node": "Therapist Agent1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "a76c1fb9-2f89-473c-8d04-49554e8e0bb4",
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "8a978da95893c3fc02d70fed7b06e199b5a4a4f765b9fd7eddf66f500f28fa0e"
+  },
+  "id": "EBo9At6eCh0S7vkM",
+  "tags": []
+}
