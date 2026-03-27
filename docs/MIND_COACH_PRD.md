@@ -111,15 +111,15 @@ Mind Coach is a **web-based, AI-assisted mental wellness companion** embedded in
 **Discovery UI (engagement pathway only):**
 
 - “Clinical insight” strip: dynamic theme, pathway confidence bands (Listening / Connecting / Formulating).  
-- **Progress bar** toward plan reveal: linear to **30 messages**; if confidence &lt; 80 at 30, bar **90%** then +2% per **5** further messages until 100%.  
-- **Therapy proposal** CTA when confidence ≥ 80 **or** message count ≥ 30 → opens `PlanProposalModal` (bottom drawer).  
+- **Progress bar** toward plan reveal: linear to **20 messages**; if confidence &lt; 80 at 20, bar **90%** then +2% per **5** further messages until 100%.
+- **Therapy proposal** CTA when confidence ≥ 80 **or** message count ≥ 20 → opens `PlanProposalModal` (bottom drawer).
 - **End session** → `mind-coach-session-end` edge function (n8n summarizer) or **dummy summary** + client completes session if edge fails.
 
 **Crisis:** `TherapistChat` can set crisis state from n8n flags → **full-screen overlay** with **iCall** (India) phone + web — **not localized** for other regions.
 
 **UX gaps:**
 
-- **Progress legend (addressed in v1.1):** discovery strip includes plain-language copy for **~30 messages**, **confidence threshold (80%)**, and the **90% + ~every 5 messages** rule.  
+- **Progress legend (addressed in v1.1):** discovery pacing aligns with **~20 messages** (and n8n), **confidence threshold (80%)**, and the **90% + ~every 5 messages** rule where applicable.  
 - **Errors / retry (addressed in v1.1):** failed user save, n8n, assistant save, or initial greeting surface an **alert** with **Retry** / **Dismiss** (no silent fallback assistant message).  
 - **No typing indicator** from therapist persona name in header during wait (only dots in thread).  
 - **Reload** mid-session: messages come from DB — any **only-local** state is lost.
@@ -232,11 +232,11 @@ Mind Coach is a **web-based, AI-assisted mental wellness companion** embedded in
 
 - Workflow JSON under `n8n/` (e.g. `mind-coach-therapist-chat-v6-robust.json`).  
 - **Patch script:** `n8n/patch-mind-coach-v6.mjs`.  
-- Env expectations: discovery pacing (e.g. ≥30 messages, every 5), structured JSON output, session-end summarizer webhook for edge function.
+- Env expectations: discovery pacing (e.g. ≥20 messages / turns, every 5), structured JSON output, session-end summarizer webhook for edge function.
 
 ### 6.5 Constants (product tuning)
 
-- `THERAPY_PROPOSAL_MIN_MESSAGE_COUNT` = 30  
+- `THERAPY_PROPOSAL_MIN_MESSAGE_COUNT` = 20  
 - `THERAPY_PROPOSAL_CONFIDENCE_READY` = 80  
 - Proposal hero image: Supabase public URL in `MindCoachConstants.ts`
 

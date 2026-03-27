@@ -1,7 +1,7 @@
 import { TherapistPersona } from '../../store/mindCoachStore';
 
-/** Total chat messages (user + assistant) in session before we emphasize the therapy pathway proposal in UI. Aligns with n8n discovery pacing when using the v6 workflow (≥30 and every 5 messages). */
-export const THERAPY_PROPOSAL_MIN_MESSAGE_COUNT = 30;
+/** Total chat messages (user + assistant) in session before we emphasize the therapy pathway proposal in UI. Aligns with n8n discovery pacing (e.g. v6 workflow: ≥20 turns and every 5 messages). */
+export const THERAPY_PROPOSAL_MIN_MESSAGE_COUNT = 20;
 
 /** Pathway confidence at or above this is treated as “ready” for plan formulation (matches discovery UI labels). */
 export const THERAPY_PROPOSAL_CONFIDENCE_READY = 80;
