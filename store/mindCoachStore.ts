@@ -51,6 +51,7 @@ export type TaskType =
 
 export type TabId =
   | 'home'
+  | 'journey'
   | 'sessions'
   | 'assessments'
   | 'journal'

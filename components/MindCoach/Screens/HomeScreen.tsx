@@ -230,7 +230,16 @@ export const HomeScreen: React.FC = () => {
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.05 }}
-          className="bg-white rounded-2xl p-5 shadow-sm border border-[#E8E4DE]"
+          className="bg-white rounded-2xl p-5 shadow-sm border border-[#E8E4DE] cursor-pointer hover:border-[#6B8F71]/35 transition-colors"
+          role="button"
+          tabIndex={0}
+          onClick={() => setActiveTab('journey')}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setActiveTab('journey');
+            }
+          }}
         >
           {/* Horizontal 5-phase stepper */}
           <div className="flex items-center gap-1 mb-5">
@@ -304,7 +313,10 @@ export const HomeScreen: React.FC = () => {
             </div>
 
             <button
-              onClick={handleContinueWithTherapist}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleContinueWithTherapist();
+              }}
               disabled={isContinuingSession}
               className="w-full py-3 rounded-xl bg-[#6B8F71] text-white font-semibold text-sm hover:bg-[#5A7D60] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
             >
@@ -321,7 +333,16 @@ export const HomeScreen: React.FC = () => {
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.05 }}
-          className="bg-white rounded-2xl p-5 shadow-sm border border-[#E8E4DE]"
+          className="bg-white rounded-2xl p-5 shadow-sm border border-[#E8E4DE] cursor-pointer hover:border-[#6B8F71]/35 transition-colors"
+          role="button"
+          tabIndex={0}
+          onClick={() => setActiveTab('journey')}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setActiveTab('journey');
+            }
+          }}
         >
           <div className="space-y-3">
             <div>
@@ -354,7 +375,10 @@ export const HomeScreen: React.FC = () => {
             </div>
 
             <button
-              onClick={handleContinueWithTherapist}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleContinueWithTherapist();
+              }}
               disabled={isContinuingSession}
               className="w-full py-3 rounded-xl bg-[#6B8F71] text-white font-semibold text-sm hover:bg-[#5A7D60] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
             >

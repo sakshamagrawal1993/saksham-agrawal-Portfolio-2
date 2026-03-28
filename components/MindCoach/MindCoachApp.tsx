@@ -7,6 +7,7 @@ import { BottomNav } from './BottomNav';
 import { PhoneFrame } from './shared/PhoneFrame';
 import { HomeScreen } from './Screens/HomeScreen';
 import { SessionsScreen } from './Screens/SessionsScreen';
+import { JourneyScreen } from './Screens/JourneyScreen';
 import { AssessmentsScreen } from './Screens/AssessmentsScreen';
 import { JournalScreen } from './Screens/JournalScreen';
 import { DiaryScreen } from './Screens/DiaryScreen';
@@ -22,6 +23,8 @@ function TabContent({ tab }: { tab: TabId }) {
       return <HomeScreen />;
     case 'sessions':
       return <SessionsScreen />;
+    case 'journey':
+      return <JourneyScreen />;
     case 'assessments':
       return <AssessmentsScreen />;
     case 'journal':

@@ -16,6 +16,10 @@ export const JourneyScreen: React.FC = () => {
   const currentPhase = useMindCoachStore((s) => s.currentPhaseNumber());
 
   const phases = journey?.phases ?? [];
+  const plannedSessions = phases.reduce((sum, phase) => sum + Math.max(1, phase.sessions?.length ?? 1), 0);
+  const completedSessions = sessions.filter((s) => s.session_state === 'completed');
+  const overallProgressPercent =
+    plannedSessions > 0 ? Math.min(100, Math.round((completedSessions.length / plannedSessions) * 100)) : 0;
 
   if (!journey || phases.length === 0) {
     return (
@@ -32,7 +36,22 @@ export const JourneyScreen: React.FC = () => {
   return (
     <div className="p-5 pb-4">
       <h2 className="text-xl font-semibold text-[#2C2A26] mb-1">Your Journey</h2>
-      <p className="text-sm text-[#2C2A26]/40 mb-6">{journey.title}</p>
+      <p className="text-sm text-[#2C2A26]/60">{journey.title}</p>
+      {journey.description && (
+        <p className="text-xs text-[#2C2A26]/45 mt-1 mb-4 leading-relaxed">{journey.description}</p>
+      )}
+      <div className="mb-6 p-4 rounded-2xl border border-[#E8E4DE] bg-white">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-[#2C2A26]/40 mb-2">Overall progress</p>
+        <div className="flex items-center justify-between text-sm mb-2">
+          <span className="text-[#2C2A26]/70">
+            {completedSessions.length}/{plannedSessions} sessions completed
+          </span>
+          <span className="font-semibold text-[#2C2A26]">{overallProgressPercent}%</span>
+        </div>
+        <div className="h-1.5 w-full bg-[#E8E4DE] rounded-full overflow-hidden">
+          <div className="h-full bg-[#6B8F71] rounded-full" style={{ width: `${overallProgressPercent}%` }} />
+        </div>
+      </div>
       {journey.phase_transition_result && journey.phase_transition_result.progression_enabled !== false && (
         <div className="mb-4 p-3 rounded-xl border border-[#E8E4DE] bg-white text-xs text-[#2C2A26]/65">
           {journey.phase_transition_result.advanced
@@ -42,6 +61,7 @@ export const JourneyScreen: React.FC = () => {
       )}
 
       <div className="relative">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-[#2C2A26]/40 mb-3">Four phases</p>
         {phases.map((phase, idx) => {
           const phaseNum = phase.phase_number;
           const isCompleted = phaseNum < currentPhase;
@@ -166,6 +186,44 @@ export const JourneyScreen: React.FC = () => {
             </motion.div>
           );
         })}
+      </div>
+      <div className="mt-6">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-[#2C2A26]/40 mb-3">Session history</p>
+        {completedSessions.length === 0 ? (
+          <div className="rounded-2xl border border-[#E8E4DE] bg-white p-4">
+            <p className="text-sm text-[#2C2A26]/55">No completed sessions yet.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {completedSessions.slice().sort((a, b) => {
+              const ta = new Date(a.ended_at || a.started_at).getTime();
+              const tb = new Date(b.ended_at || b.started_at).getTime();
+              return tb - ta;
+            }).map((session) => {
+              const summary = session.summary_data as Record<string, unknown> | null;
+              const opening =
+                summary && typeof summary.opening_reflection === 'string'
+                  ? summary.opening_reflection
+                  : null;
+              return (
+                <div key={session.id} className="rounded-2xl border border-[#E8E4DE] bg-white p-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-[#2C2A26]">
+                      {session.dynamic_theme || `Session ${session.session_number}`}
+                    </p>
+                    <p className="text-[11px] text-[#2C2A26]/40">
+                      {new Date(session.ended_at || session.started_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </p>
+                  </div>
+                  <p className="text-xs text-[#2C2A26]/45 mt-0.5">Phase {session.phase_number}</p>
+                  {opening && (
+                    <p className="text-xs text-[#2C2A26]/60 mt-2 line-clamp-2">{opening}</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
