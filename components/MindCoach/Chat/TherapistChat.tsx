@@ -311,16 +311,14 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
       coach_prompt: coachPrompt,
       phase_prompt: phasePrompt,
       message_count: sess.message_count,
+      client_managed_persistence: true,
     };
 
-    const response = await fetch('https://n8n.saksham-experiments.com/webhook/mind-coach-chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(n8nPayload),
+    const { data: chatData, error: chatErr } = await supabase.functions.invoke('mind-coach-chat', {
+      body: n8nPayload,
     });
-
-    if (!response.ok) throw new Error(`Coach service unreachable (${response.status}). Try again.`);
-    const data = normalizeN8nChatPayload(await response.json());
+    if (chatErr) throw new Error(`Coach service unreachable. ${chatErr.message || 'Try again.'}`);
+    const data = normalizeN8nChatPayload(chatData);
 
     if (!data?.reply) throw new Error('No reply from coach. Try again.');
 
@@ -487,19 +485,18 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
         coach_prompt: coachPrompt,
         phase_prompt: phasePrompt,
         message_count: newCount,
+        client_managed_persistence: true,
       };
 
-      const response = await fetch('https://n8n.saksham-experiments.com/webhook/mind-coach-chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(n8nPayload),
+      const { data: chatData, error: chatErr } = await supabase.functions.invoke('mind-coach-chat', {
+        body: n8nPayload,
       });
 
-      if (!response.ok) {
+      if (chatErr) {
         sendRetryModeRef.current = 'n8n_only';
-        throw new Error(`Coach unreachable (${response.status}). Tap Retry to fetch a reply.`);
+        throw new Error(`Coach unreachable. ${chatErr.message || 'Tap Retry to fetch a reply.'}`);
       }
-      const data = normalizeN8nChatPayload(await response.json());
+      const data = normalizeN8nChatPayload(chatData);
       if (!data?.reply) {
         sendRetryModeRef.current = 'n8n_only';
         throw new Error('No reply from coach. Tap Retry.');
@@ -643,18 +640,16 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
           coach_prompt: coachPrompt,
           phase_prompt: phasePrompt,
           message_count: messageCount,
+          client_managed_persistence: true,
         };
 
-        const response = await fetch('https://n8n.saksham-experiments.com/webhook/mind-coach-chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(n8nPayload),
+        const { data: chatData, error: chatErr } = await supabase.functions.invoke('mind-coach-chat', {
+          body: n8nPayload,
         });
-
-        if (!response.ok) {
-          throw new Error(`Coach unreachable (${response.status}). Try again.`);
+        if (chatErr) {
+          throw new Error(`Coach unreachable. ${chatErr.message || 'Try again.'}`);
         }
-        const data = normalizeN8nChatPayload(await response.json());
+        const data = normalizeN8nChatPayload(chatData);
         if (!data?.reply) throw new Error('No reply from coach. Try again.');
 
         const assistantMsg: ChatMessageType = {

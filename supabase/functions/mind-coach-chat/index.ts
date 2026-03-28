@@ -19,6 +19,15 @@ serve(async (req) => {
       dynamic_theme,
       pathway,
       is_system_greeting,
+      messages,
+      memories,
+      recent_case_notes,
+      recent_tasks_assigned,
+      assessments,
+      coach_prompt,
+      phase_prompt,
+      message_count,
+      client_managed_persistence,
     } = payload;
 
     if (!session_id || !profile_id || (!message_text && !is_system_greeting)) {
@@ -35,10 +44,11 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
+    const clientManaged = client_managed_persistence === true;
 
     // 1. Persist user message
     let userMessageId = null;
-    if (!is_system_greeting) {
+    if (!clientManaged && !is_system_greeting) {
       userMessageId = crypto.randomUUID();
       await supabaseAdmin.from('mind_coach_messages').insert({
         id: userMessageId,
@@ -55,61 +65,91 @@ serve(async (req) => {
       .eq('id', session_id)
       .single();
 
-    const newCount = (sessionData?.message_count ?? 0) + (is_system_greeting ? 0 : 1);
-    await supabaseAdmin
-      .from('mind_coach_sessions')
-      .update({ message_count: newCount })
-      .eq('id', session_id);
+    const newCount = clientManaged
+      ? (typeof message_count === 'number' ? message_count : (sessionData?.message_count ?? 0))
+      : (sessionData?.message_count ?? 0) + (is_system_greeting ? 0 : 1);
+    if (!clientManaged) {
+      await supabaseAdmin
+        .from('mind_coach_sessions')
+        .update({ message_count: newCount })
+        .eq('id', session_id);
+    }
 
     // 3. Fetch context for the n8n workflow
-    const [messagesRes, memoriesRes, caseNotesRes, activeTasksRes, assessmentsRes, personaPromptRes, phasePromptRes, authenticProfileRes] = await Promise.all([
-      supabaseAdmin
-        .from('mind_coach_messages')
-        .select('role,content')
-        .eq('session_id', session_id)
-        .order('created_at', { ascending: true })
-        .limit(50),
-      supabaseAdmin
-        .from('mind_coach_memories')
-        .select('memory_text,memory_type')
-        .eq('profile_id', profile_id)
-        .order('created_at', { ascending: false })
-        .limit(20),
-      supabaseAdmin
-        .from('mind_coach_sessions')
-        .select('case_notes,dynamic_theme,pathway,summary_data')
-        .eq('profile_id', profile_id)
-        .eq('session_state', 'completed')
-        .order('ended_at', { ascending: false })
-        .limit(5),
-      supabaseAdmin
-        .from('mind_coach_user_tasks')
-        .select('*')
-        .eq('profile_id', profile_id)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false }),
-      supabaseAdmin
-        .from('mind_coach_assessments')
-        .select('assessment_type,score,created_at')
-        .eq('profile_id', profile_id)
-        .order('created_at', { ascending: false })
-        .limit(5),
-      supabaseAdmin
-        .from('mind_coach_personas')
-        .select('base_prompt')
-        .eq('id', profile?.therapist_persona || 'maya')
-        .maybeSingle(),
-      supabaseAdmin
-        .from('mind_coach_pathway_phases')
-        .select('dynamic_prompt')
-        .eq('id', `${pathway || 'engagement_rapport_and_assessment'}_phase${journey_context?.current_phase || 1}`)
-        .maybeSingle(),
-      supabaseAdmin
-        .from('mind_coach_profiles')
-        .select('name,age,gender,concerns,therapist_persona')
-        .eq('id', profile_id)
-        .single(),
-    ]);
+    let messagesData: any[] = [];
+    let memoriesData: any[] = [];
+    let caseNotesData: any[] = [];
+    let activeTasksData: any[] = [];
+    let assessmentsData: any[] = [];
+    let resolvedCoachPrompt = coach_prompt || "You are an empathetic, non-judgmental mental health coach.";
+    let resolvedPhasePrompt = phase_prompt || "Focus on gathering context and building therapeutic rapport.";
+    let resolvedProfile = profile || null;
+
+    if (clientManaged) {
+      messagesData = Array.isArray(messages) ? messages : [];
+      memoriesData = Array.isArray(memories) ? memories : [];
+      caseNotesData = Array.isArray(recent_case_notes) ? recent_case_notes : [];
+      activeTasksData = Array.isArray(recent_tasks_assigned) ? recent_tasks_assigned : [];
+      assessmentsData = Array.isArray(assessments) ? assessments : [];
+    } else {
+      const [messagesRes, memoriesRes, caseNotesRes, activeTasksRes, assessmentsRes, personaPromptRes, phasePromptRes, authenticProfileRes] = await Promise.all([
+        supabaseAdmin
+          .from('mind_coach_messages')
+          .select('role,content')
+          .eq('session_id', session_id)
+          .order('created_at', { ascending: true })
+          .limit(50),
+        supabaseAdmin
+          .from('mind_coach_memories')
+          .select('memory_text,memory_type')
+          .eq('profile_id', profile_id)
+          .order('created_at', { ascending: false })
+          .limit(20),
+        supabaseAdmin
+          .from('mind_coach_sessions')
+          .select('case_notes,dynamic_theme,pathway,summary_data')
+          .eq('profile_id', profile_id)
+          .eq('session_state', 'completed')
+          .order('ended_at', { ascending: false })
+          .limit(5),
+        supabaseAdmin
+          .from('mind_coach_user_tasks')
+          .select('*')
+          .eq('profile_id', profile_id)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false }),
+        supabaseAdmin
+          .from('mind_coach_assessments')
+          .select('assessment_type,score,created_at')
+          .eq('profile_id', profile_id)
+          .order('created_at', { ascending: false })
+          .limit(5),
+        supabaseAdmin
+          .from('mind_coach_personas')
+          .select('base_prompt')
+          .eq('id', profile?.therapist_persona || 'maya')
+          .maybeSingle(),
+        supabaseAdmin
+          .from('mind_coach_pathway_phases')
+          .select('dynamic_prompt')
+          .eq('id', `${pathway || 'engagement_rapport_and_assessment'}_phase${journey_context?.current_phase || 1}`)
+          .maybeSingle(),
+        supabaseAdmin
+          .from('mind_coach_profiles')
+          .select('name,age,gender,concerns,therapist_persona')
+          .eq('id', profile_id)
+          .single(),
+      ]);
+
+      messagesData = messagesRes.data || [];
+      memoriesData = memoriesRes.data || [];
+      caseNotesData = caseNotesRes.data || [];
+      activeTasksData = activeTasksRes.data || [];
+      assessmentsData = assessmentsRes.data || [];
+      resolvedCoachPrompt = personaPromptRes.data?.base_prompt || resolvedCoachPrompt;
+      resolvedPhasePrompt = phasePromptRes.data?.dynamic_prompt || resolvedPhasePrompt;
+      resolvedProfile = authenticProfileRes.data || resolvedProfile;
+    }
 
     // 4. Forward to n8n
     const controller = new AbortController();
@@ -128,21 +168,21 @@ serve(async (req) => {
           profile_id,
           message_text,
           user_message_id: userMessageId,
-          profile: authenticProfileRes.data || profile, // Use authentic DB profile, fallback to client payload if critically missing
+          profile: resolvedProfile,
           journey_context,
           session_state: session_state || 'intake',
           dynamic_theme,
           pathway,
-          messages: messagesRes.data || [],
-          memories: (memoriesRes.data || []).map((m: any) => ({
-            text: m.memory_text,
-            type: m.memory_type,
+          messages: messagesData,
+          memories: (memoriesData || []).map((m: any) => ({
+            text: m.memory_text || m.text,
+            type: m.memory_type || m.type,
           })),
-          recent_case_notes: (caseNotesRes.data || []).map((s: any) => s.case_notes).filter(Boolean),
-          recent_tasks_assigned: activeTasksRes.data || [],
-          assessments: assessmentsRes.data || [],
-          coach_prompt: personaPromptRes.data?.base_prompt || "You are an empathetic, non-judgmental mental health coach.",
-          phase_prompt: phasePromptRes.data?.dynamic_prompt || "Focus on gathering context and building therapeutic rapport.",
+          recent_case_notes: (caseNotesData || []).map((s: any) => s.case_notes || s).filter(Boolean),
+          recent_tasks_assigned: activeTasksData || [],
+          assessments: assessmentsData || [],
+          coach_prompt: resolvedCoachPrompt,
+          phase_prompt: resolvedPhasePrompt,
           message_count: newCount,
           is_system_greeting,
         }),
@@ -200,7 +240,7 @@ serve(async (req) => {
     const suggestedPathway = result.suggested_pathway || null;
 
     // 6. Persist assistant reply
-    if (assistantReply) {
+    if (!clientManaged && assistantReply) {
       await supabaseAdmin.from('mind_coach_messages').insert({
         session_id,
         role: 'assistant',
@@ -211,21 +251,24 @@ serve(async (req) => {
     }
 
     // 7. Update session state if changed
-    const sessionUpdate: Record<string, any> = {
-      message_count: newCount,
-    };
-    if (updatedSessionState !== session_state) sessionUpdate.session_state = updatedSessionState;
-    if (updatedTheme) sessionUpdate.dynamic_theme = updatedTheme;
-    if (updatedPathway) sessionUpdate.pathway = updatedPathway;
-    if (pathwayConfidence !== undefined) sessionUpdate.pathway_confidence = pathwayConfidence;
+    if (!clientManaged) {
+      const finalCount = newCount + (assistantReply ? 1 : 0);
+      const sessionUpdate: Record<string, any> = {
+        message_count: finalCount,
+      };
+      if (updatedSessionState !== session_state) sessionUpdate.session_state = updatedSessionState;
+      if (updatedTheme) sessionUpdate.dynamic_theme = updatedTheme;
+      if (updatedPathway) sessionUpdate.pathway = updatedPathway;
+      if (pathwayConfidence !== undefined) sessionUpdate.pathway_confidence = pathwayConfidence;
 
-    await supabaseAdmin
-      .from('mind_coach_sessions')
-      .update(sessionUpdate)
-      .eq('id', session_id);
+      await supabaseAdmin
+        .from('mind_coach_sessions')
+        .update(sessionUpdate)
+        .eq('id', session_id);
+    }
 
     // 8. Log guardrail results if provided
-    if (result.guardrail_log) {
+    if (!clientManaged && result.guardrail_log) {
       for (const log of Array.isArray(result.guardrail_log) ? result.guardrail_log : [result.guardrail_log]) {
         await supabaseAdmin.from('mind_coach_guardrail_log').insert({
           session_id,
