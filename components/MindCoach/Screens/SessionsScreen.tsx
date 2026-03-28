@@ -79,7 +79,7 @@ export const SessionsScreen: React.FC = () => {
 
   if (activeSession) {
     return (
-      <>
+      <div className="h-full min-h-0">
         <TherapistChat
           onBack={handleBack}
           onViewProposal={() => setShowProposal(true)}
@@ -100,7 +100,7 @@ export const SessionsScreen: React.FC = () => {
             />
           )}
         </AnimatePresence>
-      </>
+      </div>
     );
   }
 
