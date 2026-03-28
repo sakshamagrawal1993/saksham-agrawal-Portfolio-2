@@ -54,6 +54,40 @@ function normalizeServerSessionSummary(raw: unknown): Record<string, unknown> | 
   return null;
 }
 
+function buildStoredSummaryPayload(
+  payload: Record<string, unknown> | null,
+  sessionSummary: Record<string, unknown> | null,
+): Record<string, unknown> | null {
+  if (!sessionSummary && !payload) return null;
+  const extractedTasks = Array.isArray(payload?.extracted_tasks) ? payload.extracted_tasks : [];
+  const extractedMemories = Array.isArray(payload?.extracted_memories) ? payload.extracted_memories : [];
+  const caseNotes =
+    payload?.case_notes && typeof payload.case_notes === 'object'
+      ? payload.case_notes
+      : null;
+  const agentMeta =
+    payload?.agent_meta && typeof payload.agent_meta === 'object'
+      ? payload.agent_meta
+      : null;
+  const suggestedPathway =
+    typeof payload?.suggested_pathway === 'string' ? payload.suggested_pathway : null;
+  const pathwayDetails =
+    payload?.pathway_details && typeof payload.pathway_details === 'object'
+      ? payload.pathway_details
+      : null;
+
+  return {
+    ...(sessionSummary ?? {}),
+    session_summary: sessionSummary,
+    case_notes: caseNotes,
+    extracted_tasks: extractedTasks,
+    extracted_memories: extractedMemories,
+    agent_meta: agentMeta,
+    suggested_pathway: suggestedPathway,
+    pathway_details: pathwayDetails,
+  };
+}
+
 export const DiaryScreen: React.FC = () => {
   const sessions = useMindCoachStore((s) => s.sessions);
   const journalEntries = useMindCoachStore((s) => s.journalEntries);
@@ -203,7 +237,8 @@ export const DiaryScreen: React.FC = () => {
         throw new Error('Summary generation returned an empty payload.');
       }
 
-      const patch: Record<string, unknown> = { summary_data: sessionSummary };
+      const storedSummaryPayload = buildStoredSummaryPayload(payload, sessionSummary);
+      const patch: Record<string, unknown> = { summary_data: storedSummaryPayload ?? sessionSummary };
       if (caseNotes) patch.case_notes = caseNotes;
 
       await supabase
@@ -217,7 +252,7 @@ export const DiaryScreen: React.FC = () => {
           s.id === session.id
             ? {
                 ...s,
-                summary_data: sessionSummary,
+                summary_data: storedSummaryPayload ?? sessionSummary,
                 case_notes: caseNotes ? (caseNotes as any) : s.case_notes,
               }
             : s,

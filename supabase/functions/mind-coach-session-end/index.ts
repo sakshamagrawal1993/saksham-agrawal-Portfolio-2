@@ -293,11 +293,26 @@ serve(async (req) => {
     const summaryDataForStorage =
       session_summary && typeof session_summary === 'object'
         ? {
+            // Backward compatibility: keep canonical summary fields at top-level.
             ...session_summary,
-            ...(suggestedPathwayCandidate ? { suggested_pathway: suggestedPathwayCandidate } : {}),
-            ...(pathwayDetails ? { pathway_details: pathwayDetails } : {}),
+            // Persist the complete workflow payload so detailed views can read everything.
+            session_summary,
+            case_notes,
+            extracted_tasks,
+            extracted_memories,
+            agent_meta,
+            suggested_pathway: suggestedPathwayCandidate,
+            pathway_details: pathwayDetails,
           }
-        : session_summary;
+        : {
+            session_summary,
+            case_notes,
+            extracted_tasks,
+            extracted_memories,
+            agent_meta,
+            suggested_pathway: suggestedPathwayCandidate,
+            pathway_details: pathwayDetails,
+          };
 
     // 3. Update session as completed
     await supabaseAdmin

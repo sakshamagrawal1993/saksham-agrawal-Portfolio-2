@@ -7,6 +7,8 @@ import { supabase } from '../../../lib/supabaseClient';
 import {
   useMindCoachStore,
   type TaskType,
+  type ChatMessage as ChatMessageType,
+  type MindCoachSession,
 } from '../../../store/mindCoachStore';
 import { PlanProposalModal } from '../PlanProposalModal';
 import { PATHWAY_LABELS } from '../shared/pathwayLabels';
@@ -36,6 +38,9 @@ export const HomeScreen: React.FC = () => {
   const setActiveTab = useMindCoachStore((s) => s.setActiveTab);
   const activeTasks = useMindCoachStore((s) => s.activeTasks);
   const setActiveTasks = useMindCoachStore((s) => s.setActiveTasks);
+  const setActiveSession = useMindCoachStore((s) => s.setActiveSession);
+  const setSessions = useMindCoachStore((s) => s.setSessions);
+  const setMessages = useMindCoachStore((s) => s.setMessages);
   const resetStore = useMindCoachStore((s) => s.reset);
   const navigate = useNavigate();
   const [showConfirm, setShowConfirm] = useState(false);
@@ -43,6 +48,7 @@ export const HomeScreen: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [moodExpanded, setMoodExpanded] = useState(false);
+  const [isContinuingSession, setIsContinuingSession] = useState(false);
 
   const phases = journey?.phases ?? [];
   const currentPhaseData = phases[currentPhase - 1];
@@ -117,6 +123,67 @@ export const HomeScreen: React.FC = () => {
       alert('Failed to delete profile. Please try again.');
     }
   };
+
+  const handleContinueWithTherapist = useCallback(async () => {
+    if (!profile || isContinuingSession) return;
+    setIsContinuingSession(true);
+    try {
+      const completedInPhase = sessions.filter(
+        (s) => s.session_state === 'completed' && s.phase_number === currentPhase,
+      ).length;
+      const newSession: Partial<MindCoachSession> = {
+        profile_id: profile.id,
+        journey_id: journey?.id ?? null,
+        phase_number: currentPhase,
+        session_number: completedInPhase + 1,
+        session_state: 'active',
+        message_count: 0,
+        pathway: journey?.pathway ?? null,
+        dynamic_theme: null,
+      };
+
+      const { data: createdSession, error: createErr } = await supabase
+        .from('mind_coach_sessions')
+        .insert(newSession)
+        .select('*')
+        .single();
+      if (createErr || !createdSession) {
+        throw new Error(createErr?.message || 'Could not start a new session.');
+      }
+
+      const previousSessionIds = sessions.map((s) => s.id).filter(Boolean);
+      let historicalMessages: ChatMessageType[] = [];
+      if (previousSessionIds.length > 0) {
+        const { data: messageRows } = await supabase
+          .from('mind_coach_messages')
+          .select('*')
+          .in('session_id', previousSessionIds)
+          .order('created_at', { ascending: true });
+        historicalMessages = (messageRows as ChatMessageType[]) ?? [];
+      }
+
+      setActiveSession(createdSession as MindCoachSession);
+      setSessions([createdSession as MindCoachSession, ...sessions]);
+      setMessages(historicalMessages);
+      setActiveTab('sessions');
+    } catch (err) {
+      console.error('Failed to continue with therapist:', err);
+      alert('Could not open your next session. Please try again.');
+    } finally {
+      setIsContinuingSession(false);
+    }
+  }, [
+    profile,
+    isContinuingSession,
+    sessions,
+    currentPhase,
+    journey?.id,
+    journey?.pathway,
+    setActiveSession,
+    setSessions,
+    setMessages,
+    setActiveTab,
+  ]);
 
   const fivePhaseJourney = useMemo(() => {
     if (!hasChosenPathway || phases.length === 0) return null;
@@ -237,10 +304,11 @@ export const HomeScreen: React.FC = () => {
             </div>
 
             <button
-              onClick={() => setActiveTab('sessions')}
+              onClick={handleContinueWithTherapist}
+              disabled={isContinuingSession}
               className="w-full py-3 rounded-xl bg-[#6B8F71] text-white font-semibold text-sm hover:bg-[#5A7D60] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
             >
-              Continue with {therapistName}
+              {isContinuingSession ? 'Opening session...' : `Continue with ${therapistName}`}
               <ArrowRight size={16} />
             </button>
           </div>
@@ -286,10 +354,11 @@ export const HomeScreen: React.FC = () => {
             </div>
 
             <button
-              onClick={() => setActiveTab('sessions')}
+              onClick={handleContinueWithTherapist}
+              disabled={isContinuingSession}
               className="w-full py-3 rounded-xl bg-[#6B8F71] text-white font-semibold text-sm hover:bg-[#5A7D60] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
             >
-              Continue with {therapistName}
+              {isContinuingSession ? 'Opening session...' : `Continue with ${therapistName}`}
               <ArrowRight size={16} />
             </button>
           </div>
