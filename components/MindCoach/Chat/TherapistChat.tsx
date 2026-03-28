@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useMemo, useState, useCallback } from 'react'
 import { ArrowLeft, Send, CheckCircle2, ChevronDown, ChevronUp, Sparkles, Target } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '../../../lib/supabaseClient';
+import Analytics from '../../../services/analytics';
 import {
   useMindCoachStore,
   type ChatMessage as ChatMessageType,
@@ -711,6 +712,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
   const [activePathwayPhase, setActivePathwayPhase] = useState(0);
   const [completedTaskKeys, setCompletedTaskKeys] = useState<Record<string, boolean>>({});
   const prefillAppliedForSessionRef = useRef<Set<string>>(new Set());
+  const trackedPathwayCardViewsRef = useRef<Set<string>>(new Set());
 
   const handleEndSession = async () => {
     if (!activeSession || !profile || endingSession) return;
@@ -896,6 +898,45 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
     showSummary,
   ]);
 
+  useEffect(() => {
+    if (!showSummary || !activeSession?.id) return;
+    if (trackedPathwayCardViewsRef.current.has(activeSession.id)) return;
+    const summaryForTrack = sessionSummary ?? fallbackSessionSummary(activeSession, journey);
+    const suggestedPathway = summaryForTrack.suggested_pathway || activeSession?.pathway;
+    const pathwayDetailsRaw =
+      summaryForTrack.pathway_details && typeof summaryForTrack.pathway_details === 'object'
+        ? (summaryForTrack.pathway_details as Record<string, any>)
+        : null;
+    const pathwayPhases = Array.isArray(pathwayDetailsRaw?.phases)
+      ? (pathwayDetailsRaw?.phases as Record<string, any>[]).slice(0, 4)
+      : [];
+    const isNewPathway =
+      typeof suggestedPathway === 'string' && suggestedPathway !== 'engagement_rapport_and_assessment';
+    const isPathwayUnselected =
+      (activeSession?.pathway == null || activeSession?.pathway === 'engagement_rapport_and_assessment') &&
+      (journey?.pathway == null || journey?.pathway === 'engagement_rapport_and_assessment');
+    const shouldShowPathwayPreview = isPathwayUnselected && isNewPathway && pathwayPhases.length > 0;
+    if (!shouldShowPathwayPreview) return;
+
+    trackedPathwayCardViewsRef.current.add(activeSession.id);
+    Analytics.track('pathway_card_viewed', {
+      session_id: activeSession.id,
+      profile_id: profile?.id || null,
+      suggested_pathway: suggestedPathway || null,
+      phase_count: pathwayPhases.length,
+    });
+  }, [
+    showSummary,
+    sessionSummary,
+    activeSession?.id,
+    activeSession?.pathway,
+    journey?.id,
+    journey?.pathway,
+    profile?.id,
+    activeSession,
+    journey,
+  ]);
+
   if (showSummary) {
     const summaryView = sessionSummary ?? fallbackSessionSummary(activeSession, journey);
     const caseNotes = (summaryView.case_notes ??
@@ -979,6 +1020,18 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
       (activeSession?.pathway == null || activeSession?.pathway === 'engagement_rapport_and_assessment') &&
       (journey?.pathway == null || journey?.pathway === 'engagement_rapport_and_assessment');
     const shouldShowPathwayPreview = isPathwayUnselected && isNewPathway && pathwayPreview && pathwayPhases.length > 0;
+    const followPathwayFromSummary = (source: 'pathway_card' | 'phase_modal') => {
+      Analytics.track('pathway_follow_clicked', {
+        source,
+        session_id: activeSession?.id || null,
+        profile_id: profile?.id || null,
+        suggested_pathway: suggestedPathway || null,
+      });
+      setShowPathwayPhases(false);
+      if (onViewProposal) {
+        onViewProposal();
+      }
+    };
 
     return (
       <div className="flex flex-col h-full bg-[#F9F6F2] relative">
@@ -1104,6 +1157,12 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
               <button
                 type="button"
                 onClick={() => {
+                  Analytics.track('pathway_preview_opened', {
+                    source: 'pathway_card',
+                    session_id: activeSession?.id || null,
+                    profile_id: profile?.id || null,
+                    suggested_pathway: suggestedPathway || null,
+                  });
                   setShowPathwayPhases(true);
                   setActivePathwayPhase(0);
                 }}
@@ -1121,6 +1180,13 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
                   <p className="text-xs text-[#2C2A26]/65 mt-1 leading-relaxed">{pathwayPreview?.description}</p>
                   <p className="text-xs text-[#6B8F71] font-medium mt-2">Tap to preview all 4 phases</p>
                 </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => followPathwayFromSummary('pathway_card')}
+                className="w-full mt-2 py-2.5 rounded-xl bg-[#2C2A26] text-white text-sm font-semibold hover:bg-[#3B3731] transition-colors"
+              >
+                Follow this pathway
               </button>
             </motion.div>
           )}
@@ -1475,6 +1541,13 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
                   {activePathwayPhase >= pathwayPhases.length - 1 ? 'Done' : 'Next'}
                 </button>
               </div>
+              <button
+                type="button"
+                onClick={() => followPathwayFromSummary('phase_modal')}
+                className="w-full mt-2 py-2.5 rounded-xl bg-[#6B8F71] text-white text-sm font-semibold hover:bg-[#5A7D60] transition-colors"
+              >
+                Follow this pathway
+              </button>
             </div>
           </div>
         )}
