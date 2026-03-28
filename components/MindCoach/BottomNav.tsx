@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Home, MessageCircle, MoreHorizontal, BookOpen, BookHeart, Wind, ClipboardList, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useMindCoachStore, UNLOCK_MAP, type TabId } from '../../store/mindCoachStore';
+import { useMindCoachStore, UNLOCK_MAP, type TabId, type MindCoachSession, type ChatMessage as ChatMessageType } from '../../store/mindCoachStore';
+import { supabase } from '../../lib/supabaseClient';
 
 const PRIMARY_TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: 'home', label: 'Home', icon: Home },
@@ -18,11 +19,87 @@ const MORE_ITEMS: { id: TabId; label: string; icon: React.ElementType; feature: 
 export const BottomNav: React.FC = () => {
   const activeTab = useMindCoachStore((s) => s.activeTab);
   const setActiveTab = useMindCoachStore((s) => s.setActiveTab);
+  const profile = useMindCoachStore((s) => s.profile);
+  const journey = useMindCoachStore((s) => s.journey);
+  const sessions = useMindCoachStore((s) => s.sessions);
+  const activeSession = useMindCoachStore((s) => s.activeSession);
+  const setActiveSession = useMindCoachStore((s) => s.setActiveSession);
+  const setSessions = useMindCoachStore((s) => s.setSessions);
+  const setMessages = useMindCoachStore((s) => s.setMessages);
+  const currentPhase = useMindCoachStore((s) => s.currentPhaseNumber());
   const phase = useMindCoachStore((s) => s.journey?.current_phase ?? 1);
   const [showMore, setShowMore] = useState(false);
+  const [openingTalk, setOpeningTalk] = useState(false);
 
   const unlockedFeatures = UNLOCK_MAP[Math.min(Math.max(phase, 1), 4)] ?? UNLOCK_MAP[1];
   const isMoreActive = MORE_ITEMS.some((item) => item.id === activeTab);
+
+  const handleOpenTalk = useCallback(async () => {
+    if (!profile || openingTalk) return;
+    if (activeSession) {
+      setActiveTab('sessions');
+      setShowMore(false);
+      return;
+    }
+    setOpeningTalk(true);
+    try {
+      const completedInPhase = sessions.filter(
+        (s) => s.session_state === 'completed' && s.phase_number === currentPhase,
+      ).length;
+      const newSession: Partial<MindCoachSession> = {
+        profile_id: profile.id,
+        journey_id: journey?.id ?? null,
+        phase_number: currentPhase,
+        session_number: completedInPhase + 1,
+        session_state: 'active',
+        message_count: 0,
+        pathway: journey?.pathway ?? null,
+        dynamic_theme: null,
+      };
+
+      const { data: createdSession, error: createErr } = await supabase
+        .from('mind_coach_sessions')
+        .insert(newSession)
+        .select('*')
+        .single();
+      if (createErr || !createdSession) {
+        throw new Error(createErr?.message || 'Could not start a new session.');
+      }
+
+      const previousSessionIds = sessions.map((s) => s.id).filter(Boolean);
+      let historicalMessages: ChatMessageType[] = [];
+      if (previousSessionIds.length > 0) {
+        const { data: messageRows } = await supabase
+          .from('mind_coach_messages')
+          .select('*')
+          .in('session_id', previousSessionIds)
+          .order('created_at', { ascending: true });
+        historicalMessages = (messageRows as ChatMessageType[]) ?? [];
+      }
+
+      setActiveSession(createdSession as MindCoachSession);
+      setSessions([createdSession as MindCoachSession, ...sessions]);
+      setMessages(historicalMessages);
+      setActiveTab('sessions');
+      setShowMore(false);
+    } catch (err) {
+      console.error('Failed to open talk session:', err);
+    } finally {
+      setOpeningTalk(false);
+    }
+  }, [
+    profile,
+    openingTalk,
+    activeSession,
+    sessions,
+    currentPhase,
+    journey?.id,
+    journey?.pathway,
+    setActiveSession,
+    setSessions,
+    setMessages,
+    setActiveTab,
+  ]);
 
   return (
     <>
@@ -32,7 +109,14 @@ export const BottomNav: React.FC = () => {
           return (
             <button
               key={id}
-              onClick={() => { setActiveTab(id); setShowMore(false); }}
+              onClick={() => {
+                if (id === 'sessions') {
+                  void handleOpenTalk();
+                  return;
+                }
+                setActiveTab(id);
+                setShowMore(false);
+              }}
               className={`flex flex-col items-center gap-0.5 px-4 py-1 rounded-xl transition-colors ${
                 isActive
                   ? 'text-[#6B8F71]'
