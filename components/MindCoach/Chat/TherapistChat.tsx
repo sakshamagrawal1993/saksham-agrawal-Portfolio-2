@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useMemo, useState, useCallback } from 'react';
-import { ArrowLeft, Send } from 'lucide-react';
+import { ArrowLeft, Send, CheckCircle2, ChevronDown, ChevronUp, Sparkles, Target } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '../../../lib/supabaseClient';
 import {
@@ -156,6 +156,28 @@ const PATHWAY_LABELS: Record<string, string> = {
   crisis_intervention_and_suicide_prevention: 'Crisis Support',
   engagement_rapport_and_assessment: 'Continued Exploration',
 };
+
+const NEXT_FOCUS_STORAGE_KEY_PREFIX = 'mind_coach_next_focus_intent';
+
+function getNextFocusStorageKey(profileId: string) {
+  return `${NEXT_FOCUS_STORAGE_KEY_PREFIX}:${profileId}`;
+}
+
+function safeNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function normalizeLabel(raw: string): string {
+  return raw
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (m) => m.toUpperCase())
+    .trim();
+}
 
 export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProposal, onReturnHome }) => {
   const profile = useMindCoachStore((s) => s.profile);
@@ -682,6 +704,13 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
   const [showSummary, setShowSummary] = useState(false);
   const [sessionSummary, setSessionSummary] = useState<Record<string, any> | null>(null);
   const [endingSession, setEndingSession] = useState(false);
+  const [selectedNextFocus, setSelectedNextFocus] = useState<string | null>(null);
+  const [expandedTaskKey, setExpandedTaskKey] = useState<string | null>(null);
+  const [showDeepInsights, setShowDeepInsights] = useState(false);
+  const [showPathwayPhases, setShowPathwayPhases] = useState(false);
+  const [activePathwayPhase, setActivePathwayPhase] = useState(0);
+  const [completedTaskKeys, setCompletedTaskKeys] = useState<Record<string, boolean>>({});
+  const prefillAppliedForSessionRef = useRef<Set<string>>(new Set());
 
   const handleEndSession = async () => {
     if (!activeSession || !profile || endingSession) return;
@@ -712,13 +741,39 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
       const extractedTasks = Array.isArray(payload?.extracted_tasks)
         ? (payload?.extracted_tasks as unknown[])
         : [];
+      const sessionTakeaways = Array.isArray(payload?.session_takeaways)
+        ? (payload?.session_takeaways as unknown[])
+        : [];
+      const nextFocusOptions = Array.isArray(payload?.next_focus_options)
+        ? (payload?.next_focus_options as unknown[])
+        : [];
       const phaseTransition = payload?.phase_transition_result ?? null;
+      const suggestedPathway = payload?.suggested_pathway ?? null;
+      const pathwayDetails =
+        payload?.pathway_details && typeof payload.pathway_details === 'object'
+          ? payload.pathway_details
+          : null;
       const out: Record<string, unknown> = { ...baseSummary };
       if (out.extracted_tasks == null && extractedTasks.length > 0) {
         out.extracted_tasks = extractedTasks;
       }
+      if (out.session_takeaways == null && sessionTakeaways.length > 0) {
+        out.session_takeaways = sessionTakeaways;
+      }
+      if (out.next_focus_options == null && nextFocusOptions.length > 0) {
+        out.next_focus_options = nextFocusOptions;
+      }
       if (phaseTransition && out.phase_transition_result == null) {
         out.phase_transition_result = phaseTransition;
+      }
+      if (suggestedPathway && out.suggested_pathway == null) {
+        out.suggested_pathway = suggestedPathway;
+      }
+      if (pathwayDetails && out.pathway_details == null) {
+        out.pathway_details = pathwayDetails;
+      }
+      if (out.case_notes == null && payload?.case_notes && typeof payload.case_notes === 'object') {
+        out.case_notes = payload.case_notes;
       }
       return out;
     };
@@ -730,7 +785,11 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
           profile_id: profile.id,
         },
       });
-      let payload = data as Record<string, unknown> | null;
+      const basePayload =
+        Array.isArray(data) && data[0] && typeof data[0] === 'object'
+          ? (data[0] as Record<string, unknown>)
+          : (data as Record<string, unknown> | null);
+      let payload = basePayload;
       const inner =
         payload?.output && typeof payload.output === 'object' && !Array.isArray(payload.output)
           ? (payload.output as Record<string, unknown>)
@@ -795,6 +854,12 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
   const handleCloseSummary = async () => {
     setShowSummary(false);
     setSessionSummary(null);
+    setSelectedNextFocus(null);
+    setExpandedTaskKey(null);
+    setShowDeepInsights(false);
+    setShowPathwayPhases(false);
+    setActivePathwayPhase(0);
+    setCompletedTaskKeys({});
     if (profile?.id) {
       const { data } = await supabase
         .from('mind_coach_journeys')
@@ -812,8 +877,30 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
     }
   };
 
+  useEffect(() => {
+    if (!profile?.id || !activeSession) return;
+    if (showSummary) return;
+    if (messages.length !== 0 || (activeSession.message_count ?? 0) > 0) return;
+    if (input.trim()) return;
+    if (prefillAppliedForSessionRef.current.has(activeSession.id)) return;
+    const storedFocus = localStorage.getItem(getNextFocusStorageKey(profile.id));
+    if (!storedFocus) return;
+    prefillAppliedForSessionRef.current.add(activeSession.id);
+    setInput(`I'd like to focus on ${storedFocus.toLowerCase()} today.`);
+  }, [
+    profile?.id,
+    activeSession?.id,
+    activeSession?.message_count,
+    input,
+    messages.length,
+    showSummary,
+  ]);
+
   if (showSummary) {
     const summaryView = sessionSummary ?? fallbackSessionSummary(activeSession, journey);
+    const caseNotes = (summaryView.case_notes ??
+      activeSession?.case_notes ??
+      null) as Record<string, any> | null;
     const phaseTransitionResult = (summaryView.phase_transition_result ??
       null) as
       | {
@@ -823,17 +910,78 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
           min_sessions_required?: number;
         }
       | null;
-    const tasks: any[] = Array.isArray(summaryView.extracted_tasks)
-      ? summaryView.extracted_tasks
+    const tasks: Record<string, any>[] = Array.isArray(summaryView.extracted_tasks)
+      ? (summaryView.extracted_tasks as Record<string, any>[])
       : summaryView.takeaway_task
         ? [{ dynamic_title: 'Your Takeaway', dynamic_description: summaryView.takeaway_task, task_type: 'general' }]
         : [];
+    const tasksWithUi = tasks.map((task, index) => {
+      const key = `${task.id ?? task.dynamic_title ?? task.task_name ?? task.task_type ?? 'task'}:${index}`;
+      return { ...task, _ui_key: key };
+    });
+    const takeaways = Array.isArray(summaryView.session_takeaways)
+      ? (summaryView.session_takeaways as string[]).filter(Boolean).slice(0, 3)
+      : [
+          summaryView.opening_reflection
+            ? 'What you noticed today'
+            : null,
+          caseNotes?.dynamic_theme ? `Theme surfaced: ${caseNotes.dynamic_theme}` : null,
+          tasks[0]?.dynamic_title ? `One thing to practice: ${tasks[0].dynamic_title}` : null,
+        ].filter(Boolean) as string[];
+    const nextFocusOptions = Array.isArray(summaryView.next_focus_options)
+      ? (summaryView.next_focus_options as string[]).filter(Boolean).slice(0, 3)
+      : [
+          caseNotes?.dynamic_theme ? `Work on ${String(caseNotes.dynamic_theme).toLowerCase()}` : null,
+          'Build a wind-down ritual',
+          'Strengthen self-talk before stress moments',
+        ].filter(Boolean) as string[];
+    const completedInPhase = safeNumber(phaseTransitionResult?.completed_in_phase);
+    const minInPhase = safeNumber(phaseTransitionResult?.min_sessions_required);
+    const phaseProgressPercent =
+      completedInPhase != null && minInPhase && minInPhase > 0
+        ? Math.min(100, Math.round((completedInPhase / minInPhase) * 100))
+        : null;
+    const riskLevel = String(caseNotes?.risk_level ?? '').toLowerCase();
+    const isRiskVariant =
+      riskLevel === 'high' || caseNotes?.requires_escalation === true || caseNotes?.crisis_detected === true;
+    const therapistSupportLine =
+      persona === 'maya'
+        ? 'Gentle reflection first, then one step forward.'
+        : persona === 'sophie'
+          ? 'We keep this practical: one insight, one action.'
+          : persona === 'marcus'
+            ? 'Grounded progress: reinforce what worked, repeat it this week.'
+            : 'You made progress today. Let us convert it into a repeatable step.';
 
     const suggestedPathway = summaryView.suggested_pathway || activeSession?.pathway;
     const isNewPathway = suggestedPathway && suggestedPathway !== 'engagement_rapport_and_assessment';
+    const pathwayDetailsRaw =
+      summaryView.pathway_details && typeof summaryView.pathway_details === 'object'
+        ? (summaryView.pathway_details as Record<string, any>)
+        : null;
+    const pathwayPhases = Array.isArray(pathwayDetailsRaw?.phases)
+      ? (pathwayDetailsRaw?.phases as Record<string, any>[]).slice(0, 4)
+      : [];
+    const pathwayPreview = pathwayDetailsRaw
+      ? {
+          title:
+            String(pathwayDetailsRaw.pathway_title || '').trim() ||
+            (typeof suggestedPathway === 'string'
+              ? (PATHWAY_LABELS[suggestedPathway] ?? suggestedPathway.replace(/_/g, ' '))
+              : 'Your Recommended Pathway'),
+          description:
+            String(pathwayDetailsRaw.pathway_description || '').trim() ||
+            'A structured four-phase pathway to guide your next sessions.',
+          imageUrl: String(pathwayDetailsRaw.image_url || '').trim() || null,
+        }
+      : null;
+    const isPathwayUnselected =
+      (activeSession?.pathway == null || activeSession?.pathway === 'engagement_rapport_and_assessment') &&
+      (journey?.pathway == null || journey?.pathway === 'engagement_rapport_and_assessment');
+    const shouldShowPathwayPreview = isPathwayUnselected && isNewPathway && pathwayPreview && pathwayPhases.length > 0;
 
     return (
-      <div className="flex flex-col h-full bg-[#F9F6F2]">
+      <div className="flex flex-col h-full bg-[#F9F6F2] relative">
         <div className="flex items-center gap-3 px-4 py-3 border-b border-[#E8E4DE] bg-white/80 backdrop-blur-sm shrink-0">
           <div className="flex-1">
             <p className="text-sm font-semibold text-[#2C2A26]">Session Complete</p>
@@ -846,128 +994,380 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
           </button>
         </div>
         <div className="flex-1 overflow-y-auto px-4 py-5 space-y-4">
-          {/* Title + Reflection */}
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-            <h3 className="text-lg font-semibold text-[#2C2A26] mb-1">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-3xl p-5 bg-gradient-to-br from-[#2C2A26] to-[#4B463E] text-white"
+          >
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/60 mb-2">
+              Reflection Hero
+            </p>
+            <h3 className="text-xl font-semibold mb-2">
               {summaryView.title || 'Session Summary'}
             </h3>
+            <p className="text-xs text-white/70 mb-2.5">{therapistSupportLine}</p>
             {summaryView.opening_reflection && (
-              <p className="text-sm text-[#2C2A26]/70 leading-relaxed">
+              <p className="text-sm text-white/85 leading-relaxed mb-3">
                 {summaryView.opening_reflection}
+              </p>
+            )}
+            {summaryView.quote_of_the_day && (
+              <p className="text-xs italic text-white/70 border-l border-white/25 pl-3 mb-4">
+                "{summaryView.quote_of_the_day}"
+              </p>
+            )}
+            {takeaways.length > 0 && (
+              <div className="space-y-2">
+                {takeaways.map((item, index) => (
+                  <p key={index} className="text-xs text-white/85 flex items-start gap-2">
+                    <span className="mt-0.5 text-white/70">•</span>
+                    <span>{item}</span>
+                  </p>
+                ))}
+              </div>
+            )}
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.03 }}
+            className={`rounded-2xl p-4 border ${isRiskVariant ? 'bg-[#FFF6F5] border-[#F3D0CB]' : 'bg-white border-[#E8E4DE]'}`}
+          >
+            <p className="text-xs font-semibold uppercase tracking-wide text-[#2C2A26]/50 mb-2">Clinical Signal</p>
+            <div className="space-y-1.5 text-sm text-[#2C2A26]/80">
+              {caseNotes?.presenting_concern && <p><span className="font-medium text-[#2C2A26]">Trigger:</span> {caseNotes.presenting_concern}</p>}
+              {caseNotes?.dynamic_theme && <p><span className="font-medium text-[#2C2A26]">What helped:</span> {caseNotes.dynamic_theme}</p>}
+              {caseNotes?.phase_progress && <p><span className="font-medium text-[#2C2A26]">Still active:</span> {caseNotes.phase_progress}</p>}
+              {isRiskVariant && (
+                <p className="text-xs text-[#A0493A]">
+                  We detected elevated distress. Prioritize low-friction grounding and support before deeper exposure.
+                </p>
+              )}
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.06 }}
+            className="bg-white rounded-2xl p-4 border border-[#E8E4DE]"
+          >
+            <p className="text-xs font-semibold uppercase tracking-wide text-[#2C2A26]/50 mb-2">
+              Pathway Progress Snapshot
+            </p>
+            {phaseTransitionResult ? (
+              <>
+                <p className="text-sm text-[#2C2A26]/80 mb-2">
+                  {phaseTransitionResult.advanced
+                    ? `You unlocked Phase ${(phaseTransitionResult.new_phase_index ?? 0) + 1}. Keep momentum with one small action tonight.`
+                    : `You're progressing in this phase (${phaseTransitionResult.completed_in_phase ?? 0}/${phaseTransitionResult.min_sessions_required ?? 0} sessions).`}
+                </p>
+                {phaseProgressPercent != null && (
+                  <>
+                    <div className="h-2 w-full bg-[#EFEAE3] rounded-full overflow-hidden mb-1.5">
+                      <div className="h-full bg-[#6B8F71]" style={{ width: `${phaseProgressPercent}%` }} />
+                    </div>
+                    <p className="text-[11px] text-[#2C2A26]/55">
+                      Progress in this phase: {phaseProgressPercent}%
+                    </p>
+                  </>
+                )}
+                {!phaseTransitionResult.advanced && caseNotes?.readiness_rationale && (
+                  <p className="text-xs text-[#2C2A26]/60 mt-2 leading-relaxed">
+                    Next unlock criterion: {caseNotes.readiness_rationale}
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-[#2C2A26]/65">
+                You're building consistency. Complete one support task to keep moving forward.
+              </p>
+            )}
+            {isNewPathway && (
+              <p className="text-xs text-[#2C2A26]/65 mt-2">
+                Recommended pathway: {PATHWAY_LABELS[suggestedPathway] ?? String(suggestedPathway).replace(/_/g, ' ')}
               </p>
             )}
           </motion.div>
 
-          {phaseTransitionResult && (
+          {shouldShowPathwayPreview && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.05 }}
+              transition={{ delay: 0.07 }}
               className="bg-white rounded-2xl p-4 border border-[#E8E4DE]"
             >
-              <p className="text-xs font-semibold uppercase tracking-wide text-[#2C2A26]/45 mb-1.5">
-                Journey Progress
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#2C2A26]/50 mb-2">
+                Recommended Pathway
               </p>
-              <p className="text-sm text-[#2C2A26]/75">
-                {phaseTransitionResult.advanced
-                  ? `You unlocked Phase ${(phaseTransitionResult.new_phase_index ?? 0) + 1}.`
-                  : `You are progressing in this phase (${phaseTransitionResult.completed_in_phase ?? 0}/${phaseTransitionResult.min_sessions_required ?? 0} sessions).`}
-              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPathwayPhases(true);
+                  setActivePathwayPhase(0);
+                }}
+                className="w-full text-left rounded-2xl border border-[#E8E4DE] bg-[#FAF7F3] overflow-hidden hover:bg-[#F6F1EA] transition-colors"
+              >
+                {pathwayPreview?.imageUrl && (
+                  <img
+                    src={pathwayPreview.imageUrl}
+                    alt=""
+                    className="w-full h-28 object-cover border-b border-[#E8E4DE]"
+                  />
+                )}
+                <div className="p-3">
+                  <p className="text-sm font-semibold text-[#2C2A26]">{pathwayPreview?.title}</p>
+                  <p className="text-xs text-[#2C2A26]/65 mt-1 leading-relaxed">{pathwayPreview?.description}</p>
+                  <p className="text-xs text-[#6B8F71] font-medium mt-2">Tap to preview all 4 phases</p>
+                </div>
+              </button>
             </motion.div>
           )}
 
-          {/* Quote */}
-          {summaryView.quote_of_the_day && (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-white rounded-2xl p-4 border border-[#E8E4DE]">
-              <p className="text-sm text-[#2C2A26]/80 italic text-center">"{summaryView.quote_of_the_day}"</p>
-            </motion.div>
-          )}
-
-          {/* Energy Shift */}
-          {summaryView.energy_shift && (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-white rounded-2xl p-4 border border-[#E8E4DE] flex items-center justify-between">
-              <div>
-                <p className="text-[10px] font-medium text-[#2C2A26]/50 uppercase mb-1">Start of Session</p>
-                <p className="text-sm font-medium text-[#2C2A26] line-through decoration-[#B4A7D6]">{summaryView.energy_shift.start}</p>
-              </div>
-              <div className="text-[#B4A7D6]">&rarr;</div>
-              <div className="text-right">
-                <p className="text-[10px] font-medium text-[#2C2A26]/50 uppercase mb-1">End of Session</p>
-                <p className="text-sm font-medium text-[#6B8F71]">{summaryView.energy_shift.end}</p>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Psych Flexibility */}
-          {summaryView.psychological_flexibility && (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-white rounded-2xl p-4 border border-[#E8E4DE]">
-              <p className="text-xs font-medium text-[#2C2A26]/50 uppercase mb-3">Psychological Flexibility Profile</p>
-              <div className="space-y-3">
-                {[
-                  { label: 'Self-Awareness', value: summaryView.psychological_flexibility.self_awareness },
-                  { label: 'Somatic Observation', value: summaryView.psychological_flexibility.observation },
-                  { label: 'Physical Integration', value: summaryView.psychological_flexibility.physical_awareness },
-                  { label: 'Values Alignment', value: summaryView.psychological_flexibility.core_values },
-                  { label: 'Relationships', value: summaryView.psychological_flexibility.relationships },
-                ].filter(s => s.value !== undefined).map((stat, i) => (
-                  <div key={i}>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-[#2C2A26]/80">{stat.label}</span>
-                      <span className="font-medium text-[#2C2A26]">{stat.value}%</span>
-                    </div>
-                    <div className="h-1.5 w-full bg-[#E8E4DE] rounded-full overflow-hidden">
-                      <motion.div
-                        className="h-full bg-[#D4A574]"
-                        initial={{ width: 0 }}
-                        animate={{ width: `${stat.value}%` }}
-                        transition={{ delay: 0.5 + i * 0.1, duration: 0.8, ease: "easeOut" }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-
-          {/* Self-Compassion */}
-          {summaryView.self_compassion_score !== undefined && (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="bg-[#FAF9F7] rounded-2xl p-4 text-center">
-              <p className="text-3xl font-bold text-[#6B8F71] mb-1">{summaryView.self_compassion_score}</p>
-              <p className="text-xs font-medium text-[#2C2A26]/50 uppercase">Self-Compassion Score</p>
-            </motion.div>
-          )}
-
-          {/* Homework Tasks — full extracted_tasks[] */}
-          {tasks.length > 0 && (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
-              <p className="text-xs font-semibold text-[#2C2A26]/50 uppercase tracking-wide mb-2">Your Homework</p>
-              <div className="space-y-2">
-                {tasks.map((t: any, i: number) => (
-                  <div key={i} className="bg-[#6B8F71]/8 rounded-2xl p-4 border border-[#6B8F71]/20">
-                    <div className="flex items-start gap-2">
-                      <span className="text-lg mt-0.5">{t.task_type === 'journaling' ? '✍️' : t.task_type === 'somatic_exercise' ? '🌬️' : t.task_type === 'cognitive_reframing' ? '🧠' : t.task_type === 'behavioral_exposure' ? '🚶' : '🎯'}</span>
-                      <div>
-                        <p className="text-sm font-semibold text-[#2C2A26]">{t.dynamic_title || t.task_name}</p>
-                        <p className="text-xs text-[#2C2A26]/60 mt-0.5 leading-relaxed">{t.dynamic_description || t.task_description}</p>
-                        {t.frequency && (
-                          <span className="inline-block mt-1.5 text-[10px] font-medium px-2 py-0.5 rounded-full bg-[#6B8F71]/15 text-[#6B8F71]">
-                            {t.frequency}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-
-          {/* Pathway Recommendation Card */}
-          {isNewPathway && (
+          {tasksWithUi.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
+              transition={{ delay: 0.08 }}
+            >
+              <p className="text-xs font-semibold text-[#2C2A26]/50 uppercase tracking-wide mb-2">Care Plan Tasks</p>
+              <div className="space-y-2.5">
+                {tasksWithUi.map((task, i) => {
+                  const taskTitle = task.dynamic_title || task.task_name || normalizeLabel(task.task_type || `Task ${i + 1}`);
+                  const taskDesc = task.dynamic_description || task.task_description || 'Practice this between sessions to reinforce your progress.';
+                  const taskKey = task._ui_key as string;
+                  const isExpanded = expandedTaskKey === taskKey;
+                  const done = completedTaskKeys[taskKey] === true;
+                  const taskGlyph =
+                    task.task_type === 'journaling' ? '✍️' :
+                    task.task_type === 'somatic_exercise' ? '🌬️' :
+                    task.task_type === 'cognitive_reframing' ? '🧠' :
+                    task.task_type === 'behavioral_exposure' ? '🚶' : '🎯';
+                  const effort = task.task_type === 'somatic_exercise' || task.task_type === 'journaling'
+                    ? '2-5 min'
+                    : '8-12 min';
+                  return (
+                    <div key={taskKey} className={`rounded-2xl p-4 border ${done ? 'bg-[#EEF6F0] border-[#C7DDCC]' : 'bg-white border-[#E8E4DE]'}`}>
+                      <div className="flex items-start gap-2">
+                        <span className="text-lg mt-0.5">{taskGlyph}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-semibold ${done ? 'text-[#4A6A50]' : 'text-[#2C2A26]'}`}>{taskTitle}</p>
+                          <p className="text-xs text-[#2C2A26]/65 mt-0.5 leading-relaxed">{taskDesc}</p>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[#6B8F71]/12 text-[#44614A]">
+                              Effort: {effort}
+                            </span>
+                            {task.frequency && (
+                              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[#6B8F71]/12 text-[#44614A]">
+                                {String(task.frequency)}
+                              </span>
+                            )}
+                            {task.suggested_duration_days && (
+                              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[#6B8F71]/12 text-[#44614A]">
+                                {task.suggested_duration_days} day plan
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 mt-2.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const next = !done;
+                                setCompletedTaskKeys((prev) => ({ ...prev, [taskKey]: next }));
+                                if (next && task.id && profile?.id) {
+                                  void supabase
+                                    .from('mind_coach_user_tasks')
+                                    .update({ status: 'completed', completed_at: new Date().toISOString() })
+                                    .eq('id', task.id)
+                                    .eq('profile_id', profile.id);
+                                }
+                              }}
+                              className={`text-xs font-semibold inline-flex items-center gap-1 ${done ? 'text-[#4A6A50]' : 'text-[#2C2A26]/70 hover:text-[#2C2A26]'}`}
+                            >
+                              <CheckCircle2 size={12} />
+                              {done ? 'Marked complete' : 'Quick complete'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setExpandedTaskKey(isExpanded ? null : taskKey)}
+                              className="text-xs font-medium text-[#2C2A26]/55 hover:text-[#2C2A26] inline-flex items-center gap-1"
+                            >
+                              {isExpanded ? 'Less' : 'Why this matters'}
+                              {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                            </button>
+                          </div>
+                          {isExpanded && (
+                            <div className="mt-2.5 rounded-xl bg-[#FAF7F3] border border-[#EEE6DB] p-2.5">
+                              <p className="text-xs text-[#2C2A26]/70 leading-relaxed">
+                                {task.task_rationale ||
+                                  caseNotes?.readiness_rationale ||
+                                  'This task is intentionally low-friction so practice can fit into your real day, not just ideal days.'}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
+
+          {nextFocusOptions.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="bg-white rounded-2xl p-4 border border-[#E8E4DE]"
+            >
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#2C2A26]/50 mb-1">Guided Next Focus</p>
+              <p className="text-xs text-[#2C2A26]/65 mb-2.5">Choose one intention and we will prefill your next session opener.</p>
+              <div className="flex flex-wrap gap-2">
+                {nextFocusOptions.map((option, idx) => {
+                  const selected = selectedNextFocus === option;
+                  return (
+                    <button
+                      key={`${option}-${idx}`}
+                      type="button"
+                      onClick={() => {
+                        setSelectedNextFocus(option);
+                        if (profile?.id) {
+                          localStorage.setItem(getNextFocusStorageKey(profile.id), option);
+                        }
+                      }}
+                      className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                        selected
+                          ? 'bg-[#2C2A26] text-white border-[#2C2A26]'
+                          : 'bg-[#F8F4EF] text-[#2C2A26]/80 border-[#E8E4DE] hover:bg-[#F1E9E0]'
+                      }`}
+                    >
+                      {option}
+                    </button>
+                  );
+                })}
+              </div>
+              {selectedNextFocus && (
+                <p className="text-[11px] text-[#2C2A26]/55 mt-2.5">
+                  Saved. Next time, we will start with: "{selectedNextFocus}".
+                </p>
+              )}
+            </motion.div>
+          )}
+
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.12 }}
+            className="bg-white rounded-2xl border border-[#E8E4DE] overflow-hidden"
+          >
+            <button
+              type="button"
+              onClick={() => setShowDeepInsights((s) => !s)}
+              className="w-full px-4 py-3 flex items-center justify-between text-left"
+            >
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#2C2A26]/50">Deep Insights</p>
+                <p className="text-xs text-[#2C2A26]/65 mt-0.5">Metrics are optional; open when you want details.</p>
+              </div>
+              {showDeepInsights ? <ChevronUp size={16} className="text-[#2C2A26]/55" /> : <ChevronDown size={16} className="text-[#2C2A26]/55" />}
+            </button>
+            {showDeepInsights && (
+              <div className="px-4 pb-4 space-y-3 border-t border-[#F1ECE6]">
+                {summaryView.energy_shift && (
+                  <div className="pt-3 flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] font-medium text-[#2C2A26]/50 uppercase">Energy Shift</p>
+                      <p className="text-xs text-[#2C2A26]/75">From {String(summaryView.energy_shift.start)} to {String(summaryView.energy_shift.end)}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setInput('I want to journal for 2 minutes about what shifted for me today.')}
+                      className="text-[11px] font-medium text-[#2C2A26]/60 hover:text-[#2C2A26]"
+                    >
+                      Journal 2 min
+                    </button>
+                  </div>
+                )}
+                {summaryView.psychological_flexibility && (
+                  <div>
+                    <p className="text-[10px] font-medium text-[#2C2A26]/50 uppercase mb-2">Psychological Flexibility</p>
+                    <div className="space-y-2">
+                      {[
+                        { label: 'Self-Awareness', value: summaryView.psychological_flexibility.self_awareness },
+                        { label: 'Somatic Observation', value: summaryView.psychological_flexibility.observation },
+                        { label: 'Physical Integration', value: summaryView.psychological_flexibility.physical_awareness },
+                        { label: 'Values Alignment', value: summaryView.psychological_flexibility.core_values },
+                        { label: 'Relationships', value: summaryView.psychological_flexibility.relationships },
+                      ].filter((s) => s.value !== undefined).map((stat, i) => (
+                        <div key={i}>
+                          <div className="flex justify-between text-[11px] mb-1">
+                            <span className="text-[#2C2A26]/75">{stat.label}</span>
+                            <span className="font-medium text-[#2C2A26]">{String(stat.value)}%</span>
+                          </div>
+                          <div className="h-1.5 w-full bg-[#E8E4DE] rounded-full overflow-hidden">
+                            <motion.div
+                              className="h-full bg-[#D4A574]"
+                              initial={{ width: 0 }}
+                              animate={{ width: `${stat.value}%` }}
+                              transition={{ delay: 0.2 + i * 0.08, duration: 0.6, ease: 'easeOut' }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {summaryView.self_compassion_score !== undefined && (
+                  <div className="rounded-xl bg-[#FAF9F7] p-3 border border-[#EEE6DB]">
+                    <p className="text-lg font-semibold text-[#6B8F71]">{String(summaryView.self_compassion_score)}</p>
+                    <p className="text-[11px] text-[#2C2A26]/55">Self-compassion score. Treat this as a trend, not a grade.</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="bg-white rounded-2xl p-4 border border-[#E8E4DE]"
+          >
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles size={14} className="text-[#6B8F71]" />
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#2C2A26]/50">Primary Action</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={handleCloseSummary}
+                className="py-2.5 px-3 rounded-xl bg-[#2C2A26] text-white text-sm font-semibold hover:bg-[#3B3731] transition-colors inline-flex items-center justify-center gap-2"
+              >
+                <Target size={14} />
+                Plan Next Session
+              </button>
+              <button
+                type="button"
+                onClick={() => setInput('I want to quickly journal what I learned in today\'s session.')}
+                className="py-2.5 px-3 rounded-xl border border-[#E8E4DE] text-[#2C2A26] text-sm font-medium hover:bg-[#F7F3EE] transition-colors"
+              >
+                Journal 2 min
+              </button>
+            </div>
+            {selectedNextFocus && (
+              <p className="text-[11px] text-[#2C2A26]/55 mt-2.5">
+                We will carry this intent forward: "{selectedNextFocus}".
+              </p>
+            )}
+          </motion.div>
+
+          {isNewPathway && !shouldShowPathwayPreview && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.18 }}
               className="bg-gradient-to-br from-[#2C2A26] to-[#3D3A34] rounded-2xl p-5 text-white"
             >
               <div className="flex items-center gap-2 mb-1">
@@ -975,22 +1375,109 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
                 <p className="text-[10px] font-semibold uppercase tracking-widest text-white/50">Recommended Path</p>
               </div>
               <p className="text-base font-semibold mb-1">
-                {PATHWAY_LABELS[suggestedPathway] ?? suggestedPathway.replace(/_/g, ' ')}
+                {PATHWAY_LABELS[suggestedPathway] ?? String(suggestedPathway).replace(/_/g, ' ')}
               </p>
               <p className="text-xs text-white/60 mb-4 leading-relaxed">
-                Based on our conversation, this pathway looks like a strong fit for what you're working through.
+                Based on your recent sessions, this path is a strong fit for what you are working through now.
               </p>
               <button
-                onClick={() => {
-                  handleCloseSummary();
-                }}
+                onClick={handleCloseSummary}
                 className="w-full py-2.5 bg-white text-[#2C2A26] text-sm font-semibold rounded-xl hover:bg-white/90 transition-colors"
               >
-                Start My Journey →
+                Start My Journey
               </button>
             </motion.div>
           )}
         </div>
+        {showPathwayPhases && shouldShowPathwayPreview && (
+          <div className="absolute inset-0 z-20 bg-[#2C2A26]/40 backdrop-blur-[2px] flex items-end sm:items-center sm:justify-center p-2 sm:p-4">
+            <div className="w-full sm:max-w-2xl max-h-[92vh] overflow-y-auto rounded-3xl bg-[#FBF8F4] border border-[#E8E4DE] shadow-2xl p-4 sm:p-5">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm font-semibold text-[#2C2A26]">
+                  {pathwayPreview?.title}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowPathwayPhases(false)}
+                  className="text-[#2C2A26]/50 hover:text-[#2C2A26] text-sm"
+                >
+                  Close
+                </button>
+              </div>
+              <div className="flex items-center justify-center gap-2 mb-4">
+                {pathwayPhases.map((_, index) => {
+                  const isDone = index < activePathwayPhase;
+                  const isCurrent = index === activePathwayPhase;
+                  return (
+                    <React.Fragment key={index}>
+                      <button
+                        type="button"
+                        onClick={() => setActivePathwayPhase(index)}
+                        className={`w-7 h-7 rounded-full text-[11px] font-semibold border ${
+                          isCurrent
+                            ? 'bg-[#6B8F71] text-white border-[#6B8F71]'
+                            : isDone
+                              ? 'bg-[#6B8F71]/15 text-[#44614A] border-[#6B8F71]/30'
+                              : 'bg-white text-[#2C2A26]/60 border-[#D9D3CB]'
+                        }`}
+                      >
+                        {isDone ? '✓' : index + 1}
+                      </button>
+                      {index < pathwayPhases.length - 1 && <div className="w-8 h-[2px] bg-[#D9D3CB]" />}
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+              {pathwayPhases[activePathwayPhase] && (
+                <div className="bg-white rounded-2xl border border-[#E8E4DE] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#2C2A26]/45 mb-1">
+                    Step {activePathwayPhase + 1} of {pathwayPhases.length}
+                  </p>
+                  <h4 className="text-lg font-semibold text-[#2C2A26] mb-2">
+                    {String(pathwayPhases[activePathwayPhase].phase_name || 'Phase')}
+                  </h4>
+                  <p className="text-sm text-[#2C2A26]/75 leading-relaxed mb-3">
+                    {String(pathwayPhases[activePathwayPhase].phase_description || '')}
+                  </p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#2C2A26]/45 mb-2">
+                    What we will explore together
+                  </p>
+                  <div className="space-y-1.5">
+                    {pathwayPhases.map((phase, idx) => (
+                      <p key={idx} className="text-xs text-[#2C2A26]/70 flex items-start gap-1.5">
+                        <span className="mt-0.5 text-[#6B8F71]">•</span>
+                        <span>{String(phase.phase_name || `Phase ${idx + 1}`)}</span>
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  disabled={activePathwayPhase === 0}
+                  onClick={() => setActivePathwayPhase((p) => Math.max(0, p - 1))}
+                  className="py-2.5 rounded-xl border border-[#E8E4DE] text-sm text-[#2C2A26]/70 disabled:opacity-40"
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (activePathwayPhase >= pathwayPhases.length - 1) {
+                      setShowPathwayPhases(false);
+                      return;
+                    }
+                    setActivePathwayPhase((p) => Math.min(pathwayPhases.length - 1, p + 1));
+                  }}
+                  className="py-2.5 rounded-xl bg-[#2C2A26] text-white text-sm font-semibold"
+                >
+                  {activePathwayPhase >= pathwayPhases.length - 1 ? 'Done' : 'Next'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

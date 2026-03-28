@@ -4,6 +4,8 @@ import { corsHeaders } from '../_shared/cors.ts';
 
 const DEFAULT_MIN_SESSIONS_PER_PHASE = 3;
 const DEFAULT_MAX_SESSIONS_PER_PHASE = 5;
+const DEFAULT_PATHWAY_PREVIEW_IMAGE_URL =
+  'https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/mind%20coach/Generated_image.jpg';
 
 function getRequiredSessionsForPhase(phase: any): number {
   if (!phase || !Array.isArray(phase.sessions)) return DEFAULT_MIN_SESSIONS_PER_PHASE;
@@ -16,6 +18,20 @@ function hasMajorRiskSignals(caseNotes: any, sessionSummary: any): boolean {
   if (caseNotes?.crisis_detected === true || caseNotes?.requires_escalation === true) return true;
   if (sessionSummary?.crisis_detected === true || sessionSummary?.requires_escalation === true) return true;
   return false;
+}
+
+function normalizePathwayCandidate(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed;
+}
+
+function pathwayDisplayName(pathwayName: string): string {
+  return pathwayName
+    .split('_')
+    .map((token) => token.charAt(0).toUpperCase() + token.slice(1))
+    .join(' ');
 }
 
 serve(async (req) => {
@@ -129,6 +145,8 @@ serve(async (req) => {
       profile,
       session: {
         pathway: title,
+        pathway_slug: session.pathway,
+        discovery_state: journey?.discovery_state ?? null,
         dynamic_theme: session.dynamic_theme,
         session_number: (journey?.sessions_completed || 0) + 1
       },
@@ -176,6 +194,55 @@ serve(async (req) => {
     const extracted_memories = Array.isArray(parsed?.extracted_memories) ? parsed.extracted_memories : [];
     const extracted_tasks = Array.isArray(parsed?.extracted_tasks) ? parsed.extracted_tasks : [];
     const agent_meta = parsed?.agent_meta && typeof parsed.agent_meta === 'object' ? parsed.agent_meta : null;
+    const suggestedPathwayCandidate =
+      normalizePathwayCandidate(parsed?.suggested_pathway) ??
+      normalizePathwayCandidate(session_summary?.suggested_pathway) ??
+      normalizePathwayCandidate(case_notes?.pathway_used) ??
+      normalizePathwayCandidate(journey?.discovery_state?.suggested_pathway) ??
+      null;
+
+    const shouldAttachPathwayDetails =
+      (session.pathway === 'engagement_rapport_and_assessment' || !session.pathway) &&
+      suggestedPathwayCandidate &&
+      suggestedPathwayCandidate !== 'engagement_rapport_and_assessment';
+
+    let pathwayDetails: Record<string, unknown> | null = null;
+    if (shouldAttachPathwayDetails) {
+      const { data: phaseRows } = await supabaseAdmin
+        .from('mind_coach_pathway_phases')
+        .select('pathway_name,pathway_description,phase_number,phase_name,phase_description')
+        .eq('pathway_name', suggestedPathwayCandidate)
+        .order('phase_number', { ascending: true })
+        .limit(4);
+
+      const phases = Array.isArray(phaseRows)
+        ? phaseRows.map((row: any) => ({
+            phase_number: row.phase_number,
+            phase_name: row.phase_name,
+            phase_description: row.phase_description,
+          }))
+        : [];
+      const pathwayDescription =
+        phaseRows?.[0]?.pathway_description ||
+        `A structured 4-phase pathway tailored for ${pathwayDisplayName(suggestedPathwayCandidate)}.`;
+
+      pathwayDetails = {
+        pathway_name: suggestedPathwayCandidate,
+        pathway_title: pathwayDisplayName(suggestedPathwayCandidate),
+        pathway_description: pathwayDescription,
+        image_url: Deno.env.get('MC_PATHWAY_PREVIEW_IMAGE_URL') || DEFAULT_PATHWAY_PREVIEW_IMAGE_URL,
+        phases,
+      };
+    }
+
+    const summaryDataForStorage =
+      session_summary && typeof session_summary === 'object'
+        ? {
+            ...session_summary,
+            ...(suggestedPathwayCandidate ? { suggested_pathway: suggestedPathwayCandidate } : {}),
+            ...(pathwayDetails ? { pathway_details: pathwayDetails } : {}),
+          }
+        : session_summary;
 
     // 3. Update session as completed
     await supabaseAdmin
@@ -184,7 +251,7 @@ serve(async (req) => {
         session_state: 'completed',
         ended_at: new Date().toISOString(),
         case_notes,
-        summary_data: session_summary,
+        summary_data: summaryDataForStorage,
         dynamic_theme: case_notes?.dynamic_theme || session.dynamic_theme,
         pathway: session.pathway,
       })
@@ -319,6 +386,8 @@ serve(async (req) => {
         extracted_tasks,
         extracted_memories,
         agent_meta,
+        suggested_pathway: suggestedPathwayCandidate,
+        pathway_details: pathwayDetails,
         memories_stored: memoriesStored,
         tasks_stored: extracted_tasks?.length || 0,
         session_id,
