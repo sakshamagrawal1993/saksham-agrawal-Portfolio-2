@@ -37,7 +37,7 @@ export const ExercisesScreen: React.FC = () => {
       >
         <div className="flex items-center justify-between">
           <div className="space-y-1">
-            <h2 className="text-2xl font-serif text-[#2C2A26]">Wellness Library</h2>
+            <h2 className="text-xl font-semibold text-[#2C2A26]">Wellness Library</h2>
             <p className="text-sm text-[#2C2A26]/50">Find your center with guided practices</p>
           </div>
           <div className="w-10 h-10 rounded-full bg-[#B4A7D6]/10 flex items-center justify-center text-[#B4A7D6]">
@@ -93,23 +93,20 @@ export const ExercisesScreen: React.FC = () => {
               transition={{ delay: idx * 0.05 }}
               key={ex.id}
               onClick={() => exercisesUnlocked && setActiveExercise(ex)}
-              className={`group relative bg-white p-5 rounded-[2rem] border border-[#E8E4DE] overflow-hidden ${
+              className={`group relative bg-white p-5 rounded-2xl border border-[#E8E4DE] overflow-hidden ${
                 exercisesUnlocked
                   ? 'hover:border-[#6B8F71]/30 hover:shadow-lg transition-all cursor-pointer'
                   : ''
               }`}
             >
-              {/* Decorative background shape */}
-              <div className="absolute top-0 right-0 -mr-4 -mt-4 w-24 h-24 rounded-full bg-[#F5F2EB] group-hover:bg-[#6B8F71]/5 transition-colors -z-0" />
-              
               <div className="relative z-10 flex items-start justify-between gap-4">
                 <div className="flex-1 space-y-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] uppercase tracking-widest font-bold text-[#6B8F71]">
+                    <span className="text-[11px] font-medium uppercase tracking-wide text-[#6B8F71]">
                       {ex.type}
                     </span>
-                    <span className="text-[10px] uppercase tracking-widest font-bold text-[#2C2A26]/30">•</span>
-                    <div className="flex items-center gap-1 text-[10px] uppercase tracking-widest font-bold text-[#2C2A26]/30">
+                    <span className="text-[11px] uppercase tracking-widest font-bold text-[#2C2A26]/30">•</span>
+                    <div className="flex items-center gap-1 text-[11px] uppercase tracking-widest font-bold text-[#2C2A26]/30">
                       <Clock size={10} />
                       {Math.ceil(ex.duration_seconds / 60)} min
                     </div>

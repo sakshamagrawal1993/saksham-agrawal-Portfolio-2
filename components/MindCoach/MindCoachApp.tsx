@@ -230,7 +230,7 @@ const MindCoachApp: React.FC = () => {
   // Onboarding flow
   if (needsOnboarding) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#E8E0D8] via-[#D6CFC6] to-[#C9C0B6] flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[#FAFAF7] flex items-center justify-center">
         <PhoneFrame>
           <OnboardingFlow
             onComplete={(newProfileId) => {
@@ -246,7 +246,7 @@ const MindCoachApp: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#E8E0D8] via-[#D6CFC6] to-[#C9C0B6] flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[#FAFAF7] flex items-center justify-center">
         <PhoneFrame>
           <div className="flex items-center justify-center h-full bg-[#FAFAF7]">
             <div className="flex flex-col items-center gap-3">
@@ -261,7 +261,7 @@ const MindCoachApp: React.FC = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#E8E0D8] via-[#D6CFC6] to-[#C9C0B6] flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[#FAFAF7] flex items-center justify-center">
         <PhoneFrame>
           <div className="flex items-center justify-center h-full bg-[#FAFAF7] px-6">
             <div className="text-center space-y-3">
@@ -275,15 +275,13 @@ const MindCoachApp: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#E8E0D8] via-[#D6CFC6] to-[#C9C0B6] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#FAFAF7] flex items-center justify-center">
       <PhoneFrame>
         <div className="flex flex-col h-full bg-[#FAFAF7]">
           <div className="flex-1 overflow-y-auto">
             <TabContent tab={activeTab} />
           </div>
-          {/* Hide BottomNav when in an active chat session */}
-          {activeTab !== 'sessions' && <BottomNav />}
-          {activeTab === 'sessions' && <BottomNav />}
+          <BottomNav />
         </div>
       </PhoneFrame>
     </div>

@@ -127,7 +127,7 @@ export const SessionsScreen: React.FC = () => {
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             onClick={() => handleResumeSession(session)}
-            className="w-full bg-[#6B8F71]/5 border border-[#6B8F71]/20 rounded-2xl p-4 text-left hover:border-[#6B8F71]/40 transition-colors"
+            className="w-full bg-[#6B8F71]/5 border border-[#6B8F71]/20 rounded-2xl p-5 text-left hover:border-[#6B8F71]/40 transition-colors"
           >
             <div className="flex items-center gap-2 mb-1">
               <div className="w-2 h-2 rounded-full bg-[#6B8F71] animate-pulse" />
@@ -154,7 +154,7 @@ export const SessionsScreen: React.FC = () => {
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.03 }}
-              className="bg-white rounded-2xl p-4 border border-[#E8E4DE]"
+              className="bg-white rounded-2xl p-5 border border-[#E8E4DE]"
             >
               <div className="flex items-start gap-3">
                 <div className="w-9 h-9 rounded-xl bg-[#F5F0EB] flex items-center justify-center shrink-0">

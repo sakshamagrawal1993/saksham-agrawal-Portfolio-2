@@ -25,7 +25,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   if (message.role === 'system') return null;
 
   const bubbleTone = isUser
-    ? 'bg-[#6B8F71] text-white rounded-br-md'
+    ? 'bg-[#E8F3E9] text-[#2C2A26] rounded-br-md'
     : 'bg-white text-[#2C2A26] border border-[#E8E4DE] rounded-bl-md';
 
   return (
@@ -37,7 +37,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     >
       {!isUser && (
         <div
-          className="w-7 h-7 rounded-full flex items-center justify-center overflow-hidden shrink-0 mt-1"
+          className="w-9 h-9 rounded-full flex items-center justify-center overflow-hidden shrink-0 mt-1"
           style={{ backgroundColor: therapistColor }}
         >
           {avatarUrl ? (
@@ -55,7 +55,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           {message.content}
         </div>
       ) : (
-        <div className="flex min-w-0 max-w-[75%] flex-col gap-4">
+        <div className="flex min-w-0 max-w-[85%] flex-col gap-4">
           <div
             className={`w-fit max-w-full rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${bubbleTone}`}
           >

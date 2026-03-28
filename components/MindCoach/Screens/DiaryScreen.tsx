@@ -104,29 +104,29 @@ export const DiaryScreen: React.FC = () => {
                 <div className="flex items-start gap-3">
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
                     entry.type === 'session'
-                      ? 'bg-[#B4A7D6]/15'
+                      ? 'bg-[#F5F0EB]'
                       : 'bg-[#6B8F71]/10'
                   }`}>
                     {entry.type === 'session' ? (
-                      <MessageCircle size={16} className="text-[#B4A7D6]" />
+                      <MessageCircle size={16} className="text-[#2C2A26]/40" />
                     ) : (
                       <BookOpen size={16} className="text-[#6B8F71]" />
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full ${
+                      <span className={`text-[11px] font-bold uppercase px-1.5 py-0.5 rounded-full ${
                         entry.type === 'session'
-                          ? 'bg-[#B4A7D6]/15 text-[#B4A7D6]'
+                          ? 'bg-[#F5F0EB] text-[#2C2A26]/50'
                           : 'bg-[#6B8F71]/10 text-[#6B8F71]'
                       }`}>
                         {entry.type === 'session' ? 'Session' : 'Journal'}
                       </span>
-                      <span className="text-[10px] text-[#2C2A26]/30">
+                      <span className="text-[11px] text-[#2C2A26]/30">
                         {new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                       </span>
                       {entry.mood && (
-                        <span className="text-[10px] text-[#D4A574] font-medium">· {entry.mood}</span>
+                        <span className="text-[11px] text-[#D4A574] font-medium">· {entry.mood}</span>
                       )}
                     </div>
                     <p className="text-sm font-medium text-[#2C2A26] truncate">{entry.title}</p>

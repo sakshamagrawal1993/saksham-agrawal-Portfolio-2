@@ -4,7 +4,7 @@ import { supabase } from '../../../lib/supabaseClient';
 import { useAuth } from '../../../context/AuthContext';
 import { useMindCoachStore, type TherapistPersona } from '../../../store/mindCoachStore';
 
-const TOTAL_STEPS = 8;
+const TOTAL_STEPS = 6;
 
 const CONCERN_OPTIONS = [
   'Anxiety & Worry',
@@ -36,7 +36,7 @@ const THERAPISTS: TherapistOption[] = [
     id: 'maya',
     name: 'Maya',
     style: 'Warm, empathetic listener',
-    approach: 'Person-Centered',
+    approach: 'Gentle and reflective',
     color: '#B4A7D6',
     sample: "I hear you, and I want you to know — what you're feeling makes complete sense.",
     avatarUrl: "https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/guide-avatars/maya.png",
@@ -45,7 +45,7 @@ const THERAPISTS: TherapistOption[] = [
     id: 'alex',
     name: 'Alex',
     style: 'Structured, action-oriented coach',
-    approach: 'CBT + Behavioral Activation',
+    approach: 'Structured and practical',
     color: '#D4A574',
     sample: "Let's break this down together and find practical steps you can take today.",
     avatarUrl: "https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/guide-avatars/alex.png",
@@ -54,7 +54,7 @@ const THERAPISTS: TherapistOption[] = [
     id: 'sage',
     name: 'Sage',
     style: 'Thoughtful, growth-focused guide',
-    approach: 'ACT + DBT',
+    approach: 'Mindful and values-driven',
     color: '#6B8F71',
     sample: "What if we explored what's underneath that feeling? There might be something important there.",
     avatarUrl: "https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/guide-avatars/sage.png",
@@ -99,7 +99,7 @@ function PrimaryButton({ children, onClick, disabled = false }: { children: Reac
     <button
       onClick={onClick}
       disabled={disabled}
-      className="w-full py-3.5 rounded-2xl bg-[#6B8F71] text-white font-medium text-base hover:bg-[#5A7D60] active:scale-[0.98] transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
+      className="w-full py-3.5 rounded-xl bg-[#6B8F71] text-white font-medium text-base hover:bg-[#5A7D60] active:scale-[0.98] transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
     >
       {children}
     </button>
@@ -121,9 +121,6 @@ function StepShell({ step, onBack, children, footer }: { step: number; onBack?: 
     </div>
   );
 }
-
-// Steps components (Welcome, SafeSpace, Name, etc.) follow the same pattern as MindCoachLanding...
-// [Truncated for brevity in thought, but included fully in ReplacementContent]
 
 interface OnboardingFlowProps {
   onComplete: (profileId: string) => void;
@@ -152,6 +149,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
 
   const renderStep = () => {
     switch (step) {
+      /* Step 1: Welcome — concern-mirroring copy, no generic quote */
       case 1: return (
         <StepShell step={1}>
           <div className="flex-1 flex flex-col items-center justify-center text-center space-y-8 max-w-sm mx-auto">
@@ -161,98 +159,98 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
                 <line x1="10" y1="22" x2="14" y2="22" />
               </svg>
             </div>
-            <div className="space-y-4">
-              <blockquote className="text-xl leading-relaxed text-[#2C2A26] font-serif italic">
-                "The greatest glory in living lies not in never falling, but in rising every time we fall."
-              </blockquote>
-              <p className="text-[#2C2A26]/60 text-sm">Your mind deserves the same care as your body.</p>
+            <div className="space-y-3">
+              <h2 className="text-xl font-semibold text-[#2C2A26] leading-snug">
+                Whatever brought you here, you are in the right place.
+              </h2>
+              <p className="text-[#2C2A26]/50 text-sm leading-relaxed">
+                Your mind deserves the same care as your body. This is a space to talk, reflect, and grow at your own pace.
+              </p>
             </div>
-            <div className="space-y-3 w-full">
-              <PrimaryButton onClick={goForward}>Begin Your Journey</PrimaryButton>
-              <div className="space-y-2 pt-2">
-                <p className="text-xs text-[#2C2A26]/40">Join 10,000+ people who chose to prioritize their mental well-being</p>
-                <div className="inline-flex items-center gap-1.5 bg-[#B4A7D6]/10 px-3 py-1.5 rounded-full">
-                   <span className="text-xs text-[#2C2A26]/50">Built on CBT, DBT, ACT & Person-Centered Therapy</span>
-                </div>
-              </div>
+            <div className="w-full">
+              <PrimaryButton onClick={goForward}>Begin</PrimaryButton>
             </div>
           </div>
         </StepShell>
       );
+
+      /* Step 2: Safe space — warm neutral crisis card */
       case 2: return (
         <StepShell step={2} onBack={goBack}>
           <div className="flex-1 flex flex-col items-center justify-center text-center space-y-6 max-w-sm mx-auto">
-            <div className="w-16 h-16 rounded-full bg-[#B4A7D6]/15 flex items-center justify-center">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#B4A7D6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <div className="w-16 h-16 rounded-full bg-[#F5F0EB] flex items-center justify-center">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#6B8F71" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
               </svg>
             </div>
             <div className="space-y-3">
-              <h2 className="text-2xl font-semibold text-[#2C2A26]">This is your safe space</h2>
-              <p className="text-sm text-[#2C2A26]/60 leading-relaxed">I'm an AI wellness coach, not a licensed therapist. I use evidence-based techniques to support your mental well-being.</p>
+              <h2 className="text-xl font-semibold text-[#2C2A26]">This is your safe space</h2>
+              <p className="text-sm text-[#2C2A26]/55 leading-relaxed">I'm an AI wellness coach, not a licensed therapist. I use evidence-based techniques to support your mental well-being.</p>
             </div>
-            <div className="w-full bg-red-50 border border-red-100 rounded-2xl p-4 text-left space-y-2">
-              <p className="text-xs font-semibold text-red-800/80">If you're ever in crisis:</p>
-              <p className="text-xs text-red-700/70">988 Suicide & Crisis Lifeline: <span className="font-bold">Call or text 988</span></p>
+            <div className="w-full bg-[#F5F0EB] border border-[#E8E4DE] rounded-2xl p-4 text-left space-y-2">
+              <p className="text-xs font-medium text-[#2C2A26]/70">If you're ever in crisis:</p>
+              <p className="text-xs text-[#2C2A26]/60">988 Suicide & Crisis Lifeline: <span className="font-semibold text-[#2C2A26]/80">Call or text 988</span></p>
             </div>
             <PrimaryButton onClick={goForward}>I understand, let's begin</PrimaryButton>
           </div>
         </StepShell>
       );
+
+      /* Step 3: About you — merged name, age, gender */
       case 3: return (
         <StepShell step={3} onBack={goBack}>
-          <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full space-y-8">
-            <div className="space-y-2">
-              <h2 className="text-2xl font-semibold text-[#2C2A26]">What should we call you?</h2>
+          <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full space-y-6">
+            <h2 className="text-xl font-semibold text-[#2C2A26]">Tell us about you</h2>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-medium text-[#2C2A26]/50 mb-1.5 block">Your name</label>
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Name"
+                  className="w-full px-4 py-3 rounded-xl bg-white border border-[#E8E4DE] text-[#2C2A26] text-sm focus:border-[#6B8F71] transition-all outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-[#2C2A26]/50 mb-1.5 block">Age</label>
+                <input
+                  type="number"
+                  value={age}
+                  onChange={(e) => setAge(e.target.value)}
+                  placeholder="Age"
+                  className="w-full px-4 py-3 rounded-xl bg-white border border-[#E8E4DE] text-[#2C2A26] text-sm focus:border-[#6B8F71] transition-all outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-[#2C2A26]/50 mb-1.5 block">How do you identify?</label>
+                <div className="grid grid-cols-2 gap-2.5">
+                  {GENDER_OPTIONS.map((o) => (
+                    <button
+                      key={o}
+                      onClick={() => setGender(o)}
+                      className={`p-3 rounded-xl border text-sm font-medium transition-all ${gender === o ? 'border-[#6B8F71] bg-[#6B8F71]/5 text-[#2C2A26]' : 'border-[#E8E4DE] bg-white text-[#2C2A26]/70'}`}
+                    >
+                      {o}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Your name"
-              className="w-full px-4 py-3.5 rounded-2xl bg-white border border-[#E8E4DE] text-[#2C2A26] focus:border-[#6B8F71] transition-all"
-            />
-            <PrimaryButton onClick={goForward} disabled={!name.trim()}>Continue</PrimaryButton>
+
+            <PrimaryButton onClick={goForward} disabled={!name.trim() || !age || !gender}>Continue</PrimaryButton>
           </div>
         </StepShell>
       );
+
+      /* Step 4: Concerns */
       case 4: return (
         <StepShell step={4} onBack={goBack}>
-          <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full space-y-8">
-            <h2 className="text-2xl font-semibold text-[#2C2A26]">How old are you, {name}?</h2>
-            <input
-              type="number"
-              value={age}
-              onChange={(e) => setAge(e.target.value)}
-              placeholder="Age"
-              className="w-full px-4 py-3.5 rounded-2xl bg-white border border-[#E8E4DE] text-[#2C2A26] focus:border-[#6B8F71] transition-all"
-            />
-            <PrimaryButton onClick={goForward} disabled={!age}>Continue</PrimaryButton>
-          </div>
-        </StepShell>
-      );
-      case 5: return (
-        <StepShell step={5} onBack={goBack}>
-          <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full space-y-8">
-            <h2 className="text-2xl font-semibold text-[#2C2A26]">How do you identify?</h2>
-            <div className="grid grid-cols-2 gap-3">
-              {GENDER_OPTIONS.map((o) => (
-                <button
-                  key={o}
-                  onClick={() => setGender(o)}
-                  className={`p-4 rounded-2xl border-2 text-sm font-medium transition-all ${gender === o ? 'border-[#6B8F71] bg-[#6B8F71]/5' : 'border-[#E8E4DE] bg-white'}`}
-                >
-                  {o}
-                </button>
-              ))}
-            </div>
-            <PrimaryButton onClick={goForward} disabled={!gender}>Continue</PrimaryButton>
-          </div>
-        </StepShell>
-      );
-      case 6: return (
-        <StepShell step={6} onBack={goBack}>
           <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full space-y-6">
-            <h2 className="text-2xl font-semibold text-[#2C2A26]">What brings you here, {name}?</h2>
+            <div>
+              <h2 className="text-xl font-semibold text-[#2C2A26]">What brings you here, {name}?</h2>
+              <p className="text-xs text-[#2C2A26]/40 mt-1.5">Choose up to 3 that resonate most.</p>
+            </div>
             <div className="flex flex-wrap gap-2.5">
               {CONCERN_OPTIONS.map((c) => {
                 const sel = concerns.includes(c);
@@ -271,10 +269,12 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
           </div>
         </StepShell>
       );
-      case 7: return (
-        <StepShell step={7} onBack={goBack}>
+
+      /* Step 5: Choose guide — plain-language approach labels */
+      case 5: return (
+        <StepShell step={5} onBack={goBack}>
           <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full space-y-5">
-            <h2 className="text-2xl font-semibold text-[#2C2A26]">Choose your guide</h2>
+            <h2 className="text-xl font-semibold text-[#2C2A26]">Choose your guide</h2>
             <div className="space-y-3">
               {THERAPISTS.map((t) => (
                 <button
@@ -289,7 +289,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
                         <span className="font-semibold text-[#2C2A26]">{t.name}</span>
                         <span className="text-xs text-[#2C2A26]/40">{t.approach}</span>
                       </div>
-                      <p className="text-sm text-[#2C2A26]/60">{t.style}</p>
+                      <p className="text-sm text-[#2C2A26]/55 mt-0.5">{t.style}</p>
                     </div>
                   </div>
                 </button>
@@ -299,7 +299,9 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
           </div>
         </StepShell>
       );
-      case 8: return (
+
+      /* Step 6: Journey preview */
+      case 6: return (
         <JourneyPreviewStep
           concerns={concerns}
           name={name}
@@ -338,18 +340,18 @@ function JourneyPreviewStep({ concerns, name, age, gender, therapist, onBack, on
   const { user } = useAuth();
   const { setProfile, setJourney } = useMindCoachStore();
 
+  const therapistName = THERAPISTS.find((t) => t.id === therapist)?.name ?? 'your guide';
+
   const handleStart = async () => {
     if (saving || !user?.id) return;
     setSaving(true);
     setSaveError(null);
     try {
-      // 1. Create profile
       const { data: profile, error: pErr } = await supabase.from('mind_coach_profiles')
         .insert({ user_id: user?.id, name, age, gender, concerns, therapist_persona: therapist })
         .select().single();
       if (pErr) throw pErr;
 
-      // 2. Create journey
       const { data: journey, error: jErr } = await supabase.from('mind_coach_journeys')
         .insert({
           profile_id: profile.id,
@@ -362,7 +364,6 @@ function JourneyPreviewStep({ concerns, name, age, gender, therapist, onBack, on
         }).select().single();
       if (jErr) throw jErr;
 
-      // 3. Create session
       const { data: session, error: sErr } = await supabase.from('mind_coach_sessions')
         .insert({ profile_id: profile.id, journey_id: journey.id, phase_number: 1, session_number: 1, pathway: 'engagement_rapport_and_assessment', session_state: 'intake', message_count: 0 })
         .select().single();
@@ -376,7 +377,7 @@ function JourneyPreviewStep({ concerns, name, age, gender, therapist, onBack, on
     } catch (err) {
       console.error(err);
       setSaveError(
-        'We could not finish setup. Check your connection and try again. If this keeps happening, sign out and back in.',
+        'We could not finish setup. Check your connection and try again.',
       );
     } finally {
       setSaving(false);
@@ -384,8 +385,8 @@ function JourneyPreviewStep({ concerns, name, age, gender, therapist, onBack, on
   };
 
   return (
-    <StepShell 
-      step={8} 
+    <StepShell
+      step={6}
       onBack={onBack}
       footer={
         <div className="w-full space-y-3">
@@ -397,54 +398,34 @@ function JourneyPreviewStep({ concerns, name, age, gender, therapist, onBack, on
           <button
             onClick={handleStart}
             disabled={saving}
-            className="w-full py-4 rounded-2xl bg-[#6B8F71] text-white font-semibold text-base hover:bg-[#5A7D60] transition-all disabled:opacity-50"
+            className="w-full py-4 rounded-xl bg-[#6B8F71] text-white font-semibold text-base hover:bg-[#5A7D60] transition-all disabled:opacity-50"
           >
             {saving ? 'Setting up...' : saveError ? 'Try again' : 'Start Your Journey'}
           </button>
         </div>
       }
     >
-      <div className="flex flex-col items-center pt-4 space-y-8">
-        {/* Path Formulated Badge */}
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#E8F3E9] text-[#5B8561] text-[10px] font-bold tracking-widest uppercase shrink-0">
+      <div className="flex flex-col items-center pt-6 space-y-8">
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#E8F3E9] text-[#5B8561] text-[11px] font-semibold tracking-wide uppercase shrink-0">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="20 6 9 17 4 12" />
           </svg>
-          Your Path Formulated
+          Ready to begin
         </div>
 
-        {/* Title & Description */}
-        <div className="space-y-4 text-center max-w-[320px] shrink-0">
-          <h2 className="text-[32px] leading-tight font-serif text-[#2C2A26]">Initial Assessment Phase</h2>
-          <p className="text-[#2C2A26]/60 text-[15px] leading-relaxed">
-            Before we formulate a precise plan, let's take a few sessions just to unpack what's going on. I am here to listen and understand your world.
+        <div className="space-y-4 text-center max-w-[300px] shrink-0">
+          <h2 className="text-xl font-semibold text-[#2C2A26] leading-snug">Getting to know you</h2>
+          <p className="text-[#2C2A26]/55 text-sm leading-relaxed">
+            Your first session will be a gentle conversation with {therapistName}. No pressure, no homework — just talking about what is on your mind.
           </p>
         </div>
 
-
-        {/* Timeline View */}
-
-        {/* Timeline View */}
-        <div className="w-full relative py-2">
-          {/* Vertical Line */}
-          <div className="absolute left-[22px] top-12 bottom-0 w-[1px] bg-[#E8E4DE]" />
-          
-          <div className="flex gap-4 items-start relative pb-8">
-            <div className="z-10 w-11 h-11 rounded-full border border-[#E8E4DE] bg-white flex items-center justify-center shrink-0">
-              <span className="text-sm font-medium text-[#2C2A26]">1</span>
-            </div>
-            <div className="flex-1 bg-white border border-[#F0EDEA] rounded-[24px] p-6 shadow-[0_4px_24px_rgba(0,0,0,0.03)] space-y-3">
-              <h3 className="font-bold text-[#2C2A26] text-lg font-serif">Engagement & Rapport</h3>
-              <p className="text-[#2C2A26]/60 text-sm leading-relaxed">
-                Establish trust, safe space, and baseline emotional state.
-              </p>
-              <div className="flex gap-1.5">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="w-1.5 h-1.5 rounded-full bg-[#E8E4DE]" />
-                ))}
-              </div>
-            </div>
-          </div>
+        <div className="w-full bg-white border border-[#E8E4DE] rounded-2xl p-5 shadow-sm">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[#2C2A26]/40 mb-3">Phase 1</p>
+          <h3 className="font-semibold text-[#2C2A26] text-base">Engagement & Rapport</h3>
+          <p className="text-[#2C2A26]/55 text-sm leading-relaxed mt-1.5">
+            Establish trust, create a safe space, and understand your baseline emotional state.
+          </p>
         </div>
       </div>
     </StepShell>

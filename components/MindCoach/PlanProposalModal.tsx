@@ -348,7 +348,7 @@ export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, o
                 animate={{ y: 0 }}
                 exit={{ y: '100%' }}
                 transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-                className="relative w-full max-w-lg max-h-[88vh] md:max-h-[85vh] rounded-t-[1.75rem] md:rounded-3xl bg-[#FAFAF7] shadow-2xl overflow-hidden flex flex-col border border-[#E8E4DE]/80"
+                className="relative w-full max-w-lg max-h-[88vh] md:max-h-[85vh] rounded-t-2xl md:rounded-2xl bg-[#FAFAF7] shadow-xl overflow-hidden flex flex-col border border-[#E8E4DE]/80"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex justify-center pt-2 pb-1 md:hidden shrink-0">
@@ -365,7 +365,7 @@ export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, o
                     <X size={18} />
                 </button>
 
-                <div className="relative h-36 shrink-0 bg-[#E8E4DE]">
+                <div className="relative h-24 shrink-0 bg-[#E8E4DE]">
                     <img
                         src={MIND_COACH_PROPOSAL_DRAWER_IMAGE}
                         alt=""
@@ -375,8 +375,8 @@ export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, o
                 </div>
 
                 <div className="px-5 pt-2 pb-4 bg-[#FAFAF7] shrink-0 -mt-6 relative">
-                    <p className="text-[10px] font-bold text-[#6B8F71] uppercase tracking-widest mb-1.5">Therapy proposal</p>
-                    <h2 className="text-xl font-serif text-[#2C2A26] leading-snug mb-2">
+                    <p className="text-[11px] font-semibold text-[#6B8F71] uppercase tracking-wide mb-1.5">Suggested pathway</p>
+                    <h2 className="text-xl font-semibold text-[#2C2A26] leading-snug mb-2">
                         {planTitle}
                     </h2>
                     <p className="text-sm text-[#2C2A26]/70 leading-relaxed">
@@ -389,7 +389,7 @@ export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, o
                 </div>
 
                 <div className="flex-1 overflow-y-auto px-5 pb-4 space-y-3 min-h-0 bg-[#FAF9F7]">
-                    <p className="text-[10px] font-semibold text-[#2C2A26]/45 uppercase tracking-wide">
+                    <p className="text-[11px] font-semibold text-[#2C2A26]/45 uppercase tracking-wide">
                         Four phases
                     </p>
                     <div className="space-y-2.5">

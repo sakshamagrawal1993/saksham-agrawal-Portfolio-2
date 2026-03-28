@@ -27,7 +27,7 @@ export const JournalScreen: React.FC = () => {
           featureLabel="Journal"
           hint="Private reflections unlock in phase 2. This is a preview of your journal—keep going with your sessions to write entries."
         >
-          <div className="p-5 space-y-4 min-h-[50vh]">
+          <div className="p-5 space-y-5 min-h-[50vh]">
             <div className="flex items-center justify-between pointer-events-none opacity-95">
               <div>
                 <h2 className="text-xl font-semibold text-[#2C2A26]">Journal</h2>
@@ -57,7 +57,7 @@ export const JournalScreen: React.FC = () => {
   }
 
   return (
-    <div className="p-5 space-y-4 h-full">
+    <div className="p-5 space-y-5 h-full">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold text-[#2C2A26]">Journal</h2>
