@@ -29,6 +29,29 @@ const MOOD_EMOJIS = [
   { score: 5, emoji: '😊', label: 'Great' },
 ];
 
+const PATHWAY_LABELS: Record<string, string> = {
+  anxiety_and_stress_management: 'Anxiety & Stress Management',
+  depression_and_behavioral_activation: 'Depression & Motivation',
+  sleep_and_insomnia: 'Sleep & Insomnia',
+  trauma_processing_and_ptsd: 'Trauma Processing',
+  grief_and_loss_processing: 'Grief & Loss',
+  relationship_conflict_and_interpersonal: 'Relationship Conflict',
+  self_worth_and_self_esteem: 'Self-Worth & Esteem',
+  social_anxiety_and_isolation: 'Social Anxiety',
+  panic_and_physical_anxiety_symptoms: 'Panic & Physical Anxiety',
+  emotion_regulation_and_distress_tolerance: 'Emotion Regulation',
+  overthinking_rumination_and_cognitive_restructuring: 'Overthinking & Rumination',
+  family_conflict_and_dynamics: 'Family Conflict',
+  anger_management: 'Anger Management',
+  boundary_setting_and_assertiveness: 'Boundary Setting',
+  life_transition_and_adjustment: 'Life Transitions',
+  identity_and_self_concept: 'Identity & Self-Concept',
+  abuse_and_safety: 'Abuse & Safety',
+  health_anxiety_and_somatic_symptoms: 'Health Anxiety',
+  crisis_intervention_and_suicide_prevention: 'Crisis Support',
+  engagement_rapport_and_assessment: 'Continued Exploration',
+};
+
 function getGreeting(): string {
   const h = new Date().getHours();
   if (h < 12) return 'Good morning';
@@ -83,6 +106,12 @@ export const HomeScreen: React.FC = () => {
   ).length;
   const totalInPhase = currentPhaseData?.sessions?.length ?? 3;
   const progressPct = Math.round((completedInPhase / totalInPhase) * 100);
+  const proposedPathway = useMemo(() => {
+    const candidate = journey?.discovery_state?.suggested_pathway;
+    if (!candidate || candidate === 'engagement_rapport_and_assessment') return null;
+    const inEngagement = !journey?.pathway || journey.pathway === 'engagement_rapport_and_assessment';
+    return inEngagement ? candidate : null;
+  }, [journey?.discovery_state?.suggested_pathway, journey?.pathway]);
 
   const nextSessionTopic = currentPhaseData?.sessions?.[completedInPhase];
   const nextPhasePreviews = phaseProgress.filter((p) => p.phaseNumber > currentPhase).slice(0, 2);
@@ -179,6 +208,36 @@ export const HomeScreen: React.FC = () => {
         </h2>
         <p className="text-[#2C2A26]/40 text-sm italic mt-1.5 leading-relaxed">{quote}</p>
       </motion.div>
+
+      {proposedPathway && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.06 }}
+          className="bg-white rounded-2xl p-4 shadow-sm border border-[#6B8F71]/20"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-bold tracking-[0.1em] text-[#6B8F71] uppercase">
+                Latest Suggested Pathway
+              </p>
+              <h3 className="text-base font-semibold text-[#2C2A26] mt-1">
+                {PATHWAY_LABELS[proposedPathway] || proposedPathway.replace(/_/g, ' ')}
+              </h3>
+              <p className="text-xs text-[#2C2A26]/50 mt-1.5">
+                You are still in emotional support and rapport. When you are ready, review and follow this pathway.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab('sessions')}
+              className="shrink-0 px-3 py-1.5 rounded-full text-xs font-medium bg-[#6B8F71] text-white hover:bg-[#5A7D60] transition-colors"
+            >
+              View
+            </button>
+          </div>
+        </motion.div>
+      )}
 
       {/* Mood Check-in */}
       <motion.div

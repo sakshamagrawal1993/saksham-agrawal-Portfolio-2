@@ -110,7 +110,7 @@ const MindCoachApp: React.FC = () => {
       setError(null);
 
       try {
-        const [profileRes, journeyRes, sessionsRes, memoriesRes, moodRes, journalRes, exercisesRes, tasksRes] =
+        const [profileRes, journeyRes, sessionsRes, memoriesRes, moodRes, journalRes, exercisesRes, tasksRes, pathwayProposalRes] =
           await Promise.all([
             supabase
               .from('mind_coach_profiles')
@@ -154,6 +154,13 @@ const MindCoachApp: React.FC = () => {
               .eq('profile_id', profileId)
               .eq('status', 'active')
               .order('created_at', { ascending: false }),
+            supabase
+              .from('mind_coach_pathway_proposals')
+              .select('proposed_pathway,confidence,created_at')
+              .eq('profile_id', profileId)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle(),
           ]);
 
         if (cancelled) return;
@@ -162,7 +169,30 @@ const MindCoachApp: React.FC = () => {
         if (!profileRes.data) throw new Error('Profile not found');
 
         setProfile(profileRes.data);
-        setJourney(journeyRes.data ?? null);
+        const latestProposal =
+          pathwayProposalRes.data && typeof pathwayProposalRes.data === 'object'
+            ? pathwayProposalRes.data
+            : null;
+        const shouldAttachLatestProposal =
+          !!journeyRes.data &&
+          (journeyRes.data.pathway === 'engagement_rapport_and_assessment' || !journeyRes.data.pathway) &&
+          !!latestProposal?.proposed_pathway &&
+          latestProposal.proposed_pathway !== 'engagement_rapport_and_assessment';
+        const journeyWithProposal =
+          shouldAttachLatestProposal
+            ? {
+                ...journeyRes.data,
+                discovery_state: {
+                  suggested_pathway: latestProposal.proposed_pathway,
+                  confidence:
+                    typeof latestProposal.confidence === 'number'
+                      ? latestProposal.confidence
+                      : journeyRes.data?.discovery_state?.confidence ?? 0,
+                },
+              }
+            : journeyRes.data;
+
+        setJourney(journeyWithProposal ?? null);
         setSessions(sessionsRes.data ?? []);
         setMemories(memoriesRes.data ?? []);
         setMoodEntries(moodRes.data ?? []);

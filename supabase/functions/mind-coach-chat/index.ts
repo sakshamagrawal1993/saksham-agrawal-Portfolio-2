@@ -239,6 +239,29 @@ serve(async (req) => {
     const isSessionClose = result.is_session_close || false;
     const suggestedPathway = result.suggested_pathway || null;
 
+    if (
+      suggestedPathway &&
+      suggestedPathway !== 'engagement_rapport_and_assessment'
+    ) {
+      const proposalInsert = {
+        profile_id,
+        session_id,
+        proposed_pathway: suggestedPathway,
+        confidence: typeof pathwayConfidence === 'number' ? pathwayConfidence : null,
+        source: 'chat',
+        metadata: {
+          dynamic_theme: updatedTheme || null,
+          message_count: newCount,
+        },
+      };
+      const { error: proposalErr } = await supabaseAdmin
+        .from('mind_coach_pathway_proposals')
+        .insert(proposalInsert);
+      if (proposalErr) {
+        console.error('pathway proposal insert failed:', proposalErr.message);
+      }
+    }
+
     // 6. Persist assistant reply
     if (!clientManaged && assistantReply) {
       await supabaseAdmin.from('mind_coach_messages').insert({

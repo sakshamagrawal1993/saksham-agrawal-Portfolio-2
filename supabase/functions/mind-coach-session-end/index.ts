@@ -201,6 +201,28 @@ serve(async (req) => {
       normalizePathwayCandidate(journey?.discovery_state?.suggested_pathway) ??
       null;
 
+    if (
+      suggestedPathwayCandidate &&
+      suggestedPathwayCandidate !== 'engagement_rapport_and_assessment'
+    ) {
+      const confidenceCandidate = parsed?.pathway_confidence ?? session?.pathway_confidence ?? null;
+      const { error: proposalErr } = await supabaseAdmin
+        .from('mind_coach_pathway_proposals')
+        .insert({
+          profile_id,
+          session_id,
+          proposed_pathway: suggestedPathwayCandidate,
+          confidence: typeof confidenceCandidate === 'number' ? confidenceCandidate : null,
+          source: 'session_end',
+          metadata: {
+            dynamic_theme: case_notes?.dynamic_theme ?? session?.dynamic_theme ?? null,
+          },
+        });
+      if (proposalErr) {
+        console.error('pathway proposal insert failed:', proposalErr.message);
+      }
+    }
+
     const shouldAttachPathwayDetails =
       (session.pathway === 'engagement_rapport_and_assessment' || !session.pathway) &&
       suggestedPathwayCandidate &&
