@@ -51,6 +51,23 @@ function applyN8nSessionFields(data: Record<string, any>, patch: Record<string, 
   if (typeof data.pathway_confidence === 'number') patch.pathway_confidence = data.pathway_confidence;
 }
 
+function sanitizeAssistantMarkdownReply(raw: unknown): string {
+  const input = typeof raw === 'string' ? raw : '';
+  if (!input.trim()) return '';
+
+  let value = input.trim();
+  const fencedBlock = /^```[a-zA-Z0-9_-]*\n([\s\S]*?)\n```$/;
+
+  // Some model outputs wrap the full reply in one or more code fences.
+  for (let i = 0; i < 2; i += 1) {
+    const match = value.match(fencedBlock);
+    if (!match) break;
+    value = match[1].trim();
+  }
+
+  return value;
+}
+
 async function syncDiscoveryFromN8n(data: Record<string, any>) {
   if (data.suggested_pathway == null || typeof data.pathway_confidence !== 'number') return;
   const j = useMindCoachStore.getState().journey;
@@ -326,7 +343,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
       id: crypto.randomUUID(),
       session_id: sess.id,
       role: 'assistant',
-      content: data.reply,
+      content: sanitizeAssistantMarkdownReply(data.reply),
       guardrail_status: data.guardrail_status ?? 'passed',
       dynamic_content: data.dynamic_content,
       created_at: new Date().toISOString(),
@@ -506,7 +523,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
         id: crypto.randomUUID(),
         session_id: activeSession.id,
         role: 'assistant',
-        content: data.reply,
+        content: sanitizeAssistantMarkdownReply(data.reply),
         guardrail_status: data.guardrail_status ?? 'passed',
         dynamic_content: data.dynamic_content,
         created_at: new Date().toISOString(),
@@ -656,7 +673,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
           id: crypto.randomUUID(),
           session_id: sess.id,
           role: 'assistant',
-          content: data.reply,
+          content: sanitizeAssistantMarkdownReply(data.reply),
           guardrail_status: data.guardrail_status ?? 'passed',
           dynamic_content: data.dynamic_content,
           created_at: new Date().toISOString(),

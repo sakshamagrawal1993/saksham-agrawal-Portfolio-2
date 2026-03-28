@@ -1,5 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import type { ChatMessage as ChatMessageType } from '../../../store/mindCoachStore';
 import { DynamicVideoRenderer } from '../DynamicContent/DynamicVideoRenderer';
 import { DynamicGameRenderer } from '../DynamicContent/DynamicGameRenderer';
@@ -48,7 +50,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
 
       {isUser ? (
         <div
-          className={`max-w-[75%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${bubbleTone}`}
+          className={`max-w-[75%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${bubbleTone}`}
         >
           {message.content}
         </div>
@@ -57,7 +59,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           <div
             className={`w-fit max-w-full rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${bubbleTone}`}
           >
-            {message.content}
+            <div className="text-[#2C2A26] [&_h1]:my-2 [&_h1]:text-base [&_h1]:font-semibold [&_h2]:my-2 [&_h2]:text-sm [&_h2]:font-semibold [&_p]:my-2 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:my-0.5 [&_strong]:font-semibold">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+            </div>
           </div>
           {message.dynamic_content && (
             <div className="w-full">
