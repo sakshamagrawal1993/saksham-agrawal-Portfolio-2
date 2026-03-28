@@ -11,6 +11,7 @@ import {
   firstPhaseWhereFeatureUnlocks,
   type TabId,
 } from '../../../store/mindCoachStore';
+import { PlanProposalModal } from '../PlanProposalModal';
 
 const QUOTES = [
   '"The wound is the place where the Light enters you." — Rumi',
@@ -72,6 +73,7 @@ export const HomeScreen: React.FC = () => {
   const resetStore = useMindCoachStore((s) => s.reset);
   const navigate = useNavigate();
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showProposal, setShowProposal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const quote = useMemo(() => QUOTES[Math.floor(Math.random() * QUOTES.length)], []);
@@ -210,33 +212,31 @@ export const HomeScreen: React.FC = () => {
       </motion.div>
 
       {proposedPathway && (
-        <motion.div
+        <motion.button
+          type="button"
+          onClick={() => setShowProposal(true)}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.06 }}
-          className="bg-white rounded-2xl p-4 shadow-sm border border-[#6B8F71]/20"
+          className="w-full bg-white rounded-2xl p-4 shadow-sm border border-[#6B8F71]/20 text-left hover:border-[#6B8F71]/35 transition-colors"
         >
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-[10px] font-bold tracking-[0.1em] text-[#6B8F71] uppercase">
-                Latest Suggested Pathway
+                Suggested Pathway
               </p>
               <h3 className="text-base font-semibold text-[#2C2A26] mt-1">
                 {PATHWAY_LABELS[proposedPathway] || proposedPathway.replace(/_/g, ' ')}
               </h3>
               <p className="text-xs text-[#2C2A26]/50 mt-1.5">
-                You are still in emotional support and rapport. When you are ready, review and follow this pathway.
+                You are still in emotional support and rapport. Tap to view the 4-phase plan and choose this pathway when ready.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => setActiveTab('sessions')}
-              className="shrink-0 px-3 py-1.5 rounded-full text-xs font-medium bg-[#6B8F71] text-white hover:bg-[#5A7D60] transition-colors"
-            >
-              View
-            </button>
+            <span className="shrink-0 px-3 py-1.5 rounded-full text-xs font-medium bg-[#6B8F71] text-white">
+              Review
+            </span>
           </div>
-        </motion.div>
+        </motion.button>
       )}
 
       {/* Mood Check-in */}
@@ -593,6 +593,18 @@ export const HomeScreen: React.FC = () => {
       </div>
 
       {/* Confirmation Modal */}
+      <AnimatePresence>
+        {showProposal && (
+          <PlanProposalModal
+            onClose={() => setShowProposal(false)}
+            onAccept={() => {
+              setShowProposal(false);
+              setActiveTab('sessions');
+            }}
+          />
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {showConfirm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-[#2C2A26]/20 backdrop-blur-sm">
