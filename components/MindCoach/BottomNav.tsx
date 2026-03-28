@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { Home, MessageCircle, MoreHorizontal, BookOpen, BookHeart, Wind, ClipboardList, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useMindCoachStore, UNLOCK_MAP, type TabId, type MindCoachSession, type ChatMessage as ChatMessageType } from '../../store/mindCoachStore';
-import { supabase } from '../../lib/supabaseClient';
+import { openOrCreateInProgressSession } from './shared/sessionLifecycle';
 
 const PRIMARY_TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: 'home', label: 'Home', icon: Home },
@@ -36,50 +36,26 @@ export const BottomNav: React.FC = () => {
 
   const handleOpenTalk = useCallback(async () => {
     if (!profile || openingTalk) return;
-    if (activeSession) {
-      setActiveTab('sessions');
-      setShowMore(false);
-      return;
-    }
     setOpeningTalk(true);
     try {
-      const completedInPhase = sessions.filter(
-        (s) => s.session_state === 'completed' && s.phase_number === currentPhase,
-      ).length;
-      const newSession: Partial<MindCoachSession> = {
-        profile_id: profile.id,
-        journey_id: journey?.id ?? null,
-        phase_number: currentPhase,
-        session_number: completedInPhase + 1,
-        session_state: 'active',
-        message_count: 0,
-        pathway: journey?.pathway ?? null,
-        dynamic_theme: null,
-      };
-
-      const { data: createdSession, error: createErr } = await supabase
-        .from('mind_coach_sessions')
-        .insert(newSession)
-        .select('*')
-        .single();
-      if (createErr || !createdSession) {
-        throw new Error(createErr?.message || 'Could not start a new session.');
+      if (activeSession) {
+        setActiveTab('sessions');
+        setShowMore(false);
+        return;
       }
-
-      const previousSessionIds = sessions.map((s) => s.id).filter(Boolean);
-      let historicalMessages: ChatMessageType[] = [];
-      if (previousSessionIds.length > 0) {
-        const { data: messageRows } = await supabase
-          .from('mind_coach_messages')
-          .select('*')
-          .in('session_id', previousSessionIds)
-          .order('created_at', { ascending: true });
-        historicalMessages = (messageRows as ChatMessageType[]) ?? [];
-      }
-
-      setActiveSession(createdSession as MindCoachSession);
-      setSessions([createdSession as MindCoachSession, ...sessions]);
-      setMessages(historicalMessages);
+      const { session, initialMessages, reusedExisting } = await openOrCreateInProgressSession({
+        profile,
+        journey,
+        currentPhase,
+        sessions,
+      });
+      setActiveSession(session as MindCoachSession);
+      setSessions(
+        reusedExisting
+          ? [session as MindCoachSession, ...sessions.filter((s) => s.id !== session.id)]
+          : [session as MindCoachSession, ...sessions],
+      );
+      setMessages(initialMessages as ChatMessageType[]);
       setActiveTab('sessions');
       setShowMore(false);
     } catch (err) {
@@ -90,11 +66,10 @@ export const BottomNav: React.FC = () => {
   }, [
     profile,
     openingTalk,
-    activeSession,
     sessions,
     currentPhase,
-    journey?.id,
-    journey?.pathway,
+    journey,
+    activeSession,
     setActiveSession,
     setSessions,
     setMessages,

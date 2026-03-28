@@ -9,6 +9,7 @@ import {
 } from '../../../store/mindCoachStore';
 import { TherapistChat } from '../Chat/TherapistChat';
 import { PlanProposalModal } from '../PlanProposalModal';
+import { openOrCreateInProgressSession } from '../shared/sessionLifecycle';
 
 export const SessionsScreen: React.FC = () => {
   const profile = useMindCoachStore((s) => s.profile);
@@ -24,37 +25,37 @@ export const SessionsScreen: React.FC = () => {
   const [showProposal, setShowProposal] = useState(false);
 
   const completedSessions = sessions.filter((s) => s.session_state === 'completed');
+  const inProgressSessions = sessions
+    .filter((s) => s.session_state !== 'completed')
+    .sort((a, b) => {
+      const aTs = new Date(a.started_at || 0).getTime();
+      const bTs = new Date(b.started_at || 0).getTime();
+      return bTs - aTs;
+    })
+    .reduce<MindCoachSession[]>((acc, session) => {
+      const key = `${session.phase_number}:${session.session_number}`;
+      if (!acc.some((s) => `${s.phase_number}:${s.session_number}` === key)) {
+        acc.push(session);
+      }
+      return acc;
+    }, []);
 
   const handleStartSession = useCallback(async () => {
     if (!profile || starting) return;
     setStarting(true);
-
-    const completedInPhase = sessions.filter(
-      (s) => s.session_state === 'completed' && s.phase_number === currentPhase
-    ).length;
-
-    const newSession: Partial<MindCoachSession> = {
-      profile_id: profile.id,
-      journey_id: journey?.id ?? null,
-      phase_number: currentPhase,
-      session_number: completedInPhase + 1,
-      session_state: 'intake',
-      message_count: 0,
-    };
-
-    const { data, error } = await supabase
-      .from('mind_coach_sessions')
-      .insert(newSession)
-      .select()
-      .single();
-
-    if (!error && data) {
-      setActiveSession(data);
-      setSessions([data, ...sessions]);
-      setMessages([]);
+    try {
+      const { session, initialMessages, reusedExisting } = await openOrCreateInProgressSession({
+        profile,
+        journey,
+        currentPhase,
+        sessions,
+      });
+      setActiveSession(session);
+      setSessions(reusedExisting ? [session, ...sessions.filter((s) => s.id !== session.id)] : [session, ...sessions]);
+      setMessages(initialMessages);
+    } finally {
+      setStarting(false);
     }
-
-    setStarting(false);
   }, [profile, journey, sessions, currentPhase, starting, setActiveSession, setSessions, setMessages]);
 
   const handleResumeSession = useCallback(
@@ -119,9 +120,7 @@ export const SessionsScreen: React.FC = () => {
       </div>
 
       {/* Active (non-completed) sessions */}
-      {sessions
-        .filter((s) => s.session_state !== 'completed')
-        .map((session) => (
+      {inProgressSessions.map((session) => (
           <motion.button
             key={session.id}
             initial={{ opacity: 0, y: 6 }}

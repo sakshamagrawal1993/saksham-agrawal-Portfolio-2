@@ -718,7 +718,12 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
   const trackedPathwayCardViewsRef = useRef<Set<string>>(new Set());
 
   const handleEndSession = async () => {
-    if (!activeSession || !profile || endingSession) return;
+    if (!activeSession || endingSession) return;
+    const effectiveProfileId = profile?.id || activeSession.profile_id;
+    if (!effectiveProfileId) {
+      setChatError('We could not identify your profile for session wrap-up. Please refresh and try again.');
+      return;
+    }
     setEndingSession(true);
     const endedAt = new Date().toISOString();
 
@@ -796,17 +801,19 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
       const { data, error } = await supabase.functions.invoke('mind-coach-session-end', {
         body: {
           session_id: activeSession.id,
-          profile_id: profile.id,
+          profile_id: effectiveProfileId,
           messages: messagesPayload,
           transcript,
-          profile: {
-            id: profile.id,
-            name: profile.name,
-            age: profile.age,
-            gender: profile.gender,
-            concerns: profile.concerns,
-            therapist_persona: profile.therapist_persona,
-          },
+          profile: profile
+            ? {
+                id: profile.id,
+                name: profile.name,
+                age: profile.age,
+                gender: profile.gender,
+                concerns: profile.concerns,
+                therapist_persona: profile.therapist_persona,
+              }
+            : null,
           session: {
             pathway: activeSession.pathway,
             dynamic_theme: activeSession.dynamic_theme,

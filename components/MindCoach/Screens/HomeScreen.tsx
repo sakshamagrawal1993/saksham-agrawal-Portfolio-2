@@ -7,11 +7,10 @@ import { supabase } from '../../../lib/supabaseClient';
 import {
   useMindCoachStore,
   type TaskType,
-  type ChatMessage as ChatMessageType,
-  type MindCoachSession,
 } from '../../../store/mindCoachStore';
 import { PlanProposalModal } from '../PlanProposalModal';
 import { PATHWAY_LABELS } from '../shared/pathwayLabels';
+import { openOrCreateInProgressSession } from '../shared/sessionLifecycle';
 
 const MOOD_EMOJIS = [
   { score: 1, emoji: '😢', label: 'Awful' },
@@ -128,43 +127,15 @@ export const HomeScreen: React.FC = () => {
     if (!profile || isContinuingSession) return;
     setIsContinuingSession(true);
     try {
-      const completedInPhase = sessions.filter(
-        (s) => s.session_state === 'completed' && s.phase_number === currentPhase,
-      ).length;
-      const newSession: Partial<MindCoachSession> = {
-        profile_id: profile.id,
-        journey_id: journey?.id ?? null,
-        phase_number: currentPhase,
-        session_number: completedInPhase + 1,
-        session_state: 'active',
-        message_count: 0,
-        pathway: journey?.pathway ?? null,
-        dynamic_theme: null,
-      };
-
-      const { data: createdSession, error: createErr } = await supabase
-        .from('mind_coach_sessions')
-        .insert(newSession)
-        .select('*')
-        .single();
-      if (createErr || !createdSession) {
-        throw new Error(createErr?.message || 'Could not start a new session.');
-      }
-
-      const previousSessionIds = sessions.map((s) => s.id).filter(Boolean);
-      let historicalMessages: ChatMessageType[] = [];
-      if (previousSessionIds.length > 0) {
-        const { data: messageRows } = await supabase
-          .from('mind_coach_messages')
-          .select('*')
-          .in('session_id', previousSessionIds)
-          .order('created_at', { ascending: true });
-        historicalMessages = (messageRows as ChatMessageType[]) ?? [];
-      }
-
-      setActiveSession(createdSession as MindCoachSession);
-      setSessions([createdSession as MindCoachSession, ...sessions]);
-      setMessages(historicalMessages);
+      const { session, initialMessages, reusedExisting } = await openOrCreateInProgressSession({
+        profile,
+        journey,
+        currentPhase,
+        sessions,
+      });
+      setActiveSession(session);
+      setSessions(reusedExisting ? [session, ...sessions.filter((s) => s.id !== session.id)] : [session, ...sessions]);
+      setMessages(initialMessages);
       setActiveTab('sessions');
     } catch (err) {
       console.error('Failed to continue with therapist:', err);
@@ -177,8 +148,7 @@ export const HomeScreen: React.FC = () => {
     isContinuingSession,
     sessions,
     currentPhase,
-    journey?.id,
-    journey?.pathway,
+    journey,
     setActiveSession,
     setSessions,
     setMessages,
