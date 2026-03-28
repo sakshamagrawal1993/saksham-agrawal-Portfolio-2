@@ -61,6 +61,11 @@ export const DiaryScreen: React.FC = () => {
   const setSessions = useMindCoachStore((s) => s.setSessions);
   const [generatingSummaryFor, setGeneratingSummaryFor] = useState<string | null>(null);
   const [summaryErrorBySession, setSummaryErrorBySession] = useState<Record<string, string>>({});
+  const [showSummaryScreen, setShowSummaryScreen] = useState(false);
+  const [summaryScreenLoading, setSummaryScreenLoading] = useState(false);
+  const [summaryScreenError, setSummaryScreenError] = useState<string | null>(null);
+  const [selectedSessionTitle, setSelectedSessionTitle] = useState<string>('Session Summary');
+  const [selectedSessionSummary, setSelectedSessionSummary] = useState<Record<string, unknown> | null>(null);
 
   const entries = useMemo(() => {
     const sEntries: DiaryEntry[] = sessions
@@ -114,21 +119,68 @@ export const DiaryScreen: React.FC = () => {
 
   const handleSessionClick = async (entry: DiaryEntry) => {
     if (entry.type !== 'session') return;
-    if (entry.hasSummary) return;
-    if (generatingSummaryFor === entry.id) return;
     const session = sessions.find((s) => s.id === entry.id);
     if (!session) return;
+    if (generatingSummaryFor === entry.id) return;
+
+    const existingSummary = normalizeServerSessionSummary(session.summary_data);
+    const existingIsUsable = hasUsableSessionSummary(session.summary_data);
+    if (existingIsUsable && existingSummary) {
+      setSelectedSessionTitle(session.dynamic_theme || 'Session Summary');
+      setSelectedSessionSummary(existingSummary);
+      setSummaryScreenError(null);
+      setSummaryScreenLoading(false);
+      setShowSummaryScreen(true);
+      return;
+    }
+
     const profileId = profile?.id || session.profile_id;
     if (!profileId) return;
 
     setGeneratingSummaryFor(entry.id);
+    setSelectedSessionTitle(session.dynamic_theme || 'Session Summary');
+    setSelectedSessionSummary(null);
+    setSummaryScreenError(null);
+    setSummaryScreenLoading(true);
+    setShowSummaryScreen(true);
     setSummaryErrorBySession((prev) => ({ ...prev, [entry.id]: '' }));
 
     try {
+      const { data: messageRows } = await supabase
+        .from('mind_coach_messages')
+        .select('role,content,created_at')
+        .eq('session_id', session.id)
+        .order('created_at', { ascending: true });
+      const messagesPayload = (messageRows ?? []).map((m: any) => ({
+        role: m.role,
+        content: m.content,
+        created_at: m.created_at,
+      }));
+      const transcript = messagesPayload
+        .map((m: any) => `${m.role === 'user' ? 'Client' : 'Therapist'}: ${m.content ?? ''}`)
+        .join('\n');
+
       const { data, error } = await supabase.functions.invoke('mind-coach-session-end', {
         body: {
           session_id: session.id,
           profile_id: profileId,
+          messages: messagesPayload,
+          transcript,
+          profile: profile
+            ? {
+                id: profile.id,
+                name: profile.name,
+                age: profile.age,
+                gender: profile.gender,
+                concerns: profile.concerns,
+                therapist_persona: profile.therapist_persona,
+              }
+            : null,
+          session: {
+            pathway: session.pathway,
+            dynamic_theme: session.dynamic_theme,
+            session_number: session.session_number,
+          },
         },
       });
       if (error) throw error;
@@ -159,6 +211,7 @@ export const DiaryScreen: React.FC = () => {
         .update(patch)
         .eq('id', session.id);
 
+      setSelectedSessionSummary(sessionSummary);
       setSessions(
         sessions.map((s) =>
           s.id === session.id
@@ -173,10 +226,101 @@ export const DiaryScreen: React.FC = () => {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Could not generate summary right now.';
       setSummaryErrorBySession((prev) => ({ ...prev, [entry.id]: message }));
+      setSummaryScreenError(message);
     } finally {
+      setSummaryScreenLoading(false);
       setGeneratingSummaryFor(null);
     }
   };
+
+  if (showSummaryScreen) {
+    const openingReflection =
+      selectedSessionSummary && typeof selectedSessionSummary.opening_reflection === 'string'
+        ? selectedSessionSummary.opening_reflection
+        : '';
+    const takeaways = selectedSessionSummary && Array.isArray((selectedSessionSummary as Record<string, unknown>).session_takeaways)
+      ? ((selectedSessionSummary as Record<string, unknown>).session_takeaways as unknown[]).map((s) => String(s)).filter(Boolean)
+      : [];
+    const tasks = selectedSessionSummary && Array.isArray((selectedSessionSummary as Record<string, unknown>).extracted_tasks)
+      ? ((selectedSessionSummary as Record<string, unknown>).extracted_tasks as Record<string, unknown>[])
+      : [];
+
+    return (
+      <div className="p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-[#2C2A26]">Session Summary</h2>
+            <p className="text-xs text-[#2C2A26]/40 mt-1">{selectedSessionTitle}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setShowSummaryScreen(false);
+              setSummaryScreenLoading(false);
+              setSummaryScreenError(null);
+            }}
+            className="text-sm text-[#2C2A26]/60 hover:text-[#2C2A26]"
+          >
+            Back
+          </button>
+        </div>
+
+        {summaryScreenLoading ? (
+          <div className="min-h-[45vh] flex flex-col items-center justify-center gap-3">
+            <div className="w-8 h-8 border-2 border-[#6B8F71] border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm text-[#2C2A26]/60">Generating your session summary...</p>
+          </div>
+        ) : summaryScreenError ? (
+          <div className="rounded-2xl border border-[#F3D0CB] bg-[#FFF9F8] p-4">
+            <p className="text-sm font-medium text-[#A0493A]">Could not load summary</p>
+            <p className="text-xs text-[#A0493A]/80 mt-1">{summaryScreenError}</p>
+          </div>
+        ) : selectedSessionSummary ? (
+          <div className="space-y-3">
+            <div className="rounded-2xl border border-[#E8E4DE] bg-white p-4">
+              <p className="text-sm font-semibold text-[#2C2A26]">
+                {typeof selectedSessionSummary.title === 'string' ? selectedSessionSummary.title : 'Session Summary'}
+              </p>
+              {openingReflection && (
+                <p className="text-sm text-[#2C2A26]/75 mt-2 leading-relaxed">{openingReflection}</p>
+              )}
+            </div>
+            {takeaways.length > 0 && (
+              <div className="rounded-2xl border border-[#E8E4DE] bg-white p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[#2C2A26]/40 mb-2">Takeaways</p>
+                <div className="space-y-1.5">
+                  {takeaways.slice(0, 5).map((item, idx) => (
+                    <p key={`${item}-${idx}`} className="text-xs text-[#2C2A26]/75">• {item}</p>
+                  ))}
+                </div>
+              </div>
+            )}
+            {tasks.length > 0 && (
+              <div className="rounded-2xl border border-[#E8E4DE] bg-white p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[#2C2A26]/40 mb-2">Try this week</p>
+                <div className="space-y-2">
+                  {tasks.slice(0, 3).map((task, idx) => (
+                    <div key={idx}>
+                      <p className="text-sm text-[#2C2A26] font-medium">
+                        {String(task.dynamic_title || task.task_name || `Task ${idx + 1}`)}
+                      </p>
+                      <p className="text-xs text-[#2C2A26]/60 mt-0.5">
+                        {String(task.dynamic_description || task.task_description || '')}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-[#E8E4DE] bg-white p-4">
+            <p className="text-sm text-[#2C2A26]/60">No summary found for this session yet.</p>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="p-5 space-y-5">

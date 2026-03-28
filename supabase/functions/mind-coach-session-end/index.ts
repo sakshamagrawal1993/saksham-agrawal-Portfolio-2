@@ -40,7 +40,8 @@ serve(async (req) => {
   }
 
   try {
-    const { session_id, profile_id } = await req.json();
+    const body = await req.json();
+    const { session_id, profile_id } = body;
 
     if (!session_id || !profile_id) {
        return new Response(JSON.stringify({ error: 'Missing required IDs' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 });
@@ -93,8 +94,12 @@ serve(async (req) => {
     ]);
 
     const session = sessionRes.data;
-    const messages = messagesRes.data || [];
-    const profile = profileRes.data;
+    const incomingMessages = Array.isArray(body?.messages) ? body.messages : [];
+    const messages = incomingMessages.length > 0 ? incomingMessages : (messagesRes.data || []);
+    const profile =
+      body?.profile && typeof body.profile === 'object'
+        ? body.profile
+        : profileRes.data;
 
     if (!session || messages.length === 0) {
       return new Response(
@@ -108,7 +113,12 @@ serve(async (req) => {
       content: m.content,
       created_at: m.created_at,
     }));
-    let transcript = messagesPayload.map((m: any) => `${m.role === 'user' ? 'Client' : 'Therapist'}: ${m.content}`).join('\n');
+    let transcript =
+      typeof body?.transcript === 'string' && body.transcript.trim().length > 0
+        ? body.transcript
+        : messagesPayload
+            .map((m: any) => `${m.role === 'user' ? 'Client' : 'Therapist'}: ${m.content}`)
+            .join('\n');
 
     let currentPhase = null;
     let title = session.pathway;
@@ -124,8 +134,17 @@ serve(async (req) => {
 
     const currentPhaseIndex = journey?.current_phase_index ?? Math.max(0, (journey?.current_phase || 1) - 1);
     const phases = Array.isArray(journey?.phases) ? journey.phases : [];
-    const currentPhaseContext = phases[currentPhaseIndex] ?? currentPhase ?? null;
-    const nextPhaseContext = currentPhaseIndex + 1 < phases.length ? phases[currentPhaseIndex + 1] : null;
+    const currentPhaseContext =
+      (body?.currentPhase && typeof body.currentPhase === 'object' ? body.currentPhase : null) ??
+      phases[currentPhaseIndex] ??
+      currentPhase ??
+      null;
+    const nextPhaseContext =
+      (body?.phase_context && typeof body.phase_context === 'object' && body.phase_context.next_phase)
+        ? body.phase_context.next_phase
+        : currentPhaseIndex + 1 < phases.length
+          ? phases[currentPhaseIndex + 1]
+          : null;
     const completedInCurrentPhase =
       journey?.id
         ? ((await supabaseAdmin
@@ -144,27 +163,41 @@ serve(async (req) => {
       messages: messagesPayload,
       profile,
       session: {
-        pathway: title,
+        pathway: body?.session?.pathway || title,
         pathway_slug: session.pathway,
         discovery_state: journey?.discovery_state ?? null,
-        dynamic_theme: session.dynamic_theme,
-        session_number: (journey?.sessions_completed || 0) + 1
+        dynamic_theme: body?.session?.dynamic_theme || session.dynamic_theme,
+        session_number: body?.session?.session_number || (journey?.sessions_completed || 0) + 1
       },
       currentPhase: currentPhaseContext,
       phase_context: {
-        current_phase_index: currentPhaseIndex,
-        total_phases: phases.length,
+        current_phase_index:
+          (body?.phase_context && Number.isFinite(body.phase_context.current_phase_index))
+            ? body.phase_context.current_phase_index
+            : currentPhaseIndex,
+        total_phases:
+          (body?.phase_context && Number.isFinite(body.phase_context.total_phases))
+            ? body.phase_context.total_phases
+            : phases.length,
         current_phase: currentPhaseContext,
         next_phase: nextPhaseContext,
-        completed_in_current_phase: completedInCurrentPhase,
-        target_sessions_in_current_phase: targetInCurrentPhase,
+        completed_in_current_phase:
+          (body?.phase_context && Number.isFinite(body.phase_context.completed_in_current_phase))
+            ? body.phase_context.completed_in_current_phase
+            : completedInCurrentPhase,
+        target_sessions_in_current_phase:
+          (body?.phase_context && Number.isFinite(body.phase_context.target_sessions_in_current_phase))
+            ? body.phase_context.target_sessions_in_current_phase
+            : targetInCurrentPhase,
       },
-      memories: memoriesRes.data || [],
-      current_memory: memoriesRes.data?.[0] ?? null,
-      recent_case_notes: (caseNotesRes.data || []).map((r: any) => r.case_notes).filter(Boolean),
-      active_tasks: tasksRes.data || [],
+      memories: Array.isArray(body?.memories) ? body.memories : (memoriesRes.data || []),
+      current_memory: body?.current_memory ?? memoriesRes.data?.[0] ?? null,
+      recent_case_notes: Array.isArray(body?.recent_case_notes)
+        ? body.recent_case_notes
+        : (caseNotesRes.data || []).map((r: any) => r.case_notes).filter(Boolean),
+      active_tasks: Array.isArray(body?.active_tasks) ? body.active_tasks : (tasksRes.data || []),
       assessments: assessmentsRes.data || [],
-      mood_entries: moodRes.data || [],
+      mood_entries: Array.isArray(body?.mood_entries) ? body.mood_entries : (moodRes.data || []),
     };
 
     // 1. Send the data to the unified n8n session-end orchestrator webhook.

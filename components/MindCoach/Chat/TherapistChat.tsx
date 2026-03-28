@@ -195,6 +195,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
   const activeTasks = useMindCoachStore((s) => s.activeTasks);
   const setActiveTasks = useMindCoachStore((s) => s.setActiveTasks);
   const recentCaseNotes = useMindCoachStore((s) => s.recentCaseNotes);
+  const moodEntries = useMindCoachStore((s) => s.moodEntries);
 
   const [input, setInput] = useState('');
   const [chatError, setChatError] = useState<string | null>(null);
@@ -775,10 +776,62 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
     };
 
     try {
+      const messagesPayload = messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+        created_at: m.created_at,
+      }));
+      const transcript = messagesPayload
+        .map((m) => `${m.role === 'user' ? 'Client' : 'Therapist'}: ${m.content ?? ''}`)
+        .join('\n');
+
       const { data, error } = await supabase.functions.invoke('mind-coach-session-end', {
         body: {
           session_id: activeSession.id,
           profile_id: profile.id,
+          messages: messagesPayload,
+          transcript,
+          profile: {
+            id: profile.id,
+            name: profile.name,
+            age: profile.age,
+            gender: profile.gender,
+            concerns: profile.concerns,
+            therapist_persona: profile.therapist_persona,
+          },
+          session: {
+            pathway: activeSession.pathway,
+            dynamic_theme: activeSession.dynamic_theme,
+            session_number: activeSession.session_number,
+          },
+          currentPhase: journey?.phases?.[journey.current_phase_index ?? 0] ?? null,
+          phase_context: journey
+            ? {
+                current_phase_index: journey.current_phase_index ?? Math.max(0, (journey.current_phase || 1) - 1),
+                total_phases: Array.isArray(journey.phases) ? journey.phases.length : 0,
+                current_phase: journey.phases?.[journey.current_phase_index ?? 0] ?? null,
+                next_phase: journey.phases?.[(journey.current_phase_index ?? 0) + 1] ?? null,
+              }
+            : null,
+          memories: memories.map((m) => ({
+            memory_text: m.memory_text,
+            memory_type: m.memory_type,
+            created_at: m.created_at,
+          })),
+          current_memory: memories[0]
+            ? {
+                memory_text: memories[0].memory_text,
+                memory_type: memories[0].memory_type,
+                created_at: memories[0].created_at,
+              }
+            : null,
+          recent_case_notes,
+          active_tasks: activeTasks,
+          mood_entries: moodEntries.map((m) => ({
+            score: m.score,
+            notes: m.notes,
+            created_at: m.created_at,
+          })),
         },
       });
       const basePayload =
