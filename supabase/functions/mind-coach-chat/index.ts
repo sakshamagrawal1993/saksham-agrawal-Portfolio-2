@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import { corsHeaders } from '../_shared/cors.ts';
+import { buildContinuityPack } from '../_shared/mindCoachContext.ts';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -151,7 +152,15 @@ serve(async (req) => {
       resolvedProfile = authenticProfileRes.data || resolvedProfile;
     }
 
-    // 4. Forward to n8n
+    // 4. Build server-authoritative continuity pack
+    let continuityPack: any = null;
+    try {
+      continuityPack = await buildContinuityPack(supabaseAdmin, profile_id, session_id);
+    } catch (cpErr: any) {
+      console.error('continuity pack build failed (non-fatal):', cpErr.message);
+    }
+
+    // 5. Forward to n8n (server context is authoritative; client hints fill gaps)
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3 * 60 * 1000);
 
@@ -185,6 +194,12 @@ serve(async (req) => {
           phase_prompt: resolvedPhasePrompt,
           message_count: newCount,
           is_system_greeting,
+          // Server-authoritative continuity pack
+          last_20_conversations: continuityPack?.last_20_conversations ?? [],
+          active_tasks_context: continuityPack?.active_tasks_context ?? [],
+          recent_case_notes_context: continuityPack?.recent_case_notes_context ?? [],
+          continuity_phase_context: continuityPack?.phase_context ?? null,
+          session_stage: continuityPack?.session_stage ?? 'early',
         }),
         signal: controller.signal,
       });
@@ -209,7 +224,7 @@ serve(async (req) => {
       );
     }
 
-    // 5. Parse n8n response
+    // 6. Parse n8n response
     let parsed = await n8nResponse.json();
     const result = Array.isArray(parsed) ? parsed[0] : parsed;
 
@@ -238,6 +253,9 @@ serve(async (req) => {
     const dynamicContent = result.dynamic_content || null;
     const isSessionClose = result.is_session_close || false;
     const suggestedPathway = result.suggested_pathway || null;
+    const qualityMeta = result.quality_meta && typeof result.quality_meta === 'object'
+      ? result.quality_meta
+      : null;
 
     if (
       suggestedPathway &&
@@ -262,7 +280,7 @@ serve(async (req) => {
       }
     }
 
-    // 6. Persist assistant reply
+    // 7. Persist assistant reply
     if (!clientManaged && assistantReply) {
       await supabaseAdmin.from('mind_coach_messages').insert({
         session_id,
@@ -273,7 +291,7 @@ serve(async (req) => {
       });
     }
 
-    // 7. Update session state if changed
+    // 8. Update session state if changed
     if (!clientManaged) {
       const finalCount = newCount + (assistantReply ? 1 : 0);
       const sessionUpdate: Record<string, any> = {
@@ -290,7 +308,7 @@ serve(async (req) => {
         .eq('id', session_id);
     }
 
-    // 8. Log guardrail results if provided
+    // 9. Log guardrail results if provided
     if (!clientManaged && result.guardrail_log) {
       for (const log of Array.isArray(result.guardrail_log) ? result.guardrail_log : [result.guardrail_log]) {
         await supabaseAdmin.from('mind_coach_guardrail_log').insert({
@@ -319,6 +337,7 @@ serve(async (req) => {
         guardrail_status: guardrailStatus,
         crisis_detected: crisisDetected,
         dynamic_content: dynamicContent,
+        quality_meta: qualityMeta,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );

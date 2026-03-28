@@ -279,6 +279,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
       personaRes.data?.base_prompt || 'You are an empathetic, non-judgmental mental health coach.';
     const phasePrompt = phaseRes.data?.dynamic_prompt || 'Focus on building therapeutic rapport.';
 
+    const phaseIndex = j?.current_phase_index ?? Math.max(0, (j?.current_phase || 1) - 1);
     const n8nPayload = {
       profile_id: prof?.id,
       session_id: sess.id,
@@ -298,12 +299,15 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
             id: j.id,
             title: j.title,
             current_phase: j.current_phase,
+            current_phase_index: phaseIndex,
             phases: j.phases,
+            sessions_completed: j.sessions_completed,
           }
         : null,
       session_state: sess.session_state,
       dynamic_theme: sess.dynamic_theme,
       pathway: sess.pathway,
+      session_number: (j?.sessions_completed ?? 0) + 1,
       messages: st.messages,
       memories: st.memories.map((m) => ({ text: m.memory_text, type: m.memory_type })),
       recent_tasks_assigned: st.activeTasks,
@@ -454,6 +458,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
       const phasePrompt = phaseRes.data?.dynamic_prompt || 'Focus on building therapeutic rapport.';
 
       const history = [...useMindCoachStore.getState().messages];
+      const sendPhaseIndex = journey?.current_phase_index ?? Math.max(0, (journey?.current_phase || 1) - 1);
       const n8nPayload = {
         profile_id: profile?.id,
         session_id: activeSession.id,
@@ -472,12 +477,15 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
               id: journey.id,
               title: journey.title,
               current_phase: journey.current_phase,
+              current_phase_index: sendPhaseIndex,
               phases: journey.phases,
+              sessions_completed: journey.sessions_completed,
             }
           : null,
         session_state: activeSession.session_state,
         dynamic_theme: activeSession.dynamic_theme,
         pathway: activeSession.pathway,
+        session_number: (journey?.sessions_completed ?? 0) + 1,
         messages: history,
         memories: memories.map((m) => ({ text: m.memory_text, type: m.memory_type })),
         recent_tasks_assigned: activeTasks,
