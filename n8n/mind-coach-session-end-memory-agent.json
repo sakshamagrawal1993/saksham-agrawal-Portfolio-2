@@ -1,0 +1,153 @@
+{
+  "name": "Mind Coach - Session End Memory Agent v2 (Execute Trigger)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "node_trigger",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "function parseMaybeJson(value) {\n  if (typeof value !== 'string') return null;\n  try { return JSON.parse(value); } catch { return null; }\n}\n\nconst root = $json || {};\nconst body = typeof root.body === 'string' ? (parseMaybeJson(root.body) || {}) : (root.body || {});\nconst d = (body && typeof body === 'object' && Object.keys(body).length > 0) ? body : root;\n\nconst profile = d.profile || {};\nconst session = d.session || {};\nconst currentMemory = d.current_memory?.memory_text || d.current_memory?.text || 'None recorded';\n\nconst systemPrompt = [\n  'You are a clinical memory synthesizer for an AI therapist.',\n  'Generate exactly one updated consolidated long-term memory block.',\n  'Preserve durable facts and integrate meaningful updates from this session only.',\n  'Return ONLY valid JSON.'\n].join('\\n');\n\nconst userPrompt = [\n  'CLIENT CONTEXT:', JSON.stringify({ name: profile.name || 'User', concerns: profile.concerns || [], pathway: session.pathway || '' }),\n  '', 'CURRENT CONSOLIDATED MEMORY:', String(currentMemory),\n  '', 'RECENT CASE NOTES:', JSON.stringify(d.recent_case_notes || []),\n  '', 'MESSAGES:', JSON.stringify(d.messages || []),\n  '', 'TRANSCRIPT:', d.transcript || '',\n  '', 'Return JSON schema: {\"extracted_memories\":[{\"memory_text\":\"string\",\"memory_type\":\"life_context\"}]}'\n].join('\\n');\n\nreturn [{ json: { systemPrompt, userPrompt } }];"
+      },
+      "id": "node_prompt_builder",
+      "name": "Prompt Builder",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "agent": "conversationalAgent",
+        "promptType": "define",
+        "text": "={{ $json.userPrompt }}",
+        "options": {
+          "systemMessage": "={{ $json.systemPrompt }}"
+        },
+        "hasOutputParser": true
+      },
+      "id": "node_agent",
+      "name": "Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.6,
+      "position": [
+        440,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "node_llm",
+      "name": "LLM",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [
+        440,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"extracted_memories\": {\n      \"type\": \"array\",\n      \"minItems\": 1,\n      \"maxItems\": 1,\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"memory_text\": {\n            \"type\": \"string\"\n          },\n          \"memory_type\": {\n            \"type\": \"string\",\n            \"enum\": [\n              \"life_context\"\n            ]\n          }\n        },\n        \"required\": [\n          \"memory_text\",\n          \"memory_type\"\n        ]\n      }\n    }\n  },\n  \"required\": [\n    \"extracted_memories\"\n  ]\n}"
+      },
+      "id": "node_output_parser",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        440,
+        540
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "function parseMaybeJson(value) {\n  if (typeof value !== 'string') return null;\n  try { return JSON.parse(value); } catch { return null; }\n}\n\nfunction pickSource(payload) {\n  if (!payload || typeof payload !== 'object') return {};\n  if (payload.output && typeof payload.output === 'object') {\n    if (payload.output.output && typeof payload.output.output === 'object') return payload.output.output;\n    return payload.output;\n  }\n  const parsedOutput = parseMaybeJson(payload.output);\n  if (parsedOutput && typeof parsedOutput === 'object') return parsedOutput;\n  if (payload.data && typeof payload.data === 'object') return payload.data;\n  return payload;\n}\n\nconst source = pickSource($json);\nreturn [{\n  json: {\n    branch: 'memory',\n    model: 'gpt-4o-mini',\n    extracted_memories: Array.isArray(source.extracted_memories) ? source.extracted_memories : []\n  }\n}];"
+      },
+      "id": "node_wrap",
+      "name": "Wrap Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        240
+      ]
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Prompt Builder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prompt Builder": {
+      "main": [
+        [
+          {
+            "node": "Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent": {
+      "main": [
+        [
+          {
+            "node": "Wrap Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "mc-session-end-memory-v2-exec-trigger-2026-03-27"
+}

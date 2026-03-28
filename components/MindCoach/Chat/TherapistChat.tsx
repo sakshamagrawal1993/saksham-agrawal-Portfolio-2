@@ -175,6 +175,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
   const isCrisisDetected = useMindCoachStore((s) => s.isCrisisDetected);
   const memories = useMindCoachStore((s) => s.memories);
   const activeTasks = useMindCoachStore((s) => s.activeTasks);
+  const setActiveTasks = useMindCoachStore((s) => s.setActiveTasks);
   const recentCaseNotes = useMindCoachStore((s) => s.recentCaseNotes);
 
   const [input, setInput] = useState('');
@@ -704,6 +705,24 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
       setShowSummary(true);
     };
 
+    const buildSummaryView = (
+      baseSummary: Record<string, unknown>,
+      payload: Record<string, unknown> | null,
+    ): Record<string, unknown> => {
+      const extractedTasks = Array.isArray(payload?.extracted_tasks)
+        ? (payload?.extracted_tasks as unknown[])
+        : [];
+      const phaseTransition = payload?.phase_transition_result ?? null;
+      const out: Record<string, unknown> = { ...baseSummary };
+      if (out.extracted_tasks == null && extractedTasks.length > 0) {
+        out.extracted_tasks = extractedTasks;
+      }
+      if (phaseTransition && out.phase_transition_result == null) {
+        out.phase_transition_result = phaseTransition;
+      }
+      return out;
+    };
+
     try {
       const { data, error } = await supabase.functions.invoke('mind-coach-session-end', {
         body: {
@@ -730,8 +749,19 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
       const serverSummary = normalizeServerSessionSummary(payload?.session_summary);
 
       if (!serverError) {
-        const summary = serverSummary ?? fallbackSessionSummary(activeSession, journey);
+        const baseSummary = serverSummary ?? fallbackSessionSummary(activeSession, journey);
+        const summary = buildSummaryView(baseSummary, payload);
         finalizeLocal(summary, payload?.case_notes ?? null);
+        if (profile?.id) {
+          const { data: latestTasks } = await supabase
+            .from('mind_coach_user_tasks')
+            .select('*')
+            .eq('profile_id', profile.id)
+            .eq('status', 'active')
+            .order('created_at', { ascending: false })
+            .limit(20);
+          if (latestTasks) setActiveTasks(latestTasks as any);
+        }
       } else {
         const summary = fallbackSessionSummary(activeSession, journey);
         await supabase
@@ -784,6 +814,15 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
 
   if (showSummary) {
     const summaryView = sessionSummary ?? fallbackSessionSummary(activeSession, journey);
+    const phaseTransitionResult = (summaryView.phase_transition_result ??
+      null) as
+      | {
+          advanced?: boolean;
+          new_phase_index?: number;
+          completed_in_phase?: number;
+          min_sessions_required?: number;
+        }
+      | null;
     const tasks: any[] = Array.isArray(summaryView.extracted_tasks)
       ? summaryView.extracted_tasks
       : summaryView.takeaway_task
@@ -818,6 +857,24 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
               </p>
             )}
           </motion.div>
+
+          {phaseTransitionResult && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 }}
+              className="bg-white rounded-2xl p-4 border border-[#E8E4DE]"
+            >
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#2C2A26]/45 mb-1.5">
+                Journey Progress
+              </p>
+              <p className="text-sm text-[#2C2A26]/75">
+                {phaseTransitionResult.advanced
+                  ? `You unlocked Phase ${(phaseTransitionResult.new_phase_index ?? 0) + 1}.`
+                  : `You are progressing in this phase (${phaseTransitionResult.completed_in_phase ?? 0}/${phaseTransitionResult.min_sessions_required ?? 0} sessions).`}
+              </p>
+            </motion.div>
+          )}
 
           {/* Quote */}
           {summaryView.quote_of_the_day && (

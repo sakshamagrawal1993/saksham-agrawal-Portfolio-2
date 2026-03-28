@@ -1,11 +1,12 @@
 {
-  "name": "Mind Coach - Session End Summarizer v3 (Phase-Guided)",
+  "name": "Mind Coach - Session End Orchestrator v6 (Execute Workflow)",
   "nodes": [
     {
       "parameters": {
         "httpMethod": "POST",
         "path": "mind-coach-session-end",
-        "options": {}
+        "options": {},
+        "responseMode": "responseNode"
       },
       "id": "node_webhook",
       "name": "Webhook",
@@ -13,68 +14,125 @@
       "typeVersion": 1.1,
       "position": [
         0,
-        300
+        360
       ]
     },
     {
       "parameters": {
-        "jsCode": "const data = $node[\"Webhook\"].json.body;\nconst profile = data.profile || {};\nconst session = data.session || {};\nconst currentPhase = data.currentPhase || {};\nconst transcript = data.transcript || \"\";\n\n// Phase guidance — recommendations, not hard rules\nconst phaseNumber = currentPhase.phase_number || currentPhase.number || 1;\n\nconst PHASE_TASK_GUIDANCE = {\n  1: {\n    types: ['journaling', 'somatic_exercise'],\n    focus: 'Awareness-building and self-observation work best in this phase — the client is still building trust. Journaling and somatic exercises are ideal. You may assign other types if the transcript clearly shows the client is ready.'\n  },\n  2: {\n    types: ['journaling', 'cognitive_reframing'],\n    focus: 'Identifying patterns and gently questioning thoughts is the natural focus. Journaling and cognitive reframing fit well. Other task types are fine if they emerge from the session content.'\n  },\n  3: {\n    types: ['cognitive_reframing', 'behavioral_exposure', 'somatic_exercise', 'situational_prep'],\n    focus: 'Active skill-building and behavioural experiments are encouraged. Multiple tasks across types are appropriate here — follow what the transcript supports.'\n  },\n  4: {\n    types: ['journaling', 'situational_prep', 'general'],\n    focus: 'Integration, relapse prevention, and consolidating skills. Any task type is appropriate — use clinical judgment based on what the transcript calls for.'\n  }\n};\n\nconst guidance = PHASE_TASK_GUIDANCE[phaseNumber] || PHASE_TASK_GUIDANCE[1];\n\nconst systemPrompt = `You are a clinical supervisor generating structured post-session documentation for an AI therapy session.\n\nSession context:\n- Client name: ${profile.name || 'User'}\n- Pathway: ${session.pathway || 'engagement_rapport_and_assessment'}\n- Dynamic theme: ${session.dynamic_theme || 'Not yet identified'}\n- Session number: ${session.session_number || 1}\n- Current phase: ${currentPhase.name || 'Phase 1'} (Phase ${phaseNumber} of 4)\n- Phase goal: ${currentPhase.goal || 'Establish therapeutic rapport and build safety'}\n\n━━━ TASK ASSIGNMENT GUIDANCE ━━━\n\nUse the current pathway (${session.pathway || 'engagement_rapport_and_assessment'}) and phase (${phaseNumber}) as a clinical guide — not a strict constraint.\n\nPhase ${phaseNumber} recommended focus:\n${guidance.focus}\n\nNaturally fitting task types for Phase ${phaseNumber}: ${guidance.types.join(', ')}\nAll task types remain available if the session content warrants them.\n\nGuidelines:\n1. Personalise every task to THIS client — use their name (${profile.name || 'the client'}), reference specific triggers, situations, or language from today's transcript.\n2. Use concrete, actionable language. Vague tasks (\"try to relax\") are not acceptable.\n3. Assign as many tasks as the session warrants — 1 to 3 is typical, but more are fine if each is well-grounded.\n4. In general, earlier phases lean observational and later phases lean active — but always follow the client's readiness over the phase number.\n\nAvailable task types:\n- journaling: Written reflection exercises\n- somatic_exercise: Breathing, grounding, or body-based movement\n- cognitive_reframing: Thought records or belief-testing exercises\n- behavioral_exposure: Gradually facing a feared or avoided situation\n- situational_prep: Preparing for a specific upcoming event or conversation\n- general: Any other clinically appropriate assignment\n\nDo NOT generate dates or timestamps. The backend calculates all dates. Provide only suggested_duration_days as a plain integer.\n\nReturn ONLY valid JSON.`;\n\nconst userPrompt = `Analyze this therapy transcript and generate post-session documentation.\n\nTRANSCRIPT:\n${transcript}\n\nReturn JSON with this EXACT schema:\\n(For memory, return exactly ONE consolidated memory object in extracted_memories.)\n{\n  \"case_notes\": {\n    \"presenting_concern\": \"string\",\n    \"dynamic_theme\": \"string\",\n    \"phase_progress\": \"string - progress toward Phase ${phaseNumber} goal: ${currentPhase.goal || 'building rapport'}\",\n    \"readiness_for_next_phase\": \"not_ready | approaching | ready\"\n  },\n  \"session_summary\": {\n    \"title\": \"string - warm, non-clinical title\",\n    \"opening_reflection\": \"string - empathetic recap\",\n    \"quote_of_the_day\": \"string - short inspiring quote relevant to this session\",\n    \"energy_shift\": {\n      \"start\": \"string (e.g., Anxious, Overwhelmed)\",\n      \"end\": \"string (e.g., Calm, Grounded)\"\n    },\n    \"psychological_flexibility\": {\n      \"self_awareness\": \"integer 0-100\",\n      \"observation\": \"integer 0-100\",\n      \"physical_awareness\": \"integer 0-100\",\n      \"core_values\": \"integer 0-100\",\n      \"relationships\": \"integer 0-100\"\n    },\n    \"self_compassion_score\": \"integer 0-100\"\n  },\n  \"extracted_tasks\": [\n    {\n      \"task_type\": \"journaling | somatic_exercise | cognitive_reframing | behavioral_exposure | situational_prep | general\",\n      \"dynamic_title\": \"string - concise personalised title referencing the user's specific situation\",\n      \"dynamic_description\": \"string - specific instructions tailored to this user's context, mentioning their name and situation\",\n      \"frequency\": \"daily | weekly | situational | once\",\n      \"suggested_duration_days\": \"integer\"\n    }\n  ],\n  \"extracted_memories\": [\n    {\n      \"memory_text\": \"string - consolidated long-term clinical memory block for this client\",\n      \"memory_type\": \"life_context\"\n    }\n  ]\n}`;\n\nreturn [{ json: { systemPrompt, userPrompt } }];"
+        "jsCode": "const body = $node[\"Webhook\"].json.body || {};\nconst messages = Array.isArray(body.messages) ? body.messages : [];\nconst transcript = (typeof body.transcript === 'string' && body.transcript.trim().length > 0)\n  ? body.transcript\n  : messages\n      .map((m) => (m.role === 'user' ? 'Client' : 'Therapist') + ': ' + String(m.content || ''))\n      .join('\\n');\n\nreturn [{\n  json: {\n    session_id: body.session_id || '',\n    profile_id: body.profile_id || '',\n    profile: body.profile || {},\n    session: body.session || {},\n    phase_context: body.phase_context || {},\n    currentPhase: body.currentPhase || body.phase_context?.current_phase || {},\n    messages,\n    transcript,\n    memories: Array.isArray(body.memories) ? body.memories : [],\n    current_memory: body.current_memory || null,\n    recent_case_notes: Array.isArray(body.recent_case_notes) ? body.recent_case_notes : [],\n    active_tasks: Array.isArray(body.active_tasks) ? body.active_tasks : [],\n    assessments: Array.isArray(body.assessments) ? body.assessments : [],\n    mood_entries: Array.isArray(body.mood_entries) ? body.mood_entries : [],\n    memory_workflow_id: body.memory_workflow_id || 'REPLACE_WITH_MEMORY_WORKFLOW_ID',\n    summary_workflow_id: body.summary_workflow_id || 'REPLACE_WITH_SUMMARY_WORKFLOW_ID',\n    readiness_workflow_id: body.readiness_workflow_id || 'REPLACE_WITH_READINESS_WORKFLOW_ID'\n  }\n}];"
       },
-      "id": "node_prompt_builder",
-      "name": "Prompt Builder",
+      "id": "node_normalize",
+      "name": "Normalize Context",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         220,
-        300
+        360
       ]
     },
     {
       "parameters": {
-        "agent": "conversationalAgent",
-        "promptType": "define",
-        "text": "={{ $json.userPrompt }}",
-        "options": {
-          "systemMessage": "={{ $json.systemPrompt }}"
+        "workflowId": "={{ $json.memory_workflow_id }}",
+        "options": {},
+        "workflowInputs": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
         }
       },
-      "id": "node_summarizer_agent",
-      "name": "Summarizer Agent",
-      "type": "@n8n/n8n-nodes-langchain.agent",
-      "typeVersion": 1.6,
-      "position": [
-        440,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "model": "gpt-4o-mini",
-        "options": {
-          "temperature": 0.2
-        }
-      },
-      "id": "node_summarizer_llm",
-      "name": "Summarizer LLM",
-      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "id": "node_exec_memory",
+      "name": "Execute Memory Child",
+      "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1,
       "position": [
-        440,
-        500
+        460,
+        160
       ]
     },
     {
       "parameters": {
-        "schemaType": "manual",
-        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"case_notes\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"presenting_concern\": { \"type\": \"string\" },\n        \"dynamic_theme\": { \"type\": \"string\" },\n        \"phase_progress\": { \"type\": \"string\" },\n        \"readiness_for_next_phase\": { \"type\": \"string\", \"enum\": [\"not_ready\", \"approaching\", \"ready\"] }\n      },\n      \"required\": [\"presenting_concern\", \"dynamic_theme\", \"phase_progress\", \"readiness_for_next_phase\"]\n    },\n    \"session_summary\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"title\": { \"type\": \"string\" },\n        \"opening_reflection\": { \"type\": \"string\" },\n        \"quote_of_the_day\": { \"type\": \"string\" },\n        \"energy_shift\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"start\": { \"type\": \"string\" },\n            \"end\": { \"type\": \"string\" }\n          },\n          \"required\": [\"start\", \"end\"]\n        },\n        \"psychological_flexibility\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"self_awareness\": { \"type\": \"integer\", \"minimum\": 0, \"maximum\": 100 },\n            \"observation\": { \"type\": \"integer\", \"minimum\": 0, \"maximum\": 100 },\n            \"physical_awareness\": { \"type\": \"integer\", \"minimum\": 0, \"maximum\": 100 },\n            \"core_values\": { \"type\": \"integer\", \"minimum\": 0, \"maximum\": 100 },\n            \"relationships\": { \"type\": \"integer\", \"minimum\": 0, \"maximum\": 100 }\n          },\n          \"required\": [\"self_awareness\", \"observation\", \"physical_awareness\", \"core_values\", \"relationships\"]\n        },\n        \"self_compassion_score\": { \"type\": \"integer\", \"minimum\": 0, \"maximum\": 100 }\n      },\n      \"required\": [\"title\", \"opening_reflection\", \"quote_of_the_day\", \"energy_shift\", \"psychological_flexibility\", \"self_compassion_score\"]\n    },\n    \"extracted_tasks\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"task_type\": { \"type\": \"string\", \"enum\": [\"journaling\", \"somatic_exercise\", \"cognitive_reframing\", \"behavioral_exposure\", \"situational_prep\", \"general\"] },\n          \"dynamic_title\": { \"type\": \"string\" },\n          \"dynamic_description\": { \"type\": \"string\" },\n          \"frequency\": { \"type\": \"string\", \"enum\": [\"daily\", \"weekly\", \"situational\", \"once\"] },\n          \"suggested_duration_days\": { \"type\": \"integer\", \"minimum\": 1, \"maximum\": 90 }\n        },\n        \"required\": [\"task_type\", \"dynamic_title\", \"dynamic_description\", \"frequency\", \"suggested_duration_days\"]\n      }\n    },\n    \"extracted_memories\": {\n      \"type\": \"array\",\n      \"minItems\": 1,\n      \"maxItems\": 1,\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"memory_text\": { \"type\": \"string\" },\n          \"memory_type\": { \"type\": \"string\", \"enum\": [\"life_context\", \"fact\", \"trigger\", \"coping_strategy\", \"relationship\", \"goal\"] }\n        },\n        \"required\": [\"memory_text\", \"memory_type\"]\n      }\n    }\n  },\n  \"required\": [\"case_notes\", \"session_summary\", \"extracted_tasks\", \"extracted_memories\"]\n}"
+        "workflowId": "={{ $json.summary_workflow_id }}",
+        "options": {},
+        "workflowInputs": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        }
       },
-      "id": "node_output_parser",
-      "name": "Structured Output Parser",
-      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
-      "typeVersion": 1.2,
+      "id": "node_exec_summary",
+      "name": "Execute Summary Child",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
       "position": [
-        440,
-        680
+        460,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "={{ $json.readiness_workflow_id }}",
+        "options": {},
+        "workflowInputs": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        }
+      },
+      "id": "node_exec_readiness",
+      "name": "Execute Readiness Child",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        460,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "append"
+      },
+      "id": "node_merge_memory_summary",
+      "name": "Merge Memory+Summary",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        700,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "append"
+      },
+      "id": "node_merge_all",
+      "name": "Merge All Branches",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        920,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const payloads = $input.all().map((i) => i.json || {});\nconst memory = payloads.find((p) => p.branch === 'memory');\nconst summary = payloads.find((p) => p.branch === 'summary');\nconst readiness = payloads.find((p) => p.branch === 'readiness');\n\nif (!memory) throw new Error('MERGE_ERROR: Missing memory branch response');\nif (!summary) throw new Error('MERGE_ERROR: Missing summary branch response');\nif (!readiness) throw new Error('MERGE_ERROR: Missing readiness branch response');\n\nif (!Array.isArray(memory.extracted_memories) || memory.extracted_memories.length === 0) {\n  throw new Error('MERGE_ERROR: Invalid extracted_memories from memory workflow');\n}\nif (!summary.session_summary || !summary.case_notes_base) {\n  throw new Error('MERGE_ERROR: Invalid summary payload');\n}\nif (!['not_ready', 'approaching', 'ready'].includes(String(readiness.readiness_for_next_phase || ''))) {\n  throw new Error('MERGE_ERROR: Invalid readiness_for_next_phase');\n}\n\nconst cnb = summary.case_notes_base;\nconst rc = Number(readiness.readiness_confidence);\n\nreturn [{\n  json: {\n    case_notes: {\n      presenting_concern: String(cnb.presenting_concern || ''),\n      dynamic_theme: String(cnb.dynamic_theme || ''),\n      phase_progress: String(cnb.phase_progress || ''),\n      readiness_for_next_phase: readiness.readiness_for_next_phase,\n      risk_level: String(readiness.risk_level || 'low'),\n      requires_escalation: Boolean(readiness.requires_escalation),\n      crisis_detected: Boolean(readiness.crisis_detected),\n      readiness_rationale: String(readiness.readiness_rationale || ''),\n      readiness_confidence: Number.isFinite(rc) ? Math.min(1, Math.max(0, rc)) : 0.5,\n    },\n    session_summary: summary.session_summary,\n    extracted_tasks: Array.isArray(summary.extracted_tasks) ? summary.extracted_tasks : [],\n    extracted_memories: memory.extracted_memories,\n    agent_meta: {\n      architecture: 'parent_execute_workflow_children',\n      memory_agent_model: memory.model || 'gpt-4o-mini',\n      summary_agent_model: summary.model || 'gpt-4o-mini',\n      readiness_agent_model: readiness.model || 'gpt-4o-mini'\n    }\n  }\n}];"
+      },
+      "id": "node_merge_results",
+      "name": "Merge Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        360
       ]
     },
     {
@@ -88,63 +146,209 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
       "position": [
-        660,
-        300
+        1360,
+        360
       ]
     }
   ],
-  "pinData": {},
+  "pinData": {
+    "Webhook": [
+      {
+        "json": {
+          "body": {
+            "session_id": "11111111-1111-1111-1111-111111111111",
+            "profile_id": "22222222-2222-2222-2222-222222222222",
+            "memory_workflow_id": "REPLACE_WITH_MEMORY_WORKFLOW_ID",
+            "summary_workflow_id": "REPLACE_WITH_SUMMARY_WORKFLOW_ID",
+            "readiness_workflow_id": "REPLACE_WITH_READINESS_WORKFLOW_ID",
+            "messages": [
+              {
+                "role": "user",
+                "content": "I spiraled before my team presentation.",
+                "created_at": "2026-03-27T10:01:00.000Z"
+              },
+              {
+                "role": "assistant",
+                "content": "What thoughts showed up right before the spiral?",
+                "created_at": "2026-03-27T10:01:25.000Z"
+              },
+              {
+                "role": "user",
+                "content": "That everyone would think I am incompetent.",
+                "created_at": "2026-03-27T10:02:02.000Z"
+              }
+            ],
+            "transcript": "Client: I spiraled before my team presentation.\\nTherapist: What thoughts showed up right before the spiral?\\nClient: That everyone would think I am incompetent.",
+            "profile": {
+              "id": "22222222-2222-2222-2222-222222222222",
+              "name": "Aarav",
+              "age": 29,
+              "gender": "male",
+              "concerns": [
+                "anxiety",
+                "overthinking"
+              ],
+              "therapist_persona": "maya"
+            },
+            "session": {
+              "pathway": "anxiety_and_stress_management",
+              "dynamic_theme": "Performance anxiety",
+              "session_number": 4
+            },
+            "phase_context": {
+              "current_phase_index": 1,
+              "total_phases": 4,
+              "current_phase": {
+                "phase_number": 2,
+                "name": "Cognitive Reframing",
+                "goal": "Identify and restructure anxious thought loops"
+              },
+              "next_phase": {
+                "phase_number": 3,
+                "name": "Behavioral Practice",
+                "goal": "Apply skills in real-world triggers"
+              },
+              "completed_in_current_phase": 2,
+              "target_sessions_in_current_phase": 3
+            },
+            "current_memory": {
+              "memory_text": "Aarav experiences anticipatory anxiety before public speaking and tends to catastrophize peer judgment.",
+              "memory_type": "life_context",
+              "created_at": "2026-03-25T09:00:00.000Z"
+            },
+            "recent_case_notes": [
+              {
+                "dynamic_theme": "Fear of negative evaluation",
+                "phase_progress": "Can identify automatic thoughts but struggles to challenge them independently"
+              }
+            ],
+            "active_tasks": [
+              {
+                "task_type": "journaling",
+                "dynamic_title": "Thought log before meetings",
+                "dynamic_description": "Capture trigger-thought-emotion for each major meeting",
+                "status": "active"
+              }
+            ],
+            "assessments": [
+              {
+                "assessment_type": "gad7",
+                "total_score": 11,
+                "severity": "moderate",
+                "created_at": "2026-03-20T08:00:00.000Z"
+              }
+            ],
+            "mood_entries": [
+              {
+                "score": 5,
+                "notes": "Nervous before standup",
+                "created_at": "2026-03-26T07:45:00.000Z"
+              },
+              {
+                "score": 7,
+                "notes": "Felt better after breathing",
+                "created_at": "2026-03-27T11:00:00.000Z"
+              }
+            ]
+          }
+        }
+      }
+    ]
+  },
   "connections": {
     "Webhook": {
       "main": [
         [
           {
-            "node": "Prompt Builder",
+            "node": "Normalize Context",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Prompt Builder": {
+    "Normalize Context": {
       "main": [
         [
           {
-            "node": "Summarizer Agent",
+            "node": "Execute Memory Child",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Execute Summary Child",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Execute Readiness Child",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Summarizer Agent": {
+    "Execute Memory Child": {
+      "main": [
+        [
+          {
+            "node": "Merge Memory+Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Summary Child": {
+      "main": [
+        [
+          {
+            "node": "Merge Memory+Summary",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Memory+Summary": {
+      "main": [
+        [
+          {
+            "node": "Merge All Branches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Readiness Child": {
+      "main": [
+        [
+          {
+            "node": "Merge All Branches",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge All Branches": {
+      "main": [
+        [
+          {
+            "node": "Merge Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Results": {
       "main": [
         [
           {
             "node": "Respond to Webhook",
             "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Summarizer LLM": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "Summarizer Agent",
-            "type": "ai_languageModel",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Structured Output Parser": {
-      "ai_outputParser": [
-        [
-          {
-            "node": "Summarizer Agent",
-            "type": "ai_outputParser",
             "index": 0
           }
         ]
@@ -155,5 +359,5 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "mc-session-end-v3-phase-guided-2026-03-26"
+  "versionId": "mc-session-end-v6-execute-workflow-2026-03-27"
 }

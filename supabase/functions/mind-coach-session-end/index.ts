@@ -38,10 +38,42 @@ serve(async (req) => {
     const n8nWebhookUrl = Deno.env.get('MC_N8N_SESSION_END_WEBHOOK_URL') || 'https://your-n8n-instance.com/webhook/mind-coach-session-end';
     const n8nSecret = Deno.env.get('MC_N8N_WEBHOOK_SECRET') || 'placeholder-secret';
 
-    const [sessionRes, messagesRes, profileRes] = await Promise.all([
+    const [sessionRes, messagesRes, profileRes, memoriesRes, caseNotesRes, tasksRes, assessmentsRes, moodRes] = await Promise.all([
         supabaseAdmin.from('mind_coach_sessions').select('*').eq('id', session_id).single(),
-        supabaseAdmin.from('mind_coach_messages').select('role, content').eq('session_id', session_id).order('created_at', { ascending: true }),
-        supabaseAdmin.from('mind_coach_profiles').select('*').eq('id', profile_id).single()
+        supabaseAdmin.from('mind_coach_messages').select('role, content, created_at').eq('session_id', session_id).order('created_at', { ascending: true }),
+        supabaseAdmin.from('mind_coach_profiles').select('*').eq('id', profile_id).single(),
+        supabaseAdmin
+          .from('mind_coach_memories')
+          .select('memory_text, memory_type, created_at')
+          .eq('profile_id', profile_id)
+          .order('created_at', { ascending: false })
+          .limit(1),
+        supabaseAdmin
+          .from('mind_coach_sessions')
+          .select('case_notes, ended_at')
+          .eq('profile_id', profile_id)
+          .eq('session_state', 'completed')
+          .order('ended_at', { ascending: false })
+          .limit(2),
+        supabaseAdmin
+          .from('mind_coach_user_tasks')
+          .select('task_type,dynamic_title,dynamic_description,status,task_end_date')
+          .eq('profile_id', profile_id)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(10),
+        supabaseAdmin
+          .from('mind_coach_assessment_scores')
+          .select('assessment_type,total_score,severity,created_at')
+          .eq('profile_id', profile_id)
+          .order('created_at', { ascending: false })
+          .limit(20),
+        supabaseAdmin
+          .from('mind_coach_mood_entries')
+          .select('score,notes,created_at')
+          .eq('profile_id', profile_id)
+          .order('created_at', { ascending: false })
+          .limit(14),
     ]);
 
     const session = sessionRes.data;
@@ -55,7 +87,12 @@ serve(async (req) => {
       );
     }
 
-    let transcript = messages.map(m => `${m.role === 'user' ? 'Client' : 'Therapist'}: ${m.content}`).join('\n');
+    const messagesPayload = messages.map((m: any) => ({
+      role: m.role,
+      content: m.content,
+      created_at: m.created_at,
+    }));
+    let transcript = messagesPayload.map((m: any) => `${m.role === 'user' ? 'Client' : 'Therapist'}: ${m.content}`).join('\n');
 
     let currentPhase = null;
     let title = session.pathway;
@@ -69,25 +106,57 @@ serve(async (req) => {
         }
     }
 
-    // 1. Send the data to the new n8n Summarizer Webhook
+    const currentPhaseIndex = journey?.current_phase_index ?? Math.max(0, (journey?.current_phase || 1) - 1);
+    const phases = Array.isArray(journey?.phases) ? journey.phases : [];
+    const currentPhaseContext = phases[currentPhaseIndex] ?? currentPhase ?? null;
+    const nextPhaseContext = currentPhaseIndex + 1 < phases.length ? phases[currentPhaseIndex + 1] : null;
+    const completedInCurrentPhase =
+      journey?.id
+        ? ((await supabaseAdmin
+            .from('mind_coach_sessions')
+            .select('id', { count: 'exact', head: true })
+            .eq('journey_id', journey.id)
+            .eq('phase_number', currentPhaseIndex + 1)
+            .eq('session_state', 'completed')).count ?? 0)
+        : 0;
+    const targetInCurrentPhase = getRequiredSessionsForPhase(currentPhaseContext);
+
+    const n8nPayload = {
+      session_id,
+      profile_id,
+      transcript,
+      messages: messagesPayload,
+      profile,
+      session: {
+        pathway: title,
+        dynamic_theme: session.dynamic_theme,
+        session_number: (journey?.sessions_completed || 0) + 1
+      },
+      currentPhase: currentPhaseContext,
+      phase_context: {
+        current_phase_index: currentPhaseIndex,
+        total_phases: phases.length,
+        current_phase: currentPhaseContext,
+        next_phase: nextPhaseContext,
+        completed_in_current_phase: completedInCurrentPhase,
+        target_sessions_in_current_phase: targetInCurrentPhase,
+      },
+      memories: memoriesRes.data || [],
+      current_memory: memoriesRes.data?.[0] ?? null,
+      recent_case_notes: (caseNotesRes.data || []).map((r: any) => r.case_notes).filter(Boolean),
+      active_tasks: tasksRes.data || [],
+      assessments: assessmentsRes.data || [],
+      mood_entries: moodRes.data || [],
+    };
+
+    // 1. Send the data to the unified n8n session-end orchestrator webhook.
     const n8nResponse = await fetch(n8nWebhookUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-n8n-secret': n8nSecret,
       },
-      body: JSON.stringify({
-        session_id,
-        profile_id,
-        transcript,
-        profile,
-        session: {
-          pathway: title,
-          dynamic_theme: session.dynamic_theme,
-          session_number: (journey?.sessions_completed || 0) + 1
-        },
-        currentPhase
-      }),
+      body: JSON.stringify(n8nPayload),
     });
 
     if (!n8nResponse.ok) {
@@ -102,7 +171,11 @@ serve(async (req) => {
     let parsed = await n8nResponse.json();
     parsed = Array.isArray(parsed) ? parsed[0] : parsed;
 
-    const { case_notes, session_summary, extracted_memories, extracted_tasks } = parsed;
+    const case_notes = parsed?.case_notes ?? null;
+    const session_summary = parsed?.session_summary ?? null;
+    const extracted_memories = Array.isArray(parsed?.extracted_memories) ? parsed.extracted_memories : [];
+    const extracted_tasks = Array.isArray(parsed?.extracted_tasks) ? parsed.extracted_tasks : [];
+    const agent_meta = parsed?.agent_meta && typeof parsed.agent_meta === 'object' ? parsed.agent_meta : null;
 
     // 3. Update session as completed
     await supabaseAdmin
@@ -243,6 +316,9 @@ serve(async (req) => {
       JSON.stringify({
         case_notes,
         session_summary,
+        extracted_tasks,
+        extracted_memories,
+        agent_meta,
         memories_stored: memoriesStored,
         tasks_stored: extracted_tasks?.length || 0,
         session_id,
