@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import { corsHeaders } from '../_shared/cors.ts';
+import { normalizeJourneyPhases } from '../_shared/mindCoachSessionGoals.ts';
 
 // OpenAI API key is no longer used here; routing logic is delegated to n8n.
 
@@ -237,6 +238,7 @@ serve(async (req) => {
     const routerOutput = Array.isArray(aiResult) ? aiResult[0] : aiResult;
     const selectedPathway = routerOutput.pathway || 'exploratory_validation';
     const playbook = PATHWAY_PLAYBOOKS[selectedPathway] || PATHWAY_PLAYBOOKS.exploratory_validation;
+    const normalizedPhases = normalizeJourneyPhases(playbook.phases);
 
     // Create journey
     const { data: journey, error: journeyErr } = await supabaseAdmin
@@ -245,7 +247,7 @@ serve(async (req) => {
         profile_id,
         pathway: selectedPathway,
         title: playbook.name,
-        phases: playbook.phases,
+        phases: normalizedPhases,
         current_phase_index: 0,
         sessions_completed: 0,
         active: true,

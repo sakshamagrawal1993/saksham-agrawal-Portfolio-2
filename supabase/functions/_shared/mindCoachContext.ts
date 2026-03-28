@@ -1,3 +1,8 @@
+import {
+  type SessionGoalContext,
+  resolveSessionGoalContext,
+} from './mindCoachSessionGoals.ts';
+
 /**
  * Shared context builder for Mind Coach edge functions.
  *
@@ -41,6 +46,7 @@ export interface PhaseContextPack {
   session_stage: SessionStage;
   phase_goal: string | null;
   sessions_remaining_in_phase: number;
+  session_goal_context: SessionGoalContext | null;
 }
 
 export interface ContinuityPack {
@@ -49,6 +55,7 @@ export interface ContinuityPack {
   recent_case_notes_context: CaseNoteItem[];
   phase_context: PhaseContextPack | null;
   session_stage: SessionStage;
+  session_goal_context: SessionGoalContext | null;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -198,6 +205,7 @@ export async function buildPhaseContext(
   const stage = deriveSessionStage(completed, target);
   const phaseGoal: string | null =
     typeof currentPhase?.goal === 'string' ? currentPhase.goal : null;
+  const sessionGoalContext = resolveSessionGoalContext(currentPhase, completed, DEFAULT_MIN_SESSIONS_PER_PHASE);
 
   return {
     current_phase_index: currentPhaseIndex,
@@ -209,6 +217,7 @@ export async function buildPhaseContext(
     session_stage: stage,
     phase_goal: phaseGoal,
     sessions_remaining_in_phase: Math.max(0, target - completed),
+    session_goal_context: sessionGoalContext,
   };
 }
 
@@ -219,9 +228,13 @@ export async function buildContinuityPack(
   supabaseAdmin: any,
   profileId: string,
   sessionId: string,
+  options?: { transcriptLimit?: number },
 ): Promise<ContinuityPack> {
+  const transcriptLimit = Number.isFinite(options?.transcriptLimit)
+    ? Math.max(8, Math.min(30, Number(options?.transcriptLimit)))
+    : 20;
   const [conversations, tasks, caseNotes, phaseCtx] = await Promise.all([
-    buildConversationWindow(supabaseAdmin, profileId, sessionId, 20),
+    buildConversationWindow(supabaseAdmin, profileId, sessionId, transcriptLimit),
     buildTaskContext(supabaseAdmin, profileId),
     buildCaseNotesContext(supabaseAdmin, profileId, 3),
     buildPhaseContext(supabaseAdmin, profileId, sessionId),
@@ -233,5 +246,6 @@ export async function buildContinuityPack(
     recent_case_notes_context: caseNotes,
     phase_context: phaseCtx,
     session_stage: phaseCtx?.session_stage ?? 'early',
+    session_goal_context: phaseCtx?.session_goal_context ?? null,
   };
 }

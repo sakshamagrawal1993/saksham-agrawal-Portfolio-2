@@ -2,6 +2,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import { corsHeaders } from '../_shared/cors.ts';
 import { buildContinuityPack } from '../_shared/mindCoachContext.ts';
+import { normalizeJourneyPhases } from '../_shared/mindCoachSessionGoals.ts';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -29,6 +30,7 @@ serve(async (req) => {
       phase_prompt,
       message_count,
       client_managed_persistence,
+      session_number,
     } = payload;
 
     if (!session_id || !profile_id || (!message_text && !is_system_greeting)) {
@@ -62,7 +64,7 @@ serve(async (req) => {
     // 2. Update session message count
     const { data: sessionData } = await supabaseAdmin
       .from('mind_coach_sessions')
-      .select('message_count')
+      .select('message_count,journey_id,pathway_confidence')
       .eq('id', session_id)
       .single();
 
@@ -153,12 +155,68 @@ serve(async (req) => {
     }
 
     // 4. Build server-authoritative continuity pack
+    const configuredTranscriptLimit = Number.parseInt(
+      Deno.env.get('MC_CHAT_TRANSCRIPT_LIMIT') || '20',
+      10,
+    );
+    const transcriptLimit = Number.isFinite(configuredTranscriptLimit)
+      ? Math.max(8, Math.min(30, configuredTranscriptLimit))
+      : 20;
+
     let continuityPack: any = null;
     try {
-      continuityPack = await buildContinuityPack(supabaseAdmin, profile_id, session_id);
+      continuityPack = await buildContinuityPack(supabaseAdmin, profile_id, session_id, {
+        transcriptLimit,
+      });
     } catch (cpErr: any) {
       console.error('continuity pack build failed (non-fatal):', cpErr.message);
     }
+
+    let serverJourneyContext: Record<string, unknown> | null = null;
+    if (sessionData?.journey_id) {
+      const { data: journeyRow } = await supabaseAdmin
+        .from('mind_coach_journeys')
+        .select('id,title,description,current_phase,current_phase_index,phases,sessions_completed')
+        .eq('id', sessionData.journey_id)
+        .maybeSingle();
+      if (journeyRow) {
+        serverJourneyContext = {
+          id: journeyRow.id,
+          title: journeyRow.title,
+          description: journeyRow.description ?? null,
+          current_phase: journeyRow.current_phase,
+          current_phase_index: journeyRow.current_phase_index ?? Math.max(0, (journeyRow.current_phase || 1) - 1),
+          phases: normalizeJourneyPhases(journeyRow.phases),
+          sessions_completed: journeyRow.sessions_completed ?? 0,
+        };
+      }
+    }
+    const sessionGoalContext =
+      continuityPack?.session_goal_context &&
+      typeof continuityPack.session_goal_context === 'object'
+        ? continuityPack.session_goal_context
+        : null;
+    const effectivePhasePrompt =
+      sessionGoalContext?.session_objective
+        ? `${resolvedPhasePrompt}\n\n[SESSION GOAL CONTEXT]\nSession objective: ${sessionGoalContext.session_objective}\nSuccess signal: ${sessionGoalContext.session_success_signal || 'Show measurable progress on this session objective.'}`
+        : resolvedPhasePrompt;
+
+    // Canonical prompt contract values (legacy fields kept for compatibility)
+    const canonicalMessages =
+      Array.isArray(continuityPack?.last_20_conversations) && continuityPack.last_20_conversations.length > 0
+        ? continuityPack.last_20_conversations
+        : messagesData;
+    const canonicalTasks =
+      Array.isArray(continuityPack?.active_tasks_context) && continuityPack.active_tasks_context.length > 0
+        ? continuityPack.active_tasks_context
+        : activeTasksData;
+    const canonicalCaseNotesContext =
+      Array.isArray(continuityPack?.recent_case_notes_context)
+        ? continuityPack.recent_case_notes_context
+        : [];
+    const legacyCaseNotes = canonicalCaseNotesContext
+      .map((row: any) => row?.case_notes || row)
+      .filter(Boolean);
 
     // 5. Forward to n8n (server context is authoritative; client hints fill gaps)
     const controller = new AbortController();
@@ -178,28 +236,37 @@ serve(async (req) => {
           message_text,
           user_message_id: userMessageId,
           profile: resolvedProfile,
-          journey_context,
+          journey_context: serverJourneyContext ?? journey_context ?? null,
           session_state: session_state || 'intake',
           dynamic_theme,
           pathway,
-          messages: messagesData,
+          messages: canonicalMessages,
           memories: (memoriesData || []).map((m: any) => ({
             text: m.memory_text || m.text,
             type: m.memory_type || m.type,
           })),
-          recent_case_notes: (caseNotesData || []).map((s: any) => s.case_notes || s).filter(Boolean),
-          recent_tasks_assigned: activeTasksData || [],
           assessments: assessmentsData || [],
           coach_prompt: resolvedCoachPrompt,
-          phase_prompt: resolvedPhasePrompt,
+          phase_prompt: effectivePhasePrompt,
           message_count: newCount,
+          session_number:
+            Number.isFinite(session_number)
+              ? session_number
+              : Number.isFinite(serverJourneyContext?.sessions_completed as number)
+                ? (Number(serverJourneyContext?.sessions_completed) + 1)
+                : 1,
           is_system_greeting,
-          // Server-authoritative continuity pack
+          // Canonical server context fields
           last_20_conversations: continuityPack?.last_20_conversations ?? [],
           active_tasks_context: continuityPack?.active_tasks_context ?? [],
-          recent_case_notes_context: continuityPack?.recent_case_notes_context ?? [],
+          recent_case_notes_context: canonicalCaseNotesContext,
           continuity_phase_context: continuityPack?.phase_context ?? null,
-          session_stage: continuityPack?.session_stage ?? 'early',
+          session_goal_context: sessionGoalContext,
+          session_stage: continuityPack?.phase_context?.session_stage ?? continuityPack?.session_stage ?? 'early',
+          transcript_limit: transcriptLimit,
+          // Legacy compatibility fields (deprecate downstream)
+          recent_case_notes: legacyCaseNotes,
+          recent_tasks_assigned: canonicalTasks,
         }),
         signal: controller.signal,
       });
@@ -253,9 +320,34 @@ serve(async (req) => {
     const dynamicContent = result.dynamic_content || null;
     const isSessionClose = result.is_session_close || false;
     const suggestedPathway = result.suggested_pathway || null;
-    const qualityMeta = result.quality_meta && typeof result.quality_meta === 'object'
+    const rawQualityMeta = result.quality_meta && typeof result.quality_meta === 'object'
       ? result.quality_meta
-      : null;
+      : {};
+    const qualityMeta = {
+      ...rawQualityMeta,
+      context_used:
+        typeof rawQualityMeta.context_used === 'boolean'
+          ? rawQualityMeta.context_used
+          : (Array.isArray(continuityPack?.last_20_conversations) && continuityPack.last_20_conversations.length > 0),
+      task_followup_used:
+        typeof rawQualityMeta.task_followup_used === 'boolean'
+          ? rawQualityMeta.task_followup_used
+          : (Array.isArray(continuityPack?.active_tasks_context) && continuityPack.active_tasks_context.length > 0),
+      phase_goal_touched:
+        typeof rawQualityMeta.phase_goal_touched === 'boolean'
+          ? rawQualityMeta.phase_goal_touched
+          : Boolean(continuityPack?.phase_context?.phase_goal),
+      session_goal_touched:
+        typeof rawQualityMeta.session_goal_touched === 'boolean'
+          ? rawQualityMeta.session_goal_touched
+          : Boolean(sessionGoalContext?.session_objective),
+      session_stage:
+        rawQualityMeta.session_stage ||
+        continuityPack?.phase_context?.session_stage ||
+        continuityPack?.session_stage ||
+        'early',
+      transcript_limit: transcriptLimit,
+    };
 
     if (
       suggestedPathway &&
