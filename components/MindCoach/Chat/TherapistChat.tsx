@@ -703,6 +703,8 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
   const [showPathwayPhases, setShowPathwayPhases] = useState(false);
   const [activePathwayPhase, setActivePathwayPhase] = useState(0);
   const [completedTaskKeys, setCompletedTaskKeys] = useState<Record<string, boolean>>({});
+  const [showTier2, setShowTier2] = useState(false);
+  const [showTier3, setShowTier3] = useState(false);
   const prefillAppliedForSessionRef = useRef<Set<string>>(new Set());
   const trackedPathwayCardViewsRef = useRef<Set<string>>(new Set());
 
@@ -852,6 +854,8 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
     setShowPathwayPhases(false);
     setActivePathwayPhase(0);
     setCompletedTaskKeys({});
+    setShowTier2(false);
+    setShowTier3(false);
     if (profile?.id) {
       const { data } = await supabase
         .from('mind_coach_journeys')
@@ -1022,9 +1026,6 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
         onViewProposal();
       }
     };
-
-    const [showTier2, setShowTier2] = React.useState(false);
-    const [showTier3, setShowTier3] = React.useState(false);
 
     const hasTier2Content = phaseTransitionResult || shouldShowPathwayPreview || nextFocusOptions.length > 0 || isNewPathway;
     const hasTier3Content = tasksWithUi.length > 0 || summaryView.energy_shift || summaryView.psychological_flexibility || summaryView.self_compassion_score !== undefined || (caseNotes?.presenting_concern || caseNotes?.dynamic_theme);

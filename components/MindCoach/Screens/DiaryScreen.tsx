@@ -14,6 +14,25 @@ interface DiaryEntry {
   hasSummary?: boolean;
 }
 
+function hasUsableSessionSummary(raw: unknown): boolean {
+  const summary = normalizeServerSessionSummary(raw);
+  if (!summary) return false;
+  const title = typeof summary.title === 'string' ? summary.title.trim() : '';
+  const openingReflection =
+    typeof summary.opening_reflection === 'string' ? summary.opening_reflection.trim() : '';
+  const isKnownPlaceholder =
+    title.toLowerCase() === 'session wrap-up' &&
+    openingReflection.toLowerCase().includes('placeholder summary');
+  if (isKnownPlaceholder) return false;
+  const takeaways = Array.isArray((summary as Record<string, unknown>).session_takeaways)
+    ? (summary as Record<string, unknown>).session_takeaways
+    : [];
+  const tasks = Array.isArray((summary as Record<string, unknown>).extracted_tasks)
+    ? (summary as Record<string, unknown>).extracted_tasks
+    : [];
+  return !!(title || openingReflection || takeaways.length > 0 || tasks.length > 0);
+}
+
 function normalizeServerSessionSummary(raw: unknown): Record<string, unknown> | null {
   if (raw == null) return null;
   if (typeof raw === 'string') {
@@ -47,13 +66,14 @@ export const DiaryScreen: React.FC = () => {
     const sEntries: DiaryEntry[] = sessions
       .filter((s) => s.session_state === 'completed')
       .map((s) => {
-        const data = (s.summary_data ?? null) as Record<string, unknown> | null;
+        const data = normalizeServerSessionSummary(s.summary_data);
+        const hasSummary = hasUsableSessionSummary(s.summary_data);
         const title =
           (typeof data?.title === 'string' && data.title) ||
           s.dynamic_theme ||
           'Session';
         const preview =
-          (typeof data?.opening_reflection === 'string' && data.opening_reflection) ||
+          (hasSummary && typeof data?.opening_reflection === 'string' && data.opening_reflection) ||
           (s.ended_at ? 'Session completed — summary will appear when available.' : 'Session completed');
         return {
           id: s.id,
@@ -61,7 +81,7 @@ export const DiaryScreen: React.FC = () => {
           title,
           preview,
           date: s.ended_at || s.started_at,
-          hasSummary: !!data,
+          hasSummary,
         };
       });
 
@@ -96,10 +116,10 @@ export const DiaryScreen: React.FC = () => {
     if (entry.type !== 'session') return;
     if (entry.hasSummary) return;
     if (generatingSummaryFor === entry.id) return;
-    if (!profile?.id) return;
-
     const session = sessions.find((s) => s.id === entry.id);
     if (!session) return;
+    const profileId = profile?.id || session.profile_id;
+    if (!profileId) return;
 
     setGeneratingSummaryFor(entry.id);
     setSummaryErrorBySession((prev) => ({ ...prev, [entry.id]: '' }));
@@ -108,7 +128,7 @@ export const DiaryScreen: React.FC = () => {
       const { data, error } = await supabase.functions.invoke('mind-coach-session-end', {
         body: {
           session_id: session.id,
-          profile_id: profile.id,
+          profile_id: profileId,
         },
       });
       if (error) throw error;
@@ -202,7 +222,7 @@ export const DiaryScreen: React.FC = () => {
                       void handleSessionClick(entry);
                     }
                   }}
-                  className={`w-full text-left p-4 ${entry.type === 'session' ? 'hover:bg-[#FAF7F3] transition-colors' : ''}`}
+                  className={`w-full text-left p-4 ${entry.type === 'session' ? 'hover:bg-[#FAF7F3] transition-colors cursor-pointer' : ''}`}
                   disabled={entry.type === 'session' && generatingSummaryFor === entry.id}
                 >
                   <div className="flex items-start gap-3">
