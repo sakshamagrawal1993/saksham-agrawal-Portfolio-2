@@ -18,6 +18,7 @@ import {
 } from '../MindCoachConstants';
 import { PhaseProgressStepper } from './PhaseProgressStepper';
 import { SessionSummaryView } from '../Summary/SessionSummaryView';
+import '../Atmosphere/MindCoachZen.css';
 
 function normalizeN8nChatPayload(raw: unknown): Record<string, any> {
   const base = (Array.isArray(raw) ? raw[0] : raw) as Record<string, any> | null;
@@ -1047,14 +1048,21 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
   // ── Crisis overlay ──────────────────────────────────────────────────────
   if (isCrisisDetected) {
     return (
-      <div className="flex flex-col h-full bg-[#FFF5F5]">
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-red-100 bg-white shrink-0">
-          <button onClick={onBack} className="text-[#2C2A26]/60 hover:text-[#2C2A26]">
-            <ArrowLeft size={20} />
-          </button>
-          <p className="text-sm font-semibold text-red-600">Crisis Support</p>
-        </div>
-        <div className="flex-1 flex flex-col items-center justify-center px-6 text-center gap-5">
+    <div className="flex flex-col h-full bg-[#fdfaf7] relative overflow-hidden">
+      {/* Zen Atmospheric Aura — subtle overlay */}
+      <div className="absolute inset-0 pointer-events-none opacity-[0.4] z-0">
+        <div className="absolute top-[-10%] left-[-10%] w-[120%] h-[40%] bg-gradient-to-b from-[#E8F3E9] to-transparent blur-[80px]" />
+      </div>
+
+      {/* Header — Zen Glass */}
+      <header className="zen-glass sticky top-0 z-30 flex items-center gap-3 px-4 py-3 border-b border-white/40 shrink-0">
+        <button onClick={onBack} className="text-[#2C2A26]/60 hover:text-[#2C2A26]">
+          <ArrowLeft size={20} />
+        </button>
+        <p className="text-sm font-semibold text-red-600">Crisis Support</p>
+      </header>
+
+      <div className="flex-1 flex flex-col items-center justify-center px-6 text-center gap-5 relative z-10 overflow-y-auto">
           <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -1122,9 +1130,14 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0">
-      {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-[#E8E4DE] bg-white/80 backdrop-blur-sm shrink-0">
+    <div className="flex flex-col h-full min-h-0 bg-[#fdfaf7] relative overflow-hidden">
+      {/* Zen Atmospheric Aura */}
+      <div className="absolute inset-0 pointer-events-none opacity-[0.4] z-0">
+        <div className="absolute top-[-10%] left-[-10%] w-[120%] h-[40%] bg-gradient-to-b from-[#E8F3E9] to-transparent blur-[80px]" />
+      </div>
+
+      {/* Header — Zen Glass */}
+      <div className="zen-glass sticky top-0 z-30 flex items-center gap-3 px-4 py-3 border-b border-white/40 backdrop-blur-md shrink-0">
         <button onClick={onBack} className="text-[#2C2A26]/60 hover:text-[#2C2A26]">
           <ArrowLeft size={20} />
         </button>
@@ -1268,86 +1281,95 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
         </div>
       )}
 
-      {/* Messages */}
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3">
-        {showSafeExitToast && (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mx-auto max-w-[280px] bg-white border border-[#E8E4DE] rounded-xl px-4 py-2.5 text-center shadow-sm cursor-pointer"
-            onClick={() => {
-              setShowSafeExitToast(false);
-              if (profile?.id) localStorage.setItem(`mc_safe_exit_seen_${profile.id}`, '1');
-            }}
-          >
-            <p className="text-xs text-[#2C2A26]/60">You can close anytime. Your progress is saved.</p>
-          </motion.div>
-        )}
-        {messages.length === 0 && (
-          <div className="text-center text-sm text-[#2C2A26]/40 mt-10">
-            Start the conversation — {meta.name} is here to listen.
-          </div>
-        )}
-        {messages.map((msg) => (
-          <ChatMessage
-            key={msg.id}
-            message={msg}
-            therapistColor={meta.color}
-            therapistInitial={meta.name[0]}
-            avatarUrl={meta.avatarUrl}
-          />
-        ))}
-        {isLoading && (
-          <div className="flex gap-2">
-            <div
-              className="w-9 h-9 rounded-full flex items-center justify-center overflow-hidden text-white text-xs font-semibold shrink-0"
-              style={{ backgroundColor: meta.color }}
+      {/* Message List */}
+      <div 
+        ref={scrollRef} 
+        className="flex-1 overflow-y-auto px-4 py-6 space-y-6 relative z-10"
+      >
+        <div className="max-w-2xl mx-auto space-y-6">
+          {showSafeExitToast && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mx-auto max-w-[280px] bg-white border border-[#E8E4DE] rounded-xl px-4 py-2.5 text-center shadow-sm cursor-pointer"
+              onClick={() => {
+                setShowSafeExitToast(false);
+                if (profile?.id) localStorage.setItem(`mc_safe_exit_seen_${profile.id}`, '1');
+              }}
             >
-              {meta.avatarUrl ? (
-                <img src={meta.avatarUrl} alt={meta.name[0]} className="w-full h-full object-cover" />
-              ) : (
-                meta.name[0]
-              )}
+              <p className="text-xs text-[#2C2A26]/60">You can close anytime. Your progress is saved.</p>
+            </motion.div>
+          )}
+          {messages.length === 0 && (
+            <div className="text-center text-sm text-[#2C2A26]/40 mt-10">
+              Start the conversation — {meta.name} is here to listen.
             </div>
-            <div className="bg-white border border-[#E8E4DE] rounded-2xl rounded-bl-md px-4 py-3">
-              <div className="flex gap-1.5">
-                <span className="w-2 h-2 bg-[#2C2A26]/20 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-2 h-2 bg-[#2C2A26]/20 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-2 h-2 bg-[#2C2A26]/20 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+          )}
+          {messages.map((m, idx) => (
+            <motion.div
+              key={m.id}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ 
+                duration: 0.8, 
+                delay: idx === messages.length - 1 ? 0 : idx * 0.05,
+                ease: [0.2, 0, 0.2, 1]
+              }}
+              className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} zen-stagger-entry`}
+            >
+              <div className={m.role === 'assistant' ? 'animate-zen-float' : ''}>
+                <ChatMessage 
+                  message={m} 
+                  therapistColor={meta.color}
+                  therapistInitial={meta.name[0]}
+                  avatarUrl={meta.avatarUrl}
+                />
               </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Input */}
-      <div className="px-3 py-3 border-t border-[#E8E4DE] bg-white shrink-0">
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key !== 'Enter' || e.shiftKey) return;
-              e.preventDefault();
-              if (!isLoading) handleSend();
-            }}
-            placeholder="Type a message…"
-            className="flex-1 px-4 py-2.5 text-sm bg-[#F5F0EB] rounded-full outline-none placeholder:text-[#2C2A26]/30 text-[#2C2A26]"
-          />
-          <button
-            type="button"
-            onClick={handleSend}
-            disabled={!input.trim() || isLoading}
-            className="w-9 h-9 flex items-center justify-center rounded-full bg-[#6B8F71] text-white disabled:opacity-40 transition-opacity shrink-0"
-            aria-busy={isLoading}
-            title={isLoading ? 'Wait for reply…' : 'Send'}
-          >
-            <Send size={16} />
-          </button>
+            </motion.div>
+          ))}
+          {isLoading && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex justify-start zen-stagger-entry"
+            >
+              <div className="animate-zen-float">
+                <div className="zen-glass px-4 py-3 rounded-2xl flex items-center gap-1.5 border border-white/60">
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#6B8F71] animate-bounce [animation-delay:-0.3s]" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#6B8F71] animate-bounce [animation-delay:-0.15s]" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#6B8F71] animate-bounce" />
+                </div>
+              </div>
+            </motion.div>
+          )}
         </div>
       </div>
 
+      {/* Footer / Input — Zen Glass */}
+      <footer className="p-4 pb-8 zen-glass-heavy border-t border-white/50 relative z-30">
+        <div className="max-w-2xl mx-auto flex items-center gap-3">
+          <input
+            type="text"
+            className="flex-1 bg-white/50 border border-white/80 rounded-2xl px-5 h-12 text-sm focus:outline-none focus:ring-2 focus:ring-[#6B8F71]/30 placeholder-[#2C2A26]/30 transition-all zen-card-shadow"
+            placeholder={`Message ${meta.name}...`}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
+          />
+          <button
+            onClick={handleSend}
+            disabled={!input.trim() || isLoading || endingSession}
+            className="w-12 h-12 rounded-2xl bg-[#6B8F71] text-white flex items-center justify-center hover:bg-[#5A7D60] active:scale-[0.95] disabled:opacity-30 transition-all shadow-lg shadow-[#6B8F71]/20"
+          >
+            <Send size={18} />
+          </button>
+        </div>
+      </footer>
     </div>
   );
 };

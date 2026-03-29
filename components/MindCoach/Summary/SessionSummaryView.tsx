@@ -10,6 +10,7 @@ import {
   TherapistPersona,
 } from '../../../store/mindCoachStore';
 import { PATHWAY_LABELS } from '../shared/pathwayLabels';
+import '../Atmosphere/MindCoachZen.css';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -60,8 +61,8 @@ export const SessionSummaryView: React.FC<SessionSummaryViewProps> = ({
   onJournal,
   title = 'Session Complete',
 }) => {
-  const [showTier2, setShowTier2] = useState(false);
-  const [showTier3, setShowTier3] = useState(false);
+  const [showTier2, setShowTier2] = useState(true);
+  const [showTier3, setShowTier3] = useState(true);
   const [completedTaskKeys, setCompletedTaskKeys] = useState<Record<string, boolean>>({});
   const [showPathwayPhases, setShowPathwayPhases] = useState(false);
   const [activePathwayPhase, setActivePathwayPhase] = useState(0);
@@ -72,7 +73,7 @@ export const SessionSummaryView: React.FC<SessionSummaryViewProps> = ({
     return null;
   });
 
-  const summaryView = summaryData;
+  const summaryView = (summaryData || {}) as Record<string, any>;
   const caseNotes = (summaryView.case_notes ?? activeSession?.case_notes ?? null) as Record<
     string,
     any
@@ -185,35 +186,35 @@ export const SessionSummaryView: React.FC<SessionSummaryViewProps> = ({
     }
   };
 
-  const hasTier2Content =
-    phaseTransitionResult || shouldShowPathwayPreview || nextFocusOptions.length > 0 || isNewPathway;
-  const hasTier3Content =
-    tasksWithUi.length > 0 ||
-    summaryView.energy_shift ||
-    summaryView.psychological_flexibility ||
-    summaryView.self_compassion_score !== undefined ||
-    (caseNotes?.presenting_concern || caseNotes?.dynamic_theme);
+  const hasTier2Content = true; // Always show tiers for better visibility as requested
+  const hasTier3Content = true; 
 
   return (
-    <div className="flex flex-col h-full bg-[#F9F6F2] relative">
-      <div className="flex items-center gap-3 px-5 py-3 border-b border-[#E8E4DE] bg-white/80 backdrop-blur-sm shrink-0">
+    <div className="flex flex-col h-full bg-[#fdfaf7] relative overflow-hidden">
+      {/* Zen Atmospheric Aura */}
+      <div className="absolute inset-0 pointer-events-none opacity-[0.4] z-0">
+        <div className="absolute top-[-10%] right-[-10%] w-[120%] h-[40%] bg-gradient-to-b from-[#E8F3E9] to-transparent blur-[80px]" />
+        <div className="absolute bottom-[-10%] left-[-10%] w-[100%] h-[40%] bg-gradient-to-t from-[#F0F4F8] to-transparent blur-[80px]" />
+      </div>
+
+      <div className="zen-glass sticky top-0 z-30 flex items-center gap-3 px-5 py-3 border-b border-white/40 backdrop-blur-md shrink-0">
         <div className="flex-1">
-          <p className="text-sm font-semibold text-[#2C2A26]">{title}</p>
+          <p className="text-sm font-semibold text-[#2C2A26] uppercase tracking-wider opacity-60">{title}</p>
         </div>
         <button
           onClick={onClose}
-          className="text-[#2C2A26]/60 hover:text-[#2C2A26] text-sm font-medium"
+          className="text-[#2C2A26]/60 hover:text-[#2C2A26] text-sm font-medium px-3 py-1.5 rounded-full hover:bg-white/40 transition-colors"
         >
           {title === 'Session Summary' ? 'Back' : 'Done'}
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-5 py-6 space-y-5">
+      <div className="flex-1 overflow-y-auto px-5 py-6 space-y-6 relative z-10">
         {/* ── TIER 1: Warm reflection + takeaway + next step ── */}
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
+          initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          className="rounded-2xl p-5 bg-[#F0EDE8] border border-[#E8E4DE]"
+          className="zen-glass-heavy rounded-2xl p-6 border border-white/60 zen-card-shadow animate-zen-float"
         >
           <h3 className="text-base font-semibold text-[#2C2A26] mb-2">
             {summaryView.title || 'Session Summary'}
@@ -246,8 +247,8 @@ export const SessionSummaryView: React.FC<SessionSummaryViewProps> = ({
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.04 }}
-            className="bg-white rounded-2xl p-5 border border-[#E8E4DE]"
+            transition={{ delay: 0.1 }}
+            className="zen-glass rounded-2xl p-6 border border-white/50 zen-card-shadow"
           >
             <p className="text-[11px] font-semibold uppercase tracking-wide text-[#2C2A26]/40 mb-3">
               Try this week
@@ -308,7 +309,7 @@ export const SessionSummaryView: React.FC<SessionSummaryViewProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="w-full py-3 rounded-xl bg-[#6B8F71] text-white text-sm font-semibold hover:bg-[#5A7D60] active:scale-[0.98] transition-all"
+            className="w-full py-4 rounded-2xl bg-[#6B8F71] text-white text-sm font-semibold hover:bg-[#5A7D60] active:scale-[0.98] transition-all shadow-lg shadow-[#6B8F71]/20"
           >
             {title === 'Session Summary' ? 'Back to Diary' : 'Done'}
           </button>
@@ -328,8 +329,8 @@ export const SessionSummaryView: React.FC<SessionSummaryViewProps> = ({
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.12 }}
-            className="bg-white rounded-2xl border border-[#E8E4DE] overflow-hidden"
+            transition={{ delay: 0.15 }}
+            className="zen-glass rounded-2xl border border-white/50 overflow-hidden zen-card-shadow"
           >
             <button
               type="button"
@@ -472,8 +473,8 @@ export const SessionSummaryView: React.FC<SessionSummaryViewProps> = ({
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.15 }}
-            className="bg-white rounded-2xl border border-[#E8E4DE] overflow-hidden"
+            transition={{ delay: 0.2 }}
+            className="zen-glass rounded-2xl border border-white/40 overflow-hidden zen-card-shadow"
           >
             <button
               type="button"

@@ -30,114 +30,135 @@ export const ExercisesScreen: React.FC = () => {
   });
 
   const headerEl = (
-      <div
-        className={`px-6 pt-8 pb-6 space-y-6 bg-white/50 backdrop-blur-sm border-b border-[#E8E4DE]/50 ${
-          exercisesUnlocked ? 'sticky top-0 z-20' : 'pointer-events-none opacity-95'
-        }`}
-      >
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <h2 className="text-xl font-semibold text-[#2C2A26]">Wellness Library</h2>
-            <p className="text-sm text-[#2C2A26]/50">Find your center with guided practices</p>
-          </div>
-          <div className="w-10 h-10 rounded-full bg-[#B4A7D6]/10 flex items-center justify-center text-[#B4A7D6]">
-            <Sparkles size={20} />
-          </div>
+    <div
+      className={`relative z-20 px-6 pt-10 pb-6 space-y-6 zen-glass border-b border-white/60 zen-card-shadow ${
+        exercisesUnlocked ? 'sticky top-0' : 'pointer-events-none opacity-95'
+      }`}
+    >
+      <div className="flex items-center justify-between">
+        <div className="space-y-1">
+          <h2 className="text-2xl font-bold text-[#2C2A26] tracking-tight">Wellness Library</h2>
+          <p className="text-sm text-[#2C2A26]/40">Find your center with guided practices</p>
         </div>
-
-        {/* Search & Filter */}
-        <div className="space-y-4">
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#2C2A26]/30" size={18} />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search techniques..."
-              className="w-full pl-11 pr-4 py-3 rounded-2xl bg-white border border-[#E8E4DE] text-sm focus:border-[#6B8F71] transition-all outline-none"
-            />
-          </div>
-
-          <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-            <button
-              onClick={() => setSelectedCategory(null)}
-              className={`px-4 py-2 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
-                !selectedCategory ? 'bg-[#6B8F71] text-white' : 'bg-white border border-[#E8E4DE] text-[#2C2A26]/60'
-              }`}
-            >
-              All
-            </button>
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`px-4 py-2 rounded-full text-xs font-medium transition-all whitespace-nowrap capitalize ${
-                  selectedCategory === cat ? 'bg-[#6B8F71] text-white' : 'bg-white border border-[#E8E4DE] text-[#2C2A26]/60'
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
+        <div className="w-12 h-12 rounded-2xl bg-[#6B8F71]/10 flex items-center justify-center text-[#6B8F71] shadow-inner">
+          <Sparkles size={24} />
         </div>
       </div>
+
+      {/* Search & Filter */}
+      <div className="space-y-5">
+        <div className="relative group">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#2C2A26]/20 transition-colors group-focus-within:text-[#6B8F71]" size={18} />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search techniques..."
+            className="w-full pl-11 pr-4 py-3.5 rounded-2xl bg-white/40 backdrop-blur-md border border-white/80 text-sm focus:border-[#6B8F71]/40 focus:bg-white/60 transition-all outline-none zen-card-shadow"
+          />
+        </div>
+
+        <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+          <button
+            onClick={() => setSelectedCategory(null)}
+            className={`px-5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap ${
+              !selectedCategory 
+                ? 'bg-[#6B8F71] text-white shadow-lg shadow-[#6B8F71]/20' 
+                : 'bg-white/40 border border-white/60 text-[#2C2A26]/50 hover:bg-white/60'
+            }`}
+          >
+            All
+          </button>
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap capitalize ${
+                selectedCategory === cat 
+                  ? 'bg-[#6B8F71] text-white shadow-lg shadow-[#6B8F71]/20' 
+                  : 'bg-white/40 border border-white/60 text-[#2C2A26]/50 hover:bg-white/60'
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 
   const gridEl = (
-      <div className={exercisesUnlocked ? 'flex-1 overflow-y-auto px-6 py-6' : 'px-6 py-6'}>
-        <div className="grid grid-cols-1 gap-4">
-          {filteredExercises.map((ex, idx) => (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.05 }}
-              key={ex.id}
-              onClick={() => exercisesUnlocked && setActiveExercise(ex)}
-              className={`group relative bg-white p-5 rounded-2xl border border-[#E8E4DE] overflow-hidden ${
-                exercisesUnlocked
-                  ? 'hover:border-[#6B8F71]/30 hover:shadow-lg transition-all cursor-pointer'
-                  : ''
-              }`}
-            >
-              <div className="relative z-10 flex items-start justify-between gap-4">
-                <div className="flex-1 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-medium uppercase tracking-wide text-[#6B8F71]">
-                      {ex.type}
-                    </span>
-                    <span className="text-[11px] uppercase tracking-widest font-bold text-[#2C2A26]/30">•</span>
-                    <div className="flex items-center gap-1 text-[11px] uppercase tracking-widest font-bold text-[#2C2A26]/30">
-                      <Clock size={10} />
-                      {Math.ceil(ex.duration_seconds / 60)} min
-                    </div>
+    <div className={exercisesUnlocked ? 'relative z-10 flex-1 overflow-y-auto px-6 py-8' : 'relative z-10 px-6 py-8'}>
+      <div className="grid grid-cols-1 gap-5">
+        {filteredExercises.map((ex, idx) => (
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ 
+              duration: 0.5,
+              delay: idx * 0.04,
+              ease: [0.2, 0, 0.2, 1]
+            }}
+            key={ex.id}
+            onClick={() => exercisesUnlocked && setActiveExercise(ex)}
+            className={`group relative zen-glass p-5 rounded-3xl border border-white/60 overflow-hidden zen-card-shadow active:scale-[0.98] ${
+              exercisesUnlocked
+                ? 'hover:bg-white/40 transition-all cursor-pointer'
+                : ''
+            }`}
+          >
+            <div className="relative z-10 flex items-start justify-between gap-5">
+              <div className="flex-1 space-y-3">
+                <div className="flex items-center gap-3">
+                  <span className="px-2.5 py-1 rounded-lg bg-[#6B8F71]/10 text-[10px] font-bold uppercase tracking-widest text-[#6B8F71]">
+                    {ex.type}
+                  </span>
+                  <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-[#2C2A26]/30">
+                    <Clock size={12} className="opacity-50" />
+                    {Math.ceil(ex.duration_seconds / 60)} min
                   </div>
-                  <h3 className="text-lg font-semibold text-[#2C2A26]">{ex.title}</h3>
-                  <p className="text-sm text-[#2C2A26]/50 line-clamp-2 leading-relaxed">
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-[#2C2A26] mb-1 group-hover:text-[#6B8F71] transition-colors">{ex.title}</h3>
+                  <p className="text-sm text-[#2C2A26]/40 line-clamp-2 leading-relaxed">
                     {ex.description}
                   </p>
                 </div>
-                
-                <div className="w-12 h-12 rounded-2xl bg-[#FAFAF7] border border-[#E8E4DE] flex items-center justify-center text-[#6B8F71] group-hover:bg-[#6B8F71] group-hover:text-white transition-all transform group-hover:scale-110">
-                  <Play size={20} fill="currentColor" />
-                </div>
               </div>
-            </motion.div>
-          ))}
-        </div>
-
-        {filteredExercises.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
-            <div className="w-16 h-16 rounded-full bg-[#E8E4DE]/30 flex items-center justify-center text-[#2C2A26]/20">
-              <Search size={32} />
+              
+              <div className="w-14 h-14 rounded-2xl bg-white border border-white flex items-center justify-center text-[#6B8F71] shadow-sm transform group-hover:scale-110 group-hover:bg-[#6B8F71] group-hover:text-white transition-all duration-300">
+                <Play size={22} fill="currentColor" />
+              </div>
             </div>
-            <p className="text-[#2C2A26]/40 font-medium">No techniques found matching your search</p>
-          </div>
-        )}
+          </motion.div>
+        ))}
       </div>
+
+      {filteredExercises.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-24 text-center space-y-6">
+          <div className="w-20 h-20 rounded-full bg-white/30 backdrop-blur-md flex items-center justify-center text-[#2C2A26]/10 border border-white/60 zen-card-shadow">
+            <Search size={36} />
+          </div>
+          <div className="space-y-1">
+            <h4 className="text-[#2C2A26] font-semibold">No results found</h4>
+            <p className="text-[#2C2A26]/40 text-sm max-w-[200px]">Try searching for something else or explore a different category.</p>
+          </div>
+        </div>
+      )}
+    </div>
   );
 
   return (
-    <div className="flex flex-col h-full bg-[#FAFAF7]">
+    <div className="relative flex flex-col h-full bg-[#FAFAF8] overflow-hidden">
+      {/* Zen Atmospheric Aura */}
+      <div className="zen-aura-container">
+        <img 
+          src="https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/mind%20coach/hero_aura_zen_1774777549788.png" 
+          alt="" 
+          className="zen-aura-img"
+        />
+      </div>
+
       {!exercisesUnlocked ? (
         <FeaturePreviewLockOverlay
           unlockPhase={firstPhaseWhereFeatureUnlocks('exercises')}

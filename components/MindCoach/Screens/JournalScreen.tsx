@@ -57,24 +57,35 @@ export const JournalScreen: React.FC = () => {
   }
 
   return (
-    <div className="p-5 space-y-5 h-full">
-      <div className="flex items-center justify-between">
+    <div className="relative p-5 space-y-5 min-h-screen overflow-x-hidden">
+      {/* Zen Atmospheric Aura */}
+      <div className="zen-aura-container">
+        <img 
+          src="https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/mind%20coach/hero_aura_zen_1774777549788.png" 
+          alt="" 
+          className="zen-aura-img"
+        />
+      </div>
+
+      <div className="relative z-10 flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold text-[#2C2A26]">Journal</h2>
           <p className="text-xs text-[#2C2A26]/40 mt-0.5">Reflect and process your thoughts</p>
         </div>
         <button
           onClick={() => { setEditingEntry(undefined); setMode('new'); }}
-          className="flex items-center gap-1.5 px-3.5 py-2 bg-[#6B8F71] text-white text-sm font-medium rounded-xl hover:bg-[#5A7D60] transition-colors"
+          className="flex items-center gap-1.5 px-3.5 py-2 bg-[#6B8F71] text-white text-sm font-medium rounded-xl hover:bg-[#5A7D60] transition-colors shadow-lg shadow-[#6B8F71]/20"
         >
           <Plus size={14} />
           New Entry
         </button>
       </div>
-      <JournalList
-        onNewEntry={() => { setEditingEntry(undefined); setMode('new'); }}
-        onEditEntry={(entry) => { setEditingEntry(entry); setMode('edit'); }}
-      />
+      <div className="relative z-10 h-full">
+        <JournalList
+          onNewEntry={() => { setEditingEntry(undefined); setMode('new'); }}
+          onEditEntry={(entry) => { setEditingEntry(entry); setMode('edit'); }}
+        />
+      </div>
     </div>
   );
 };

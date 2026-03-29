@@ -156,7 +156,7 @@ export const EditDataModal: React.FC<{ params: HealthParameter[]; onClose: () =>
                                     <td className="py-2 pr-2">
                                         <input
                                             type={r.parameter_text ? 'text' : 'number'}
-                                            value={r.parameter_text || r.parameter_value}
+                                            value={r.parameter_text || (r.parameter_value !== null ? r.parameter_value.toString() : '')}
                                             onChange={e => updateRow(i, r.parameter_text ? 'parameter_text' : 'parameter_value', e.target.value)}
                                             className="w-24 bg-[#F5F2EB] border border-[#EBE7DE] rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#A84A00]"
                                         />
@@ -287,14 +287,20 @@ export const VitalsChart: React.FC<ChartProps> = ({ data, onEditClick }) => {
     const latestTemp = getByName(catData, 'Body Temperature');
     const latestGlucose = getByName(catData, 'Blood Glucose Record');
 
+    const getSafeValue = (val: number | boolean | undefined): string | number => {
+        if (val === undefined || val === null) return '—';
+        if (typeof val === 'boolean') return val ? 1 : 0;
+        return val;
+    };
+
     return (
         <div className="space-y-6">
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                <StatCard label="Resting HR" value={latestRHR[latestRHR.length - 1]?.parameter_value || '—'} unit="bpm" color="#d946ef" />
-                <StatCard label="SPO2" value={latestSPO2[latestSPO2.length - 1]?.parameter_value || '—'} unit="%" color="#3b82f6" />
-                <StatCard label="Resp Rate" value={latestResp[latestResp.length - 1]?.parameter_value || '—'} unit="br/min" color="#10b981" />
-                <StatCard label="Temp" value={latestTemp[latestTemp.length - 1]?.parameter_value || '—'} unit="°C" color="#f59e0b" />
-                <StatCard label="Glucose" value={latestGlucose[latestGlucose.length - 1]?.parameter_value || '—'} unit="mg/dL" color="#ef4444" />
+                <StatCard label="Resting HR" value={getSafeValue(latestRHR[latestRHR.length - 1]?.parameter_value)} unit="bpm" color="#d946ef" />
+                <StatCard label="SPO2" value={getSafeValue(latestSPO2[latestSPO2.length - 1]?.parameter_value)} unit="%" color="#3b82f6" />
+                <StatCard label="Resp Rate" value={getSafeValue(latestResp[latestResp.length - 1]?.parameter_value)} unit="br/min" color="#10b981" />
+                <StatCard label="Temp" value={getSafeValue(latestTemp[latestTemp.length - 1]?.parameter_value)} unit="°C" color="#f59e0b" />
+                <StatCard label="Glucose" value={getSafeValue(latestGlucose[latestGlucose.length - 1]?.parameter_value)} unit="mg/dL" color="#ef4444" />
             </div>
 
             <ChartCard parameterNames={['Heart Rate', 'Resting Heart Rate', 'Walking Heart Rate', 'Heart Rate Recovery']} data={data} onEditClick={onEditClick}>
@@ -640,7 +646,7 @@ export const RecoveryChart: React.FC<ChartProps> = ({ data, onEditClick }) => {
 // ========================
 export const SymptomsChart: React.FC<ChartProps> = ({ data, onEditClick }) => {
     const catData = data.filter(d => d.category === 'symptoms');
-    const days = [...new Set(catData.map(d => dayLabel(d.recorded_at)))];
+    const days = [...new Set(catData.map(d => dayLabel(d.recorded_at || '')))];
     const paramNames = [...new Set(catData.map(d => d.parameter_name))].sort();
 
     return (
@@ -1001,7 +1007,8 @@ export const LabReportsChart: React.FC<ChartProps> = ({ data, onEditClick }) => 
 
                         // Calculate range positions relative to 100% width
                         let minBound = range?.critical_min || range?.normal_min || range?.optimal_min || 0;
-                        let maxBound = range?.critical_max || range?.normal_max || range?.optimal_max || Math.max(minBound * 2, latest.parameter_value * 1.5);
+                        const latestVal = typeof latest.parameter_value === 'number' ? latest.parameter_value : (latest.parameter_value ? 1 : 0);
+                        let maxBound = range?.critical_max || range?.normal_max || range?.optimal_max || Math.max(minBound * 2, latestVal * 1.5);
 
                         // padding
                         const padding = (maxBound - minBound) * 0.1 || 10;
@@ -1014,15 +1021,15 @@ export const LabReportsChart: React.FC<ChartProps> = ({ data, onEditClick }) => 
                         // Hard fallbacks if ranges are fully missing to prevent divide-by-zero explosions visually
                         const optMinPct = range?.optimal_min ? getPercentage(range.optimal_min) : 25;
                         const optMaxPct = range?.optimal_max ? getPercentage(range.optimal_max) : 75;
-                        const valPct = totalRange === 0 ? 50 : getPercentage(latest.parameter_value);
+                        const valPct = totalRange === 0 ? 50 : getPercentage(latestVal);
 
                         let statusColor = '#ef4444'; // red
                         let statusText = 'Out of Range';
 
-                        if (range?.optimal_min != null && range?.optimal_max != null && latest.parameter_value >= range.optimal_min && latest.parameter_value <= range.optimal_max) {
+                        if (range?.optimal_min != null && range?.optimal_max != null && latestVal >= range.optimal_min && latestVal <= range.optimal_max) {
                             statusColor = '#10b981'; // green
                             statusText = 'Optimal';
-                        } else if (range?.normal_min != null && range?.normal_max != null && latest.parameter_value >= range.normal_min && latest.parameter_value <= range.normal_max) {
+                        } else if (range?.normal_min != null && range?.normal_max != null && latestVal >= range.normal_min && latestVal <= range.normal_max) {
                             statusColor = '#f59e0b'; // yellow
                             statusText = 'Normal';
                         } else if (!range) {
@@ -1032,7 +1039,7 @@ export const LabReportsChart: React.FC<ChartProps> = ({ data, onEditClick }) => 
 
                         const chartData = history.map(h => ({
                             date: dayLabel(h.recorded_at),
-                            value: h.parameter_value
+                            value: typeof h.parameter_value === 'number' ? h.parameter_value : (h.parameter_value ? 1 : 0)
                         }));
 
                         return (
@@ -1044,7 +1051,7 @@ export const LabReportsChart: React.FC<ChartProps> = ({ data, onEditClick }) => 
                                     </div>
                                     <div className="text-right">
                                         <p className="text-xl font-serif font-bold" style={{ color: statusColor }}>
-                                            {latest.parameter_value} <span className="text-sm font-normal text-[#A8A29E]">{latest.unit}</span>
+                                            {latestVal} <span className="text-sm font-normal text-[#A8A29E]">{latest.unit}</span>
                                         </p>
                                         <p className="text-[10px] uppercase font-bold tracking-widest" style={{ color: statusColor }}>{statusText}</p>
                                     </div>

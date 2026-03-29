@@ -113,28 +113,28 @@ function AssessmentCatalogSection({
           return (
             <motion.div
               key={type}
-              initial={{ opacity: 0, y: 6 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05 }}
-              className="bg-white rounded-2xl p-4 shadow-sm border border-[#E8E4DE]"
+              className="group relative zen-glass rounded-3xl p-5 zen-card-shadow border border-white/60 hover:bg-white/40 transition-all active:scale-[0.98]"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#F5F0EB] flex items-center justify-center text-lg shrink-0">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-white/60 zen-card-shadow flex items-center justify-center text-xl shrink-0 border border-white">
                   {info.emoji}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-[#2C2A26]">{info.name}</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-base font-bold text-[#2C2A26] tracking-tight">{info.name}</p>
                     {latest && severity && (
                       <span
-                        className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
+                        className="text-[10px] font-bold uppercase px-3 py-1 rounded-lg"
                         style={{ backgroundColor: severity.color + '15', color: severity.color }}
                       >
                         {severity.label}
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-[#2C2A26]/50">{info.description}</p>
+                  <p className="text-xs text-[#2C2A26]/40 font-medium">{info.description}</p>
                 </div>
               </div>
 
@@ -155,13 +155,13 @@ function AssessmentCatalogSection({
                       )}
                     </div>
                   </div>
-                  <div className="w-full h-1.5 bg-[#F5F0EB] rounded-full overflow-hidden mb-3">
+                  <div className="w-full h-2 bg-white/40 rounded-full overflow-hidden mb-4 border border-white/40 shadow-inner">
                     <motion.div
                       className="h-full rounded-full"
                       style={{ backgroundColor: severity!.color }}
                       initial={{ width: 0 }}
                       animate={{ width: `${(latest.total_score / info.maxScore) * 100}%` }}
-                      transition={{ duration: 0.6, delay: 0.2 + i * 0.1 }}
+                      transition={{ duration: 1, ease: [0.2, 0, 0, 1], delay: 0.2 + i * 0.1 }}
                     />
                   </div>
                   <button
@@ -318,18 +318,28 @@ export const AssessmentsScreen: React.FC = () => {
 
   if (!assessmentsUnlocked) {
     return (
-      <div className="flex flex-col h-full min-h-0 bg-[#FAFAF7]">
+      <div className="relative flex flex-col h-full bg-[#FAFAF8] overflow-hidden">
+        {/* Zen Atmospheric Aura */}
+        <div className="zen-aura-container">
+          <img 
+            src="https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/mind%20coach/hero_aura_zen_1774777549788.png" 
+            alt="" 
+            className="zen-aura-img"
+          />
+        </div>
         <FeaturePreviewLockOverlay
           unlockPhase={firstPhaseWhereFeatureUnlocks('assessments')}
           featureLabel="Assessments"
           hint="GAD-7, PHQ-9, and PSS-4 unlock in phase 2. Here is what you will use—complete this phase to take them."
         >
-          <AssessmentCatalogSection
-            latestByType={{}}
-            historyByType={{}}
-            onStartAssessment={() => {}}
-            allScores={[]}
-          />
+          <div className="relative z-10 h-full overflow-y-auto pt-4">
+            <AssessmentCatalogSection
+              latestByType={{}}
+              historyByType={{}}
+              onStartAssessment={() => {}}
+              allScores={[]}
+            />
+          </div>
         </FeaturePreviewLockOverlay>
       </div>
     );
@@ -353,45 +363,54 @@ export const AssessmentsScreen: React.FC = () => {
     };
 
     return (
-      <div className="p-5 flex flex-col h-full bg-[#FAFAF7]">
-        <div className="flex-1 overflow-y-auto space-y-6">
-          <div className="text-center space-y-2 py-4">
-            <div className="w-16 h-16 rounded-full bg-[#6B8F71]/10 flex items-center justify-center mx-auto mb-2">
-              <Check size={32} className="text-[#6B8F71]" />
+      <div className="relative p-5 flex flex-col h-full bg-[#FAFAF8] overflow-hidden">
+        {/* Zen Atmospheric Aura */}
+        <div className="zen-aura-container">
+          <img 
+            src="https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/mind%20coach/hero_aura_zen_1774777549788.png" 
+            alt="" 
+            className="zen-aura-img"
+          />
+        </div>
+        <div className="relative z-10 flex-1 overflow-y-auto space-y-8 pt-8 pb-10">
+          <div className="text-center space-y-3 py-6">
+            <div className="w-20 h-20 rounded-full bg-white/40 zen-glass zen-card-shadow flex items-center justify-center mx-auto mb-4 border border-white">
+              <Check size={40} className="text-[#6B8F71] drop-shadow-sm" />
             </div>
-            <h3 className="text-lg font-bold text-[#2C2A26]">Assessment Complete</h3>
-            <p className="text-xs text-[#2C2A26]/40 uppercase tracking-widest font-bold">Your {info.name} Results</p>
+            <h3 className="text-2xl font-bold text-[#2C2A26] tracking-tight">Assessment Complete</h3>
+            <p className="text-[10px] text-[#2C2A26]/40 uppercase tracking-[0.2em] font-black">Your {info.name} Results</p>
           </div>
 
           {/* Score Card */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-3xl p-6 shadow-sm border border-[#E8E4DE] text-center"
+            transition={{ type: "spring", damping: 20 }}
+            className="zen-glass rounded-[2rem] p-8 zen-card-shadow border border-white text-center shadow-lg shadow-[#6B8F71]/5"
           >
-            <div className="inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide mb-3"
+            <div className="inline-block px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest mb-4"
                  style={{ backgroundColor: severityInfo.color + '15', color: severityInfo.color }}>
               {severityInfo.label}
             </div>
-            <div className="text-5xl font-bold text-[#2C2A26] mb-1">
+            <div className="text-6xl font-black text-[#2C2A26] mb-2 tracking-tighter">
               {showResult.score}
-              <span className="text-xl text-[#2C2A26]/20">/{info.maxScore}</span>
+              <span className="text-2xl text-[#2C2A26]/10">/{info.maxScore}</span>
             </div>
-            <p className="text-xs text-[#2C2A26]/40">Total Score</p>
+            <p className="text-xs text-[#2C2A26]/30 font-bold uppercase tracking-wider">Total Health Score</p>
           </motion.div>
 
           {/* Meaning Card */}
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-[#E8E4DE] space-y-4">
-            <h4 className="text-sm font-bold text-[#2C2A26] flex items-center gap-2">
-              <ClipboardList size={16} className="text-[#6B8F71]" />
-              Meaning of your score
+          <div className="zen-glass rounded-[2rem] p-7 zen-card-shadow border border-white/60 space-y-6">
+            <h4 className="text-sm font-black text-[#2C2A26] uppercase tracking-[0.1em] flex items-center gap-2">
+              <ClipboardList size={18} className="text-[#6B8F71]" />
+              Insights
             </h4>
-            <div className="space-y-3">
-              <p className="text-sm text-[#2C2A26]/70 leading-relaxed font-medium">
+            <div className="space-y-4">
+              <p className="text-base text-[#2C2A26]/70 leading-relaxed font-semibold">
                 {interpretation.meaning}
               </p>
-              <div className="p-4 bg-[#F5F0EB] rounded-2xl">
-                <p className="text-xs text-[#2C2A26]/60 leading-relaxed italic">
+              <div className="p-5 bg-white/30 rounded-2xl border border-white/20 italic">
+                <p className="text-[13px] text-[#2C2A26]/50 leading-relaxed font-medium">
                   "{interpretation.advice}"
                 </p>
               </div>
@@ -399,39 +418,43 @@ export const AssessmentsScreen: React.FC = () => {
           </div>
 
           {/* Action Cards */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-4">
             <button
               onClick={() => setActiveTab('journal')}
-              className="bg-white p-4 rounded-2xl border border-[#E8E4DE] text-left hover:border-[#6B8F71]/30 transition-colors group"
+              className="zen-glass p-5 rounded-[1.5rem] border border-white/60 text-left hover:bg-white/40 transition-all group zen-card-shadow active:scale-[0.98]"
             >
-              <BookOpen size={16} className="text-[#6B8F71] mb-2 group-hover:scale-110 transition-transform" />
-              <p className="text-[10px] font-bold text-[#2C2A26] uppercase mb-0.5">Journal</p>
-              <p className="text-[10px] text-[#2C2A26]/40">Reflect on these feelings</p>
+              <div className="w-10 h-10 rounded-xl bg-[#6B8F71]/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                <BookOpen size={18} className="text-[#6B8F71]" />
+              </div>
+              <p className="text-[11px] font-black text-[#2C2A26] uppercase tracking-wider mb-1">Journal</p>
+              <p className="text-[10px] text-[#2C2A26]/40 leading-tight">Reflect on these insights</p>
             </button>
             <button
               onClick={() => setActiveTab('home')}
-              className="bg-white p-4 rounded-2xl border border-[#E8E4DE] text-left hover:border-[#6B8F71]/30 transition-colors group"
+              className="zen-glass p-5 rounded-[1.5rem] border border-white/60 text-left hover:bg-white/40 transition-all group zen-card-shadow active:scale-[0.98]"
             >
-              <TrendingUp size={16} className="text-[#D4A574] mb-2 group-hover:scale-110 transition-transform" />
-              <p className="text-[10px] font-bold text-[#2C2A26] uppercase mb-0.5">Track</p>
-              <p className="text-[10px] text-[#2C2A26]/40">View your progress</p>
+              <div className="w-10 h-10 rounded-xl bg-[#D4A574]/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                <TrendingUp size={18} className="text-[#D4A574]" />
+              </div>
+              <p className="text-[11px] font-black text-[#2C2A26] uppercase tracking-wider mb-1">Track</p>
+              <p className="text-[10px] text-[#2C2A26]/40 leading-tight">View journey progress</p>
             </button>
           </div>
         </div>
 
         {/* Action Button */}
-        <div className="pt-4 space-y-3">
+        <div className="relative z-20 pt-4 pb-6 space-y-4">
           <button
             onClick={() => setActiveTab('home')}
-            className="w-full py-4 bg-[#2C2A26] text-white text-sm font-bold rounded-2xl shadow-lg shadow-[#2C2A26]/10 active:scale-95 transition-all"
+            className="w-full py-4.5 bg-[#2C2A26] text-white text-sm font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-[#2C2A26]/20 active:scale-95 transition-all"
           >
-            Discuss with your Therapist
+            Open Therapy Session
           </button>
           <button
             onClick={() => setShowResult(null)}
-            className="w-full text-center py-2 text-[10px] font-bold text-[#2C2A26]/30 uppercase tracking-widest hover:text-[#2C2A26]"
+            className="w-full text-center py-2 text-[10px] font-black text-[#2C2A26]/20 uppercase tracking-[0.2em] hover:text-[#2C2A26] transition-colors"
           >
-            Back to Assessments
+            ← Catalog
           </button>
         </div>
       </div>
@@ -553,11 +576,23 @@ export const AssessmentsScreen: React.FC = () => {
 
   // Assessment list UI
   return (
-    <AssessmentCatalogSection
-      latestByType={latestByType}
-      historyByType={historyByType}
-      onStartAssessment={startAssessment}
-      allScores={scores}
-    />
+    <div className="relative flex flex-col h-full bg-[#FAFAF8] overflow-hidden">
+      {/* Zen Atmospheric Aura */}
+      <div className="zen-aura-container">
+        <img 
+          src="https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/mind%20coach/hero_aura_zen_1774777549788.png" 
+          alt="" 
+          className="zen-aura-img"
+        />
+      </div>
+      <div className="relative z-10 flex-1 overflow-y-auto">
+        <AssessmentCatalogSection
+          latestByType={latestByType}
+          historyByType={historyByType}
+          onStartAssessment={startAssessment}
+          allScores={scores}
+        />
+      </div>
+    </div>
   );
 };

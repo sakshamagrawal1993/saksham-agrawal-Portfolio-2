@@ -1,0 +1,92 @@
+/* Mind Coach Minimalist Zen Theme */
+
+:root {
+  --zen-sage: #6B8F71;
+  --zen-sage-light: #E8F3E9;
+  --zen-cream: #F5F0EB;
+  --zen-bone: #E8E4DE;
+  --zen-earth: #2C2A26;
+  --zen-accent: #B4A7D6; /* For unlocks */
+}
+
+.zen-glass {
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.03);
+}
+
+.zen-glass-heavy {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.zen-card-shadow {
+  box-shadow: 0 8px 32px -4px rgba(107, 143, 113, 0.08);
+}
+
+/* Animations */
+@keyframes zen-float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-3px); }
+  100% { transform: translateY(0px); }
+}
+
+.animate-zen-float {
+  animation: zen-float 4s ease-in-out infinite;
+}
+
+@keyframes serene-fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.zen-stagger-entry {
+  animation: serene-fade-in 0.8s cubic-bezier(0.2, 0, 0.2, 1) forwards;
+}
+
+/* Decorative elements */
+.zen-aura-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 380px;
+  z-index: -1;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+}
+
+.zen-aura-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.65;
+  filter: saturate(0.8) contrast(1.05);
+  transform: scale(1.1);
+}
+
+/* Stepper specific */
+.zen-step-line {
+  height: 2px;
+  background: linear-gradient(to right, var(--zen-sage) 0%, var(--zen-bone) 100%);
+  transition: all 0.5s ease;
+}
+
+.zen-step-glow {
+  box-shadow: 0 0 15px rgba(107, 143, 113, 0.3);
+}
+
+/* Typography polish */
+.zen-title {
+  letter-spacing: -0.01em;
+  color: var(--zen-earth);
+}
+
+.zen-muted {
+  color: rgba(44, 42, 38, 0.5);
+}

@@ -339,7 +339,7 @@ export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, o
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="absolute inset-0 bg-[#2C2A26]/45 backdrop-blur-[2px]"
+                className="absolute inset-0 bg-[#2C2A26]/10 backdrop-blur-[6px]"
                 onClick={onClose}
                 aria-hidden
             />
@@ -348,9 +348,13 @@ export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, o
                 animate={{ y: 0 }}
                 exit={{ y: '100%' }}
                 transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-                className="relative w-full max-w-lg max-h-[88vh] md:max-h-[85vh] rounded-t-2xl md:rounded-2xl bg-[#FAFAF7] shadow-xl overflow-hidden flex flex-col border border-[#E8E4DE]/80"
+                className="relative w-full max-w-lg max-h-[88vh] md:max-h-[85vh] rounded-t-2xl md:rounded-2xl zen-glass-heavy shadow-2xl overflow-hidden flex flex-col border border-white/60"
                 onClick={(e) => e.stopPropagation()}
             >
+                {/* Zen Atmospheric Aura */}
+                <div className="absolute inset-0 pointer-events-none opacity-[0.3] z-0">
+                    <div className="absolute top-[-10%] right-[-10%] w-[100%] h-[30%] bg-[#E8F3E9] blur-[60px]" />
+                </div>
                 <div className="flex justify-center pt-2 pb-1 md:hidden shrink-0">
                     <div className="w-10 h-1 rounded-full bg-[#2C2A26]/15" aria-hidden />
                 </div>

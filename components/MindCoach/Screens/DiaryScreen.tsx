@@ -329,8 +329,17 @@ export const DiaryScreen: React.FC = () => {
   }
 
   return (
-    <div className="p-5 space-y-5">
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+    <div className="relative p-5 space-y-5 min-h-screen overflow-x-hidden">
+      {/* Zen Atmospheric Aura */}
+      <div className="zen-aura-container">
+        <img 
+          src="https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/mind%20coach/hero_aura_zen_1774777549788.png" 
+          alt="" 
+          className="zen-aura-img"
+        />
+      </div>
+
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="relative z-10">
         <h2 className="text-xl font-semibold text-[#2C2A26]">My Diary</h2>
         <p className="text-xs text-[#2C2A26]/40 mt-1">Session reflections & journal entries</p>
       </motion.div>
@@ -363,7 +372,7 @@ export const DiaryScreen: React.FC = () => {
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.03 }}
-                className="bg-white rounded-2xl border border-[#E8E4DE] shadow-sm"
+                className="zen-glass rounded-2xl zen-card-shadow border border-[#E8E4DE]/50 group"
               >
                 <button
                   type="button"
@@ -372,7 +381,7 @@ export const DiaryScreen: React.FC = () => {
                       void handleSessionClick(entry);
                     }
                   }}
-                  className={`w-full text-left p-4 ${entry.type === 'session' ? 'hover:bg-[#FAF7F3] transition-colors cursor-pointer' : ''}`}
+                  className={`w-full text-left p-4 rounded-2xl ${entry.type === 'session' ? 'hover:bg-white/20 transition-all cursor-pointer' : ''}`}
                   disabled={entry.type === 'session' && generatingSummaryFor === entry.id}
                 >
                   <div className="flex items-start gap-3">

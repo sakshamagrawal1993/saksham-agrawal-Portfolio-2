@@ -25,8 +25,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   if (message.role === 'system') return null;
 
   const bubbleTone = isUser
-    ? 'bg-[#E8F3E9] text-[#2C2A26] rounded-br-md'
-    : 'bg-white text-[#2C2A26] border border-[#E8E4DE] rounded-bl-md';
+    ? 'zen-glass bg-[#E8F3E9]/40 text-[#2C2A26] rounded-br-md border-white/40'
+    : 'zen-glass-heavy bg-white/60 text-[#2C2A26] border-white/60 rounded-bl-md';
 
   return (
     <motion.div

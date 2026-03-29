@@ -26,7 +26,7 @@ const WidgetTitle: React.FC<{ title?: string }> = ({ title }) => (
 // ─── 1. Line Chart ────────────────────────────────────────────
 const LineChartWidget: React.FC<{ widget: ChatWidget }> = ({ widget }) => (
     <ResponsiveContainer width="100%" height={180}>
-        <LineChart data={widget.data} margin={{ top: 5, right: 10, bottom: 5, left: -10 }}>
+        <LineChart data={widget.data || []} margin={{ top: 5, right: 10, bottom: 5, left: -10 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={BRAND.border} />
             <XAxis dataKey="label" tick={{ fontSize: 10, fill: BRAND.muted }} />
             <YAxis tick={{ fontSize: 10, fill: BRAND.muted }} />
@@ -42,7 +42,7 @@ const MultiLineChartWidget: React.FC<{ widget: ChatWidget }> = ({ widget }) => {
     const keys = Object.keys(widget.data[0]).filter(k => k !== 'label');
     return (
         <ResponsiveContainer width="100%" height={180}>
-            <LineChart data={widget.data} margin={{ top: 5, right: 10, bottom: 5, left: -10 }}>
+            <LineChart data={widget.data || []} margin={{ top: 5, right: 10, bottom: 5, left: -10 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={BRAND.border} />
                 <XAxis dataKey="label" tick={{ fontSize: 10, fill: BRAND.muted }} />
                 <YAxis tick={{ fontSize: 10, fill: BRAND.muted }} />
@@ -59,7 +59,7 @@ const MultiLineChartWidget: React.FC<{ widget: ChatWidget }> = ({ widget }) => {
 // ─── 3. Bar Chart ─────────────────────────────────────────────
 const BarChartWidget: React.FC<{ widget: ChatWidget }> = ({ widget }) => (
     <ResponsiveContainer width="100%" height={180}>
-        <BarChart data={widget.data} margin={{ top: 5, right: 10, bottom: 5, left: -10 }}>
+        <BarChart data={widget.data || []} margin={{ top: 5, right: 10, bottom: 5, left: -10 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={BRAND.border} />
             <XAxis dataKey="label" tick={{ fontSize: 10, fill: BRAND.muted }} />
             <YAxis tick={{ fontSize: 10, fill: BRAND.muted }} />
@@ -75,7 +75,7 @@ const StackedBarChartWidget: React.FC<{ widget: ChatWidget }> = ({ widget }) => 
     const keys = Object.keys(widget.data[0]).filter(k => k !== 'label');
     return (
         <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={widget.data} margin={{ top: 5, right: 10, bottom: 5, left: -10 }}>
+            <BarChart data={widget.data || []} margin={{ top: 5, right: 10, bottom: 5, left: -10 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={BRAND.border} />
                 <XAxis dataKey="label" tick={{ fontSize: 10, fill: BRAND.muted }} />
                 <YAxis tick={{ fontSize: 10, fill: BRAND.muted }} />
@@ -92,7 +92,7 @@ const StackedBarChartWidget: React.FC<{ widget: ChatWidget }> = ({ widget }) => 
 // ─── 5. Area Chart ────────────────────────────────────────────
 const AreaChartWidget: React.FC<{ widget: ChatWidget }> = ({ widget }) => (
     <ResponsiveContainer width="100%" height={180}>
-        <AreaChart data={widget.data} margin={{ top: 5, right: 10, bottom: 5, left: -10 }}>
+        <AreaChart data={widget.data || []} margin={{ top: 5, right: 10, bottom: 5, left: -10 }}>
             <defs>
                 <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor={BRAND.primary} stopOpacity={0.3} />
@@ -115,7 +115,7 @@ const DonutChartWidget: React.FC<{ widget: ChatWidget }> = ({ widget }) => {
         <ResponsiveContainer width="100%" height={200}>
             <PieChart>
                 <Pie
-                    data={widget.data}
+                    data={widget.data || []}
                     cx="50%"
                     cy="50%"
                     innerRadius={50}
@@ -147,7 +147,7 @@ const ScatterPlotWidget: React.FC<{ widget: ChatWidget }> = ({ widget }) => (
             <XAxis dataKey="x" type="number" tick={{ fontSize: 10, fill: BRAND.muted }} name={widget.x_axis_label || 'X'} />
             <YAxis dataKey="y" type="number" tick={{ fontSize: 10, fill: BRAND.muted }} name={widget.y_axis_label || 'Y'} />
             <Tooltip {...tooltipStyle} cursor={{ strokeDasharray: '3 3' }} />
-            <Scatter data={widget.data} fill={BRAND.primary} />
+            <Scatter data={widget.data || []} fill={BRAND.primary} />
         </ScatterChart>
     </ResponsiveContainer>
 );
@@ -155,7 +155,7 @@ const ScatterPlotWidget: React.FC<{ widget: ChatWidget }> = ({ widget }) => (
 // ─── 8. Radar Chart ───────────────────────────────────────────
 const RadarChartWidget: React.FC<{ widget: ChatWidget }> = ({ widget }) => (
     <ResponsiveContainer width="100%" height={220}>
-        <RadarChart cx="50%" cy="50%" outerRadius="70%" data={widget.data}>
+        <RadarChart cx="50%" cy="50%" outerRadius="70%" data={widget.data || []}>
             <PolarGrid stroke={BRAND.border} />
             <PolarAngleAxis dataKey="axis" tick={{ fontSize: 10, fill: BRAND.muted }} />
             <PolarRadiusAxis tick={{ fontSize: 9, fill: BRAND.muted }} />
@@ -218,8 +218,8 @@ const HeatMapWidget: React.FC<{ widget: ChatWidget }> = ({ widget }) => {
     const range = maxVal - minVal || 1;
 
     // Get unique x and y values
-    const xLabels = [...new Set(widget.data.map(d => String(d.x)))];
-    const yLabels = [...new Set(widget.data.map(d => String(d.y)))];
+    const xLabels = [...new Set((widget.data || []).map(d => String(d.x)))];
+    const yLabels = [...new Set((widget.data || []).map(d => String(d.y)))];
 
     const getColor = (v: number) => {
         const norm = (v - minVal) / range;

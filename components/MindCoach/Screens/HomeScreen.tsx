@@ -11,6 +11,7 @@ import {
 import { PlanProposalModal } from '../PlanProposalModal';
 import { PATHWAY_LABELS } from '../shared/pathwayLabels';
 import { openOrCreateInProgressSession } from '../shared/sessionLifecycle';
+import './Atmosphere/MindCoachZen.css';
 
 const MOOD_EMOJIS = [
   { score: 1, emoji: '😢', label: 'Awful' },
@@ -44,7 +45,7 @@ export const HomeScreen: React.FC = () => {
   const navigate = useNavigate();
   const [showConfirm, setShowConfirm] = useState(false);
   const [showProposal, setShowProposal] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
+  const [showDeleteSection, setShowDeleteSection] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [moodExpanded, setMoodExpanded] = useState(false);
   const [isContinuingSession, setIsContinuingSession] = useState(false);
@@ -176,16 +177,25 @@ export const HomeScreen: React.FC = () => {
   }, [hasChosenPathway, phases, sessions, currentPhase]);
 
   return (
-    <div className="px-6 pt-8 pb-24 space-y-8">
-      {/* Greeting — clean, no quote */}
+    <div className="relative px-6 pt-8 pb-24 space-y-8 overflow-x-hidden">
+      {/* Zen Atmospheric Aura */}
+      <div className="zen-aura-container">
+        <img 
+          src="https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/mind%20coach/hero_aura_zen_1774777549788.png" 
+          alt="" 
+          className="zen-aura-img"
+        />
+      </div>
+
+      {/* Greeting — Zen styled */}
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-[#2C2A26]">
+          <h2 className="text-xl font-semibold zen-title">
             {getGreeting()}, {firstName}
           </h2>
           <button
             type="button"
-            onClick={() => setShowSettings((s) => !s)}
+            onClick={() => setShowDeleteSection((prev) => !prev)}
             className="w-8 h-8 rounded-full flex items-center justify-center text-[#2C2A26]/30 hover:text-[#2C2A26]/60 hover:bg-[#F5F0EB] transition-colors"
             aria-label="Settings"
           >
@@ -219,12 +229,12 @@ export const HomeScreen: React.FC = () => {
                 <React.Fragment key={phase.phaseNumber}>
                   <div className="flex flex-col items-center" style={{ minWidth: 0, flex: phase.isCurrent ? '1.2' : '1' }}>
                     <span
-                      className={`w-7 h-7 rounded-full border-2 flex items-center justify-center text-[11px] font-semibold transition-colors ${
+                      className={`w-7 h-7 rounded-full border-2 flex items-center justify-center text-[11px] font-semibold transition-all duration-500 ${
                         phase.isCompleted
                           ? 'bg-[#6B8F71] border-[#6B8F71] text-white'
                           : phase.isCurrent
-                            ? 'bg-white border-[#6B8F71] text-[#6B8F71]'
-                            : 'bg-[#F5F0EB] border-[#E8E4DE] text-[#2C2A26]/30'
+                            ? 'bg-white border-[#6B8F71] text-[#6B8F71] zen-step-glow scale-110'
+                            : 'bg-[#F5F0EB]/50 border-[#E8E4DE] text-[#2C2A26]/30'
                       }`}
                     >
                       {phase.isCompleted ? '✓' : phase.phaseNumber}
@@ -240,8 +250,8 @@ export const HomeScreen: React.FC = () => {
                     </span>
                   </div>
                   {!isLast && (
-                    <span className={`h-[2px] flex-1 rounded-full -mt-5 ${
-                      phase.isCompleted ? 'bg-[#6B8F71]' : 'bg-[#E8E4DE]'
+                    <span className={`h-[2px] flex-1 rounded-full -mt-5 transition-all duration-700 ${
+                      phase.isCompleted ? 'bg-[#6B8F71]' : 'bg-[#E8E4DE]/60'
                     }`} />
                   )}
                 </React.Fragment>
@@ -303,7 +313,7 @@ export const HomeScreen: React.FC = () => {
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.05 }}
-          className="bg-white rounded-2xl p-5 shadow-sm border border-[#E8E4DE] cursor-pointer hover:border-[#6B8F71]/35 transition-colors"
+          className="zen-glass rounded-2xl p-5 zen-card-shadow cursor-pointer hover:border-[#6B8F71]/35 transition-all duration-500"
           role="button"
           tabIndex={0}
           onClick={() => setActiveTab('journey')}
@@ -367,7 +377,7 @@ export const HomeScreen: React.FC = () => {
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.08 }}
-          className="w-full bg-white rounded-2xl p-5 shadow-sm border border-[#E8E4DE] text-left hover:border-[#6B8F71]/30 transition-colors"
+          className="w-full zen-glass-heavy rounded-2xl p-5 zen-card-shadow text-left hover:border-[#6B8F71]/30 transition-all duration-500"
         >
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -411,7 +421,7 @@ export const HomeScreen: React.FC = () => {
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.15 + i * 0.04 }}
-                className="bg-white rounded-2xl p-5 shadow-sm border border-[#E8E4DE]"
+                className="zen-glass rounded-2xl p-5 zen-card-shadow border border-[#E8E4DE]/50"
               >
                 <div className="flex items-start gap-3">
                   <div className="w-9 h-9 rounded-xl bg-[#F5F0EB] flex items-center justify-center shrink-0">
@@ -523,30 +533,40 @@ export const HomeScreen: React.FC = () => {
       )}
 
       {/* ── Settings section (collapsed) ── */}
-      <AnimatePresence>
-        {showSettings && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden"
-          >
-            <div className="flex flex-col items-center gap-3 py-4">
-              <button
-                onClick={() => setShowConfirm(true)}
-                className="px-5 py-2 text-xs font-medium text-red-500 hover:bg-red-50 rounded-xl transition-colors border border-red-200"
-              >
-                Delete my profile
-              </button>
-              <p className="text-[11px] text-[#2C2A26]/30 text-center max-w-[260px]">
-                This permanently removes all chat history, journal entries, and progress.
-              </p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* ── Settings section ── */}
+      <div className="mt-6">
+        <button
+          onClick={() => setShowDeleteSection(!showDeleteSection)}
+          className="w-full flex items-center justify-between text-sm font-medium text-[#2C2A26]/60 py-2"
+        >
+          Privacy & Data
+        </button>
+        
+        <AnimatePresence>
+          {showDeleteSection && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="flex flex-col items-center gap-3 py-4">
+                <button
+                  onClick={() => setShowConfirm(true)}
+                  className="px-5 py-2 text-xs font-medium text-red-500 hover:bg-red-50 rounded-xl transition-colors border border-red-200"
+                >
+                  Delete my profile
+                </button>
+                <p className="text-[11px] text-[#2C2A26]/30 text-center max-w-[260px]">
+                  This permanently removes all chat history, journal entries, and progress.
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
-      {/* Modals */}
+      {/* Final Overlay Screens */}
       <AnimatePresence>
         {showProposal && (
           <PlanProposalModal
@@ -561,7 +581,7 @@ export const HomeScreen: React.FC = () => {
 
       <AnimatePresence>
         {showConfirm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-[#2C2A26]/20 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-[#2C2A26]/80 backdrop-blur-md">
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}

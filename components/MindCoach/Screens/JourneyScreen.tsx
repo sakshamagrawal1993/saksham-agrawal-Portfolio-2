@@ -1,12 +1,20 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Check, Lock, Sparkles } from 'lucide-react';
+import { Check, Lock, Sparkles, Footprints } from 'lucide-react';
 import { useMindCoachStore, UNLOCK_MAP } from '../../../store/mindCoachStore';
+import '../Atmosphere/MindCoachZen.css';
 
 const FEATURE_BADGES: Record<number, string> = {
   2: '📓 Journaling unlocks here',
   3: '🧘 Exercises unlock here',
   4: '🧠 Meditation unlocks here',
+};
+
+const PHASE_IMAGES: Record<number, string> = {
+  1: 'https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/mind%20coach/phase_1_rapport_zen_1774777577976.png',
+  2: 'https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/mind%20coach/phase_2_exploration_zen_1774777608656.png',
+  3: 'https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/mind%20coach/phase_3_deep_work_zen_1774777638728.png',
+  4: 'https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/mind%20coach/phase_4_integration_zen_1774777670009.png',
 };
 
 export const JourneyScreen: React.FC = () => {
@@ -34,22 +42,23 @@ export const JourneyScreen: React.FC = () => {
   }
 
   return (
-    <div className="p-5 pb-4">
-      <h2 className="text-xl font-semibold text-[#2C2A26] mb-1">Your Journey</h2>
-      <p className="text-sm text-[#2C2A26]/60">{journey.title}</p>
+    <div className="p-5 pb-24 relative overflow-x-hidden">
+      <h2 className="text-xl font-semibold zen-title mb-1">Your Journey</h2>
+      <p className="text-sm zen-muted">{journey.title}</p>
       {journey.description && (
         <p className="text-xs text-[#2C2A26]/45 mt-1 mb-4 leading-relaxed">{journey.description}</p>
       )}
-      <div className="mb-6 p-4 rounded-2xl border border-[#E8E4DE] bg-white">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-[#2C2A26]/40 mb-2">Overall progress</p>
-        <div className="flex items-center justify-between text-sm mb-2">
-          <span className="text-[#2C2A26]/70">
-            {completedSessions.length}/{plannedSessions} sessions completed
+      <div className="mb-6 p-5 rounded-2xl zen-glass zen-card-shadow border border-white/40">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-[#2C2A26]/30 mb-2.5">Overall progress</p>
+        <div className="flex items-center justify-between text-sm mb-2.5">
+          <span className="text-[#2C2A26]/60 flex items-center gap-1.5">
+            <Footprints size={14} className="text-[#6B8F71]" />
+            {completedSessions.length}/{plannedSessions} sessions
           </span>
-          <span className="font-semibold text-[#2C2A26]">{overallProgressPercent}%</span>
+          <span className="font-semibold text-[#2C2A26] bg-[#6B8F71]/5 px-2 py-0.5 rounded-lg">{overallProgressPercent}%</span>
         </div>
-        <div className="h-1.5 w-full bg-[#E8E4DE] rounded-full overflow-hidden">
-          <div className="h-full bg-[#6B8F71] rounded-full" style={{ width: `${overallProgressPercent}%` }} />
+        <div className="h-2 w-full bg-[#E8E4DE]/50 rounded-full overflow-hidden">
+          <div className="h-full bg-[#6B8F71] rounded-full transition-all duration-1000 ease-out" style={{ width: `${overallProgressPercent}%` }} />
         </div>
       </div>
       {journey.phase_transition_result && journey.phase_transition_result.progression_enabled !== false && (
@@ -90,12 +99,12 @@ export const JourneyScreen: React.FC = () => {
               {/* Timeline rail */}
               <div className="flex flex-col items-center">
                 <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border-2 ${
+                  className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 border-2 transition-all duration-500 ${
                     isCompleted
-                      ? 'bg-[#6B8F71] border-[#6B8F71] text-white'
+                      ? 'bg-[#6B8F71] border-[#6B8F71] text-white shadow-lg shadow-[#6B8F71]/20'
                       : isCurrent
-                        ? 'bg-white border-[#6B8F71] text-[#6B8F71]'
-                        : 'bg-[#F5F0EB] border-[#E8E4DE] text-[#2C2A26]/25'
+                        ? 'bg-white border-[#6B8F71] text-[#6B8F71] zen-step-glow scale-110'
+                        : 'bg-[#F5F0EB]/50 border-[#E8E4DE] text-[#2C2A26]/20'
                   }`}
                 >
                   {isCompleted ? (
@@ -108,8 +117,8 @@ export const JourneyScreen: React.FC = () => {
                 </div>
                 {!isLast && (
                   <div
-                    className={`w-0.5 flex-1 min-h-[24px] ${
-                      isCompleted ? 'bg-[#6B8F71]' : 'bg-[#E8E4DE]'
+                    className={`w-0.5 flex-1 min-h-[40px] transition-colors duration-700 ${
+                      isCompleted ? 'bg-[#6B8F71]' : 'bg-[#E8E4DE]/50'
                     }`}
                   />
                 )}
@@ -117,19 +126,31 @@ export const JourneyScreen: React.FC = () => {
 
               {/* Content */}
               <div className={`pb-6 flex-1 min-w-0 ${isFuture ? 'opacity-50' : ''}`}>
-                <p
-                  className={`text-sm font-semibold ${
-                    isCurrent ? 'text-[#6B8F71]' : 'text-[#2C2A26]'
-                  }`}
-                >
-                  {phase.title}
-                </p>
-                <p className="text-xs text-[#2C2A26]/40 mt-0.5 leading-relaxed">
-                  {phase.goal}
-                </p>
-                <p className="text-xs text-[#2C2A26]/50 mt-1">
-                  {completedInPhase}/{totalInPhase} sessions
-                </p>
+                <div className={`mb-8 p-4 rounded-2xl transition-all duration-500 ${isCurrent ? 'zen-glass-heavy zen-card-shadow' : 'opacity-80'}`}>
+                  {/* Phase Illustration */}
+                  {(isCurrent || isCompleted) && PHASE_IMAGES[phaseNum] && (
+                    <div className="w-full h-32 rounded-xl mb-3 overflow-hidden bg-[#F5F0EB]/30">
+                      <img 
+                        src={PHASE_IMAGES[phaseNum]} 
+                        alt="" 
+                        className="w-full h-full object-cover opacity-90 transition-transform duration-700 hover:scale-105"
+                      />
+                    </div>
+                  )}
+                  
+                  <p
+                    className={`text-sm font-semibold ${
+                      isCurrent ? 'text-[#6B8F71]' : 'text-[#2C2A26]'
+                    }`}
+                  >
+                    {phase.title}
+                  </p>
+                  <p className="text-xs text-[#2C2A26]/50 mt-1 leading-relaxed">
+                    {phase.goal}
+                  </p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-[#6B8F71]/60 mt-2">
+                    Progression: {completedInPhase}/{totalInPhase} sessions
+                  </p>
 
                 {/* Expanded session cards for current phase */}
                 {isCurrent && phase.sessions && (
@@ -178,10 +199,11 @@ export const JourneyScreen: React.FC = () => {
 
                 {/* Feature unlock badge */}
                 {badge && newFeatures && newFeatures.length > 0 && (
-                  <div className="mt-3 flex items-center gap-1.5 px-3 py-1.5 bg-[#B4A7D6]/10 rounded-lg w-fit">
-                    <span className="text-xs text-[#B4A7D6] font-medium">{badge}</span>
+                  <div className="mt-3 flex items-center gap-1.5 px-3 py-1.5 bg-[#B4A7D6]/10 rounded-lg w-fit border border-[#B4A7D6]/20">
+                    <span className="text-[10px] text-[#B4A7D6] font-semibold uppercase tracking-wider">{badge}</span>
                   </div>
                 )}
+                </div>
               </div>
             </motion.div>
           );

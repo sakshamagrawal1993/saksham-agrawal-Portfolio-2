@@ -25,16 +25,17 @@ export const JournalList: React.FC<JournalListProps> = ({ onNewEntry, onEditEntr
 
   if (sorted.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full px-6 text-center">
-        <div className="w-16 h-16 rounded-full bg-[#B4A7D6]/20 flex items-center justify-center mb-4">
-          <BookOpen size={28} className="text-[#B4A7D6]" />
+      <div className="flex flex-col items-center justify-center p-12 text-center h-[60vh]">
+        <div className="w-20 h-20 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center mb-6 zen-card-shadow border border-white/60">
+          <BookOpen size={32} className="text-[#6B8F71]" />
         </div>
-        <p className="text-[#2C2A26]/50 text-sm mb-6">
-          Start journaling to reflect on your sessions
+        <h3 className="text-[#2C2A26] font-medium mb-2">Safe Space for Reflection</h3>
+        <p className="text-[#2C2A26]/40 text-sm mb-8 max-w-[240px]">
+          Start journaling to capture your thoughts and insights from your growth journey.
         </p>
         <button
           onClick={onNewEntry}
-          className="px-5 py-2.5 bg-[#6B8F71] text-white text-sm font-medium rounded-full"
+          className="px-6 py-3 bg-[#6B8F71] text-white text-sm font-semibold rounded-2xl shadow-lg shadow-[#6B8F71]/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
         >
           Write First Entry
         </button>
@@ -43,8 +44,8 @@ export const JournalList: React.FC<JournalListProps> = ({ onNewEntry, onEditEntr
   }
 
   return (
-    <div className="relative h-full">
-      <div className="space-y-2">
+    <div className="relative pb-24">
+      <div className="space-y-3">
         {sorted.map((entry, i) => {
           const date = new Date(entry.created_at);
           const formatted = date.toLocaleDateString('en-US', {
@@ -56,28 +57,41 @@ export const JournalList: React.FC<JournalListProps> = ({ onNewEntry, onEditEntr
           return (
             <motion.button
               key={entry.id}
-              initial={{ opacity: 0, y: 10 }}
+              initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.04 }}
+              transition={{ 
+                duration: 0.5,
+                delay: i * 0.05,
+                ease: [0.2, 0, 0.2, 1]
+              }}
               onClick={() => onEditEntry(entry)}
-              className="w-full text-left bg-white rounded-2xl p-4 shadow-sm border border-[#E8E4DE] hover:border-[#B4A7D6]/40 transition-colors"
+              className="w-full text-left zen-glass p-4 rounded-2xl border border-white/60 hover:bg-white/40 transition-all zen-card-shadow active:scale-[0.99]"
             >
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-[#2C2A26] truncate">
-                    {entry.title || 'Untitled Entry'}
-                  </p>
-                  <p className="text-xs text-[#2C2A26]/40 mt-0.5">{formatted}</p>
-                  <p className="text-xs text-[#2C2A26]/50 mt-1.5 line-clamp-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="text-sm font-semibold text-[#2C2A26] truncate">
+                      {entry.title || 'Untitled Entry'}
+                    </p>
+                    <span className="text-[10px] uppercase tracking-wider text-[#2C2A26]/30 font-bold">
+                      {formatted}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#2C2A26]/50 line-clamp-2 leading-relaxed">
                     {entry.content}
                   </p>
                 </div>
-                {moodColor && (
-                  <span
-                    className="w-3 h-3 rounded-full shrink-0 mt-1"
-                    style={{ backgroundColor: moodColor }}
-                  />
-                )}
+                <div className="flex flex-col items-end gap-2 shrink-0">
+                  {moodColor && (
+                    <div
+                      className="w-2.5 h-2.5 rounded-full shadow-inner"
+                      style={{ 
+                        backgroundColor: moodColor,
+                        boxShadow: `0 0 8px ${moodColor}40`
+                      }}
+                    />
+                  )}
+                </div>
               </div>
             </motion.button>
           );
@@ -86,9 +100,9 @@ export const JournalList: React.FC<JournalListProps> = ({ onNewEntry, onEditEntr
 
       <button
         onClick={onNewEntry}
-        className="absolute bottom-4 right-4 w-12 h-12 rounded-full bg-[#6B8F71] text-white shadow-lg flex items-center justify-center hover:bg-[#5A7D60] transition-colors"
+        className="fixed bottom-8 right-6 w-14 h-14 rounded-2xl bg-[#6B8F71] text-white shadow-xl shadow-[#6B8F71]/30 flex items-center justify-center hover:bg-[#5A7D60] active:scale-[0.9] transition-all z-20"
       >
-        <Plus size={22} />
+        <Plus size={24} />
       </button>
     </div>
   );
