@@ -46,7 +46,7 @@ export async function openOrCreateInProgressSession({
     .select('*')
     .eq('profile_id', profile.id)
     .in('session_state', [...IN_PROGRESS_STATES])
-    .order('created_at', { ascending: false })
+    .order('started_at', { ascending: false })
     .limit(5);
 
   const existing = Array.isArray(existingRows) && existingRows.length > 0

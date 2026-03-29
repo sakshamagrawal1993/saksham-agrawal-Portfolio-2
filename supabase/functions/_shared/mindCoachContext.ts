@@ -92,7 +92,7 @@ export async function buildConversationWindow(
     .select('id')
     .eq('profile_id', profileId)
     .in('session_state', ['active', 'completed'])
-    .order('created_at', { ascending: false })
+    .order('started_at', { ascending: false })
     .limit(5);
 
   const sessionIds: string[] = [];
