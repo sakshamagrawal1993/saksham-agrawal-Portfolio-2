@@ -718,8 +718,38 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
   const trackedPathwayCardViewsRef = useRef<Set<string>>(new Set());
 
   const handleEndSession = async () => {
-    if (!activeSession || endingSession) return;
-    const effectiveProfileId = profile?.id || activeSession.profile_id;
+    if (endingSession) return;
+
+    let effectiveSession: MindCoachSession | null = activeSession ?? null;
+    if (!effectiveSession) {
+      const latestMessageSessionId = [...messages].reverse().find((m) => !!m.session_id)?.session_id;
+      if (latestMessageSessionId) {
+        const { data: recoveredSession } = await supabase
+          .from('mind_coach_sessions')
+          .select('*')
+          .eq('id', latestMessageSessionId)
+          .maybeSingle();
+        if (recoveredSession) {
+          effectiveSession = recoveredSession as MindCoachSession;
+          updateActiveSession(effectiveSession);
+        }
+      }
+    }
+    if (!effectiveSession) {
+      const fallbackInProgress = [...sessions]
+        .filter((s) => s.session_state !== 'completed')
+        .sort((a, b) => new Date(b.started_at || 0).getTime() - new Date(a.started_at || 0).getTime())[0];
+      if (fallbackInProgress) {
+        effectiveSession = fallbackInProgress;
+        updateActiveSession(effectiveSession);
+      }
+    }
+    if (!effectiveSession) {
+      setChatError('We could not find the current session to end. Please refresh and try again.');
+      return;
+    }
+
+    const effectiveProfileId = profile?.id || effectiveSession.profile_id;
     if (!effectiveProfileId) {
       setChatError('We could not identify your profile for session wrap-up. Please refresh and try again.');
       return;
@@ -732,7 +762,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
       caseNotes: unknown,
     ) => {
       const updated = {
-        ...activeSession,
+        ...effectiveSession,
         session_state: 'completed' as const,
         ended_at: endedAt,
         case_notes: caseNotes ?? null,
@@ -800,7 +830,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
 
       const { data, error } = await supabase.functions.invoke('mind-coach-session-end', {
         body: {
-          session_id: activeSession.id,
+          session_id: effectiveSession.id,
           profile_id: effectiveProfileId,
           messages: messagesPayload,
           transcript,
@@ -815,11 +845,14 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
               }
             : null,
           session: {
-            pathway: activeSession.pathway,
-            dynamic_theme: activeSession.dynamic_theme,
-            session_number: activeSession.session_number,
+            pathway: effectiveSession.pathway,
+            dynamic_theme: effectiveSession.dynamic_theme,
+            session_number: effectiveSession.session_number,
           },
-          currentPhase: journey?.phases?.[journey.current_phase_index ?? 0] ?? null,
+          currentPhase:
+            journey && Array.isArray(journey.phases)
+              ? journey.phases[journey.current_phase_index ?? Math.max(0, (journey.current_phase || 1) - 1)] ?? null
+              : null,
           phase_context: journey
             ? {
                 current_phase_index: journey.current_phase_index ?? Math.max(0, (journey.current_phase || 1) - 1),
@@ -894,7 +927,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
             ended_at: endedAt,
             summary_data: summary,
           })
-          .eq('id', activeSession.id);
+          .eq('id', effectiveSession.id);
         finalizeLocal(summary, null);
       }
     } catch (err) {
@@ -907,7 +940,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
           ended_at: endedAt,
           summary_data: summary,
         })
-        .eq('id', activeSession.id)
+        .eq('id', effectiveSession.id)
         .catch(() => {});
       finalizeLocal(summary, null);
     } finally {
