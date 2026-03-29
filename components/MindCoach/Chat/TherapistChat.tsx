@@ -155,9 +155,28 @@ interface TherapistChatProps {
 }
 
 const NEXT_FOCUS_STORAGE_KEY_PREFIX = 'mind_coach_next_focus_intent';
+const CHAT_RESPONSE_TIMEOUT_MS = 20_000;
 
 function getNextFocusStorageKey(profileId: string) {
   return `${NEXT_FOCUS_STORAGE_KEY_PREFIX}:${profileId}`;
+}
+
+async function invokeMindCoachChatWithTimeout(payload: Record<string, unknown>) {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      supabase.functions.invoke('mind-coach-chat', {
+        body: payload,
+      }),
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new Error('Coach is taking longer than expected (>20s). Please tap Retry.'));
+        }, CHAT_RESPONSE_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
 }
 
 
@@ -304,9 +323,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
       client_managed_persistence: true,
     };
 
-    const { data: chatData, error: chatErr } = await supabase.functions.invoke('mind-coach-chat', {
-      body: n8nPayload,
-    });
+    const { data: chatData, error: chatErr } = await invokeMindCoachChatWithTimeout(n8nPayload);
     if (chatErr) throw new Error(`Coach service unreachable. ${chatErr.message || 'Try again.'}`);
     const data = normalizeN8nChatPayload(chatData);
 
@@ -482,9 +499,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
         client_managed_persistence: true,
       };
 
-      const { data: chatData, error: chatErr } = await supabase.functions.invoke('mind-coach-chat', {
-        body: n8nPayload,
-      });
+      const { data: chatData, error: chatErr } = await invokeMindCoachChatWithTimeout(n8nPayload);
 
       if (chatErr) {
         sendRetryModeRef.current = 'n8n_only';
@@ -637,9 +652,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
           client_managed_persistence: true,
         };
 
-        const { data: chatData, error: chatErr } = await supabase.functions.invoke('mind-coach-chat', {
-          body: n8nPayload,
-        });
+        const { data: chatData, error: chatErr } = await invokeMindCoachChatWithTimeout(n8nPayload);
         if (chatErr) {
           throw new Error(`Coach unreachable. ${chatErr.message || 'Try again.'}`);
         }

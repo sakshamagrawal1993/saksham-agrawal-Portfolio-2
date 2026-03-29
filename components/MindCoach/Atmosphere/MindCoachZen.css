@@ -31,12 +31,12 @@
 /* Animations */
 @keyframes zen-float {
   0% { transform: translateY(0px); }
-  50% { transform: translateY(-3px); }
+  50% { transform: translateY(-1px); }
   100% { transform: translateY(0px); }
 }
 
 .animate-zen-float {
-  animation: zen-float 4s ease-in-out infinite;
+  animation: zen-float 6s ease-in-out infinite;
 }
 
 @keyframes serene-fade-in {

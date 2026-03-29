@@ -222,8 +222,15 @@ export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, o
         }
         return journey?.discovery_state?.suggested_pathway ?? 'engagement_rapport_and_assessment';
     }, [activeSession?.pathway, journey?.discovery_state?.suggested_pathway]);
+    const [selectedPathwayId, setSelectedPathwayId] = useState(suggestedPathwayId);
 
-    const playbookDirect = PATHWAY_PLAYBOOKS[suggestedPathwayId];
+    useEffect(() => {
+        if (!showPostAccept) {
+            setSelectedPathwayId(suggestedPathwayId);
+        }
+    }, [suggestedPathwayId, showPostAccept]);
+
+    const playbookDirect = PATHWAY_PLAYBOOKS[selectedPathwayId];
     const playbook = playbookDirect || PATHWAY_PLAYBOOKS.engagement_rapport_and_assessment;
 
     useEffect(() => {
@@ -234,7 +241,7 @@ export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, o
                 .select(
                     'pathway_name, pathway_description, phase_number, phase_name, phase_description',
                 )
-                .eq('pathway_name', suggestedPathwayId)
+                .eq('pathway_name', selectedPathwayId)
                 .order('phase_number', { ascending: true });
             if (cancelled) return;
             if (error || !data?.length) {
@@ -246,7 +253,7 @@ export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, o
         return () => {
             cancelled = true;
         };
-    }, [suggestedPathwayId]);
+    }, [selectedPathwayId]);
 
     const displayPhases =
         dbPhases && dbPhases.length > 0
@@ -268,6 +275,8 @@ export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, o
         setAcceptError(null);
 
         try {
+            const acceptedPathwayId = selectedPathwayId;
+            setSelectedPathwayId(acceptedPathwayId);
             await supabase
                 .from('mind_coach_journeys')
                 .update({ active: false })
@@ -301,7 +310,7 @@ export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, o
                 .from('mind_coach_journeys')
                 .insert({
                     profile_id: profile.id,
-                    pathway: suggestedPathwayId,
+                    pathway: acceptedPathwayId,
                     title: planTitle,
                     phases: customPhases,
                     current_phase: 1,
@@ -422,6 +431,35 @@ export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, o
                     )}
                     {showPostAccept ? (
                         <>
+                            <motion.div
+                                initial={{ opacity: 0, y: 8 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.4 }}
+                                className="relative overflow-hidden rounded-2xl border border-[#DDEBDD] bg-gradient-to-br from-[#F3FAF3] via-white to-[#F7FBF7] px-4 py-4"
+                            >
+                                <motion.div
+                                    initial={{ scale: 0.8, opacity: 0 }}
+                                    animate={{ scale: 1.12, opacity: 0 }}
+                                    transition={{ duration: 1.8, repeat: Infinity, ease: 'easeOut' }}
+                                    className="absolute left-1/2 top-6 h-12 w-12 -translate-x-1/2 rounded-full bg-[#6B8F71]/20"
+                                />
+                                <div className="relative flex flex-col items-center text-center">
+                                    <motion.div
+                                        initial={{ scale: 0.9, opacity: 0 }}
+                                        animate={{ scale: 1, opacity: 1 }}
+                                        transition={{ duration: 0.45, delay: 0.05 }}
+                                        className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-[#6B8F71] text-white shadow-sm"
+                                    >
+                                        ✓
+                                    </motion.div>
+                                    <p className="text-sm font-semibold text-[#2C2A26]">
+                                        You&apos;re on your way
+                                    </p>
+                                    <p className="mt-1 text-xs leading-relaxed text-[#2C2A26]/65">
+                                        Beautiful step. Your pathway is now active, and we&apos;ll walk it one calm session at a time.
+                                    </p>
+                                </div>
+                            </motion.div>
                             <p className="text-sm text-[#2C2A26]/75 leading-relaxed text-center px-1">
                                 Your new pathway is active. Upcoming sessions will follow these phases; journal and tools
                                 unlock as you progress through each phase on Home.

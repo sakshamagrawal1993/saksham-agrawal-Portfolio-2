@@ -219,8 +219,15 @@ serve(async (req) => {
       .filter(Boolean);
 
     // 5. Forward to n8n (server context is authoritative; client hints fill gaps)
+    const configuredN8nTimeout = Number.parseInt(
+      Deno.env.get('MC_N8N_CHAT_TIMEOUT_MS') || '20000',
+      10,
+    );
+    const n8nTimeoutMs = Number.isFinite(configuredN8nTimeout)
+      ? Math.max(5000, Math.min(180000, configuredN8nTimeout))
+      : 20000;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3 * 60 * 1000);
+    const timeoutId = setTimeout(() => controller.abort(), n8nTimeoutMs);
 
     let n8nResponse;
     try {
@@ -274,7 +281,7 @@ serve(async (req) => {
       clearTimeout(timeoutId);
       if (fetchError.name === 'AbortError') {
         return new Response(
-          JSON.stringify({ error: 'Agent took too long to respond.' }),
+          JSON.stringify({ error: `Agent took too long to respond (>${Math.round(n8nTimeoutMs / 1000)}s).` }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 504 }
         );
       }

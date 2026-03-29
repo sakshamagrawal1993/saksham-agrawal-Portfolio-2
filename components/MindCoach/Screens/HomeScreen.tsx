@@ -21,6 +21,9 @@ const MOOD_EMOJIS = [
   { score: 5, emoji: '😊', label: 'Great' },
 ];
 
+const HERO_AURA_URL =
+  'https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/mind%20coach/hero_aura_zen_1774777549788.png';
+
 function getGreeting(): string {
   const h = new Date().getHours();
   if (h < 12) return 'Good morning';
@@ -177,15 +180,7 @@ export const HomeScreen: React.FC = () => {
   }, [hasChosenPathway, phases, sessions, currentPhase]);
 
   return (
-    <div className="relative px-6 pt-8 pb-24 space-y-8 overflow-x-hidden">
-      {/* Zen Atmospheric Aura */}
-      <div className="zen-aura-container">
-        <img 
-          src="https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/mind%20coach/hero_aura_zen_1774777549788.png" 
-          alt="" 
-          className="zen-aura-img"
-        />
-      </div>
+    <div className="relative px-6 pt-8 pb-24 space-y-8 overflow-x-hidden bg-gradient-to-b from-[#FBF8F4] via-[#F9F5EF] to-transparent">
 
       {/* Greeting — Zen styled */}
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
@@ -201,6 +196,33 @@ export const HomeScreen: React.FC = () => {
           >
             <Settings size={18} />
           </button>
+        </div>
+      </motion.div>
+
+      {/* Premium hero panel */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.04 }}
+        className="relative overflow-hidden rounded-3xl border border-white/70 shadow-[0_20px_60px_-30px_rgba(44,42,38,0.35)]"
+      >
+        <img
+          src={HERO_AURA_URL}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover scale-[1.08] opacity-80"
+        />
+        <div className="absolute inset-0 bg-gradient-to-br from-[#2C2A26]/35 via-[#2C2A26]/10 to-[#6B8F71]/25" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#2C2A26]/50 via-transparent to-transparent" />
+        <div className="relative px-5 py-6 text-white">
+          <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-white/80">
+            Mind Coach
+          </p>
+          <h3 className="mt-1 text-lg font-semibold leading-tight">
+            Your calm space with {therapistName}
+          </h3>
+          <p className="mt-2 text-xs text-white/80">
+            Phase {currentPhase} in progress - {completedInPhase}/{totalInPhase} sessions completed
+          </p>
         </div>
       </motion.div>
 
