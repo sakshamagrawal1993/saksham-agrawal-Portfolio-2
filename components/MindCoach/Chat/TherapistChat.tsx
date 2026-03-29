@@ -867,7 +867,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
                 created_at: memories[0].created_at,
               }
             : null,
-          recent_case_notes,
+          recent_case_notes: recentCaseNotes.map((n) => n.key_insight).filter(Boolean),
           active_tasks: activeTasks,
           mood_entries: moodEntries.map((m) => ({
             score: m.score,
