@@ -1,4 +1,4 @@
-export type DynamicContentType = 'video' | 'game' | 'assessment' | 'exercise';
+export type DynamicContentType = 'video' | 'game' | 'assessment' | 'exercise' | 'exercise_card';
 
 export interface DynamicVideo {
   id: string;

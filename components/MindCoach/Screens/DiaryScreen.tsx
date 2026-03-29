@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { BookOpen, MessageCircle, Calendar } from 'lucide-react';
-import { useMindCoachStore } from '../../../store/mindCoachStore';
+import { useMindCoachStore, MindCoachSession } from '../../../store/mindCoachStore';
+import { SessionSummaryView } from '../Summary/SessionSummaryView';
 import { supabase } from '../../../lib/supabaseClient';
 
 interface DiaryEntry {
@@ -25,10 +26,10 @@ function hasUsableSessionSummary(raw: unknown): boolean {
     openingReflection.toLowerCase().includes('placeholder summary');
   if (isKnownPlaceholder) return false;
   const takeaways = Array.isArray((summary as Record<string, unknown>).session_takeaways)
-    ? (summary as Record<string, unknown>).session_takeaways
+    ? ((summary as Record<string, unknown>).session_takeaways as any[])
     : [];
   const tasks = Array.isArray((summary as Record<string, unknown>).extracted_tasks)
-    ? (summary as Record<string, unknown>).extracted_tasks
+    ? ((summary as Record<string, unknown>).extracted_tasks as any[])
     : [];
   return !!(title || openingReflection || takeaways.length > 0 || tasks.length > 0);
 }
@@ -98,8 +99,8 @@ export const DiaryScreen: React.FC = () => {
   const [showSummaryScreen, setShowSummaryScreen] = useState(false);
   const [summaryScreenLoading, setSummaryScreenLoading] = useState(false);
   const [summaryScreenError, setSummaryScreenError] = useState<string | null>(null);
-  const [selectedSessionTitle, setSelectedSessionTitle] = useState<string>('Session Summary');
   const [selectedSessionSummary, setSelectedSessionSummary] = useState<Record<string, unknown> | null>(null);
+  const [selectedSession, setSelectedSession] = useState<MindCoachSession | null>(null);
 
   const entries = useMemo(() => {
     const sEntries: DiaryEntry[] = sessions
@@ -160,8 +161,8 @@ export const DiaryScreen: React.FC = () => {
     const existingSummary = normalizeServerSessionSummary(session.summary_data);
     const existingIsUsable = hasUsableSessionSummary(session.summary_data);
     if (existingIsUsable && existingSummary) {
-      setSelectedSessionTitle(session.dynamic_theme || 'Session Summary');
       setSelectedSessionSummary(existingSummary);
+      setSelectedSession(session);
       setSummaryScreenError(null);
       setSummaryScreenLoading(false);
       setShowSummaryScreen(true);
@@ -172,8 +173,8 @@ export const DiaryScreen: React.FC = () => {
     if (!profileId) return;
 
     setGeneratingSummaryFor(entry.id);
-    setSelectedSessionTitle(session.dynamic_theme || 'Session Summary');
     setSelectedSessionSummary(null);
+    setSelectedSession(session);
     setSummaryScreenError(null);
     setSummaryScreenLoading(true);
     setShowSummaryScreen(true);
@@ -269,91 +270,61 @@ export const DiaryScreen: React.FC = () => {
   };
 
   if (showSummaryScreen) {
-    const openingReflection =
-      selectedSessionSummary && typeof selectedSessionSummary.opening_reflection === 'string'
-        ? selectedSessionSummary.opening_reflection
-        : '';
-    const takeaways = selectedSessionSummary && Array.isArray((selectedSessionSummary as Record<string, unknown>).session_takeaways)
-      ? ((selectedSessionSummary as Record<string, unknown>).session_takeaways as unknown[]).map((s) => String(s)).filter(Boolean)
-      : [];
-    const tasks = selectedSessionSummary && Array.isArray((selectedSessionSummary as Record<string, unknown>).extracted_tasks)
-      ? ((selectedSessionSummary as Record<string, unknown>).extracted_tasks as Record<string, unknown>[])
-      : [];
+    const handleClose = () => {
+      setShowSummaryScreen(false);
+      setSummaryScreenLoading(false);
+      setSummaryScreenError(null);
+    };
 
-    return (
-      <div className="p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-semibold text-[#2C2A26]">Session Summary</h2>
-            <p className="text-xs text-[#2C2A26]/40 mt-1">{selectedSessionTitle}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              setShowSummaryScreen(false);
-              setSummaryScreenLoading(false);
-              setSummaryScreenError(null);
-            }}
-            className="text-sm text-[#2C2A26]/60 hover:text-[#2C2A26]"
-          >
-            Back
-          </button>
+    if (summaryScreenLoading) {
+      return (
+        <div className="flex flex-col h-full bg-[#F9F6F2] items-center justify-center p-8">
+          <div className="w-10 h-10 border-2 border-[#6B8F71] border-t-transparent rounded-full animate-spin" />
+          <p className="mt-5 text-sm font-medium text-[#2C2A26]/70 text-center">Reconstructing your session reflection…</p>
+          <p className="mt-2 text-xs text-[#2C2A26]/45 text-center">This may take a few seconds.</p>
         </div>
+      );
+    }
 
-        {summaryScreenLoading ? (
-          <div className="min-h-[45vh] flex flex-col items-center justify-center gap-3">
-            <div className="w-8 h-8 border-2 border-[#6B8F71] border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm text-[#2C2A26]/60">Generating your session summary...</p>
+    if (summaryScreenError) {
+      return (
+        <div className="flex flex-col h-full bg-[#F9F6F2] p-5">
+           <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-[#2C2A26]">Session Summary</h2>
+            <button onClick={handleClose} className="text-sm text-[#2C2A26]/60 hover:text-[#2C2A26]">Back</button>
           </div>
-        ) : summaryScreenError ? (
-          <div className="rounded-2xl border border-[#F3D0CB] bg-[#FFF9F8] p-4">
+          <div className="rounded-2xl border border-[#F3D0CB] bg-[#FFF9F8] p-4 text-center">
             <p className="text-sm font-medium text-[#A0493A]">Could not load summary</p>
             <p className="text-xs text-[#A0493A]/80 mt-1">{summaryScreenError}</p>
           </div>
-        ) : selectedSessionSummary ? (
-          <div className="space-y-3">
-            <div className="rounded-2xl border border-[#E8E4DE] bg-white p-4">
-              <p className="text-sm font-semibold text-[#2C2A26]">
-                {typeof selectedSessionSummary.title === 'string' ? selectedSessionSummary.title : 'Session Summary'}
-              </p>
-              {openingReflection && (
-                <p className="text-sm text-[#2C2A26]/75 mt-2 leading-relaxed">{openingReflection}</p>
-              )}
-            </div>
-            {takeaways.length > 0 && (
-              <div className="rounded-2xl border border-[#E8E4DE] bg-white p-4">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-[#2C2A26]/40 mb-2">Takeaways</p>
-                <div className="space-y-1.5">
-                  {takeaways.slice(0, 5).map((item, idx) => (
-                    <p key={`${item}-${idx}`} className="text-xs text-[#2C2A26]/75">• {item}</p>
-                  ))}
-                </div>
-              </div>
-            )}
-            {tasks.length > 0 && (
-              <div className="rounded-2xl border border-[#E8E4DE] bg-white p-4">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-[#2C2A26]/40 mb-2">Try this week</p>
-                <div className="space-y-2">
-                  {tasks.slice(0, 3).map((task, idx) => (
-                    <div key={idx}>
-                      <p className="text-sm text-[#2C2A26] font-medium">
-                        {String(task.dynamic_title || task.task_name || `Task ${idx + 1}`)}
-                      </p>
-                      <p className="text-xs text-[#2C2A26]/60 mt-0.5">
-                        {String(task.dynamic_description || task.task_description || '')}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+        </div>
+      );
+    }
+
+    if (!selectedSessionSummary) {
+      return (
+        <div className="flex flex-col h-full bg-[#F9F6F2] p-5">
+           <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-[#2C2A26]">Session Summary</h2>
+            <button onClick={handleClose} className="text-sm text-[#2C2A26]/60 hover:text-[#2C2A26]">Back</button>
           </div>
-        ) : (
           <div className="rounded-2xl border border-[#E8E4DE] bg-white p-4">
             <p className="text-sm text-[#2C2A26]/60">No summary found for this session yet.</p>
           </div>
-        )}
-      </div>
+        </div>
+      );
+    }
+
+    return (
+      <SessionSummaryView
+        summaryData={selectedSessionSummary}
+        activeSession={selectedSession}
+        journey={null} // Diary view might not have the journey context easily, but the summary data has what it needs
+        profile={profile}
+        persona={profile?.therapist_persona || 'maya'}
+        onClose={handleClose}
+        title="Session Summary"
+      />
     );
   }
 
