@@ -11,7 +11,7 @@ import {
 import { PlanProposalModal } from '../PlanProposalModal';
 import { PATHWAY_LABELS } from '../shared/pathwayLabels';
 import { openOrCreateInProgressSession } from '../shared/sessionLifecycle';
-import './Atmosphere/MindCoachZen.css';
+import '../Atmosphere/MindCoachZen.css';
 
 const MOOD_EMOJIS = [
   { score: 1, emoji: '😢', label: 'Awful' },
