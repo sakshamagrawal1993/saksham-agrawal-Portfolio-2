@@ -719,60 +719,55 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
 
   const handleEndSession = async () => {
     if (endingSession) return;
+    setEndingSession(true);
 
     let effectiveSession: MindCoachSession | null = activeSession ?? null;
-    if (!effectiveSession) {
-      const latestMessageSessionId = [...messages].reverse().find((m) => !!m.session_id)?.session_id;
-      if (latestMessageSessionId) {
-        const { data: recoveredSession } = await supabase
-          .from('mind_coach_sessions')
-          .select('*')
-          .eq('id', latestMessageSessionId)
-          .maybeSingle();
-        if (recoveredSession) {
-          effectiveSession = recoveredSession as MindCoachSession;
+    try {
+      if (!effectiveSession) {
+        const latestMessageSessionId = [...messages].reverse().find((m) => !!m.session_id)?.session_id;
+        if (latestMessageSessionId) {
+          const { data: recoveredSession } = await supabase
+            .from('mind_coach_sessions')
+            .select('*')
+            .eq('id', latestMessageSessionId)
+            .maybeSingle();
+          if (recoveredSession) {
+            effectiveSession = recoveredSession as MindCoachSession;
+            updateActiveSession(effectiveSession);
+          }
+        }
+      }
+      if (!effectiveSession) {
+        const fallbackInProgress = [...sessions]
+          .filter((s) => s.session_state !== 'completed')
+          .sort((a, b) => new Date(b.started_at || 0).getTime() - new Date(a.started_at || 0).getTime())[0];
+        if (fallbackInProgress) {
+          effectiveSession = fallbackInProgress;
           updateActiveSession(effectiveSession);
         }
       }
-    }
-    if (!effectiveSession) {
-      const fallbackInProgress = [...sessions]
-        .filter((s) => s.session_state !== 'completed')
-        .sort((a, b) => new Date(b.started_at || 0).getTime() - new Date(a.started_at || 0).getTime())[0];
-      if (fallbackInProgress) {
-        effectiveSession = fallbackInProgress;
-        updateActiveSession(effectiveSession);
-      }
-    }
-    if (!effectiveSession) {
-      setChatError('We could not find the current session to end. Please refresh and try again.');
-      return;
-    }
+      if (!effectiveSession) throw new Error('missing_session');
 
-    const effectiveProfileId = profile?.id || effectiveSession.profile_id;
-    if (!effectiveProfileId) {
-      setChatError('We could not identify your profile for session wrap-up. Please refresh and try again.');
-      return;
-    }
-    setEndingSession(true);
-    const endedAt = new Date().toISOString();
+      const effectiveProfileId = profile?.id || effectiveSession.profile_id;
+      if (!effectiveProfileId) throw new Error('missing_profile');
+      const endedAt = new Date().toISOString();
 
-    const finalizeLocal = (
-      summary: Record<string, unknown>,
-      caseNotes: unknown,
-    ) => {
-      const updated = {
-        ...effectiveSession,
-        session_state: 'completed' as const,
-        ended_at: endedAt,
-        case_notes: caseNotes ?? null,
-        summary_data: summary,
+      const finalizeLocal = (
+        summary: Record<string, unknown>,
+        caseNotes: unknown,
+      ) => {
+        const updated = {
+          ...effectiveSession,
+          session_state: 'completed' as const,
+          ended_at: endedAt,
+          case_notes: caseNotes ?? null,
+          summary_data: summary,
+        };
+        setSessions(sessions.map((s) => (s.id === updated.id ? updated : s)));
+        updateActiveSession(updated);
+        setSessionSummary(summary);
+        setShowSummary(true);
       };
-      setSessions(sessions.map((s) => (s.id === updated.id ? updated : s)));
-      updateActiveSession(updated);
-      setSessionSummary(summary);
-      setShowSummary(true);
-    };
 
     const buildSummaryView = (
       baseSummary: Record<string, unknown>,
@@ -818,7 +813,6 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
       return out;
     };
 
-    try {
       const messagesPayload = messages.map((m) => ({
         role: m.role,
         content: m.content,
@@ -932,17 +926,35 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
       }
     } catch (err) {
       console.error('Session end failed:', err);
-      const summary = fallbackSessionSummary(activeSession, journey);
-      await supabase
-        .from('mind_coach_sessions')
-        .update({
-          session_state: 'completed',
+      const errCode = err instanceof Error ? err.message : '';
+      if (errCode === 'missing_session') {
+        setChatError('We could not find the current session to end. Please refresh and try again.');
+      } else if (errCode === 'missing_profile') {
+        setChatError('We could not identify your profile for session wrap-up. Please refresh and try again.');
+      } else if (effectiveSession) {
+        const endedAt = new Date().toISOString();
+        const summary = fallbackSessionSummary(activeSession, journey);
+        await supabase
+          .from('mind_coach_sessions')
+          .update({
+            session_state: 'completed',
+            ended_at: endedAt,
+            summary_data: summary,
+          })
+          .eq('id', effectiveSession.id)
+          .catch(() => {});
+        const updated = {
+          ...effectiveSession,
+          session_state: 'completed' as const,
           ended_at: endedAt,
+          case_notes: null,
           summary_data: summary,
-        })
-        .eq('id', effectiveSession.id)
-        .catch(() => {});
-      finalizeLocal(summary, null);
+        };
+        setSessions(sessions.map((s) => (s.id === updated.id ? updated : s)));
+        updateActiveSession(updated);
+        setSessionSummary(summary);
+        setShowSummary(true);
+      }
     } finally {
       setEndingSession(false);
     }
@@ -1705,7 +1717,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
           type="button"
           onClick={handleEndSession}
           disabled={endingSession}
-          className="shrink-0 text-xs font-medium text-[#2C2A26]/45 hover:text-[#2C2A26] disabled:opacity-50 py-1.5 px-2 rounded-lg hover:bg-[#F5F0EB] transition-colors"
+          className="relative z-10 shrink-0 text-xs font-semibold text-[#2C2A26]/60 hover:text-[#2C2A26] disabled:opacity-50 py-2 px-3 rounded-lg hover:bg-[#F5F0EB] transition-colors"
         >
           {endingSession ? 'Ending…' : 'End session'}
         </button>
