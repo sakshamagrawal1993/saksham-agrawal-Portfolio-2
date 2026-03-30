@@ -15,6 +15,15 @@ export interface SessionGoalContext {
   session_success_signal: string | null;
 }
 
+export interface JourneySessionGoalRow {
+  session_order: number;
+  status: string;
+  attempt_count?: number;
+  generated_title?: string | null;
+  generated_goal?: string | null;
+  generated_description?: string | null;
+}
+
 function safeString(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
@@ -110,5 +119,66 @@ export function resolveSessionGoalContext(
     session_title: session.title,
     session_objective: session.objective,
     session_success_signal: session.success_signal,
+  };
+}
+
+export function resolveSessionGoalContextFromJourneySessions(
+  phase: Record<string, unknown> | null,
+  sessionRows: JourneySessionGoalRow[],
+  completedInCurrentPhase: number,
+  fallbackMinSessions = 3,
+): SessionGoalContext | null {
+  if (!phase) return null;
+  if (!Array.isArray(sessionRows) || sessionRows.length === 0) {
+    return resolveSessionGoalContext(phase, completedInCurrentPhase, fallbackMinSessions);
+  }
+
+  const byOrder = new Map<number, JourneySessionGoalRow[]>();
+  for (const row of sessionRows) {
+    const order = Number.isFinite(row.session_order) ? Number(row.session_order) : null;
+    if (!order || order < 1) continue;
+    const existing = byOrder.get(order) ?? [];
+    existing.push(row);
+    byOrder.set(order, existing);
+  }
+
+  const sortedOrders = [...byOrder.keys()].sort((a, b) => a - b);
+  if (sortedOrders.length === 0) {
+    return resolveSessionGoalContext(phase, completedInCurrentPhase, fallbackMinSessions);
+  }
+
+  const latestRowsByOrder = sortedOrders.map((order) => {
+    const rowsForOrder = byOrder.get(order) ?? [];
+    const bestRow = [...rowsForOrder].sort((a, b) => (b.attempt_count ?? 1) - (a.attempt_count ?? 1))[0] ?? null;
+    return { order, row: bestRow };
+  });
+
+  const totalSessions = latestRowsByOrder.length;
+  const nextIncompleteIndex = latestRowsByOrder.findIndex((entry) => entry.row?.status !== 'completed');
+  const activeIndex = nextIncompleteIndex >= 0
+    ? nextIncompleteIndex
+    : Math.min(totalSessions - 1, Math.max(0, completedInCurrentPhase - 1));
+  const activeOrder = latestRowsByOrder[activeIndex]?.order ?? sortedOrders[0];
+  const bestRow = latestRowsByOrder[activeIndex]?.row ?? null;
+
+  const title =
+    safeString(bestRow?.generated_title) ??
+    `Session ${activeOrder}`;
+  const objective =
+    safeString(bestRow?.generated_goal) ??
+    safeString(bestRow?.generated_description) ??
+    safeString(phase.goal) ??
+    'Support steady progress toward the current phase goal.';
+  const successSignal = `Client demonstrates measurable progress on session ${activeOrder} objective.`;
+
+  return {
+    phase_title: safeString(phase.title) ?? safeString(phase.name),
+    phase_goal: safeString(phase.goal),
+    // Keep numbering contiguous for prompts even if session_order is non-contiguous.
+    session_number_in_phase: activeIndex + 1,
+    total_sessions_in_phase: totalSessions,
+    session_title: title,
+    session_objective: objective,
+    session_success_signal: successSignal,
   };
 }

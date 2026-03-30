@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Check, Lock, Sparkles, Footprints } from 'lucide-react';
 import { useMindCoachStore, UNLOCK_MAP } from '../../../store/mindCoachStore';
+import { supabase } from '../../../lib/supabaseClient';
 import '../Atmosphere/MindCoachZen.css';
 
 const FEATURE_BADGES: Record<number, string> = {
@@ -17,6 +18,23 @@ const PHASE_IMAGES: Record<number, string> = {
   4: 'https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/mind%20coach/phase_4_integration_zen_1774777670009.png',
 };
 
+function transitionReasonLabel(reason?: string): string {
+  switch (reason) {
+    case 'blocked_by_risk':
+      return 'Paused due to elevated risk. Stabilization comes first.';
+    case 'objective_not_met':
+      return 'Current objective needs one more attempt before phase advancement.';
+    case 'readiness_not_ready':
+      return 'Objective met, but readiness is still building for next phase.';
+    case 'phase_requirements_not_met':
+      return 'Complete required sessions in this phase before advancing.';
+    case 'final_phase':
+      return 'You are in the final phase of this journey.';
+    default:
+      return 'Transition decision applied with current objective, readiness, and risk signals.';
+  }
+}
+
 export const JourneyScreen: React.FC = () => {
   const journey = useMindCoachStore((s) => s.journey);
   const sessions = useMindCoachStore((s) => s.sessions);
@@ -24,6 +42,42 @@ export const JourneyScreen: React.FC = () => {
   const currentPhase = useMindCoachStore((s) => s.currentPhaseNumber());
 
   const phases = journey?.phases ?? [];
+  const [journeySessionRows, setJourneySessionRows] = useState<any[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!journey?.id) {
+        setJourneySessionRows([]);
+        return;
+      }
+      const { data } = await supabase
+        .from('mind_coach_journey_sessions')
+        .select('phase_number,session_order,status,attempt_count,generated_title,generated_description')
+        .eq('journey_id', journey.id)
+        .in('status', ['planned', 'in_progress', 'completed', 'revisit', 'blocked'])
+        .order('phase_number', { ascending: true })
+        .order('session_order', { ascending: true })
+        .order('attempt_count', { ascending: false });
+      if (!cancelled) {
+        setJourneySessionRows(data ?? []);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [journey?.id]);
+
+  const journeySessionsByPhase = useMemo(() => {
+    const map = new Map<number, any[]>();
+    for (const row of journeySessionRows) {
+      const key = Number(row.phase_number);
+      const existing = map.get(key) ?? [];
+      existing.push(row);
+      map.set(key, existing);
+    }
+    return map;
+  }, [journeySessionRows]);
   const plannedSessions = phases.reduce((sum, phase) => sum + Math.max(1, phase.sessions?.length ?? 1), 0);
   const completedSessions = sessions.filter((s) => s.session_state === 'completed');
   const overallProgressPercent =
@@ -63,9 +117,14 @@ export const JourneyScreen: React.FC = () => {
       </div>
       {journey.phase_transition_result && journey.phase_transition_result.progression_enabled !== false && (
         <div className="mb-4 p-3 rounded-xl border border-[#E8E4DE] bg-white text-xs text-[#2C2A26]/65">
-          {journey.phase_transition_result.advanced
-            ? `Nice work. You moved to Phase ${journey.phase_transition_result.new_phase_index + 1}.`
-            : `Keep going in this phase. ${journey.phase_transition_result.completed_in_phase}/${journey.phase_transition_result.min_sessions_required} sessions completed.`}
+          <p>
+            {journey.phase_transition_result.advanced
+              ? `Nice work. You moved to Phase ${journey.phase_transition_result.new_phase_index + 1}.`
+              : `Keep going in this phase. ${journey.phase_transition_result.completed_in_phase}/${journey.phase_transition_result.min_sessions_required} sessions completed.`}
+          </p>
+          <p className="mt-1 text-[11px] text-[#2C2A26]/50">
+            {transitionReasonLabel(journey.phase_transition_result.phase_gate_reason)}
+          </p>
         </div>
       )}
 
@@ -80,7 +139,25 @@ export const JourneyScreen: React.FC = () => {
           const completedInPhase = sessions.filter(
             (s) => s.session_state === 'completed' && s.phase_number === phaseNum
           ).length;
-          const totalInPhase = phase.sessions?.length ?? 3;
+          const runtimeRows = journeySessionsByPhase.get(phaseNum) ?? [];
+          const latestByOrder = new Map<number, any>();
+          for (const row of runtimeRows) {
+            const order = Number(row?.session_order);
+            if (!Number.isFinite(order) || order < 1) continue;
+            const prev = latestByOrder.get(order);
+            if (!prev || Number(row?.attempt_count ?? 1) > Number(prev?.attempt_count ?? 1)) {
+              latestByOrder.set(order, row);
+            }
+          }
+          const latestRows = [...latestByOrder.values()].sort(
+            (a, b) => Number(a.session_order) - Number(b.session_order),
+          );
+          const totalInPhase = latestRows.length > 0 ? latestRows.length : (phase.sessions?.length ?? 3);
+          const completedInPhaseResolved = latestRows.filter((r) => r.status === 'completed').length || completedInPhase;
+          const activeRuntimeSession =
+            latestRows.find((r) => r.status === 'in_progress' || r.status === 'revisit' || r.status === 'blocked') ??
+            latestRows.find((r) => r.status === 'planned') ??
+            null;
 
           const isLast = idx === phases.length - 1;
           const badge = FEATURE_BADGES[phaseNum];
@@ -149,15 +226,32 @@ export const JourneyScreen: React.FC = () => {
                     {phase.goal}
                   </p>
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-[#6B8F71]/60 mt-2">
-                    Progression: {completedInPhase}/{totalInPhase} sessions
+                    Progression: {completedInPhaseResolved}/{totalInPhase} sessions
                   </p>
+                  {isCurrent && activeRuntimeSession?.status && activeRuntimeSession.status !== 'planned' && (
+                    <p className="mt-1 text-[10px] text-[#2C2A26]/50">
+                      Status: {activeRuntimeSession.status === 'revisit'
+                        ? 'Revisit requested'
+                        : activeRuntimeSession.status === 'blocked'
+                          ? 'Stabilization / risk hold'
+                          : 'In progress'}
+                    </p>
+                  )}
 
                 {/* Expanded session cards for current phase */}
                 {isCurrent && phase.sessions && (
                   <div className="mt-3 space-y-2">
                     {phase.sessions.map((s, sIdx) => {
-                      const isDone = sIdx < completedInPhase;
-                      const isNext = sIdx === completedInPhase;
+                      const isDone = sIdx < completedInPhaseResolved;
+                      const isNext = sIdx === completedInPhaseResolved;
+                      const nextSessionTitle =
+                        isNext && activeRuntimeSession?.generated_title
+                          ? activeRuntimeSession.generated_title
+                          : s.topic;
+                      const nextSessionDescription =
+                        isNext && activeRuntimeSession?.generated_description
+                          ? activeRuntimeSession.generated_description
+                          : s.description;
                       return (
                         <button
                           key={sIdx}
@@ -183,12 +277,12 @@ export const JourneyScreen: React.FC = () => {
                                 isDone ? 'text-[#6B8F71]' : 'text-[#2C2A26]'
                               }`}
                             >
-                              {s.topic}
+                              {nextSessionTitle}
                             </span>
                           </div>
                           {isNext && (
                             <p className="text-[10px] text-[#2C2A26]/40 mt-1 ml-0">
-                              {s.description}
+                              {nextSessionDescription}
                             </p>
                           )}
                         </button>

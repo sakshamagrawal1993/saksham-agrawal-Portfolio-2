@@ -1,6 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Check, Lock } from 'lucide-react';
 import { MindCoachJourney, MindCoachSession, normalizeJourneyPhaseState } from '../../../store/mindCoachStore';
+import { supabase } from '../../../lib/supabaseClient';
 
 interface PhaseProgressStepperProps {
   journey: MindCoachJourney;
@@ -12,10 +13,58 @@ export const PhaseProgressStepper: React.FC<PhaseProgressStepperProps> = ({ jour
   const phases = normalized.phases ?? [];
   const currentPhase = normalized.current_phase;
   const currentPhaseData = phases[currentPhase - 1];
+  const [journeySessionRows, setJourneySessionRows] = useState<any[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!journey?.id) {
+        setJourneySessionRows([]);
+        return;
+      }
+      const { data } = await supabase
+        .from('mind_coach_journey_sessions')
+        .select('phase_number,session_order,status,attempt_count')
+        .eq('journey_id', journey.id)
+        .eq('phase_number', currentPhase)
+        .in('status', ['planned', 'in_progress', 'completed', 'revisit', 'blocked'])
+        .order('session_order', { ascending: true });
+      if (!cancelled) setJourneySessionRows(data ?? []);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [journey?.id, currentPhase]);
+
   const currentCompleted = sessions.filter(
     (s) => s.session_state === 'completed' && s.phase_number === currentPhase,
   ).length;
-  const currentTarget = Math.max(1, currentPhaseData?.sessions?.length ?? 3);
+  const latestByOrder = new Map<number, any>();
+  for (const row of journeySessionRows) {
+    const order = Number(row?.session_order);
+    if (!Number.isFinite(order) || order < 1) continue;
+    const prev = latestByOrder.get(order);
+    if (!prev || Number(row?.attempt_count ?? 1) > Number(prev?.attempt_count ?? 1)) {
+      latestByOrder.set(order, row);
+    }
+  }
+  const latestRows = [...latestByOrder.values()];
+  const runtimeSessionOrders = new Set(
+    latestRows
+      .map((r) => (Number.isFinite(r.session_order) ? Number(r.session_order) : null))
+      .filter((v): v is number => v != null),
+  );
+  const runtimeCompletedOrders = new Set(
+    latestRows
+      .filter((r) => r.status === 'completed')
+      .map((r) => (Number.isFinite(r.session_order) ? Number(r.session_order) : null))
+      .filter((v): v is number => v != null),
+  );
+  const currentTarget = Math.max(
+    1,
+    runtimeSessionOrders.size > 0 ? runtimeSessionOrders.size : (currentPhaseData?.sessions?.length ?? 3),
+  );
+  const currentCompletedResolved = runtimeCompletedOrders.size > 0 ? runtimeCompletedOrders.size : currentCompleted;
 
   return (
     <div className="shrink-0 px-4 pt-2.5 pb-2 border-b border-[#E8E4DE] bg-[#FAFAF7]">
@@ -62,15 +111,26 @@ export const PhaseProgressStepper: React.FC<PhaseProgressStepperProps> = ({ jour
           Phase {currentPhase}: {currentPhaseData?.title ?? 'Current phase'}
         </p>
         <p className="text-[10px] text-[#2C2A26]/45">
-          {currentCompleted}/{currentTarget} sessions
+          {currentCompletedResolved}/{currentTarget} sessions
         </p>
       </div>
+      {journey.phase_transition_result?.phase_gate_reason && (
+        <p className="mt-1 text-[10px] text-[#2C2A26]/40">
+          {journey.phase_transition_result.phase_gate_reason === 'blocked_by_risk'
+            ? 'Risk hold active; stabilizing before progression.'
+            : journey.phase_transition_result.phase_gate_reason === 'objective_not_met'
+              ? 'Objective not met yet; revisit remains active.'
+              : journey.phase_transition_result.phase_gate_reason === 'readiness_not_ready'
+                ? 'Readiness still building before phase transition.'
+                : ''}
+        </p>
+      )}
       <div className="mt-1.5 flex gap-1">
         {Array.from({ length: currentTarget }, (_, idx) => (
           <span
             key={idx}
             className={`h-1.5 flex-1 rounded-full ${
-              idx < currentCompleted ? 'bg-[#6B8F71]' : 'bg-[#E8E4DE]'
+              idx < currentCompletedResolved ? 'bg-[#6B8F71]' : 'bg-[#E8E4DE]'
             }`}
           />
         ))}

@@ -27,6 +27,41 @@ function normalizePathwayCandidate(value: unknown): string | null {
   return trimmed;
 }
 
+function clampScore(value: unknown, fallback: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(1, Math.max(0, parsed));
+}
+
+function parseBoolean(value: unknown): boolean | null {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (['true', 'yes', '1'].includes(normalized)) return true;
+    if (['false', 'no', '0'].includes(normalized)) return false;
+  }
+  return null;
+}
+
+function normalizeRiskLevel(caseNotes: any, sessionSummary: any): string {
+  const raw = String(caseNotes?.risk_level ?? caseNotes?.risk ?? sessionSummary?.risk_level ?? '').toLowerCase();
+  if (raw === 'low' || raw === 'medium' || raw === 'high' || raw === 'critical') return raw;
+  return hasMajorRiskSignals(caseNotes, sessionSummary) ? 'high' : 'low';
+}
+
+function getLatestAttemptRowsByOrder(rows: any[]): any[] {
+  const byOrder = new Map<number, any>();
+  for (const row of rows) {
+    const order = Number(row?.session_order);
+    if (!Number.isFinite(order) || order < 1) continue;
+    const prev = byOrder.get(order);
+    if (!prev || Number(row?.attempt_count ?? 1) > Number(prev?.attempt_count ?? 1)) {
+      byOrder.set(order, row);
+    }
+  }
+  return [...byOrder.values()].sort((a, b) => Number(a.session_order) - Number(b.session_order));
+}
+
 function pathwayDisplayName(pathwayName: string): string {
   return pathwayName
     .split('_')
@@ -105,6 +140,37 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ error: 'Session not found or empty' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
+      );
+    }
+
+    const existingSummary =
+      session.summary_data && typeof session.summary_data === 'object'
+        ? session.summary_data as Record<string, any>
+        : null;
+    const previousMeta =
+      existingSummary?.__session_end_meta && typeof existingSummary.__session_end_meta === 'object'
+        ? existingSummary.__session_end_meta
+        : null;
+    if (
+      session.session_state === 'completed' &&
+      previousMeta?.idempotency_key === session_id
+    ) {
+      return new Response(
+        JSON.stringify({
+          case_notes: existingSummary?.case_notes ?? session.case_notes ?? null,
+          session_summary: existingSummary?.session_summary ?? null,
+          extracted_tasks: Array.isArray(existingSummary?.extracted_tasks) ? existingSummary.extracted_tasks : [],
+          extracted_memories: Array.isArray(existingSummary?.extracted_memories) ? existingSummary.extracted_memories : [],
+          agent_meta: existingSummary?.agent_meta ?? null,
+          suggested_pathway: existingSummary?.suggested_pathway ?? null,
+          pathway_details: existingSummary?.pathway_details ?? null,
+          memories_stored: 0,
+          tasks_stored: 0,
+          session_id,
+          phase_transition_result: existingSummary?.phase_transition_result ?? null,
+          idempotent_replay: true,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }
 
@@ -290,7 +356,7 @@ serve(async (req) => {
       };
     }
 
-    const summaryDataForStorage =
+    let summaryDataForStorage =
       session_summary && typeof session_summary === 'object'
         ? {
             // Backward compatibility: keep canonical summary fields at top-level.
@@ -303,6 +369,10 @@ serve(async (req) => {
             agent_meta,
             suggested_pathway: suggestedPathwayCandidate,
             pathway_details: pathwayDetails,
+            __session_end_meta: {
+              idempotency_key: session_id,
+              processed_at: new Date().toISOString(),
+            },
           }
         : {
             session_summary,
@@ -312,6 +382,10 @@ serve(async (req) => {
             agent_meta,
             suggested_pathway: suggestedPathwayCandidate,
             pathway_details: pathwayDetails,
+            __session_end_meta: {
+              idempotency_key: session_id,
+              processed_at: new Date().toISOString(),
+            },
           };
 
     // 3. Update session as completed
@@ -383,8 +457,9 @@ serve(async (req) => {
       await supabaseAdmin.from('mind_coach_user_tasks').insert(taskRows);
     }
 
-    // 5. Update journey progress (pathway progression only; discovery flow remains unchanged)
+    // 5. Update journey/session progression (template-aware + strict policy)
     let phaseTransitionResult: Record<string, unknown> | null = null;
+    const policyConflicts: string[] = [];
     if (journey) {
       const currentPhaseIndex = Number.isFinite(journey.current_phase_index)
         ? journey.current_phase_index
@@ -396,28 +471,256 @@ serve(async (req) => {
       const currentPhaseNumber = currentPhaseIndex + 1;
       const currentPhase = phases[currentPhaseIndex] ?? null;
 
-      const { count: completedInPhase } = await supabaseAdmin
-        .from('mind_coach_sessions')
-        .select('id', { count: 'exact', head: true })
+      const majorRisk = hasMajorRiskSignals(case_notes, session_summary);
+      const riskLevel = normalizeRiskLevel(case_notes, session_summary);
+      const requiresEscalation = Boolean(case_notes?.requires_escalation || session_summary?.requires_escalation);
+      const readinessLabel = String(case_notes?.readiness_for_next_phase ?? '').toLowerCase();
+      const readinessSignal = readinessLabel === 'ready';
+
+      const incomingSessionTransition = parsed?.session_transition && typeof parsed.session_transition === 'object'
+        ? parsed.session_transition
+        : null;
+      const incomingPhaseTransition = parsed?.phase_transition && typeof parsed.phase_transition === 'object'
+        ? parsed.phase_transition
+        : null;
+      const incomingObjectiveSignal = parseBoolean(
+        parsed?.objective_met ??
+        incomingSessionTransition?.objective_met ??
+        incomingSessionTransition?.session_transition,
+      );
+      const incomingPhaseAdvanceSignal = parseBoolean(
+        incomingPhaseTransition?.phase_transition ??
+        incomingPhaseTransition?.should_advance ??
+        parsed?.phase_transition,
+      );
+      const incomingCompletionScore = parsed?.completion_score ?? session_summary?.completion_score;
+
+      const activePathway = normalizePathwayCandidate(journey.pathway || session.pathway) || 'engagement_rapport_and_assessment';
+      const { data: phaseTemplatesRaw } = await supabaseAdmin
+        .from('mind_coach_session_templates')
+        .select('id,session_order,min_completion_score,title,goal,description,fallback_strategy')
+        .eq('pathway_name', activePathway)
+        .eq('phase_number', currentPhaseNumber)
+        .eq('is_active', true)
+        .order('session_order', { ascending: true });
+      const phaseTemplates = Array.isArray(phaseTemplatesRaw) ? phaseTemplatesRaw : [];
+
+      const { data: runtimePhaseRowsRaw } = await supabaseAdmin
+        .from('mind_coach_journey_sessions')
+        .select('id,session_template_id,linked_session_id,session_order,status,attempt_count,generated_title,generated_goal,generated_description')
         .eq('journey_id', journey.id)
         .eq('phase_number', currentPhaseNumber)
-        .eq('session_state', 'completed');
+        .order('session_order', { ascending: true })
+        .order('attempt_count', { ascending: false });
+      let runtimePhaseRows = Array.isArray(runtimePhaseRowsRaw) ? runtimePhaseRowsRaw : [];
+
+      // Normalize race leftovers: only one in-progress per phase.
+      const inProgressRows = runtimePhaseRows.filter((row: any) => row.status === 'in_progress');
+      if (inProgressRows.length > 1) {
+        const keep = inProgressRows
+          .slice()
+          .sort((a: any, b: any) => Number(a.session_order) - Number(b.session_order) || Number(b.attempt_count ?? 1) - Number(a.attempt_count ?? 1))[0];
+        const demoteIds = inProgressRows
+          .filter((row: any) => row.id !== keep.id)
+          .map((row: any) => row.id);
+        if (demoteIds.length > 0) {
+          await supabaseAdmin
+            .from('mind_coach_journey_sessions')
+            .update({ status: 'planned' })
+            .in('id', demoteIds);
+          runtimePhaseRows = runtimePhaseRows.map((row: any) =>
+            demoteIds.includes(row.id) ? { ...row, status: 'planned' } : row,
+          );
+        }
+      }
+
+      const latestRows = getLatestAttemptRowsByOrder(runtimePhaseRows);
+      let activeJourneySession =
+        latestRows.find((r: any) => r.status === 'in_progress') ||
+        latestRows.find((r: any) => r.status === 'revisit') ||
+        latestRows.find((r: any) => r.status === 'blocked') ||
+        latestRows.find((r: any) => r.status === 'planned') ||
+        null;
+
+      if (!activeJourneySession) {
+        const templateFirst = phaseTemplates[0] || null;
+        const fallbackOrder = templateFirst?.session_order ?? Math.max(1, latestRows.length + 1);
+        const fallbackAttempt = 1;
+        const { data: insertedManual } = await supabaseAdmin
+          .from('mind_coach_journey_sessions')
+          .upsert({
+            journey_id: journey.id,
+            profile_id,
+            pathway_name: activePathway,
+            session_template_id: templateFirst?.id ?? null,
+            linked_session_id: session_id,
+            phase_number: currentPhaseNumber,
+            session_order: fallbackOrder,
+            status: 'in_progress',
+            attempt_count: fallbackAttempt,
+            source: templateFirst ? 'template' : 'manual',
+            generated_title: templateFirst?.title ?? `Session ${fallbackOrder}`,
+            generated_goal: templateFirst?.goal ?? (currentPhase?.goal || 'Continue progress in this phase.'),
+            generated_description: templateFirst?.description ?? (currentPhase?.goal || 'Continue progress in this phase.'),
+            activated_at: new Date().toISOString(),
+          }, { onConflict: 'journey_id,phase_number,session_order,attempt_count' })
+          .select('id,session_template_id,linked_session_id,session_order,status,attempt_count,generated_title,generated_goal,generated_description')
+          .single();
+        activeJourneySession = insertedManual;
+      }
+
+      if (!activeJourneySession) {
+        throw new Error('Unable to resolve active journey session for transition processing.');
+      }
+
+      const activeTemplate = phaseTemplates.find((t: any) => t.id === activeJourneySession.session_template_id) || null;
+      const minCompletionScore = clampScore(activeTemplate?.min_completion_score ?? 0.7, 0.7);
+      const completionScore = clampScore(
+        incomingCompletionScore ?? (readinessSignal ? 0.8 : 0.45),
+        readinessSignal ? 0.8 : 0.45,
+      );
+      let objectiveMet = incomingObjectiveSignal ?? (!majorRisk && completionScore >= minCompletionScore);
+      if (majorRisk && objectiveMet) {
+        policyConflicts.push('risk_overrode_objective_true');
+        objectiveMet = false;
+      }
+
+      const recommendedNextAction = majorRisk
+        ? (requiresEscalation ? 'escalate' : 'stabilize')
+        : (objectiveMet ? 'advance' : 'revisit');
+      const completionStatus = objectiveMet ? 'completed' : (majorRisk ? 'blocked' : 'revisit');
+
+      if (incomingPhaseAdvanceSignal === true && !objectiveMet) {
+        policyConflicts.push('phase_advance_signal_ignored_objective_false');
+      }
+
+      if (activeJourneySession.status !== 'in_progress') {
+        await supabaseAdmin
+          .from('mind_coach_journey_sessions')
+          .update({ linked_session_id: session_id, status: 'in_progress' })
+          .eq('id', activeJourneySession.id);
+      }
+
+      await supabaseAdmin
+        .from('mind_coach_journey_sessions')
+        .update({
+          status: completionStatus,
+          completion_score: completionScore,
+          completion_reason: objectiveMet
+            ? 'objective_met'
+            : (majorRisk ? 'risk_stabilization_required' : 'objective_not_met'),
+          linked_session_id: session_id,
+          completed_at: objectiveMet ? new Date().toISOString() : null,
+        })
+        .eq('id', activeJourneySession.id);
+
+      const { data: existingEvaluation } = await supabaseAdmin
+        .from('mind_coach_session_evaluations')
+        .select('id')
+        .eq('journey_session_id', activeJourneySession.id)
+        .eq('session_id', session_id)
+        .limit(1)
+        .maybeSingle();
+
+      if (!existingEvaluation?.id) {
+        await supabaseAdmin
+          .from('mind_coach_session_evaluations')
+          .insert({
+            journey_session_id: activeJourneySession.id,
+            journey_id: journey.id,
+            profile_id,
+            session_id,
+            objective_met: objectiveMet,
+            objective_confidence: clampScore(parsed?.objective_confidence ?? completionScore, completionScore),
+            completion_score: completionScore,
+            risk_level: riskLevel,
+            requires_escalation: requiresEscalation,
+            unresolved_items: Array.isArray(parsed?.unresolved_items) ? parsed.unresolved_items : [],
+            strengths_observed: Array.isArray(parsed?.strengths_observed) ? parsed.strengths_observed : [],
+            recommended_next_action: recommendedNextAction,
+            recommended_adjustments: parsed?.recommended_adjustments && typeof parsed.recommended_adjustments === 'object'
+              ? parsed.recommended_adjustments
+              : {},
+            evaluator_meta: {
+              readiness_signal: readinessSignal ? 'ready' : 'continue',
+              major_risk: majorRisk,
+              policy: 'strictReady',
+              conflicts: policyConflicts,
+            },
+          });
+      }
+
+      if (!objectiveMet) {
+        const nextAttempt = Number(activeJourneySession.attempt_count ?? 1) + 1;
+        await supabaseAdmin
+          .from('mind_coach_journey_sessions')
+          .upsert({
+            journey_id: journey.id,
+            profile_id,
+            pathway_name: activePathway,
+            session_template_id: activeJourneySession.session_template_id ?? null,
+            phase_number: currentPhaseNumber,
+            session_order: activeJourneySession.session_order,
+            status: 'in_progress',
+            attempt_count: nextAttempt,
+            source: 'adapted',
+            adaptation_reason: majorRisk ? 'risk_stabilization' : 'objective_not_met',
+            generated_title: activeJourneySession.generated_title ?? `Session ${activeJourneySession.session_order}`,
+            generated_goal: activeJourneySession.generated_goal ?? (currentPhase?.goal || 'Continue progress in this phase.'),
+            generated_description: activeJourneySession.generated_description ?? (currentPhase?.goal || 'Continue progress in this phase.'),
+            activated_at: new Date().toISOString(),
+          }, { onConflict: 'journey_id,phase_number,session_order,attempt_count' });
+      } else {
+        const nextInPhase = latestRows.find((row: any) => Number(row.session_order) > Number(activeJourneySession.session_order));
+        if (nextInPhase && nextInPhase.status === 'planned') {
+          await supabaseAdmin
+            .from('mind_coach_journey_sessions')
+            .update({ status: 'in_progress', activated_at: new Date().toISOString() })
+            .eq('id', nextInPhase.id);
+        }
+      }
+
+      const { data: latestRuntimeRowsRaw } = await supabaseAdmin
+        .from('mind_coach_journey_sessions')
+        .select('id,session_template_id,session_order,status,attempt_count')
+        .eq('journey_id', journey.id)
+        .eq('phase_number', currentPhaseNumber)
+        .order('session_order', { ascending: true })
+        .order('attempt_count', { ascending: false });
+      const latestRuntimeRows = getLatestAttemptRowsByOrder(Array.isArray(latestRuntimeRowsRaw) ? latestRuntimeRowsRaw : []);
+      const completedLatestRows = latestRuntimeRows.filter((row: any) => row.status === 'completed');
+      const completedTemplateRows = completedLatestRows.filter((row: any) => Boolean(row.session_template_id));
+      const completedInCurrentPhase = completedLatestRows.length;
+      const templateSessionOrderSet = new Set<number>(
+        phaseTemplates
+          .map((t: any) => Number(t.session_order))
+          .filter((n: number) => Number.isFinite(n) && n > 0),
+      );
+      const requiredTemplateCount = templateSessionOrderSet.size > 0
+        ? templateSessionOrderSet.size
+        : Math.max(1, getRequiredSessionsForPhase(currentPhase));
+      const minSessionsForPhase = Math.max(1, getRequiredSessionsForPhase(currentPhase));
+      const maxSessionsForPhase = Math.max(minSessionsForPhase, DEFAULT_MAX_SESSIONS_PER_PHASE);
+      const phaseObjectivesMet = completedTemplateRows.length >= requiredTemplateCount;
+      const maxSessionsFallbackPassed = completedInCurrentPhase >= maxSessionsForPhase;
+      // Canonical policy: strictReady (risk -> objective -> readiness+phase gate).
+      const shouldAdvance = progressionEnabled &&
+        hasNextPhase &&
+        !majorRisk &&
+        objectiveMet &&
+        readinessSignal &&
+        (phaseObjectivesMet || maxSessionsFallbackPassed);
+
+      if (incomingPhaseAdvanceSignal === true && !shouldAdvance) {
+        policyConflicts.push('incoming_phase_advance_overridden_by_policy');
+      }
 
       const { count: completedInJourney } = await supabaseAdmin
         .from('mind_coach_sessions')
         .select('id', { count: 'exact', head: true })
         .eq('journey_id', journey.id)
         .eq('session_state', 'completed');
-
-      const completedInCurrentPhase = completedInPhase ?? 0;
       const newSessionCount = completedInJourney ?? ((journey.sessions_completed || 0) + 1);
-      const minSessionsForPhase = getRequiredSessionsForPhase(currentPhase);
-      const maxSessionsForPhase = Math.max(minSessionsForPhase, DEFAULT_MAX_SESSIONS_PER_PHASE);
-      const readinessSignal = String(case_notes?.readiness_for_next_phase ?? '').toLowerCase() === 'ready';
-      const majorRisk = hasMajorRiskSignals(case_notes, session_summary);
-      const readyGatePassed = readinessSignal && completedInCurrentPhase >= minSessionsForPhase;
-      const maxSessionsFallbackPassed = completedInCurrentPhase >= maxSessionsForPhase && !majorRisk;
-      const shouldAdvance = progressionEnabled && hasNextPhase && (readyGatePassed || maxSessionsFallbackPassed);
 
       const journeyUpdate: Record<string, any> = {
         sessions_completed: newSessionCount,
@@ -425,9 +728,24 @@ serve(async (req) => {
 
       if (shouldAdvance) {
         journeyUpdate.current_phase_index = currentPhaseIndex + 1;
-        // Keep legacy compatibility where UI reads current_phase.
         journeyUpdate.current_phase = currentPhaseIndex + 2;
+        const { data: nextPhaseRowsRaw } = await supabaseAdmin
+          .from('mind_coach_journey_sessions')
+          .select('id,status,session_order,attempt_count')
+          .eq('journey_id', journey.id)
+          .eq('phase_number', currentPhaseNumber + 1)
+          .order('session_order', { ascending: true })
+          .order('attempt_count', { ascending: false });
+        const nextPhaseRows = getLatestAttemptRowsByOrder(Array.isArray(nextPhaseRowsRaw) ? nextPhaseRowsRaw : []);
+        const firstNext = nextPhaseRows.find((row: any) => row.status !== 'completed');
+        if (firstNext && firstNext.status === 'planned') {
+          await supabaseAdmin
+            .from('mind_coach_journey_sessions')
+            .update({ status: 'in_progress', activated_at: new Date().toISOString() })
+            .eq('id', firstNext.id);
+        }
       }
+
       phaseTransitionResult = {
         advanced: shouldAdvance,
         previous_phase_index: currentPhaseIndex,
@@ -436,9 +754,29 @@ serve(async (req) => {
         min_sessions_required: minSessionsForPhase,
         max_sessions_fallback: maxSessionsForPhase,
         readiness_signal: readinessSignal ? 'ready' : 'continue',
-        used_max_sessions_fallback: !readyGatePassed && maxSessionsFallbackPassed,
-        blocked_by_risk: majorRisk && completedInCurrentPhase >= maxSessionsForPhase,
+        blocked_by_risk: majorRisk,
         progression_enabled: progressionEnabled,
+        objective_met: objectiveMet,
+        completion_score: completionScore,
+        objective_confidence: clampScore(parsed?.objective_confidence ?? completionScore, completionScore),
+        recommended_next_action: recommendedNextAction,
+        session_transition_status: completionStatus,
+        phase_objectives_met: phaseObjectivesMet,
+        required_template_sessions: requiredTemplateCount,
+        completed_template_sessions: completedTemplateRows.length,
+        phase_policy: 'strictReady',
+        phase_gate_reason: shouldAdvance
+          ? 'objective_ready_and_phase_requirements_met'
+          : majorRisk
+            ? 'blocked_by_risk'
+            : !objectiveMet
+              ? 'objective_not_met'
+              : !readinessSignal
+                ? 'readiness_not_ready'
+                : !hasNextPhase
+                  ? 'final_phase'
+                  : 'phase_requirements_not_met',
+        conflicts_normalized: policyConflicts,
         evaluated_at: new Date().toISOString(),
       };
       journeyUpdate.phase_transition_result = phaseTransitionResult;
@@ -447,6 +785,19 @@ serve(async (req) => {
         .from('mind_coach_journeys')
         .update(journeyUpdate)
         .eq('id', journey.id);
+    }
+
+    if (phaseTransitionResult) {
+      summaryDataForStorage = {
+        ...summaryDataForStorage,
+        phase_transition_result: phaseTransitionResult,
+      };
+      await supabaseAdmin
+        .from('mind_coach_sessions')
+        .update({
+          summary_data: summaryDataForStorage,
+        })
+        .eq('id', session_id);
     }
 
     return new Response(

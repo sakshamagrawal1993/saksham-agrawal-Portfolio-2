@@ -204,6 +204,18 @@ type PathwayPhaseRow = {
     phase_description: string | null;
 };
 
+type SessionTemplateRow = {
+    id: string;
+    pathway_name: string;
+    phase_number: number;
+    session_order: number;
+    title: string;
+    goal: string;
+    description: string;
+    min_completion_score: number | null;
+    fallback_strategy: string;
+};
+
 export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, onAccept }) => {
     const profile = useMindCoachStore((s) => s.profile);
     const activeSession = useMindCoachStore((s) => s.activeSession);
@@ -215,6 +227,7 @@ export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, o
     const [showPostAccept, setShowPostAccept] = useState(false);
     const [acceptError, setAcceptError] = useState<string | null>(null);
     const [dbPhases, setDbPhases] = useState<PathwayPhaseRow[] | null>(null);
+    const [sessionTemplates, setSessionTemplates] = useState<SessionTemplateRow[] | null>(null);
 
     const suggestedPathwayId = useMemo(() => {
         if (activeSession?.pathway && activeSession.pathway !== 'engagement_rapport_and_assessment') {
@@ -255,6 +268,40 @@ export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, o
         };
     }, [selectedPathwayId]);
 
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            const { data, error } = await supabase
+                .from('mind_coach_session_templates')
+                .select(
+                    'id,pathway_name,phase_number,session_order,title,goal,description,min_completion_score,fallback_strategy',
+                )
+                .eq('pathway_name', selectedPathwayId)
+                .eq('is_active', true)
+                .order('phase_number', { ascending: true })
+                .order('session_order', { ascending: true });
+            if (cancelled) return;
+            if (error || !data?.length) {
+                setSessionTemplates([]);
+                return;
+            }
+            setSessionTemplates(data as SessionTemplateRow[]);
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [selectedPathwayId]);
+
+    const templatesByPhase = useMemo(() => {
+        const map = new Map<number, SessionTemplateRow[]>();
+        for (const row of sessionTemplates ?? []) {
+            const existing = map.get(row.phase_number) ?? [];
+            existing.push(row);
+            map.set(row.phase_number, existing);
+        }
+        return map;
+    }, [sessionTemplates]);
+
     const displayPhases =
         dbPhases && dbPhases.length > 0
             ? dbPhases.map((r) => ({
@@ -285,25 +332,44 @@ export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, o
             const phasesForJourney =
                 dbPhases && dbPhases.length > 0
                     ? dbPhases.map((r) => ({
+                          phaseNumber: r.phase_number,
                           title: r.phase_name,
                           goal: r.phase_description || '',
-                          sessions: 3,
+                          sessions: Math.max(1, templatesByPhase.get(r.phase_number)?.length ?? 3),
                       }))
                     : playbook.phases.map((p) => ({
+                          phaseNumber: undefined,
                           title: p.name,
                           goal: p.goal,
                           sessions: p.sessions,
                       }));
 
             const customPhases: JourneyPhase[] = phasesForJourney.map((p, i) => ({
-                phase_number: i + 1,
+                phase_number: Number.isFinite(p.phaseNumber) ? Number(p.phaseNumber) : i + 1,
                 title: p.title,
                 goal: p.goal,
-                sessions: Array.from({ length: p.sessions }, (_, si) => ({
-                    session_number: i * p.sessions + si + 1,
-                    topic: `Session ${i * p.sessions + si + 1}`,
-                    description: p.goal,
-                })),
+                sessions: (() => {
+                    const phaseNumber = Number.isFinite(p.phaseNumber) ? Number(p.phaseNumber) : i + 1;
+                    const phaseTemplates = templatesByPhase.get(phaseNumber) ?? [];
+                    if (phaseTemplates.length > 0) {
+                        return phaseTemplates.map((tpl) => ({
+                            session_number: tpl.session_order,
+                            topic: tpl.title,
+                            title: tpl.title,
+                            objective: tpl.goal,
+                            description: tpl.description,
+                            success_signal: `Completion score at or above ${
+                                tpl.min_completion_score != null ? Math.round(tpl.min_completion_score * 100) : 70
+                            }%.`,
+                            fallback_strategy: tpl.fallback_strategy,
+                        }));
+                    }
+                    return Array.from({ length: p.sessions }, (_, si) => ({
+                        session_number: si + 1,
+                        topic: `Session ${si + 1}`,
+                        description: p.goal,
+                    }));
+                })(),
             }));
 
             const { data: routeData, error: err } = await supabase
@@ -323,6 +389,28 @@ export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, o
                 .single();
 
             if (err) throw err;
+
+            const templateRowsForJourney =
+                (sessionTemplates ?? [])
+                    .map((tpl) => ({
+                        journey_id: routeData.id,
+                        profile_id: profile.id,
+                        pathway_name: selectedPathwayId,
+                        session_template_id: tpl.id,
+                        phase_number: tpl.phase_number,
+                        session_order: tpl.session_order,
+                        status: tpl.phase_number === 1 && tpl.session_order === 1 ? 'in_progress' : 'planned',
+                        attempt_count: 1,
+                        source: 'template',
+                        generated_title: tpl.title,
+                        generated_goal: tpl.goal,
+                        generated_description: tpl.description,
+                        activated_at: tpl.phase_number === 1 && tpl.session_order === 1 ? new Date().toISOString() : null,
+                    }));
+
+            if (templateRowsForJourney.length > 0) {
+                await supabase.from('mind_coach_journey_sessions').insert(templateRowsForJourney);
+            }
 
             if (activeSession) {
                 await supabase

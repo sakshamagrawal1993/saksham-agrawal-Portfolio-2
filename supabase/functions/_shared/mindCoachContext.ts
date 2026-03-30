@@ -1,6 +1,7 @@
 import {
   type SessionGoalContext,
   resolveSessionGoalContext,
+  resolveSessionGoalContextFromJourneySessions,
 } from './mindCoachSessionGoals.ts';
 
 /**
@@ -202,21 +203,49 @@ export async function buildPhaseContext(
     .eq('session_state', 'completed');
 
   const completed = count ?? 0;
-  const stage = deriveSessionStage(completed, target);
+  const { data: journeySessionRows } = await supabaseAdmin
+    .from('mind_coach_journey_sessions')
+    .select('session_order,status,attempt_count,generated_title,generated_goal,generated_description')
+    .eq('journey_id', journey.id)
+    .eq('phase_number', currentPhaseIndex + 1)
+    .in('status', ['planned', 'in_progress', 'completed', 'revisit', 'blocked'])
+    .order('session_order', { ascending: true })
+    .order('attempt_count', { ascending: false });
+
+  const byOrder = new Map<number, any>();
+  for (const row of journeySessionRows || []) {
+    const order = Number(row?.session_order);
+    if (!Number.isFinite(order) || order < 1) continue;
+    const prev = byOrder.get(order);
+    if (!prev || Number(row?.attempt_count ?? 1) > Number(prev?.attempt_count ?? 1)) {
+      byOrder.set(order, row);
+    }
+  }
+  const latestRows = [...byOrder.values()].sort((a, b) => Number(a.session_order) - Number(b.session_order));
+  const targetFromJourneySessions = latestRows.length > 0 ? latestRows.length : target;
+  const completedFromJourneySessions = latestRows.filter((row: any) => row.status === 'completed').length;
+
+  const effectiveCompleted = completedFromJourneySessions > 0 ? completedFromJourneySessions : completed;
+  const effectiveTarget = Math.max(1, targetFromJourneySessions);
   const phaseGoal: string | null =
     typeof currentPhase?.goal === 'string' ? currentPhase.goal : null;
-  const sessionGoalContext = resolveSessionGoalContext(currentPhase, completed, DEFAULT_MIN_SESSIONS_PER_PHASE);
+  const sessionGoalContext = resolveSessionGoalContextFromJourneySessions(
+    currentPhase,
+    journeySessionRows || [],
+    effectiveCompleted,
+    DEFAULT_MIN_SESSIONS_PER_PHASE,
+  ) ?? resolveSessionGoalContext(currentPhase, effectiveCompleted, DEFAULT_MIN_SESSIONS_PER_PHASE);
 
   return {
     current_phase_index: currentPhaseIndex,
     total_phases: phases.length,
     current_phase: currentPhase,
     next_phase: nextPhase,
-    completed_in_current_phase: completed,
-    target_sessions_in_current_phase: target,
-    session_stage: stage,
+    completed_in_current_phase: effectiveCompleted,
+    target_sessions_in_current_phase: effectiveTarget,
+    session_stage: deriveSessionStage(effectiveCompleted, effectiveTarget),
     phase_goal: phaseGoal,
-    sessions_remaining_in_phase: Math.max(0, target - completed),
+    sessions_remaining_in_phase: Math.max(0, effectiveTarget - effectiveCompleted),
     session_goal_context: sessionGoalContext,
   };
 }

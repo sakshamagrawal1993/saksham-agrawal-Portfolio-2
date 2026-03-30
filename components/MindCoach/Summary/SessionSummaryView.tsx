@@ -83,6 +83,10 @@ export const SessionSummaryView: React.FC<SessionSummaryViewProps> = ({
     new_phase_index?: number;
     completed_in_phase?: number;
     min_sessions_required?: number;
+    phase_gate_reason?: string;
+    recommended_next_action?: string;
+    session_transition_status?: string;
+    blocked_by_risk?: boolean;
   } | null;
 
   const tasks: Record<string, any>[] = Array.isArray(summaryView.extracted_tasks)
@@ -124,6 +128,16 @@ export const SessionSummaryView: React.FC<SessionSummaryViewProps> = ({
     completedInPhase != null && minInPhase && minInPhase > 0
       ? Math.min(100, Math.round((completedInPhase / minInPhase) * 100))
       : null;
+  const transitionExplanation =
+    phaseTransitionResult?.phase_gate_reason === 'blocked_by_risk'
+      ? 'We are prioritizing safety and stabilization before progression.'
+      : phaseTransitionResult?.phase_gate_reason === 'objective_not_met'
+        ? 'Objective for this session is not fully met yet, so revisit is queued.'
+        : phaseTransitionResult?.phase_gate_reason === 'readiness_not_ready'
+          ? 'Objective is progressing, but readiness is not yet at phase-transition level.'
+          : phaseTransitionResult?.phase_gate_reason === 'phase_requirements_not_met'
+            ? 'Complete remaining required sessions in this phase before advancing.'
+            : null;
 
   const riskLevel = String(caseNotes?.risk_level ?? '').toLowerCase();
   const isRiskVariant =
@@ -357,6 +371,21 @@ export const SessionSummaryView: React.FC<SessionSummaryViewProps> = ({
                         ? `You unlocked Phase ${(phaseTransitionResult.new_phase_index ?? 0) + 1}. Keep momentum with one small action tonight.`
                         : `You're progressing in this phase (${phaseTransitionResult.completed_in_phase ?? 0}/${phaseTransitionResult.min_sessions_required ?? 0} sessions).`}
                     </p>
+                    {phaseTransitionResult.session_transition_status && (
+                      <p className="text-xs text-[#2C2A26]/55 mb-2">
+                        Session outcome: {phaseTransitionResult.session_transition_status === 'revisit'
+                          ? 'Revisit'
+                          : phaseTransitionResult.session_transition_status === 'blocked'
+                            ? 'Stabilize / Risk hold'
+                            : 'Completed'}
+                        {phaseTransitionResult.recommended_next_action
+                          ? ` • Next action: ${phaseTransitionResult.recommended_next_action}`
+                          : ''}
+                      </p>
+                    )}
+                    {transitionExplanation && (
+                      <p className="text-xs text-[#2C2A26]/50 mb-2">{transitionExplanation}</p>
+                    )}
                     {phaseProgressPercent != null && (
                       <div className="h-1.5 w-full bg-[#E8E4DE] rounded-full overflow-hidden">
                         <div

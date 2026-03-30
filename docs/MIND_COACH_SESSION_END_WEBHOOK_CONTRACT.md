@@ -134,6 +134,31 @@ The workflow merges all branch outputs and returns one final JSON payload.
 }
 ```
 
+### Transition fields required by backend policy
+
+`mind-coach-session-end` now applies a canonical **strictReady** transition policy. n8n should emit these fields explicitly:
+
+```json
+{
+  "objective_met": true,
+  "completion_score": 0.82,
+  "objective_confidence": 0.79,
+  "recommended_adjustments": {
+    "prompt_style": "reinforce evidence log"
+  },
+  "session_transition": {
+    "objective_met": true,
+    "session_transition": true,
+    "recommended_next_action": "advance"
+  },
+  "phase_transition": {
+    "phase_transition": false,
+    "should_advance": false,
+    "rationale": "readiness approaching, continue current phase"
+  }
+}
+```
+
 Canonical response is a single JSON object. The edge function tolerates array-wrapped payloads for backward compatibility, but new workflows should return an object.
 
 ## Fields used by edge function
@@ -144,11 +169,29 @@ Canonical response is a single JSON object. The edge function tolerates array-wr
   - `extracted_tasks` (array, can be empty)
   - `extracted_memories` (array, can be empty)
 - **Progression logic uses**
-  - `case_notes.readiness_for_next_phase` (`ready` may advance when min sessions are met)
+  - `case_notes.readiness_for_next_phase`
+  - `objective_met`
+  - `completion_score`
+  - `objective_confidence` (optional, persisted)
+  - `session_transition.*` and `phase_transition.*` (optional hints, normalized against policy)
 - **Optional risk guards recognized**
   - `case_notes.risk_level` (`high`/`critical` blocks max-session fallback)
   - `case_notes.requires_escalation` (boolean)
   - `case_notes.crisis_detected` (boolean)
+
+## Canonical transition policy (`strictReady`)
+
+Order of precedence for contradictions:
+
+1. **Risk gate wins**: if `risk_level` is high/critical, `crisis_detected=true`, or escalation is required, session cannot advance.
+2. **Objective gate second**: session transition is based on `objective_met` (or deterministic fallback from `completion_score` + template threshold).
+3. **Phase gate third**: phase advance requires all of:
+   - no major risk,
+   - objective met,
+   - readiness is `ready`,
+   - phase objectives complete (or max-session fallback).
+
+If workflow signals conflict with this precedence (example: `phase_transition=true` while `objective_met=false`), backend normalizes to policy and records conflict tags in transition metadata.
 
 ## Response returned by edge function to frontend
 

@@ -79,6 +79,15 @@ export const HomeScreen: React.FC = () => {
   };
   const therapistName = THERAPIST_NAMES[profile?.therapist_persona ?? 'maya'];
   const firstName = profile?.name?.split(' ')[0] ?? 'there';
+  const userTimeZone = useMemo(
+    () => Intl.DateTimeFormat().resolvedOptions().timeZone || '',
+    [],
+  );
+  const timeZoneLabel = useMemo(() => {
+    if (!userTimeZone) return 'your local time';
+    const city = userTimeZone.split('/').pop();
+    return city ? city.replace(/_/g, ' ') : userTimeZone;
+  }, [userTimeZone]);
 
   const TASK_ICONS: Record<TaskType, React.ElementType> = {
     journaling: BookOpen,
@@ -181,13 +190,28 @@ export const HomeScreen: React.FC = () => {
 
   return (
     <div className="relative px-6 pt-8 pb-24 space-y-8 overflow-x-hidden bg-gradient-to-b from-[#FBF8F4] via-[#F9F5EF] to-transparent">
+      {/* Subtle top-half aura background */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[52%] overflow-hidden">
+        <img
+          src={HERO_AURA_URL}
+          alt=""
+          className="h-full w-full object-cover opacity-32 scale-[1.1]"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-white/15 via-[#F9F5EF]/45 to-[#F9F5EF]" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#F9F5EF]/55 via-transparent to-[#F9F5EF]/55" />
+      </div>
 
       {/* Greeting — Zen styled */}
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="relative z-10">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold zen-title">
-            {getGreeting()}, {firstName}
-          </h2>
+          <div>
+            <h2 className="text-xl font-semibold zen-title">
+              {getGreeting()}, {firstName}
+            </h2>
+            <p className="mt-0.5 text-[11px] uppercase tracking-[0.12em] text-[#2C2A26]/35">
+              {timeZoneLabel}
+            </p>
+          </div>
           <button
             type="button"
             onClick={() => setShowDeleteSection((prev) => !prev)}
@@ -196,33 +220,6 @@ export const HomeScreen: React.FC = () => {
           >
             <Settings size={18} />
           </button>
-        </div>
-      </motion.div>
-
-      {/* Premium hero panel */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.04 }}
-        className="relative overflow-hidden rounded-3xl border border-white/70 shadow-[0_20px_60px_-30px_rgba(44,42,38,0.35)]"
-      >
-        <img
-          src={HERO_AURA_URL}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover scale-[1.08] opacity-80"
-        />
-        <div className="absolute inset-0 bg-gradient-to-br from-[#2C2A26]/35 via-[#2C2A26]/10 to-[#6B8F71]/25" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#2C2A26]/50 via-transparent to-transparent" />
-        <div className="relative px-5 py-6 text-white">
-          <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-white/80">
-            Mind Coach
-          </p>
-          <h3 className="mt-1 text-lg font-semibold leading-tight">
-            Your calm space with {therapistName}
-          </h3>
-          <p className="mt-2 text-xs text-white/80">
-            Phase {currentPhase} in progress - {completedInPhase}/{totalInPhase} sessions completed
-          </p>
         </div>
       </motion.div>
 
