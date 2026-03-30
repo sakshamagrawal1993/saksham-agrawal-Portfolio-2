@@ -41,11 +41,17 @@ export async function openOrCreateInProgressSession({
   currentPhase,
   sessions,
 }: OpenOrCreateArgs): Promise<OpenOrCreateResult> {
-  const { data: existingRows } = await supabase
+  let existingQuery = supabase
     .from('mind_coach_sessions')
     .select('*')
     .eq('profile_id', profile.id)
-    .in('session_state', [...IN_PROGRESS_STATES])
+    .in('session_state', [...IN_PROGRESS_STATES]);
+
+  if (journey?.id) {
+    existingQuery = existingQuery.eq('journey_id', journey.id);
+  }
+
+  const { data: existingRows } = await existingQuery
     .order('started_at', { ascending: false })
     .limit(5);
 
@@ -63,7 +69,10 @@ export async function openOrCreateInProgressSession({
   }
 
   const completedInPhase = sessions.filter(
-    (s) => s.session_state === 'completed' && s.phase_number === currentPhase,
+    (s) =>
+      s.session_state === 'completed' &&
+      s.phase_number === currentPhase &&
+      s.journey_id === (journey?.id ?? null),
   ).length;
 
   const newSession: Partial<MindCoachSession> = {
@@ -87,7 +96,10 @@ export async function openOrCreateInProgressSession({
     throw new Error(createErr?.message || 'Could not start a new session.');
   }
 
-  const previousSessionIds = sessions.map((s) => s.id).filter(Boolean);
+  const previousSessionIds = sessions
+    .filter((s) => s.journey_id === (journey?.id ?? null))
+    .map((s) => s.id)
+    .filter(Boolean);
   const historicalMessages = await fetchHistoricalMessages(previousSessionIds);
 
   return {

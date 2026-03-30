@@ -56,11 +56,15 @@ export const HomeScreen: React.FC = () => {
   const phases = journey?.phases ?? [];
   const currentPhaseData = phases[currentPhase - 1];
   const completedInPhase = sessions.filter(
-    (s) => s.session_state === 'completed' && s.phase_number === currentPhase
+    (s) =>
+      s.session_state === 'completed' &&
+      s.phase_number === currentPhase &&
+      s.journey_id === (journey?.id ?? null),
   ).length;
   const totalInPhase = currentPhaseData?.sessions?.length ?? 3;
 
   const hasChosenPathway = journey?.pathway != null && journey.pathway !== 'engagement_rapport_and_assessment';
+  const displayCurrentPhase = hasChosenPathway ? currentPhase + 1 : currentPhase;
 
   const proposedPathway = useMemo(() => {
     const candidate = journey?.discovery_state?.suggested_pathway;
@@ -170,23 +174,47 @@ export const HomeScreen: React.FC = () => {
 
   const fivePhaseJourney = useMemo(() => {
     if (!hasChosenPathway || phases.length === 0) return null;
-    return phases.map((phase, idx) => {
+    const engagementCompletedSessions = sessions.filter(
+      (s) => s.pathway === 'engagement_rapport_and_assessment' && s.session_state === 'completed',
+    ).length;
+    const engagementTotalSessions = Math.max(
+      1,
+      sessions.filter((s) => s.pathway === 'engagement_rapport_and_assessment').length,
+    );
+    const pathwayPhases = phases.map((phase, idx) => {
       const phaseNumber = phase.phase_number || idx + 1;
+      const displayPhaseNumber = phaseNumber + 1;
       const completed = sessions.filter(
-        (s) => s.session_state === 'completed' && s.phase_number === phaseNumber,
+        (s) =>
+          s.session_state === 'completed' &&
+          s.phase_number === phaseNumber &&
+          s.journey_id === (journey?.id ?? null),
       ).length;
       const total = Math.max(1, phase.sessions?.length ?? 3);
       return {
-        phaseNumber,
+        phaseNumber: displayPhaseNumber,
         title: phase.title || `Phase ${phaseNumber}`,
         goal: phase.goal || '',
         completed,
         total,
-        isCompleted: phaseNumber < currentPhase,
-        isCurrent: phaseNumber === currentPhase,
+        isCompleted: displayPhaseNumber < displayCurrentPhase,
+        isCurrent: displayPhaseNumber === displayCurrentPhase,
       };
     });
-  }, [hasChosenPathway, phases, sessions, currentPhase]);
+
+    return [
+      {
+        phaseNumber: 1,
+        title: 'Engagement & Rapport',
+        goal: 'Establish trust, safety, and understanding before pathway work begins.',
+        completed: engagementCompletedSessions,
+        total: engagementTotalSessions,
+        isCompleted: true,
+        isCurrent: false,
+      },
+      ...pathwayPhases,
+    ];
+  }, [hasChosenPathway, phases, sessions, displayCurrentPhase]);
 
   return (
     <div className="relative px-6 pt-8 pb-24 overflow-x-hidden bg-gradient-to-b from-[#FBF8F4] via-[#F9F5EF] to-transparent">
@@ -284,7 +312,7 @@ export const HomeScreen: React.FC = () => {
           <div className="space-y-3">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-wide text-[#2C2A26]/40">
-                Phase {currentPhase}
+                Phase {displayCurrentPhase}
               </p>
               <h3 className="text-base font-semibold text-[#2C2A26] mt-0.5">
                 {currentPhaseData?.title || 'Engagement & Rapport'}
@@ -346,6 +374,36 @@ export const HomeScreen: React.FC = () => {
           }}
         >
           <div className="space-y-3">
+            <div className="rounded-xl border border-[#E8E4DE] bg-white/80 p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-[#2C2A26]/45">
+                Journey roadmap
+              </p>
+              <div className="mt-2 flex items-center gap-1.5">
+                {Array.from({ length: 5 }, (_, idx) => {
+                  const phaseNum = idx + 1;
+                  const active = phaseNum === 1;
+                  return (
+                    <React.Fragment key={phaseNum}>
+                      <span
+                        className={`h-6 min-w-6 px-1 rounded-full border text-[10px] font-semibold flex items-center justify-center ${
+                          active
+                            ? 'bg-[#6B8F71] border-[#6B8F71] text-white'
+                            : 'bg-[#F5F0EB]/70 border-[#E8E4DE] text-[#2C2A26]/35'
+                        }`}
+                      >
+                        {phaseNum}
+                      </span>
+                      {phaseNum < 5 && (
+                        <span className="h-[2px] flex-1 rounded-full bg-[#E8E4DE]/70" />
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+              <p className="mt-2 text-[11px] text-[#2C2A26]/55 leading-relaxed">
+                You are in Phase 1 (Engagement & Rapport). Phases 2-5 unlock after your pathway is revealed.
+              </p>
+            </div>
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-wide text-[#2C2A26]/40">
                 Phase {currentPhase}

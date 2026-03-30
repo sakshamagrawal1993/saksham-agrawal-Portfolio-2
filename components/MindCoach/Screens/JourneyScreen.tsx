@@ -57,6 +57,40 @@ export const JourneyScreen: React.FC = () => {
   const currentPhase = useMindCoachStore((s) => s.currentPhaseNumber());
 
   const phases = journey?.phases ?? [];
+  const hasChosenPathway =
+    journey?.pathway != null && journey.pathway !== 'engagement_rapport_and_assessment';
+  const displayCurrentPhase = hasChosenPathway ? currentPhase + 1 : currentPhase;
+  const engagementSessions = sessions.filter(
+    (s) => s.pathway === 'engagement_rapport_and_assessment',
+  );
+  const engagementCompletedCount = engagementSessions.filter(
+    (s) => s.session_state === 'completed',
+  ).length;
+  const engagementTotalCount = Math.max(1, engagementSessions.length);
+  const displayPhases = hasChosenPathway
+    ? [
+        {
+          display_number: 1,
+          source_phase_number: null as number | null,
+          title: 'Engagement & Rapport',
+          goal: 'Establish trust, safety, and understanding before pathway work begins.',
+          sessions: [],
+        },
+        ...phases.map((phase) => ({
+          display_number: Number(phase.phase_number ?? 1) + 1,
+          source_phase_number: Number(phase.phase_number ?? 1),
+          title: phase.title,
+          goal: phase.goal,
+          sessions: phase.sessions,
+        })),
+      ]
+    : phases.map((phase) => ({
+        display_number: Number(phase.phase_number ?? 1),
+        source_phase_number: Number(phase.phase_number ?? 1),
+        title: phase.title,
+        goal: phase.goal,
+        sessions: phase.sessions,
+      }));
   const [journeySessionRows, setJourneySessionRows] = useState<any[]>([]);
 
   useEffect(() => {
@@ -93,8 +127,15 @@ export const JourneyScreen: React.FC = () => {
     }
     return map;
   }, [journeySessionRows]);
-  const plannedSessions = phases.reduce((sum, phase) => sum + Math.max(1, phase.sessions?.length ?? 1), 0);
-  const completedSessions = sessions.filter((s) => s.session_state === 'completed');
+  const plannedSessions = hasChosenPathway
+    ? engagementTotalCount +
+      phases.reduce((sum, phase) => sum + Math.max(1, phase.sessions?.length ?? 1), 0)
+    : phases.reduce((sum, phase) => sum + Math.max(1, phase.sessions?.length ?? 1), 0);
+  const completedSessions = sessions.filter((s) => {
+    if (s.session_state !== 'completed') return false;
+    if (s.journey_id === journey?.id) return true;
+    return hasChosenPathway && s.pathway === 'engagement_rapport_and_assessment';
+  });
   const overallProgressPercent =
     plannedSessions > 0 ? Math.min(100, Math.round((completedSessions.length / plannedSessions) * 100)) : 0;
 
@@ -120,6 +161,36 @@ export const JourneyScreen: React.FC = () => {
       <p className="text-xs text-[#2C2A26]/45 mb-4 leading-relaxed">
         Progress can include repeat sessions when needed; revisit loops are expected and help strengthen outcomes.
       </p>
+      {!hasChosenPathway && (
+        <div className="mb-4 rounded-xl border border-[#E8E4DE] bg-white p-3">
+          <p className="text-[10px] uppercase tracking-wide text-[#2C2A26]/45">Current status</p>
+          <p className="mt-1 text-xs text-[#2C2A26]/75">
+            You are in Phase 1 (Engagement & Rapport). Your personalized pathway is yet to be revealed.
+          </p>
+          <div className="mt-2 flex items-center gap-1.5">
+            {Array.from({ length: 5 }, (_, idx) => {
+              const phaseNum = idx + 1;
+              const active = phaseNum === 1;
+              return (
+                <React.Fragment key={`preview-${phaseNum}`}>
+                  <span
+                    className={`h-6 min-w-6 px-1 rounded-full border text-[10px] font-semibold flex items-center justify-center ${
+                      active
+                        ? 'bg-[#6B8F71] border-[#6B8F71] text-white'
+                        : 'bg-[#F5F0EB]/70 border-[#E8E4DE] text-[#2C2A26]/35'
+                    }`}
+                  >
+                    {phaseNum}
+                  </span>
+                  {phaseNum < 5 && (
+                    <span className="h-[2px] flex-1 rounded-full bg-[#E8E4DE]/70" />
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </div>
+        </div>
+      )}
       <div className="mb-6 p-5 rounded-2xl zen-glass zen-card-shadow border border-white/40">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-[#2C2A26]/30 mb-2.5">Overall progress</p>
         <div className="flex items-center justify-between text-sm mb-2.5">
@@ -140,7 +211,10 @@ export const JourneyScreen: React.FC = () => {
               <p className="text-[10px] uppercase tracking-wide text-[#2C2A26]/45">What happened this session</p>
               <p>
                 {journey.phase_transition_result.advanced
-                  ? `Nice work. You moved to Phase ${journey.phase_transition_result.new_phase_index + 1}.`
+                  ? `Nice work. You moved to Phase ${
+                      journey.phase_transition_result.new_phase_index +
+                      (hasChosenPathway ? 2 : 1)
+                    }.`
                   : `Keep going in this phase. ${journey.phase_transition_result.completed_in_phase}/${journey.phase_transition_result.min_sessions_required} sessions completed.`}
               </p>
             </div>
@@ -161,17 +235,26 @@ export const JourneyScreen: React.FC = () => {
       )}
 
       <div className="relative">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-[#2C2A26]/40 mb-3">Four phases</p>
-        {phases.map((phase, idx) => {
-          const phaseNum = phase.phase_number;
-          const isCompleted = phaseNum < currentPhase;
-          const isCurrent = phaseNum === currentPhase;
-          const isFuture = phaseNum > currentPhase;
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-[#2C2A26]/40 mb-3">
+          {hasChosenPathway ? 'Five phases overall' : 'Current engagement phase'}
+        </p>
+        {displayPhases.map((phase, idx) => {
+          const phaseNum = phase.display_number;
+          const sourcePhaseNum = phase.source_phase_number;
+          const isEngagementPhase = sourcePhaseNum == null;
+          const isCompleted = phaseNum < displayCurrentPhase;
+          const isCurrent = phaseNum === displayCurrentPhase;
+          const isFuture = phaseNum > displayCurrentPhase;
 
-          const completedInPhase = sessions.filter(
-            (s) => s.session_state === 'completed' && s.phase_number === phaseNum
-          ).length;
-          const runtimeRows = journeySessionsByPhase.get(phaseNum) ?? [];
+          const completedInPhase = isEngagementPhase
+            ? engagementCompletedCount
+            : sessions.filter(
+                (s) =>
+                  s.session_state === 'completed' &&
+                  s.phase_number === sourcePhaseNum &&
+                  s.journey_id === journey?.id,
+              ).length;
+          const runtimeRows = sourcePhaseNum ? (journeySessionsByPhase.get(sourcePhaseNum) ?? []) : [];
           const latestByOrder = new Map<number, any>();
           for (const row of runtimeRows) {
             const order = Number(row?.session_order);
@@ -184,17 +267,22 @@ export const JourneyScreen: React.FC = () => {
           const latestRows = [...latestByOrder.values()].sort(
             (a, b) => Number(a.session_order) - Number(b.session_order),
           );
-          const totalInPhase = latestRows.length > 0 ? latestRows.length : (phase.sessions?.length ?? 3);
+          const totalInPhase = isEngagementPhase
+            ? engagementTotalCount
+            : latestRows.length > 0
+              ? latestRows.length
+              : (phase.sessions?.length ?? 3);
           const completedInPhaseResolved = latestRows.filter((r) => r.status === 'completed').length || completedInPhase;
           const activeRuntimeSession =
             latestRows.find((r) => r.status === 'in_progress' || r.status === 'revisit' || r.status === 'blocked') ??
             latestRows.find((r) => r.status === 'planned') ??
             null;
 
-          const isLast = idx === phases.length - 1;
-          const badge = FEATURE_BADGES[phaseNum];
-          const newFeatures = UNLOCK_MAP[phaseNum]?.filter(
-            (f) => !UNLOCK_MAP[phaseNum - 1]?.includes(f)
+          const isLast = idx === displayPhases.length - 1;
+          const unlockPhaseKey = Math.max(1, hasChosenPathway ? phaseNum - 1 : phaseNum);
+          const badge = FEATURE_BADGES[unlockPhaseKey];
+          const newFeatures = UNLOCK_MAP[unlockPhaseKey]?.filter(
+            (f) => !UNLOCK_MAP[unlockPhaseKey - 1]?.includes(f)
           );
 
           return (
@@ -237,10 +325,10 @@ export const JourneyScreen: React.FC = () => {
               <div className={`pb-6 flex-1 min-w-0 ${isFuture ? 'opacity-50' : ''}`}>
                 <div className={`mb-8 p-4 rounded-2xl transition-all duration-500 ${isCurrent ? 'zen-glass-heavy zen-card-shadow' : 'opacity-80'}`}>
                   {/* Phase Illustration */}
-                  {(isCurrent || isCompleted) && PHASE_IMAGES[phaseNum] && (
+                  {(isCurrent || isCompleted) && sourcePhaseNum != null && PHASE_IMAGES[sourcePhaseNum] && (
                     <div className="w-full h-32 rounded-xl mb-3 overflow-hidden bg-[#F5F0EB]/30">
                       <img 
-                        src={PHASE_IMAGES[phaseNum]} 
+                        src={PHASE_IMAGES[sourcePhaseNum]} 
                         alt="" 
                         className="w-full h-full object-cover opacity-90 transition-transform duration-700 hover:scale-105"
                       />
@@ -252,7 +340,7 @@ export const JourneyScreen: React.FC = () => {
                       isCurrent ? 'text-[#6B8F71]' : 'text-[#2C2A26]'
                     }`}
                   >
-                    {phase.title}
+                    {phase.title || `Phase ${phaseNum}`}
                   </p>
                   <p className="text-xs text-[#2C2A26]/50 mt-1 leading-relaxed">
                     {phase.goal}
@@ -271,7 +359,7 @@ export const JourneyScreen: React.FC = () => {
                   )}
 
                 {/* Expanded session cards for current phase */}
-                {isCurrent && phase.sessions && (
+                {isCurrent && phase.sessions && phase.sessions.length > 0 && (
                   <div className="mt-3 space-y-2">
                     {phase.sessions.map((s, sIdx) => {
                       const isDone = sIdx < completedInPhaseResolved;
@@ -363,7 +451,12 @@ export const JourneyScreen: React.FC = () => {
                       {new Date(session.ended_at || session.started_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </p>
                   </div>
-                  <p className="text-xs text-[#2C2A26]/45 mt-0.5">Phase {session.phase_number}</p>
+                  <p className="text-xs text-[#2C2A26]/45 mt-0.5">
+                    Phase{' '}
+                    {hasChosenPathway && session.pathway !== 'engagement_rapport_and_assessment'
+                      ? Number(session.phase_number ?? 1) + 1
+                      : session.phase_number}
+                  </p>
                   {opening && (
                     <p className="text-xs text-[#2C2A26]/60 mt-2 line-clamp-2">{opening}</p>
                   )}

@@ -530,8 +530,38 @@ export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, o
                 </div>
 
                 <div className="flex-1 overflow-y-auto px-5 pb-4 space-y-3 min-h-0 bg-[#FAF9F7]">
+                    <div className="rounded-xl border border-[#E8E4DE] bg-white p-3">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-[#2C2A26]/45">
+                            5-phase journey roadmap
+                        </p>
+                        <div className="mt-2 flex items-center gap-1.5">
+                            {Array.from({ length: 5 }, (_, idx) => {
+                                const phaseNum = idx + 1;
+                                const isEngagement = phaseNum === 1;
+                                return (
+                                    <React.Fragment key={`proposal-phase-preview-${phaseNum}`}>
+                                        <span
+                                            className={`h-6 min-w-6 px-1 rounded-full border text-[10px] font-semibold flex items-center justify-center ${
+                                                isEngagement
+                                                    ? 'bg-[#6B8F71] border-[#6B8F71] text-white'
+                                                    : 'bg-[#F5F0EB]/70 border-[#E8E4DE] text-[#2C2A26]/35'
+                                            }`}
+                                        >
+                                            {phaseNum}
+                                        </span>
+                                        {phaseNum < 5 && (
+                                            <span className="h-[2px] flex-1 rounded-full bg-[#E8E4DE]/70" />
+                                        )}
+                                    </React.Fragment>
+                                );
+                            })}
+                        </div>
+                        <p className="mt-2 text-[11px] text-[#2C2A26]/55 leading-relaxed">
+                            You are currently in Phase 1 (Engagement & Rapport). This pathway will shape Phases 2-5.
+                        </p>
+                    </div>
                     <p className="text-[11px] font-semibold text-[#2C2A26]/45 uppercase tracking-wide">
-                        Four phases
+                        Pathway phases (2-5)
                     </p>
                     <div className="space-y-2.5">
                         {displayPhases.map((phase, i) => (

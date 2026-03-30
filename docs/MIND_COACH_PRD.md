@@ -237,9 +237,9 @@ Mind Coach is a **web-based, AI-assisted mental wellness companion** embedded in
 
 ### 6.4 n8n
 
-- Workflow JSON under `n8n/` (e.g. `mind-coach-therapist-chat-v6-robust.json`).  
-- **Patch script:** `n8n/patch-mind-coach-v6.mjs`.  
-- Env expectations: discovery pacing (e.g. ≥20 messages / turns, every 5), structured JSON output, session-end summarizer webhook for edge function.
+- Workflow source of truth lives in the separate `n8n-workflows` repository (`definitions/`).  
+- Deployment/apply scripts live in the `n8n-workflows` repo (`scripts/apply.sh`, `scripts/import-all.sh`).  
+- Env expectations: discovery pacing (e.g. >=20 messages / turns, every 5), structured JSON output, session-end summarizer webhook for edge function.
 
 ### 6.5 Constants (product tuning)
 
@@ -382,7 +382,7 @@ This section is split into **completed work** (synced with the repo and [`MIND_C
 | Constants | `components/MindCoach/MindCoachConstants.ts` |
 | Exercise resolve | `lib/mindCoachExerciseResolve.ts` |
 | Dynamic content types | `lib/dynamicContentLibrary.ts` |
-| n8n | `n8n/mind-coach-therapist-chat-v6-robust.json`, `n8n/patch-mind-coach-v6.mjs` |
+| n8n | Managed in the separate `n8n-workflows` repository (`definitions/` + `scripts/`) |
 | Edge functions | `supabase/functions/mind-coach-*/` |
 | Schema | `supabase/migrations/20260302200000_mind_coach_schema.sql` + subsequent mind_coach_* migrations |
 
