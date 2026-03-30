@@ -131,13 +131,34 @@ export const JourneyScreen: React.FC = () => {
     ? engagementTotalCount +
       phases.reduce((sum, phase) => sum + Math.max(1, phase.sessions?.length ?? 1), 0)
     : phases.reduce((sum, phase) => sum + Math.max(1, phase.sessions?.length ?? 1), 0);
-  const completedSessions = sessions.filter((s) => {
-    if (s.session_state !== 'completed') return false;
+  const relevantSessions = sessions.filter((s) => {
     if (s.journey_id === journey?.id) return true;
     return hasChosenPathway && s.pathway === 'engagement_rapport_and_assessment';
   });
+  const completedSessions = relevantSessions.filter(
+    (s) => s.session_state === 'completed' && Boolean(s.ended_at),
+  );
+  const inFlightSessions = relevantSessions.filter(
+    (s) => !(s.session_state === 'completed' && Boolean(s.ended_at)),
+  );
+  const partialProgressUnits = inFlightSessions.reduce((sum, session) => {
+    const messageProgress = Math.min(0.75, Number(session.message_count ?? 0) / 12);
+    const stateBaseline =
+      session.session_state === 'wrapping_up'
+        ? 0.75
+        : session.session_state === 'active'
+          ? 0.35
+          : session.session_state === 'intake'
+            ? 0.2
+            : 0.1;
+    return sum + Math.min(0.9, Math.max(messageProgress, stateBaseline));
+  }, 0);
+  const overallProgressUnits = Math.min(plannedSessions, completedSessions.length + partialProgressUnits);
   const overallProgressPercent =
-    plannedSessions > 0 ? Math.min(100, Math.round((completedSessions.length / plannedSessions) * 100)) : 0;
+    plannedSessions > 0 ? Math.min(100, Math.round((overallProgressUnits / plannedSessions) * 100)) : 0;
+  const overallProgressLabel = Number.isInteger(overallProgressUnits)
+    ? `${overallProgressUnits}/${plannedSessions} sessions`
+    : `${overallProgressUnits.toFixed(1)}/${plannedSessions} sessions`;
 
   if (!journey || phases.length === 0) {
     return (
@@ -162,9 +183,9 @@ export const JourneyScreen: React.FC = () => {
         Progress can include repeat sessions when needed; revisit loops are expected and help strengthen outcomes.
       </p>
       {!hasChosenPathway && (
-        <div className="mb-4 rounded-xl border border-[#E8E4DE] bg-white p-3">
-          <p className="text-[10px] uppercase tracking-wide text-[#2C2A26]/45">Current status</p>
-          <p className="mt-1 text-xs text-[#2C2A26]/75">
+        <div className="mb-4 rounded-2xl border border-[#E8E4DE] bg-gradient-to-br from-white via-[#FCFAF7] to-[#F5F0EB]/50 p-4 shadow-sm">
+          <p className="text-[10px] uppercase tracking-[0.12em] text-[#2C2A26]/45">Current status</p>
+          <p className="mt-1 text-sm font-medium text-[#2C2A26]">
             You are in Phase 1 (Engagement & Rapport). Your personalized pathway is yet to be revealed.
           </p>
           <div className="mt-2 flex items-center gap-1.5">
@@ -189,6 +210,9 @@ export const JourneyScreen: React.FC = () => {
               );
             })}
           </div>
+          <p className="mt-2 text-[11px] text-[#2C2A26]/55">
+            As rapport deepens, we reveal your best-fit pathway and unlock Phases 2-5.
+          </p>
         </div>
       )}
       <div className="mb-6 p-5 rounded-2xl zen-glass zen-card-shadow border border-white/40">
@@ -196,7 +220,7 @@ export const JourneyScreen: React.FC = () => {
         <div className="flex items-center justify-between text-sm mb-2.5">
           <span className="text-[#2C2A26]/60 flex items-center gap-1.5">
             <Footprints size={14} className="text-[#6B8F71]" />
-            {completedSessions.length}/{plannedSessions} sessions
+            {overallProgressLabel}
           </span>
           <span className="font-semibold text-[#2C2A26] bg-[#6B8F71]/5 px-2 py-0.5 rounded-lg">{overallProgressPercent}%</span>
         </div>
@@ -345,6 +369,21 @@ export const JourneyScreen: React.FC = () => {
                   <p className="text-xs text-[#2C2A26]/50 mt-1 leading-relaxed">
                     {phase.goal}
                   </p>
+                  {isFuture && (
+                    <div className="mt-2">
+                      <p className="text-[10px] uppercase tracking-wide text-[#2C2A26]/35">
+                        Ahead
+                      </p>
+                      <div className="mt-1 flex items-center gap-1.5">
+                        <span className="h-1.5 w-1.5 rounded-full bg-[#DCCFBF]" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-[#DCCFBF]/80" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-[#DCCFBF]/60" />
+                        <p className="text-[11px] text-[#2C2A26]/45">
+                          This phase unlocks as you complete the current milestone.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-[#6B8F71]/60 mt-2">
                     Progression: {completedInPhaseResolved}/{totalInPhase} sessions
                   </p>

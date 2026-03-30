@@ -374,7 +374,7 @@ export const HomeScreen: React.FC = () => {
           }}
         >
           <div className="space-y-3">
-            <div className="rounded-xl border border-[#E8E4DE] bg-white/80 p-3">
+            <div>
               <p className="text-[10px] font-semibold uppercase tracking-wide text-[#2C2A26]/45">
                 Journey roadmap
               </p>
@@ -387,8 +387,8 @@ export const HomeScreen: React.FC = () => {
                       <span
                         className={`h-6 min-w-6 px-1 rounded-full border text-[10px] font-semibold flex items-center justify-center ${
                           active
-                            ? 'bg-[#6B8F71] border-[#6B8F71] text-white'
-                            : 'bg-[#F5F0EB]/70 border-[#E8E4DE] text-[#2C2A26]/35'
+                            ? 'bg-[#6B8F71] border-[#6B8F71] text-white shadow-sm'
+                            : 'bg-[#F5F0EB]/45 border-[#E8E4DE]/80 text-[#2C2A26]/35'
                         }`}
                       >
                         {phaseNum}
