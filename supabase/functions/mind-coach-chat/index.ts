@@ -4,6 +4,61 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { buildContinuityPack } from '../_shared/mindCoachContext.ts';
 import { normalizeJourneyPhases } from '../_shared/mindCoachSessionGoals.ts';
 
+function safeObject(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function parseN8nBody(rawText: string): unknown {
+  const text = rawText.trim();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { reply: text };
+  }
+}
+
+function normalizeN8nResult(raw: unknown): Record<string, unknown> {
+  const base = Array.isArray(raw) ? raw[0] : raw;
+  const baseObj = safeObject(base) ?? {};
+
+  let outputObj: Record<string, unknown> | null = null;
+  const outputRaw = baseObj.output;
+  if (typeof outputRaw === 'string') {
+    try {
+      outputObj = safeObject(JSON.parse(outputRaw));
+    } catch {
+      outputObj = null;
+    }
+  } else {
+    outputObj = safeObject(outputRaw);
+  }
+
+  return outputObj ? { ...outputObj, ...baseObj } : { ...baseObj };
+}
+
+function extractReply(result: Record<string, unknown>): string {
+  const candidates: unknown[] = [
+    result.reply,
+    result.assistant_reply,
+    result.output,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim()) {
+      return candidate.trim();
+    }
+    if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) {
+      const nested = candidate as Record<string, unknown>;
+      if (typeof nested.reply === 'string' && nested.reply.trim()) {
+        return nested.reply.trim();
+      }
+    }
+  }
+  return '';
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -322,21 +377,24 @@ serve(async (req) => {
     }
 
     // 6. Parse n8n response
-    let parsed = await n8nResponse.json();
-    const result = Array.isArray(parsed) ? parsed[0] : parsed;
+    const n8nText = await n8nResponse.text();
+    const parsedBody = parseN8nBody(n8nText);
+    const result = normalizeN8nResult(parsedBody);
 
-    let assistantReply = result.reply || result.assistant_reply || result.output || '';
-    if (typeof assistantReply === 'string') {
-      const trimmed = assistantReply.trim();
-      if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
-        try { assistantReply = JSON.parse(trimmed); } catch { /* keep as-is */ }
-      }
+    let assistantReply = extractReply(result);
+    const trimmed = assistantReply.trim();
+    if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+      try { assistantReply = JSON.parse(trimmed); } catch { /* keep as-is */ }
+    }
+    if (!assistantReply.trim()) {
+      assistantReply =
+        "I'm here with you. I had trouble formatting that response, but we can continue. Could you share that one more time?";
     }
 
     // --- SECONDARY LLM EVALUATION FOR DYNAMIC DISCOVERY ---
     // This is now purely delegated to the n8n workflow. 
     // n8n is expected to return pathway_confidence, dynamic_theme, and suggested_pathway in its JSON response.
-    let updatedTheme = result.dynamic_theme || dynamic_theme;
+    let updatedTheme = String(result.dynamic_theme || dynamic_theme || '') || null;
     let updatedPathway = result.pathway || pathway || result.suggested_pathway;
     let pathwayConfidence = sessionData?.pathway_confidence || 0;
     

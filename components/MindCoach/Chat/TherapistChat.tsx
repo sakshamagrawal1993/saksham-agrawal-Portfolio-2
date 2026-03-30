@@ -24,7 +24,19 @@ function normalizeN8nChatPayload(raw: unknown): Record<string, any> {
   const base = (Array.isArray(raw) ? raw[0] : raw) as Record<string, any> | null;
   if (!base || typeof base !== 'object') return {};
   const merged: Record<string, any> = { ...base };
-  const inner = base.output && typeof base.output === 'object' ? (base.output as Record<string, any>) : null;
+  let inner: Record<string, any> | null = null;
+  if (typeof base.output === 'string') {
+    try {
+      const parsed = JSON.parse(base.output);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        inner = parsed as Record<string, any>;
+      }
+    } catch {
+      inner = null;
+    }
+  } else if (base.output && typeof base.output === 'object') {
+    inner = base.output as Record<string, any>;
+  }
   if (inner) {
     for (const key of [
       'suggested_pathway',
@@ -38,6 +50,8 @@ function normalizeN8nChatPayload(raw: unknown): Record<string, any> {
       'is_session_close',
       'dynamic_content',
       'dynamic_in_chat_exercise',
+      'crisis_type',
+      'quality_meta',
     ]) {
       if (merged[key] == null && inner[key] != null) merged[key] = inner[key];
     }
