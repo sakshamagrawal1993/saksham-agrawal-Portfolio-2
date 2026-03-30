@@ -64,9 +64,17 @@ serve(async (req) => {
     // 2. Update session message count
     const { data: sessionData } = await supabaseAdmin
       .from('mind_coach_sessions')
-      .select('message_count,journey_id,pathway_confidence')
+      .select('message_count,journey_id,pathway_confidence,summary_data,crisis_detected,crisis_detection_count,crisis_last_detected_at,crisis_last_type')
       .eq('id', session_id)
       .single();
+    const existingSummaryData =
+      sessionData?.summary_data && typeof sessionData.summary_data === 'object'
+        ? (sessionData.summary_data as Record<string, unknown>)
+        : {};
+    const existingSessionCrisisFlags =
+      existingSummaryData.crisis_flags && typeof existingSummaryData.crisis_flags === 'object'
+        ? (existingSummaryData.crisis_flags as Record<string, unknown>)
+        : null;
 
     const newCount = clientManaged
       ? (typeof message_count === 'number' ? message_count : (sessionData?.message_count ?? 0))
@@ -256,6 +264,21 @@ serve(async (req) => {
           coach_prompt: resolvedCoachPrompt,
           phase_prompt: effectivePhasePrompt,
           message_count: newCount,
+          session_crisis_flags: {
+            detected: Boolean(
+              sessionData?.crisis_detected === true ||
+              existingSessionCrisisFlags?.detected === true,
+            ),
+            detection_count: Number(sessionData?.crisis_detection_count ?? 0),
+            last_detected_at: sessionData?.crisis_last_detected_at ?? null,
+            last_crisis_type: sessionData?.crisis_last_type ?? null,
+          },
+          session_has_prior_crisis: Boolean(
+            sessionData?.crisis_detected === true ||
+            Number(sessionData?.crisis_detection_count ?? 0) > 0 ||
+            existingSessionCrisisFlags?.detected === true ||
+            existingSummaryData.crisis_detected === true,
+          ),
           session_number:
             Number.isFinite(session_number)
               ? session_number
@@ -324,6 +347,10 @@ serve(async (req) => {
     const updatedSessionState = result.session_state || session_state;
     const guardrailStatus = result.guardrail_status || 'passed';
     const crisisDetected = result.crisis_detected || false;
+    const crisisType =
+      typeof result.crisis_type === 'string' && result.crisis_type.trim()
+        ? result.crisis_type.trim()
+        : null;
     const dynamicContent = result.dynamic_content || null;
     const isSessionClose = result.is_session_close || false;
     const suggestedPathway = result.suggested_pathway || null;
@@ -379,6 +406,42 @@ serve(async (req) => {
       }
     }
 
+    // Persist crisis flag state in session summary_data so UI can show durable support indicators.
+    let mergedSummaryData: Record<string, unknown> | null = null;
+    let crisisColumnsUpdate: Record<string, unknown> | null = null;
+    if (crisisDetected) {
+      const priorTopLevelCount = Number(sessionData?.crisis_detection_count ?? 0);
+      const priorSummary =
+        existingSummaryData;
+      const priorFlags =
+        priorSummary.crisis_flags && typeof priorSummary.crisis_flags === 'object'
+          ? (priorSummary.crisis_flags as Record<string, unknown>)
+          : {};
+      const priorCount =
+        typeof priorFlags.detection_count === 'number'
+          ? Number(priorFlags.detection_count)
+          : 0;
+      const nextDetectionCount = Math.max(priorTopLevelCount + 1, priorCount + 1);
+      mergedSummaryData = {
+        ...priorSummary,
+        crisis_detected: true,
+        crisis_flags: {
+          ...priorFlags,
+          detected: true,
+          detection_count: nextDetectionCount,
+          last_detected_at: new Date().toISOString(),
+          last_crisis_type: crisisType,
+          source: 'mind-coach-chat',
+        },
+      };
+      crisisColumnsUpdate = {
+        crisis_detected: true,
+        crisis_detection_count: nextDetectionCount,
+        crisis_last_detected_at: new Date().toISOString(),
+        crisis_last_type: crisisType,
+      };
+    }
+
     // 7. Persist assistant reply
     if (!clientManaged && assistantReply) {
       await supabaseAdmin.from('mind_coach_messages').insert({
@@ -400,10 +463,20 @@ serve(async (req) => {
       if (updatedTheme) sessionUpdate.dynamic_theme = updatedTheme;
       if (updatedPathway) sessionUpdate.pathway = updatedPathway;
       if (pathwayConfidence !== undefined) sessionUpdate.pathway_confidence = pathwayConfidence;
+      if (mergedSummaryData) sessionUpdate.summary_data = mergedSummaryData;
+      if (crisisColumnsUpdate) Object.assign(sessionUpdate, crisisColumnsUpdate);
 
       await supabaseAdmin
         .from('mind_coach_sessions')
         .update(sessionUpdate)
+        .eq('id', session_id);
+    } else if (mergedSummaryData || crisisColumnsUpdate) {
+      const clientManagedUpdate: Record<string, unknown> = {};
+      if (mergedSummaryData) clientManagedUpdate.summary_data = mergedSummaryData;
+      if (crisisColumnsUpdate) Object.assign(clientManagedUpdate, crisisColumnsUpdate);
+      await supabaseAdmin
+        .from('mind_coach_sessions')
+        .update(clientManagedUpdate)
         .eq('id', session_id);
     }
 

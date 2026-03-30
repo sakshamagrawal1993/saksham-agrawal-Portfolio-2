@@ -152,6 +152,10 @@ export interface MindCoachSession {
   summary: string | null;
   summary_data: Record<string, unknown> | null;
   case_notes: CaseNotes | null;
+  crisis_detected?: boolean;
+  crisis_detection_count?: number;
+  crisis_last_detected_at?: string | null;
+  crisis_last_type?: string | null;
   started_at: string;
   ended_at: string | null;
 }

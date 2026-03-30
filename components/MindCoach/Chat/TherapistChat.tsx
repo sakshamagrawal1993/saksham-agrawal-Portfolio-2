@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useMemo, useState, useCallback } from 'react';
-import { ArrowLeft, Send } from 'lucide-react';
+import { ArrowLeft, Send, AlertTriangle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '../../../lib/supabaseClient';
 import Analytics from '../../../services/analytics';
@@ -204,6 +204,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
 
   const [input, setInput] = useState('');
   const [chatError, setChatError] = useState<string | null>(null);
+  const [showCrisisSupport, setShowCrisisSupport] = useState(false);
   const [greetingRetryToken, setGreetingRetryToken] = useState(0);
   const [showSafeExitToast, setShowSafeExitToast] = useState(() => {
     if (!profile?.id) return false;
@@ -222,6 +223,57 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
   const meta = THERAPIST_CONFIG[persona];
 
   const isEngagementDiscovery = activeSession?.pathway === 'engagement_rapport_and_assessment';
+  const sessionCrisisFlag = useMemo(() => {
+    const summary = activeSession?.summary_data;
+    if (activeSession?.crisis_detected === true) return true;
+    if (!summary || typeof summary !== 'object') return isCrisisDetected;
+    const crisisFlags =
+      summary.crisis_flags && typeof summary.crisis_flags === 'object'
+        ? (summary.crisis_flags as Record<string, unknown>)
+        : null;
+    return (
+      crisisFlags?.detected === true ||
+      summary.crisis_detected === true ||
+      isCrisisDetected
+    );
+  }, [activeSession?.summary_data, isCrisisDetected]);
+
+  const markSessionCrisisDetected = useCallback((source: string) => {
+    if (!activeSession) return;
+    setCrisisDetected(true);
+    const priorTopLevelCount =
+      typeof activeSession.crisis_detection_count === 'number'
+        ? activeSession.crisis_detection_count
+        : 0;
+    const summary = activeSession.summary_data && typeof activeSession.summary_data === 'object'
+      ? (activeSession.summary_data as Record<string, unknown>)
+      : {};
+    const priorFlags =
+      summary.crisis_flags && typeof summary.crisis_flags === 'object'
+        ? (summary.crisis_flags as Record<string, unknown>)
+        : {};
+    const priorCount =
+      typeof priorFlags.detection_count === 'number'
+        ? Number(priorFlags.detection_count)
+        : 0;
+    const nextSummary = {
+      ...summary,
+      crisis_detected: true,
+      crisis_flags: {
+        ...priorFlags,
+        detected: true,
+        detection_count: Math.max(priorCount + 1, priorTopLevelCount + 1),
+        last_detected_at: new Date().toISOString(),
+        source,
+      },
+    };
+    updateActiveSession({
+      crisis_detected: true,
+      crisis_detection_count: priorTopLevelCount + 1,
+      crisis_last_detected_at: new Date().toISOString(),
+      summary_data: nextSummary,
+    });
+  }, [activeSession, setCrisisDetected, updateActiveSession]);
 
   const planRevealProgress = useMemo(() => {
     if (!isEngagementDiscovery || !activeSession) return 0;
@@ -256,6 +308,25 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, isLoading]);
+
+  useEffect(() => {
+    if (!activeSession) return;
+    setShowCrisisSupport(false);
+    if (activeSession.crisis_detected === true) {
+      setCrisisDetected(true);
+      return;
+    }
+    const summary = activeSession.summary_data;
+    if (!summary || typeof summary !== 'object') {
+      setCrisisDetected(false);
+      return;
+    }
+    const crisisFlags =
+      summary.crisis_flags && typeof summary.crisis_flags === 'object'
+        ? (summary.crisis_flags as Record<string, unknown>)
+        : null;
+    setCrisisDetected(Boolean(crisisFlags?.detected === true || summary.crisis_detected === true));
+  }, [activeSession?.id, activeSession?.summary_data, activeSession?.crisis_detected, setCrisisDetected]);
 
   const runInitialGreeting = useCallback(async () => {
     const st = useMindCoachStore.getState();
@@ -358,10 +429,10 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
     await supabase.from('mind_coach_sessions').update(sessionUpdate).eq('id', sess.id);
     st.updateActiveSession(sessionUpdate);
 
-    if (data.crisis_detected) st.setCrisisDetected(true);
+    if (data.crisis_detected) markSessionCrisisDetected('initial_greeting');
     if (data.is_session_close) st.setIsSessionClose(true);
     // Exercise stays on the teaser card until the user taps Start Activity (DynamicExerciseTrigger).
-  }, []);
+  }, [markSessionCrisisDetected]);
 
   useEffect(() => {
     if (!activeSession || messages.length !== 0 || (activeSession.message_count ?? 0) > 0) {
@@ -545,7 +616,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
       await supabase.from('mind_coach_sessions').update(sessionUpdate).eq('id', activeSession.id);
       updateActiveSession(sessionUpdate);
 
-      if (data.crisis_detected) setCrisisDetected(true);
+      if (data.crisis_detected) markSessionCrisisDetected('chat_reply');
       if (data.is_session_close) setIsSessionClose(true);
 
       sendRetryModeRef.current = 'none';
@@ -579,7 +650,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
         await syncDiscoveryFromN8n(n8nData);
         await supabase.from('mind_coach_sessions').update(sessionUpdate).eq('id', activeSession.id);
         updateActiveSession(sessionUpdate);
-        if (n8nData.crisis_detected) setCrisisDetected(true);
+        if (n8nData.crisis_detected) markSessionCrisisDetected('retry_assistant_save');
         if (n8nData.is_session_close) setIsSessionClose(true);
         pendingAfterN8nRef.current = null;
         sendRetryModeRef.current = 'none';
@@ -692,7 +763,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
         await syncDiscoveryFromN8n(data);
         await supabase.from('mind_coach_sessions').update(sessionUpdate).eq('id', sess.id);
         updateActiveSession(sessionUpdate);
-        if (data.crisis_detected) setCrisisDetected(true);
+        if (data.crisis_detected) markSessionCrisisDetected('retry_n8n');
         if (data.is_session_close) setIsSessionClose(true);
         sendRetryModeRef.current = 'none';
       }
@@ -1059,7 +1130,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
   }
 
   // ── Crisis overlay ──────────────────────────────────────────────────────
-  if (isCrisisDetected) {
+  if (showCrisisSupport && sessionCrisisFlag) {
     return (
     <div className="flex flex-col h-full bg-[#fdfaf7] relative overflow-hidden">
       {/* Zen Atmospheric Aura — subtle overlay */}
@@ -1069,7 +1140,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
 
       {/* Header — Zen Glass */}
       <header className="zen-glass sticky top-0 z-30 flex items-center gap-3 px-4 py-3 border-b border-white/40 shrink-0">
-        <button onClick={onBack} className="text-[#2C2A26]/60 hover:text-[#2C2A26]">
+        <button onClick={() => setShowCrisisSupport(false)} className="text-[#2C2A26]/60 hover:text-[#2C2A26]">
           <ArrowLeft size={20} />
         </button>
         <p className="text-sm font-semibold text-red-600">Crisis Support</p>
@@ -1132,10 +1203,10 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.4 }}
-            onClick={onBack}
+            onClick={() => setShowCrisisSupport(false)}
             className="text-xs text-[#2C2A26]/30 underline"
           >
-            Go back
+            Go back to session
           </motion.button>
         </div>
       </div>
@@ -1173,6 +1244,18 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
             {isLoading ? 'Writing a reply…' : 'Online'}
           </p>
         </div>
+        {sessionCrisisFlag && (
+          <button
+            type="button"
+            onClick={() => setShowCrisisSupport(true)}
+            className="relative shrink-0 h-9 w-9 rounded-full border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition-colors flex items-center justify-center"
+            aria-label="Open crisis support"
+            title="Crisis support"
+          >
+            <AlertTriangle size={16} />
+            <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-red-500" />
+          </button>
+        )}
         <button
           type="button"
           onClick={handleEndSession}
@@ -1328,9 +1411,9 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
                 delay: idx === messages.length - 1 ? 0 : idx * 0.05,
                 ease: [0.2, 0, 0.2, 1]
               }}
-              className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} zen-stagger-entry`}
+              className={`flex w-full ${m.role === 'user' ? 'justify-end' : 'justify-start'} zen-stagger-entry`}
             >
-              <div className={m.role === 'assistant' ? 'animate-zen-float' : ''}>
+              <div className={`${m.role === 'assistant' ? 'animate-zen-float' : ''} w-full`}>
                 <ChatMessage 
                   message={m} 
                   therapistColor={meta.color}

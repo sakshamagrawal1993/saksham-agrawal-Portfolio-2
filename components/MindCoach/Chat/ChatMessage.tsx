@@ -33,7 +33,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
-      className={`flex w-full gap-2 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
+      className={`flex w-full min-w-0 ${isUser ? 'flex-row-reverse gap-0' : 'flex-row gap-2'}`}
     >
       {!isUser && (
         <div
@@ -50,7 +50,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
 
       {isUser ? (
         <div
-          className={`ml-auto w-fit max-w-[85%] whitespace-pre-wrap break-words rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${bubbleTone}`}
+          className={`ml-auto inline-block max-w-[85%] whitespace-pre-wrap break-words rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${bubbleTone}`}
         >
           {message.content}
         </div>
