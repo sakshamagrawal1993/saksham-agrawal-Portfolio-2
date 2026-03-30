@@ -2,7 +2,7 @@ import React, { useMemo, useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, CheckCircle2, BookOpen, Wind, Brain, Flower2, Moon, MessageCircle as MsgIcon, Shield, Target, Heart, Sparkles, Settings } from 'lucide-react';
-import { AreaChart, Area, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, ResponsiveContainer, YAxis } from 'recharts';
 import { supabase } from '../../../lib/supabaseClient';
 import {
   useMindCoachStore,
@@ -589,8 +589,26 @@ export const HomeScreen: React.FC = () => {
               Last {Math.min(7, moodChartData.length)} check-ins
             </span>
           </div>
+          <p className="mb-2 text-[10px] text-[#2C2A26]/45">
+            😢 Awful · 😐 Okay · 😊 Great
+          </p>
           <ResponsiveContainer width="100%" height={90}>
             <AreaChart data={moodChartData}>
+              <YAxis
+                type="number"
+                domain={[1, 5]}
+                ticks={[1, 3, 5]}
+                width={44}
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: 10, fill: '#2C2A26' }}
+                tickFormatter={(value) => {
+                  if (Number(value) === 1) return 'Awful';
+                  if (Number(value) === 3) return 'Okay';
+                  if (Number(value) === 5) return 'Great';
+                  return '';
+                }}
+              />
               <defs>
                 <linearGradient id="moodGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#6B8F71" stopOpacity={0.2} />

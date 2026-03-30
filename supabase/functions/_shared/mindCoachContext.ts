@@ -19,6 +19,7 @@ export interface ConversationTurn {
   content: string;
   created_at?: string;
   session_id?: string;
+  dynamic_content?: Record<string, unknown> | null;
 }
 
 export interface TaskContextItem {
@@ -108,7 +109,7 @@ export async function buildConversationWindow(
 
   const { data: msgs } = await supabaseAdmin
     .from('mind_coach_messages')
-    .select('role, content, created_at, session_id')
+    .select('role, content, created_at, session_id, dynamic_content')
     .in('session_id', sessionIds)
     .order('created_at', { ascending: false })
     .limit(limit);
@@ -119,6 +120,7 @@ export async function buildConversationWindow(
       content: m.content,
       created_at: m.created_at,
       session_id: m.session_id,
+      dynamic_content: m.dynamic_content ?? null,
     }))
     .reverse();
 

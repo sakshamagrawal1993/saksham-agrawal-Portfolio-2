@@ -59,12 +59,18 @@ function extractReply(result: Record<string, unknown>): string {
   return '';
 }
 
+function toRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
+    const requestStartMs = Date.now();
     const payload = await req.json();
     const {
       session_id,
@@ -96,7 +102,9 @@ serve(async (req) => {
     }
 
     const n8nWebhookUrl = Deno.env.get('MC_N8N_CHAT_WEBHOOK_URL') || 'https://n8n.saksham-experiments.com/webhook/mind-coach-chat';
+    const n8nDiscoveryWebhookUrl = Deno.env.get('MC_N8N_DISCOVERY_WEBHOOK_URL') || n8nWebhookUrl;
     const n8nSecret = Deno.env.get('MC_N8N_WEBHOOK_SECRET') || 'placeholder-secret';
+    const enableSyncDiscovery = /^(1|true|yes)$/i.test(Deno.env.get('MC_SYNC_DISCOVERY') || '');
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -227,6 +235,7 @@ serve(async (req) => {
       : 20;
 
     let continuityPack: any = null;
+    const contextBuildStartMs = Date.now();
     try {
       continuityPack = await buildContinuityPack(supabaseAdmin, profile_id, session_id, {
         transcriptLimit,
@@ -269,6 +278,7 @@ serve(async (req) => {
       Array.isArray(continuityPack?.last_20_conversations) && continuityPack.last_20_conversations.length > 0
         ? continuityPack.last_20_conversations
         : messagesData;
+    const currentSessionMessages = canonicalMessages.filter((m: any) => m?.session_id === session_id);
     const canonicalTasks =
       Array.isArray(continuityPack?.active_tasks_context) && continuityPack.active_tasks_context.length > 0
         ? continuityPack.active_tasks_context
@@ -293,6 +303,7 @@ serve(async (req) => {
     const timeoutId = setTimeout(() => controller.abort(), n8nTimeoutMs);
 
     let n8nResponse;
+    const n8nCallStartMs = Date.now();
     try {
       n8nResponse = await fetch(n8nWebhookUrl, {
         method: 'POST',
@@ -311,6 +322,7 @@ serve(async (req) => {
           dynamic_theme,
           pathway,
           messages: canonicalMessages,
+          current_session_messages: currentSessionMessages,
           memories: (memoriesData || []).map((m: any) => ({
             text: m.memory_text || m.text,
             type: m.memory_type || m.type,
@@ -348,6 +360,7 @@ serve(async (req) => {
           continuity_phase_context: continuityPack?.phase_context ?? null,
           session_goal_context: sessionGoalContext,
           session_stage: continuityPack?.phase_context?.session_stage ?? continuityPack?.session_stage ?? 'early',
+          enable_sync_discovery: enableSyncDiscovery,
           transcript_limit: transcriptLimit,
           // Legacy compatibility fields (deprecate downstream)
           recent_case_notes: legacyCaseNotes,
@@ -378,6 +391,7 @@ serve(async (req) => {
 
     // 6. Parse n8n response
     const n8nText = await n8nResponse.text();
+    const n8nCallDurationMs = Date.now() - n8nCallStartMs;
     const parsedBody = parseN8nBody(n8nText);
     const result = normalizeN8nResult(parsedBody);
 
@@ -412,9 +426,14 @@ serve(async (req) => {
     const dynamicContent = result.dynamic_content || null;
     const isSessionClose = result.is_session_close || false;
     const suggestedPathway = result.suggested_pathway || null;
+    const planSummary =
+      result.plan_summary && typeof result.plan_summary === 'object'
+        ? (result.plan_summary as Record<string, unknown>)
+        : null;
     const rawQualityMeta = result.quality_meta && typeof result.quality_meta === 'object'
       ? result.quality_meta
       : {};
+    const contextBuildDurationMs = Date.now() - contextBuildStartMs;
     const qualityMeta = {
       ...rawQualityMeta,
       context_used:
@@ -439,6 +458,11 @@ serve(async (req) => {
         continuityPack?.session_stage ||
         'early',
       transcript_limit: transcriptLimit,
+      timing_ms: {
+        context_build_ms: contextBuildDurationMs,
+        n8n_call_ms: n8nCallDurationMs,
+        total_request_ms: Date.now() - requestStartMs,
+      },
     };
 
     if (
@@ -461,6 +485,138 @@ serve(async (req) => {
         .insert(proposalInsert);
       if (proposalErr) {
         console.error('pathway proposal insert failed:', proposalErr.message);
+      }
+    }
+
+    // Optional async discovery path: keep chat response fast while updating pathway proposal in background.
+    const shouldQueueAsyncDiscovery =
+      !enableSyncDiscovery &&
+      !is_system_greeting &&
+      !crisisDetected &&
+      !isSessionClose &&
+      !suggestedPathway &&
+      (!pathway || pathway === 'engagement_rapport_and_assessment') &&
+      typeof newCount === 'number' &&
+      newCount >= 20 &&
+      newCount % 5 === 0;
+    if (shouldQueueAsyncDiscovery) {
+      const asyncDiscoveryTask = (async () => {
+        const asyncController = new AbortController();
+        const asyncTimeoutId = setTimeout(() => asyncController.abort(), 6500);
+        try {
+          const discoveryRes = await fetch(n8nDiscoveryWebhookUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-n8n-secret': n8nSecret,
+            },
+            body: JSON.stringify({
+              session_id,
+              profile_id,
+              message_text,
+              profile: resolvedProfile,
+              journey_context: serverJourneyContext ?? journey_context ?? null,
+              session_state: session_state || 'intake',
+              dynamic_theme,
+              pathway,
+              messages: canonicalMessages,
+              current_session_messages: currentSessionMessages,
+              memories: (memoriesData || []).map((m: any) => ({
+                text: m.memory_text || m.text,
+                type: m.memory_type || m.type,
+              })),
+              assessments: assessmentsData || [],
+              coach_prompt: resolvedCoachPrompt,
+              phase_prompt: effectivePhasePrompt,
+              message_count: newCount,
+              enable_sync_discovery: true,
+              session_number:
+                Number.isFinite(session_number)
+                  ? session_number
+                  : Number.isFinite(serverJourneyContext?.sessions_completed as number)
+                    ? (Number(serverJourneyContext?.sessions_completed) + 1)
+                    : 1,
+              is_system_greeting: false,
+              last_20_conversations: continuityPack?.last_20_conversations ?? [],
+              active_tasks_context: continuityPack?.active_tasks_context ?? [],
+              recent_case_notes_context: canonicalCaseNotesContext,
+              continuity_phase_context: continuityPack?.phase_context ?? null,
+              session_goal_context: sessionGoalContext,
+              session_stage: continuityPack?.phase_context?.session_stage ?? continuityPack?.session_stage ?? 'early',
+              transcript_limit: transcriptLimit,
+              recent_case_notes: legacyCaseNotes,
+              recent_tasks_assigned: canonicalTasks,
+            }),
+            signal: asyncController.signal,
+          });
+          if (!discoveryRes.ok) return;
+          const discoveryText = await discoveryRes.text();
+          const discoveryParsed = normalizeN8nResult(parseN8nBody(discoveryText));
+          const asyncSuggestedPathway = discoveryParsed.suggested_pathway;
+          const asyncPathwayConfidence =
+            typeof discoveryParsed.pathway_confidence === 'number'
+              ? discoveryParsed.pathway_confidence
+              : null;
+          const asyncDynamicTheme =
+            typeof discoveryParsed.dynamic_theme === 'string' && discoveryParsed.dynamic_theme.trim()
+              ? discoveryParsed.dynamic_theme.trim()
+              : null;
+          const asyncPlanSummary = toRecord(discoveryParsed.plan_summary);
+
+          if (
+            typeof asyncSuggestedPathway === 'string' &&
+            asyncSuggestedPathway &&
+            asyncSuggestedPathway !== 'engagement_rapport_and_assessment'
+          ) {
+            const { data: existingProposal } = await supabaseAdmin
+              .from('mind_coach_pathway_proposals')
+              .select('id')
+              .eq('profile_id', profile_id)
+              .eq('session_id', session_id)
+              .eq('proposed_pathway', asyncSuggestedPathway)
+              .in('source', ['chat', 'chat_async_discovery'])
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            if (!existingProposal) {
+              await supabaseAdmin
+                .from('mind_coach_pathway_proposals')
+                .insert({
+                  profile_id,
+                  session_id,
+                  proposed_pathway: asyncSuggestedPathway,
+                  confidence: asyncPathwayConfidence,
+                  source: 'chat_async_discovery',
+                  metadata: {
+                    dynamic_theme: asyncDynamicTheme,
+                    message_count: newCount,
+                    plan_summary: asyncPlanSummary,
+                  },
+                });
+            }
+          }
+          const asyncUpdate: Record<string, unknown> = {};
+          if (asyncDynamicTheme) asyncUpdate.dynamic_theme = asyncDynamicTheme;
+          if (asyncPathwayConfidence !== null) asyncUpdate.pathway_confidence = asyncPathwayConfidence;
+          if (Object.keys(asyncUpdate).length > 0) {
+            await supabaseAdmin
+              .from('mind_coach_sessions')
+              .update(asyncUpdate)
+              .eq('id', session_id);
+          }
+        } catch (_err) {
+          // Non-fatal background attempt.
+        } finally {
+          clearTimeout(asyncTimeoutId);
+        }
+      })();
+      try {
+        const edgeRuntime = (globalThis as unknown as { EdgeRuntime?: { waitUntil?: (promise: Promise<unknown>) => void } }).EdgeRuntime;
+        if (edgeRuntime?.waitUntil) {
+          edgeRuntime.waitUntil(asyncDiscoveryTask);
+        }
+      } catch (_err) {
+        // Best effort only.
       }
     }
 
@@ -567,6 +723,7 @@ serve(async (req) => {
         guardrail_status: guardrailStatus,
         crisis_detected: crisisDetected,
         dynamic_content: dynamicContent,
+        plan_summary: planSummary,
         quality_meta: qualityMeta,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
