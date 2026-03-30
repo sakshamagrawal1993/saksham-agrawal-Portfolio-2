@@ -193,6 +193,11 @@ export const JourneyScreen: React.FC = () => {
     <div className="p-5 pb-24 relative overflow-x-hidden">
       <h2 className="text-xl font-semibold zen-title mb-1">Your Journey</h2>
       <p className="text-sm zen-muted">{journey.title}</p>
+      {!hasChosenPathway && (
+        <p className="text-sm text-[#2C2A26]/55 mt-2 mb-4 leading-relaxed">
+          As rapport deepens, we reveal your best-fit pathway and unlock Phases 2-5.
+        </p>
+      )}
       {journey.description && hasChosenPathway && (
         <p className="text-xs text-[#2C2A26]/45 mt-1 mb-4 leading-relaxed">{journey.description}</p>
       )}
@@ -242,7 +247,7 @@ export const JourneyScreen: React.FC = () => {
       )}
 
       <div className="relative">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-[#2C2A26]/40 mb-3">Journey</p>
+        <h3 className="text-base font-semibold text-[#2C2A26] mb-3">Journey</h3>
         {displayPhases.map((phase, idx) => {
           const phaseNum = phase.display_number;
           const sourcePhaseNum = phase.source_phase_number;

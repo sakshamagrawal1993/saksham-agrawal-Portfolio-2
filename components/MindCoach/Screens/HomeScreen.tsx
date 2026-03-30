@@ -1,7 +1,7 @@
 import React, { useMemo, useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, CheckCircle2, BookOpen, Wind, Brain, Flower2, Moon, MessageCircle as MsgIcon, Shield, Target, Heart, Sparkles, ChevronDown, ChevronUp, Settings } from 'lucide-react';
+import { ArrowRight, CheckCircle2, BookOpen, Wind, Brain, Flower2, Moon, MessageCircle as MsgIcon, Shield, Target, Heart, Sparkles, Settings } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 import { supabase } from '../../../lib/supabaseClient';
 import {
@@ -50,7 +50,6 @@ export const HomeScreen: React.FC = () => {
   const [showProposal, setShowProposal] = useState(false);
   const [showDeleteSection, setShowDeleteSection] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [moodExpanded, setMoodExpanded] = useState(false);
   const [isContinuingSession, setIsContinuingSession] = useState(false);
 
   const phases = journey?.phases ?? [];
@@ -77,6 +76,7 @@ export const HomeScreen: React.FC = () => {
     const last7 = [...moodEntries].reverse().slice(-7);
     return last7.map((m) => ({ score: m.score, date: m.created_at }));
   }, [moodEntries]);
+  const latestMoodScore = moodEntries[0]?.score ?? null;
 
   const THERAPIST_NAMES: Record<string, string> = {
     maya: 'Maya', alex: 'Alex', sage: 'Sage',
@@ -400,13 +400,13 @@ export const HomeScreen: React.FC = () => {
                   );
                 })}
               </div>
-              <p className="mt-2 text-[11px] text-[#2C2A26]/55 leading-relaxed">
-                You are in Phase 1 (Engagement & Rapport). Phases 2-5 unlock after your pathway is revealed.
+              <p className="mt-2 text-[11px] text-[#2C2A26]/50 leading-relaxed">
+                Phases 2-5 reveal after pathway selection.
               </p>
             </div>
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-wide text-[#2C2A26]/40">
-                Phase {currentPhase}
+                Current focus
               </p>
               <h3 className="text-base font-semibold text-[#2C2A26] mt-0.5">
                 {currentPhaseData?.title || 'Engagement & Rapport'}
@@ -533,50 +533,44 @@ export const HomeScreen: React.FC = () => {
         </motion.div>
         )}
 
-        {/* Mood Check-in — collapsed by default */}
+        {/* Mood Check-in */}
         <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.18 }}
-        className="bg-white rounded-2xl shadow-sm border border-[#E8E4DE] overflow-hidden"
+        className="relative overflow-hidden rounded-2xl border border-[#E8E4DE] bg-gradient-to-br from-white via-[#FCFAF8] to-[#F5F0EB]/65 p-5 shadow-sm"
       >
-        <button
-          type="button"
-          onClick={() => setMoodExpanded((s) => !s)}
-          className="w-full px-5 py-4 flex items-center justify-between text-left"
-        >
-          <p className="text-sm font-medium text-[#2C2A26]">How are you feeling?</p>
-          {moodExpanded
-            ? <ChevronUp size={16} className="text-[#2C2A26]/30" />
-            : <ChevronDown size={16} className="text-[#2C2A26]/30" />
-          }
-        </button>
-        <AnimatePresence>
-          {moodExpanded && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="overflow-hidden"
-            >
-              <div className="px-5 pb-4">
-                <div className="flex justify-between">
-                  {MOOD_EMOJIS.map(({ score, emoji, label }) => (
-                    <button
-                      key={score}
-                      onClick={() => handleMoodTap(score)}
-                      className="flex flex-col items-center gap-1 group"
-                    >
-                      <span className="text-2xl group-hover:scale-110 transition-transform">{emoji}</span>
-                      <span className="text-[11px] text-[#2C2A26]/40">{label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <div className="absolute -top-14 -right-10 h-28 w-28 rounded-full bg-[#6B8F71]/8 blur-2xl pointer-events-none" />
+        <div className="relative">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[#2C2A26]/40">
+            Mood check-in
+          </p>
+          <p className="text-sm text-[#2C2A26]/75 mt-1">
+            How are you feeling right now?
+          </p>
+          <div className="mt-3 grid grid-cols-5 gap-2">
+            {MOOD_EMOJIS.map(({ score, emoji, label }) => {
+              const isLatest = latestMoodScore === score;
+              return (
+                <button
+                  key={score}
+                  onClick={() => handleMoodTap(score)}
+                  className={`group rounded-xl px-2 py-2 border transition-all ${
+                    isLatest
+                      ? 'border-[#6B8F71]/40 bg-[#6B8F71]/8'
+                      : 'border-[#E8E4DE] bg-white/70 hover:bg-white hover:border-[#6B8F71]/20'
+                  }`}
+                  aria-label={`Set mood ${label}`}
+                >
+                  <span className="mx-auto flex h-8 w-8 items-center justify-center rounded-full bg-[#F5F0EB] text-xl group-hover:scale-105 transition-transform">
+                    {emoji}
+                  </span>
+                  <span className="mt-1 block text-[10px] font-medium text-[#2C2A26]/55">{label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
         </motion.div>
 
         {/* Mood Trend — only if enough data */}
@@ -585,12 +579,17 @@ export const HomeScreen: React.FC = () => {
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.22 }}
-          className="bg-white rounded-2xl p-5 shadow-sm border border-[#E8E4DE]"
+          className="rounded-2xl p-5 shadow-sm border border-[#E8E4DE] bg-gradient-to-br from-white via-[#FCFAF8] to-[#F4F8F4]"
         >
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-[#2C2A26]/40 mb-3">
-            Mood trend
-          </p>
-          <ResponsiveContainer width="100%" height={80}>
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[#2C2A26]/40">
+              Mood trend
+            </p>
+            <span className="text-[10px] text-[#2C2A26]/45 bg-white/80 border border-[#E8E4DE] rounded-full px-2 py-0.5">
+              Last {Math.min(7, moodChartData.length)} check-ins
+            </span>
+          </div>
+          <ResponsiveContainer width="100%" height={90}>
             <AreaChart data={moodChartData}>
               <defs>
                 <linearGradient id="moodGrad" x1="0" y1="0" x2="0" y2="1">

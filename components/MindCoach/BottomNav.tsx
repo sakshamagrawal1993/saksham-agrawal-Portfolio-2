@@ -11,7 +11,7 @@ const PRIMARY_TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
 
 const MORE_ITEMS: { id: TabId; label: string; icon: React.ElementType; feature: string }[] = [
   { id: 'journal', label: 'Journal', icon: BookOpen, feature: 'journal' },
-  { id: 'diary', label: 'Diary', icon: BookHeart, feature: 'chat' },
+  { id: 'diary', label: 'History', icon: BookHeart, feature: 'chat' },
   { id: 'exercises', label: 'Exercises', icon: Wind, feature: 'exercises' },
   { id: 'assessments', label: 'Assessments', icon: ClipboardList, feature: 'assessments' },
 ];
