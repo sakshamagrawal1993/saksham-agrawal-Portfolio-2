@@ -2,7 +2,7 @@ import React, { useMemo, useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, CheckCircle2, BookOpen, Wind, Brain, Flower2, Moon, MessageCircle as MsgIcon, Shield, Target, Heart, Sparkles, Settings } from 'lucide-react';
-import { AreaChart, Area, ResponsiveContainer, YAxis } from 'recharts';
+import { AreaChart, Area, ResponsiveContainer, YAxis, CartesianGrid } from 'recharts';
 import { supabase } from '../../../lib/supabaseClient';
 import {
   useMindCoachStore,
@@ -29,6 +29,13 @@ function getGreeting(): string {
   if (h < 12) return 'Good morning';
   if (h < 17) return 'Good afternoon';
   return 'Good evening';
+}
+
+function getTimeAwareSubheadline(): string {
+  const h = new Date().getHours();
+  if (h < 12) return 'A calm morning to begin your day.';
+  if (h < 17) return 'A calm afternoon to steady your day.';
+  return 'A calm evening to close your day.';
 }
 
 export const HomeScreen: React.FC = () => {
@@ -83,15 +90,6 @@ export const HomeScreen: React.FC = () => {
   };
   const therapistName = THERAPIST_NAMES[profile?.therapist_persona ?? 'maya'];
   const firstName = profile?.name?.split(' ')[0] ?? 'there';
-  const userTimeZone = useMemo(
-    () => Intl.DateTimeFormat().resolvedOptions().timeZone || '',
-    [],
-  );
-  const timeZoneLabel = useMemo(() => {
-    if (!userTimeZone) return 'your local time';
-    const city = userTimeZone.split('/').pop();
-    return city ? city.replace(/_/g, ' ') : userTimeZone;
-  }, [userTimeZone]);
 
   const TASK_ICONS: Record<TaskType, React.ElementType> = {
     journaling: BookOpen,
@@ -241,14 +239,11 @@ export const HomeScreen: React.FC = () => {
             <Settings size={18} />
           </button>
           <div className="text-center">
-            <p className="text-[11px] uppercase tracking-[0.14em] text-[#2C2A26]/35">
-              {timeZoneLabel}
-            </p>
-            <h2 className="mt-1 text-[30px] leading-[1.1] font-semibold zen-title">
+            <h2 className="text-[30px] leading-[1.1] font-semibold zen-title">
               {getGreeting()}, {firstName}
             </h2>
             <p className="mt-2 text-xs text-[#2C2A26]/45">
-              A calm moment to begin your day.
+              {getTimeAwareSubheadline()}
             </p>
           </div>
         </motion.div>
@@ -590,22 +585,30 @@ export const HomeScreen: React.FC = () => {
             </span>
           </div>
           <p className="mb-2 text-[10px] text-[#2C2A26]/45">
-            😢 Awful · 😐 Okay · 😊 Great
+            😢 · 😕 · 😐 · 🙂 · 😊
           </p>
           <ResponsiveContainer width="100%" height={90}>
             <AreaChart data={moodChartData}>
+              <CartesianGrid
+                vertical={false}
+                strokeDasharray="3 3"
+                stroke="#DCD5CB"
+                strokeOpacity={0.7}
+              />
               <YAxis
                 type="number"
                 domain={[1, 5]}
-                ticks={[1, 3, 5]}
-                width={44}
+                ticks={[1, 2, 3, 4, 5]}
+                width={28}
                 axisLine={false}
                 tickLine={false}
-                tick={{ fontSize: 10, fill: '#2C2A26' }}
+                tick={{ fontSize: 14, fill: '#2C2A26' }}
                 tickFormatter={(value) => {
-                  if (Number(value) === 1) return 'Awful';
-                  if (Number(value) === 3) return 'Okay';
-                  if (Number(value) === 5) return 'Great';
+                  if (Number(value) === 1) return '😢';
+                  if (Number(value) === 2) return '😕';
+                  if (Number(value) === 3) return '😐';
+                  if (Number(value) === 4) return '🙂';
+                  if (Number(value) === 5) return '😊';
                   return '';
                 }}
               />

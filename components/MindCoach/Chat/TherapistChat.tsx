@@ -18,6 +18,7 @@ import {
 } from '../MindCoachConstants';
 import { PhaseProgressStepper } from './PhaseProgressStepper';
 import { SessionSummaryView } from '../Summary/SessionSummaryView';
+import { getCountryNameFromCode, resolveCountryCodeFromClient, toTelHref } from '../shared/locationCountry';
 import '../Atmosphere/MindCoachZen.css';
 
 function normalizeN8nChatPayload(raw: unknown): Record<string, any> {
@@ -135,6 +136,18 @@ function normalizeServerSessionSummary(raw: unknown): Record<string, unknown> | 
   return null;
 }
 
+interface CrisisHelplineRow {
+  id: string;
+  country_code: string;
+  country_name: string;
+  primary_service_name: string;
+  primary_contact: string;
+  primary_contact_type: string | null;
+  emergency_number: string | null;
+  chat_url: string | null;
+  notes: string | null;
+}
+
 /**
  * Progress 0–100% toward surfacing the therapy plan. Linear to 100% by message N; if confidence
  * is still below ready at N, snap to 90% then +2% every 5 messages until 100%.
@@ -219,6 +232,9 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
   const [input, setInput] = useState('');
   const [chatError, setChatError] = useState<string | null>(null);
   const [showCrisisSupport, setShowCrisisSupport] = useState(false);
+  const [crisisHelplines, setCrisisHelplines] = useState<CrisisHelplineRow[]>([]);
+  const [crisisSupportLoading, setCrisisSupportLoading] = useState(false);
+  const [resolvedCountryCode, setResolvedCountryCode] = useState<string | null>(null);
   const [greetingRetryToken, setGreetingRetryToken] = useState(0);
   const [showSafeExitToast, setShowSafeExitToast] = useState(() => {
     if (!profile?.id) return false;
@@ -251,6 +267,47 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
       isCrisisDetected
     );
   }, [activeSession?.summary_data, isCrisisDetected]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!showCrisisSupport || !sessionCrisisFlag) return;
+
+    const loadHelplines = async () => {
+      setCrisisSupportLoading(true);
+      const country = resolveCountryCodeFromClient();
+      if (!cancelled) setResolvedCountryCode(country);
+
+      const baseQuery = supabase
+        .from('mind_coach_crisis_helplines')
+        .select('id,country_code,country_name,primary_service_name,primary_contact,primary_contact_type,emergency_number,chat_url,notes')
+        .eq('active', true);
+
+      let rows: CrisisHelplineRow[] = [];
+      if (country) {
+        const { data } = await baseQuery.eq('country_code', country);
+        rows = (data ?? []) as CrisisHelplineRow[];
+      }
+
+      if (rows.length === 0) {
+        const { data: globalRows } = await supabase
+          .from('mind_coach_crisis_helplines')
+          .select('id,country_code,country_name,primary_service_name,primary_contact,primary_contact_type,emergency_number,chat_url,notes')
+          .eq('active', true)
+          .eq('country_code', 'INTL');
+        rows = (globalRows ?? []) as CrisisHelplineRow[];
+      }
+
+      if (!cancelled) {
+        setCrisisHelplines(rows);
+        setCrisisSupportLoading(false);
+      }
+    };
+
+    void loadHelplines();
+    return () => {
+      cancelled = true;
+    };
+  }, [showCrisisSupport, sessionCrisisFlag]);
 
   const markSessionCrisisDetected = useCallback((source: string) => {
     if (!activeSession) return;
@@ -1176,42 +1233,70 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
             </p>
           </motion.div>
           <p className="text-[11px] text-[#2C2A26]/45 leading-relaxed max-w-sm">
-            If you are in the US or Canada, you can call or text{' '}
-            <a href="tel:988" className="font-semibold text-red-600 underline-offset-2 hover:underline">
-              988
-            </a>{' '}
-            (Suicide & Crisis Lifeline). In India, iCall is below.
+            {resolvedCountryCode
+              ? `Showing support options for ${getCountryNameFromCode(resolvedCountryCode) || resolvedCountryCode}.`
+              : 'Showing verified crisis support options near your region.'}
           </p>
+          {crisisSupportLoading ? (
+            <p className="text-xs text-[#2C2A26]/45">Finding local helplines…</p>
+          ) : (
+            <div className="w-full space-y-3">
+              {crisisHelplines.map((line, idx) => {
+                const telHref = toTelHref(line.primary_contact);
+                return (
+                  <motion.div
+                    key={line.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.14 + idx * 0.05 }}
+                    className="w-full rounded-2xl border border-red-200/80 bg-white/85 p-4 text-left"
+                  >
+                    <p className="text-sm font-semibold text-[#2C2A26]">{line.primary_service_name}</p>
+                    <p className="mt-0.5 text-xs text-[#2C2A26]/55">{line.country_name}</p>
+                    {line.notes && <p className="mt-2 text-xs text-[#2C2A26]/60 leading-relaxed">{line.notes}</p>}
+                    <div className="mt-3 flex flex-col gap-2">
+                      {telHref && (
+                        <a
+                          href={telHref}
+                          className="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl text-center transition-colors"
+                        >
+                          📞 {line.primary_contact}
+                        </a>
+                      )}
+                      {line.chat_url && (
+                        <a
+                          href={line.chat_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full py-2.5 border border-red-200 text-red-600 text-sm font-medium rounded-xl text-center hover:bg-red-50 transition-colors"
+                        >
+                          💬 Open chat support
+                        </a>
+                      )}
+                      {line.emergency_number && (
+                        <a
+                          href={`tel:${line.emergency_number}`}
+                          className="w-full py-2.5 border border-amber-200 text-amber-700 text-sm font-medium rounded-xl text-center hover:bg-amber-50 transition-colors"
+                        >
+                          🚨 Emergency: {line.emergency_number}
+                        </a>
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
           <motion.a
-            href="tel:988"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
-            className="w-full py-4 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-2xl text-center transition-colors flex flex-col items-center gap-0.5"
-          >
-            <span className="text-base">📞 Call or text 988</span>
-            <span className="text-xs font-normal opacity-90">US & Canada · 24/7</span>
-          </motion.a>
-          <motion.a
-            href="tel:9152987821"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="w-full py-4 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-2xl text-center transition-colors flex flex-col items-center gap-0.5"
-          >
-            <span className="text-base">📞 Call iCall (India)</span>
-            <span className="text-xs font-normal opacity-80">9152987821 · Free · Confidential</span>
-          </motion.a>
-          <motion.a
-            href="https://icallhelpline.org"
+            href="https://findahelpline.com/"
             target="_blank"
             rel="noopener noreferrer"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.25 }}
+            transition={{ delay: 0.24 }}
             className="w-full py-3 border border-red-200 text-red-600 text-sm font-medium rounded-2xl text-center hover:bg-red-50 transition-colors"
           >
-            💬 Chat with iCall Online
+            🌍 Find helplines by country
           </motion.a>
           <motion.button
             initial={{ opacity: 0 }}
