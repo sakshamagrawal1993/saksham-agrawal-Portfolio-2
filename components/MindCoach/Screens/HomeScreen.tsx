@@ -189,42 +189,44 @@ export const HomeScreen: React.FC = () => {
   }, [hasChosenPathway, phases, sessions, currentPhase]);
 
   return (
-    <div className="relative px-6 pt-8 pb-24 space-y-8 overflow-x-hidden bg-gradient-to-b from-[#FBF8F4] via-[#F9F5EF] to-transparent">
+    <div className="relative px-6 pt-8 pb-24 overflow-x-hidden bg-gradient-to-b from-[#FBF8F4] via-[#F9F5EF] to-transparent">
       {/* Subtle top-half aura background */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-[52%] overflow-hidden">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[42%] overflow-hidden">
         <img
           src={HERO_AURA_URL}
           alt=""
-          className="h-full w-full object-cover opacity-32 scale-[1.1]"
+          className="h-full w-full object-cover opacity-22 scale-[1.08]"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-white/15 via-[#F9F5EF]/45 to-[#F9F5EF]" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#F9F5EF]/55 via-transparent to-[#F9F5EF]/55" />
+        <div className="absolute inset-0 bg-gradient-to-b from-white/10 via-[#F9F5EF]/40 to-[#F9F5EF]" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#F9F5EF]/45 via-transparent to-[#F9F5EF]/45" />
       </div>
 
-      {/* Greeting — Zen styled */}
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="relative z-10">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-semibold zen-title">
-              {getGreeting()}, {firstName}
-            </h2>
-            <p className="mt-0.5 text-[11px] uppercase tracking-[0.12em] text-[#2C2A26]/35">
-              {timeZoneLabel}
-            </p>
-          </div>
+      <div className="relative z-10 space-y-7">
+        {/* Greeting — centered + premium */}
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="relative pt-1">
           <button
             type="button"
             onClick={() => setShowDeleteSection((prev) => !prev)}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-[#2C2A26]/30 hover:text-[#2C2A26]/60 hover:bg-[#F5F0EB] transition-colors"
+            className="absolute right-0 top-0 w-8 h-8 rounded-full flex items-center justify-center text-[#2C2A26]/30 hover:text-[#2C2A26]/60 hover:bg-[#F5F0EB] transition-colors"
             aria-label="Settings"
           >
             <Settings size={18} />
           </button>
-        </div>
-      </motion.div>
+          <div className="text-center">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-[#2C2A26]/35">
+              {timeZoneLabel}
+            </p>
+            <h2 className="mt-1 text-[30px] leading-[1.1] font-semibold zen-title">
+              {getGreeting()}, {firstName}
+            </h2>
+            <p className="mt-2 text-xs text-[#2C2A26]/45">
+              A calm moment to begin your day.
+            </p>
+          </div>
+        </motion.div>
 
-      {/* ── STATE B: Pathway chosen — 5-phase journey stepper ── */}
-      {fivePhaseJourney && (
+        {/* ── STATE B: Pathway chosen — 5-phase journey stepper ── */}
+        {fivePhaseJourney && (
         <motion.div
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -324,10 +326,10 @@ export const HomeScreen: React.FC = () => {
             </button>
           </div>
         </motion.div>
-      )}
+        )}
 
-      {/* ── STATE A: No pathway — simplified hero ── */}
-      {!hasChosenPathway && journey && (
+        {/* ── STATE A: No pathway — simplified hero ── */}
+        {!hasChosenPathway && journey && (
         <motion.div
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -386,10 +388,10 @@ export const HomeScreen: React.FC = () => {
             </button>
           </div>
         </motion.div>
-      )}
+        )}
 
-      {/* Suggested Pathway — only if proposal exists and no pathway chosen */}
-      {proposedPathway && (
+        {/* Suggested Pathway — only if proposal exists and no pathway chosen */}
+        {proposedPathway && (
         <motion.button
           type="button"
           onClick={() => setShowProposal(true)}
@@ -415,12 +417,12 @@ export const HomeScreen: React.FC = () => {
             </span>
           </div>
         </motion.button>
-      )}
+        )}
 
-      {/* ── Below the fold: Homework, Mood, Trend ── */}
+        {/* ── Below the fold: Homework, Mood, Trend ── */}
 
-      {/* Homework Tasks */}
-      {activeTasks.length > 0 && (
+        {/* Homework Tasks */}
+        {activeTasks.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -471,10 +473,10 @@ export const HomeScreen: React.FC = () => {
             );
           })}
         </motion.div>
-      )}
+        )}
 
-      {/* Mood Check-in — collapsed by default */}
-      <motion.div
+        {/* Mood Check-in — collapsed by default */}
+        <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.18 }}
@@ -517,10 +519,10 @@ export const HomeScreen: React.FC = () => {
             </motion.div>
           )}
         </AnimatePresence>
-      </motion.div>
+        </motion.div>
 
-      {/* Mood Trend — only if enough data */}
-      {moodChartData.length >= 3 && (
+        {/* Mood Trend — only if enough data */}
+        {moodChartData.length >= 3 && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -549,11 +551,11 @@ export const HomeScreen: React.FC = () => {
             </AreaChart>
           </ResponsiveContainer>
         </motion.div>
-      )}
+        )}
 
-      {/* ── Settings section (collapsed) ── */}
-      {/* ── Settings section ── */}
-      <div className="mt-6">
+        {/* ── Settings section (collapsed) ── */}
+        {/* ── Settings section ── */}
+        <div className="mt-6">
         <button
           onClick={() => setShowDeleteSection(!showDeleteSection)}
           className="w-full flex items-center justify-between text-sm font-medium text-[#2C2A26]/60 py-2"
@@ -583,6 +585,7 @@ export const HomeScreen: React.FC = () => {
             </motion.div>
           )}
         </AnimatePresence>
+        </div>
       </div>
 
       {/* Final Overlay Screens */}
