@@ -429,6 +429,9 @@ function JourneyPreviewStep({ concerns, name, age, gender, therapist, onBack, on
           <p className="text-[#2C2A26]/55 text-sm leading-relaxed">
             Your first session will be a gentle conversation with {therapistName}. No pressure, no homework — just talking about what is on your mind.
           </p>
+          <p className="text-[#2C2A26]/50 text-xs leading-relaxed">
+            Progress is not always linear. Some session goals may repeat, and that is a healthy part of building lasting change.
+          </p>
         </div>
 
         <div className="w-full bg-white border border-[#E8E4DE] rounded-2xl p-5 shadow-sm">

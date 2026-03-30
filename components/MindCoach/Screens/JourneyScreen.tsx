@@ -35,6 +35,21 @@ function transitionReasonLabel(reason?: string): string {
   }
 }
 
+function nextActionLine(action?: string): string {
+  switch (action) {
+    case 'advance':
+      return 'Move to the next phase with one small reinforcing action today.';
+    case 'revisit':
+      return 'Repeat this session objective with an adjusted approach next time.';
+    case 'stabilize':
+      return 'Focus on stabilization and grounding before progressing.';
+    case 'escalate':
+      return 'Increase support and use higher-care resources as needed.';
+    default:
+      return 'Keep momentum with one concrete next step this week.';
+  }
+}
+
 export const JourneyScreen: React.FC = () => {
   const journey = useMindCoachStore((s) => s.journey);
   const sessions = useMindCoachStore((s) => s.sessions);
@@ -102,6 +117,9 @@ export const JourneyScreen: React.FC = () => {
       {journey.description && (
         <p className="text-xs text-[#2C2A26]/45 mt-1 mb-4 leading-relaxed">{journey.description}</p>
       )}
+      <p className="text-xs text-[#2C2A26]/45 mb-4 leading-relaxed">
+        Progress can include repeat sessions when needed; revisit loops are expected and help strengthen outcomes.
+      </p>
       <div className="mb-6 p-5 rounded-2xl zen-glass zen-card-shadow border border-white/40">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-[#2C2A26]/30 mb-2.5">Overall progress</p>
         <div className="flex items-center justify-between text-sm mb-2.5">
@@ -117,14 +135,28 @@ export const JourneyScreen: React.FC = () => {
       </div>
       {journey.phase_transition_result && journey.phase_transition_result.progression_enabled !== false && (
         <div className="mb-4 p-3 rounded-xl border border-[#E8E4DE] bg-white text-xs text-[#2C2A26]/65">
-          <p>
-            {journey.phase_transition_result.advanced
-              ? `Nice work. You moved to Phase ${journey.phase_transition_result.new_phase_index + 1}.`
-              : `Keep going in this phase. ${journey.phase_transition_result.completed_in_phase}/${journey.phase_transition_result.min_sessions_required} sessions completed.`}
-          </p>
-          <p className="mt-1 text-[11px] text-[#2C2A26]/50">
-            {transitionReasonLabel(journey.phase_transition_result.phase_gate_reason)}
-          </p>
+          <div className="space-y-2">
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-[#2C2A26]/45">What happened this session</p>
+              <p>
+                {journey.phase_transition_result.advanced
+                  ? `Nice work. You moved to Phase ${journey.phase_transition_result.new_phase_index + 1}.`
+                  : `Keep going in this phase. ${journey.phase_transition_result.completed_in_phase}/${journey.phase_transition_result.min_sessions_required} sessions completed.`}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-[#2C2A26]/45">Why phase stayed or advanced</p>
+              <p className="text-[11px] text-[#2C2A26]/50">
+                {transitionReasonLabel(journey.phase_transition_result.phase_gate_reason)}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-[#2C2A26]/45">What to do next</p>
+              <p className="text-[11px] text-[#2C2A26]/50">
+                {nextActionLine(journey.phase_transition_result.recommended_next_action)}
+              </p>
+            </div>
+          </div>
         </div>
       )}
 

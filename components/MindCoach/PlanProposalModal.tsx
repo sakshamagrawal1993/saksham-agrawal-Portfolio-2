@@ -6,6 +6,7 @@ import { MIND_COACH_PROPOSAL_DRAWER_IMAGE } from './MindCoachConstants';
 import {
     useMindCoachStore,
     type JourneyPhase,
+    UNLOCK_MAP,
 } from '../../store/mindCoachStore';
 
 const PATHWAY_PLAYBOOKS: Record<string, { name: string; phases: { name: string; goal: string; sessions: number }[] }> = {
@@ -216,6 +217,22 @@ type SessionTemplateRow = {
     fallback_strategy: string;
 };
 
+type PostAcceptDetails = {
+    pathwayName: string;
+    activePhaseTitle: string;
+    nextSessionTitle: string;
+    toolsNow: string[];
+    nextUnlocks: string[];
+};
+
+const FEATURE_LABELS: Record<string, string> = {
+    chat: 'Guided Chat',
+    journal: 'Journal',
+    assessments: 'Assessments',
+    exercises: 'Exercises',
+    meditation: 'Meditation',
+};
+
 export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, onAccept }) => {
     const profile = useMindCoachStore((s) => s.profile);
     const activeSession = useMindCoachStore((s) => s.activeSession);
@@ -225,6 +242,7 @@ export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, o
 
     const [saving, setSaving] = useState(false);
     const [showPostAccept, setShowPostAccept] = useState(false);
+    const [postAcceptDetails, setPostAcceptDetails] = useState<PostAcceptDetails | null>(null);
     const [acceptError, setAcceptError] = useState<string | null>(null);
     const [dbPhases, setDbPhases] = useState<PathwayPhaseRow[] | null>(null);
     const [sessionTemplates, setSessionTemplates] = useState<SessionTemplateRow[] | null>(null);
@@ -412,6 +430,28 @@ export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, o
                 await supabase.from('mind_coach_journey_sessions').insert(templateRowsForJourney);
             }
 
+            const firstPhaseTemplates = (sessionTemplates ?? []).filter(
+                (tpl) => Number(tpl.phase_number) === 1,
+            );
+            const firstSessionTemplate = firstPhaseTemplates.sort(
+                (a, b) => Number(a.session_order) - Number(b.session_order),
+            )[0];
+            const phaseOneTitle =
+                customPhases.find((phase) => Number(phase.phase_number) === 1)?.title ??
+                displayPhases[0]?.name ??
+                'Engagement & Rapport';
+            const toolsNow = (UNLOCK_MAP[1] ?? []).map((key) => FEATURE_LABELS[key] ?? key);
+            const nextUnlocks = (UNLOCK_MAP[2] ?? [])
+                .filter((key) => !(UNLOCK_MAP[1] ?? []).includes(key))
+                .map((key) => FEATURE_LABELS[key] ?? key);
+            setPostAcceptDetails({
+                pathwayName: planTitle,
+                activePhaseTitle: phaseOneTitle,
+                nextSessionTitle: firstSessionTemplate?.title ?? 'Session 1',
+                toolsNow,
+                nextUnlocks,
+            });
+
             if (activeSession) {
                 await supabase
                     .from('mind_coach_sessions')
@@ -552,6 +592,31 @@ export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, o
                                 Your new pathway is active. Upcoming sessions will follow these phases; journal and tools
                                 unlock as you progress through each phase on Home.
                             </p>
+                            {postAcceptDetails && (
+                                <div className="rounded-2xl border border-[#E8E4DE] bg-[#FAF9F7] p-3 text-left space-y-2">
+                                    <p className="text-[10px] font-semibold uppercase tracking-wide text-[#2C2A26]/45">
+                                        What changes now
+                                    </p>
+                                    <p className="text-xs text-[#2C2A26]/75">
+                                        <span className="font-medium text-[#2C2A26]">Pathway:</span> {postAcceptDetails.pathwayName}
+                                    </p>
+                                    <p className="text-xs text-[#2C2A26]/75">
+                                        <span className="font-medium text-[#2C2A26]">Active phase:</span>{' '}
+                                        {postAcceptDetails.activePhaseTitle} •{' '}
+                                        <span className="font-medium text-[#2C2A26]">Next session:</span>{' '}
+                                        {postAcceptDetails.nextSessionTitle}
+                                    </p>
+                                    <p className="text-xs text-[#2C2A26]/75">
+                                        <span className="font-medium text-[#2C2A26]">Tools available now:</span>{' '}
+                                        {postAcceptDetails.toolsNow.join(', ')}
+                                    </p>
+                                    {postAcceptDetails.nextUnlocks.length > 0 && (
+                                        <p className="text-xs text-[#2C2A26]/60">
+                                            Next unlocks (Phase 2): {postAcceptDetails.nextUnlocks.join(', ')}
+                                        </p>
+                                    )}
+                                </div>
+                            )}
                             <button
                                 type="button"
                                 onClick={() => onAccept()}

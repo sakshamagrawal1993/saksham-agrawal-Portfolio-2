@@ -36,6 +36,21 @@ function getNextFocusStorageKey(profileId: string) {
   return `${NEXT_FOCUS_STORAGE_KEY_PREFIX}:${profileId}`;
 }
 
+function nextActionLabel(action?: string): string {
+  switch (action) {
+    case 'advance':
+      return 'Continue to the next phase milestone.';
+    case 'revisit':
+      return 'Repeat this objective once more with a small refinement.';
+    case 'stabilize':
+      return 'Prioritize grounding and stabilization before progression.';
+    case 'escalate':
+      return 'Increase support and connect to higher-care resources.';
+    default:
+      return 'Take one small, practical next step to keep momentum.';
+  }
+}
+
 // ── Component ──────────────────────────────────────────────────────────────
 
 interface SessionSummaryViewProps {
@@ -138,6 +153,14 @@ export const SessionSummaryView: React.FC<SessionSummaryViewProps> = ({
           : phaseTransitionResult?.phase_gate_reason === 'phase_requirements_not_met'
             ? 'Complete remaining required sessions in this phase before advancing.'
             : null;
+  const transitionOutcomeLine =
+    phaseTransitionResult?.session_transition_status === 'blocked'
+      ? 'This session is on a temporary safety hold.'
+      : phaseTransitionResult?.session_transition_status === 'revisit'
+        ? 'This session is marked for a revisit.'
+        : phaseTransitionResult?.session_transition_status === 'completed'
+          ? 'This session objective is marked complete.'
+          : 'Your session transition is being tracked.';
 
   const riskLevel = String(caseNotes?.risk_level ?? '').toLowerCase();
   const isRiskVariant =
@@ -385,6 +408,30 @@ export const SessionSummaryView: React.FC<SessionSummaryViewProps> = ({
                     )}
                     {transitionExplanation && (
                       <p className="text-xs text-[#2C2A26]/50 mb-2">{transitionExplanation}</p>
+                    )}
+                    <div className="rounded-xl border border-[#E8E4DE] bg-[#FAF9F7] p-3 space-y-2 mb-2">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-[#2C2A26]/45">What happened this session</p>
+                        <p className="text-xs text-[#2C2A26]/75 mt-0.5">{transitionOutcomeLine}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-[#2C2A26]/45">Why phase stayed or advanced</p>
+                        <p className="text-xs text-[#2C2A26]/75 mt-0.5">
+                          {transitionExplanation ?? 'Progression depends on objective quality, readiness, and safety.'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-[#2C2A26]/45">What to do next</p>
+                        <p className="text-xs text-[#2C2A26]/75 mt-0.5">
+                          {nextActionLabel(phaseTransitionResult.recommended_next_action)}
+                        </p>
+                      </div>
+                    </div>
+                    {(phaseTransitionResult.session_transition_status === 'blocked' ||
+                      phaseTransitionResult.session_transition_status === 'revisit') && (
+                      <p className="text-xs text-[#2C2A26]/55 mb-2">
+                        Revisit loops are a normal part of progress, not a setback. We adapt and keep moving at a steady pace.
+                      </p>
                     )}
                     {phaseProgressPercent != null && (
                       <div className="h-1.5 w-full bg-[#E8E4DE] rounded-full overflow-hidden">
