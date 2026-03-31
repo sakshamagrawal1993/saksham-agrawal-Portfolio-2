@@ -4,6 +4,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 
 const DEFAULT_MIN_SESSIONS_PER_PHASE = 3;
 const DEFAULT_MAX_SESSIONS_PER_PHASE = 5;
+const MAX_ACTIVE_TASKS_PER_PROFILE = 12;
 const DEFAULT_PATHWAY_PREVIEW_IMAGE_URL =
   'https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/mind%20coach/Generated_image.jpg';
 
@@ -67,6 +68,16 @@ function pathwayDisplayName(pathwayName: string): string {
     .split('_')
     .map((token) => token.charAt(0).toUpperCase() + token.slice(1))
     .join(' ');
+}
+
+function toTaskSemanticKey(taskType: unknown, title: unknown): string {
+  const typePart = typeof taskType === 'string' && taskType.trim().length > 0
+    ? taskType.trim().toLowerCase()
+    : 'general';
+  const titlePart = typeof title === 'string'
+    ? title.trim().toLowerCase().replace(/\s+/g, ' ')
+    : 'session task';
+  return `${typePart}:${titlePart}`;
 }
 
 serve(async (req) => {
@@ -293,6 +304,16 @@ serve(async (req) => {
     const extracted_memories = Array.isArray(parsed?.extracted_memories) ? parsed.extracted_memories : [];
     const extracted_tasks = Array.isArray(parsed?.extracted_tasks) ? parsed.extracted_tasks : [];
     const agent_meta = parsed?.agent_meta && typeof parsed.agent_meta === 'object' ? parsed.agent_meta : null;
+    const journey_completion_message =
+      parsed?.journey_completion_message &&
+      typeof parsed.journey_completion_message === 'object' &&
+      typeof parsed.journey_completion_message.Heading === 'string' &&
+      typeof parsed.journey_completion_message.Description === 'string'
+        ? {
+            Heading: String(parsed.journey_completion_message.Heading).trim(),
+            Description: String(parsed.journey_completion_message.Description).trim(),
+          }
+        : null;
     const suggestedPathwayCandidate =
       normalizePathwayCandidate(parsed?.suggested_pathway) ??
       normalizePathwayCandidate(session_summary?.suggested_pathway) ??
@@ -367,6 +388,7 @@ serve(async (req) => {
             extracted_tasks,
             extracted_memories,
             agent_meta,
+            journey_completion_message,
             suggested_pathway: suggestedPathwayCandidate,
             pathway_details: pathwayDetails,
             __session_end_meta: {
@@ -380,6 +402,7 @@ serve(async (req) => {
             extracted_tasks,
             extracted_memories,
             agent_meta,
+            journey_completion_message,
             suggested_pathway: suggestedPathwayCandidate,
             pathway_details: pathwayDetails,
             __session_end_meta: {
@@ -428,54 +451,108 @@ serve(async (req) => {
     //      backend calculates exact dates deterministically)
     if (extracted_tasks?.length > 0) {
       const now = new Date();
-      const taskRows = extracted_tasks.map((t: any) => {
+      const { data: existingActiveTasks } = await supabaseAdmin
+        .from('mind_coach_user_tasks')
+        .select('id,task_type,dynamic_title,task_name,created_at,task_semantic_key')
+        .eq('profile_id', profile_id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(200);
+      const existingKeys = new Set<string>(
+        (Array.isArray(existingActiveTasks) ? existingActiveTasks : [])
+          .map((row: any) => {
+            const keyFromRow =
+              typeof row?.task_semantic_key === 'string'
+                ? row.task_semantic_key.trim().toLowerCase()
+                : '';
+            if (keyFromRow) return keyFromRow;
+            return toTaskSemanticKey(row?.task_type, row?.dynamic_title || row?.task_name);
+          })
+          .filter((key: string) => key.length > 0),
+      );
+      const seenInBatch = new Set<string>();
+      const taskRows = extracted_tasks.flatMap((t: any) => {
         const startDate = new Date(now);
         const durationDays = typeof t.suggested_duration_days === 'number' && t.suggested_duration_days > 0
           ? t.suggested_duration_days
           : 7; // sensible default
         const endDate = new Date(now);
         endDate.setDate(endDate.getDate() + durationDays);
+        const resolvedTitle = t.dynamic_title || t.task_name || 'Session Task';
+        const semanticKey = toTaskSemanticKey(t.task_type || 'general', resolvedTitle);
+        if (existingKeys.has(semanticKey) || seenInBatch.has(semanticKey)) {
+          return [];
+        }
+        seenInBatch.add(semanticKey);
 
-        return {
+        return [{
           profile_id,
           session_id,
           // Structured template category chosen by LLM
           task_type: t.task_type || 'general',
           // Personalised content written by LLM
-          dynamic_title: t.dynamic_title || t.task_name || 'Session Task',
+          dynamic_title: resolvedTitle,
           dynamic_description: t.dynamic_description || t.task_description || '',
+          task_semantic_key: semanticKey,
           // Legacy column kept for backward-compat
-          task_name: t.dynamic_title || t.task_name || 'Session Task',
+          task_name: resolvedTitle,
           task_description: t.dynamic_description || t.task_description || '',
           task_frequency: t.frequency || t.task_frequency || 'daily',
           // Backend-calculated dates — never trust LLM timestamps
           task_start_date: startDate.toISOString(),
           task_end_date: endDate.toISOString(),
           status: 'active',
-        };
+        }];
       });
-      await supabaseAdmin.from('mind_coach_user_tasks').insert(taskRows);
+      if (taskRows.length > 0) {
+        await supabaseAdmin.from('mind_coach_user_tasks').insert(taskRows);
+      }
+
+      const { data: activeTasksAfterInsert } = await supabaseAdmin
+        .from('mind_coach_user_tasks')
+        .select('id')
+        .eq('profile_id', profile_id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+      const overflowRows = (Array.isArray(activeTasksAfterInsert) ? activeTasksAfterInsert : [])
+        .slice(MAX_ACTIVE_TASKS_PER_PROFILE);
+      if (overflowRows.length > 0) {
+        await supabaseAdmin
+          .from('mind_coach_user_tasks')
+          .update({ status: 'expired', updated_at: new Date().toISOString() })
+          .in('id', overflowRows.map((row: any) => row.id));
+      }
     }
 
     // 5. Update journey/session progression (template-aware + strict policy)
     let phaseTransitionResult: Record<string, unknown> | null = null;
     const policyConflicts: string[] = [];
     if (journey) {
-      const currentPhaseIndex = Number.isFinite(journey.current_phase_index)
+      const phases = Array.isArray(journey.phases) ? journey.phases : [];
+      const currentPhaseIndexFromJourney = Number.isFinite(journey.current_phase_index)
         ? journey.current_phase_index
         : Math.max(0, (journey.current_phase || 1) - 1);
-      const phases = Array.isArray(journey.phases) ? journey.phases : [];
+      const sessionPhaseNumber = Number(session.phase_number);
+      const currentPhaseNumber =
+        Number.isFinite(sessionPhaseNumber) && sessionPhaseNumber > 0
+          ? sessionPhaseNumber
+          : currentPhaseIndexFromJourney + 1;
+      const currentPhaseIndex = Math.max(0, currentPhaseNumber - 1);
       const phaseCount = phases.length;
-      const hasNextPhase = currentPhaseIndex < phaseCount - 1;
       const progressionEnabled = (journey.pathway || session.pathway) !== 'engagement_rapport_and_assessment';
-      const currentPhaseNumber = currentPhaseIndex + 1;
       const currentPhase = phases[currentPhaseIndex] ?? null;
 
       const majorRisk = hasMajorRiskSignals(case_notes, session_summary);
       const riskLevel = normalizeRiskLevel(case_notes, session_summary);
       const requiresEscalation = Boolean(case_notes?.requires_escalation || session_summary?.requires_escalation);
       const readinessLabel = String(case_notes?.readiness_for_next_phase ?? '').toLowerCase();
-      const readinessSignal = readinessLabel === 'ready';
+      const readinessState =
+        readinessLabel === 'ready'
+          ? 'ready'
+          : readinessLabel === 'approaching'
+            ? 'approaching'
+            : 'continue';
+      const readinessSignal = readinessState === 'ready' || readinessState === 'approaching';
 
       const incomingSessionTransition = parsed?.session_transition && typeof parsed.session_transition === 'object'
         ? parsed.session_transition
@@ -587,7 +664,9 @@ serve(async (req) => {
 
       const recommendedNextAction = majorRisk
         ? (requiresEscalation ? 'escalate' : 'stabilize')
-        : (objectiveMet ? 'advance' : 'revisit');
+        : objectiveMet
+          ? (readinessSignal ? 'advance' : 'continue_in_phase')
+          : 'revisit';
       const completionStatus = objectiveMet ? 'completed' : (majorRisk ? 'blocked' : 'revisit');
 
       if (incomingPhaseAdvanceSignal === true && !objectiveMet) {
@@ -642,7 +721,7 @@ serve(async (req) => {
               ? parsed.recommended_adjustments
               : {},
             evaluator_meta: {
-              readiness_signal: readinessSignal ? 'ready' : 'continue',
+              readiness_signal: readinessState,
               major_risk: majorRisk,
               policy: 'strictReady',
               conflicts: policyConflicts,
@@ -691,6 +770,21 @@ serve(async (req) => {
       const completedLatestRows = latestRuntimeRows.filter((row: any) => row.status === 'completed');
       const completedTemplateRows = completedLatestRows.filter((row: any) => Boolean(row.session_template_id));
       const completedInCurrentPhase = completedLatestRows.length;
+      let detectedMaxPhaseNumber = phaseCount > 0 ? phaseCount : currentPhaseNumber;
+      const { data: maxJourneyPhaseRow } = await supabaseAdmin
+        .from('mind_coach_journey_sessions')
+        .select('phase_number')
+        .eq('journey_id', journey.id)
+        .order('phase_number', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (Number.isFinite(Number((maxJourneyPhaseRow as any)?.phase_number))) {
+        detectedMaxPhaseNumber = Math.max(
+          detectedMaxPhaseNumber,
+          Number((maxJourneyPhaseRow as any).phase_number),
+        );
+      }
+      const hasNextPhase = currentPhaseNumber < detectedMaxPhaseNumber;
       const templateSessionOrderSet = new Set<number>(
         phaseTemplates
           .map((t: any) => Number(t.session_order))
@@ -702,14 +796,28 @@ serve(async (req) => {
       const minSessionsForPhase = Math.max(1, getRequiredSessionsForPhase(currentPhase));
       const maxSessionsForPhase = Math.max(minSessionsForPhase, DEFAULT_MAX_SESSIONS_PER_PHASE);
       const phaseObjectivesMet = completedTemplateRows.length >= requiredTemplateCount;
+      const phaseMinimumReached = completedInCurrentPhase >= minSessionsForPhase;
       const maxSessionsFallbackPassed = completedInCurrentPhase >= maxSessionsForPhase;
-      // Canonical policy: strictReady (risk -> objective -> readiness+phase gate).
+      const phaseCompletionReached = phaseObjectivesMet || phaseMinimumReached || maxSessionsFallbackPassed;
+      // Canonical policy with practical fallback:
+      // If readiness lags but phase template minimum is met, allow progression to prevent hard stalls.
+      const readinessOrPhaseFallback = readinessSignal || (
+        !majorRisk &&
+        objectiveMet &&
+        completedInCurrentPhase >= minSessionsForPhase
+      );
       const shouldAdvance = progressionEnabled &&
         hasNextPhase &&
         !majorRisk &&
         objectiveMet &&
-        readinessSignal &&
-        (phaseObjectivesMet || maxSessionsFallbackPassed);
+        readinessOrPhaseFallback &&
+        phaseCompletionReached;
+      const finalPhaseCompleted = progressionEnabled &&
+        !hasNextPhase &&
+        !majorRisk &&
+        objectiveMet &&
+        phaseCompletionReached;
+      const normalizedNextAction = finalPhaseCompleted ? 'complete_journey' : recommendedNextAction;
 
       if (incomingPhaseAdvanceSignal === true && !shouldAdvance) {
         policyConflicts.push('incoming_phase_advance_overridden_by_policy');
@@ -724,7 +832,14 @@ serve(async (req) => {
 
       const journeyUpdate: Record<string, any> = {
         sessions_completed: newSessionCount,
+        journey_state: 'active',
       };
+      if (finalPhaseCompleted) {
+        journeyUpdate.journey_state = 'completed';
+        journeyUpdate.completed_at = new Date().toISOString();
+      } else {
+        journeyUpdate.completed_at = null;
+      }
 
       if (shouldAdvance) {
         journeyUpdate.current_phase_index = currentPhaseIndex + 1;
@@ -753,13 +868,13 @@ serve(async (req) => {
         completed_in_phase: completedInCurrentPhase,
         min_sessions_required: minSessionsForPhase,
         max_sessions_fallback: maxSessionsForPhase,
-        readiness_signal: readinessSignal ? 'ready' : 'continue',
+        readiness_signal: readinessOrPhaseFallback ? readinessState : 'continue',
         blocked_by_risk: majorRisk,
         progression_enabled: progressionEnabled,
         objective_met: objectiveMet,
         completion_score: completionScore,
         objective_confidence: clampScore(parsed?.objective_confidence ?? completionScore, completionScore),
-        recommended_next_action: recommendedNextAction,
+        recommended_next_action: normalizedNextAction,
         session_transition_status: completionStatus,
         phase_objectives_met: phaseObjectivesMet,
         required_template_sessions: requiredTemplateCount,
@@ -767,11 +882,13 @@ serve(async (req) => {
         phase_policy: 'strictReady',
         phase_gate_reason: shouldAdvance
           ? 'objective_ready_and_phase_requirements_met'
+          : finalPhaseCompleted
+            ? 'journey_completed'
           : majorRisk
             ? 'blocked_by_risk'
             : !objectiveMet
               ? 'objective_not_met'
-              : !readinessSignal
+              : !readinessOrPhaseFallback
                 ? 'readiness_not_ready'
                 : !hasNextPhase
                   ? 'final_phase'
@@ -812,6 +929,7 @@ serve(async (req) => {
         memories_stored: memoriesStored,
         tasks_stored: extracted_tasks?.length || 0,
         session_id,
+        journey_completion_message,
         phase_transition_result: phaseTransitionResult,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }

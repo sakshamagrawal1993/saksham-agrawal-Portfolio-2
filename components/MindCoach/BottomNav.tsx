@@ -46,7 +46,6 @@ export const BottomNav: React.FC = () => {
       const { session, initialMessages, reusedExisting } = await openOrCreateInProgressSession({
         profile,
         journey,
-        currentPhase,
         sessions,
       });
       setActiveSession(session as MindCoachSession);
@@ -60,6 +59,10 @@ export const BottomNav: React.FC = () => {
       setShowMore(false);
     } catch (err) {
       console.error('Failed to open talk session:', err);
+      const code = err instanceof Error ? err.message : '';
+      if (code === 'journey_completed') {
+        alert('This journey is already completed. You can review it in History.');
+      }
     } finally {
       setOpeningTalk(false);
     }
@@ -67,7 +70,6 @@ export const BottomNav: React.FC = () => {
     profile,
     openingTalk,
     sessions,
-    currentPhase,
     journey,
     activeSession,
     setActiveSession,

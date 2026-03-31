@@ -61,13 +61,14 @@ export const HomeScreen: React.FC = () => {
 
   const phases = journey?.phases ?? [];
   const currentPhaseData = phases[currentPhase - 1];
-  const completedInPhase = sessions.filter(
+  const completedInPhaseRaw = sessions.filter(
     (s) =>
       s.session_state === 'completed' &&
       s.phase_number === currentPhase &&
       s.journey_id === (journey?.id ?? null),
   ).length;
-  const totalInPhase = currentPhaseData?.sessions?.length ?? 3;
+  const totalInPhase = Math.max(1, currentPhaseData?.sessions?.length ?? 3);
+  const completedInPhase = Math.min(totalInPhase, completedInPhaseRaw);
 
   const hasChosenPathway = journey?.pathway != null && journey.pathway !== 'engagement_rapport_and_assessment';
   const displayCurrentPhase = hasChosenPathway ? currentPhase + 1 : currentPhase;
@@ -145,7 +146,6 @@ export const HomeScreen: React.FC = () => {
       const { session, initialMessages, reusedExisting } = await openOrCreateInProgressSession({
         profile,
         journey,
-        currentPhase,
         sessions,
       });
       setActiveSession(session);
@@ -154,7 +154,14 @@ export const HomeScreen: React.FC = () => {
       setActiveTab('sessions');
     } catch (err) {
       console.error('Failed to continue with therapist:', err);
-      alert('Could not open your next session. Please try again.');
+      const code = err instanceof Error ? err.message : '';
+      if (code === 'journey_completed') {
+        alert('You have completed this journey cycle. Review your summary in History.');
+      } else if (code === 'no_active_journey') {
+        alert('No active journey is available to continue right now.');
+      } else {
+        alert('Could not open your next session. Please try again.');
+      }
     } finally {
       setIsContinuingSession(false);
     }
@@ -162,7 +169,6 @@ export const HomeScreen: React.FC = () => {
     profile,
     isContinuingSession,
     sessions,
-    currentPhase,
     journey,
     setActiveSession,
     setSessions,

@@ -20,6 +20,8 @@ const PHASE_IMAGES: Record<number, string> = {
 
 function transitionReasonLabel(reason?: string): string {
   switch (reason) {
+    case 'journey_completed':
+      return 'You completed all pathway phases. This journey cycle is complete.';
     case 'objective_ready_and_phase_requirements_met':
       return 'Objective, readiness, and phase requirements were met. You advanced.';
     case 'blocked_by_risk':
@@ -39,6 +41,8 @@ function transitionReasonLabel(reason?: string): string {
 
 function nextActionLine(action?: string): string {
   switch (action) {
+    case 'complete_journey':
+      return 'Celebrate your completion and maintain the practices that helped most.';
     case 'advance':
       return 'Move to the next phase with one small reinforcing action today.';
     case 'revisit':
@@ -286,7 +290,10 @@ export const JourneyScreen: React.FC = () => {
             : latestRows.length > 0
               ? latestRows.length
               : (phase.sessions?.length ?? 3);
-          const completedInPhaseResolved = latestRows.filter((r) => r.status === 'completed').length || completedInPhase;
+          const completedInPhaseResolved = Math.min(
+            totalInPhase,
+            latestRows.filter((r) => r.status === 'completed').length || completedInPhase,
+          );
           const activeRuntimeSession =
             latestRows.find((r) => r.status === 'in_progress' || r.status === 'revisit' || r.status === 'blocked') ??
             latestRows.find((r) => r.status === 'planned') ??

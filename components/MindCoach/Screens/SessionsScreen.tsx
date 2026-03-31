@@ -47,16 +47,21 @@ export const SessionsScreen: React.FC = () => {
       const { session, initialMessages, reusedExisting } = await openOrCreateInProgressSession({
         profile,
         journey,
-        currentPhase,
         sessions,
       });
       setActiveSession(session);
       setSessions(reusedExisting ? [session, ...sessions.filter((s) => s.id !== session.id)] : [session, ...sessions]);
       setMessages(initialMessages);
+    } catch (err) {
+      console.error('Failed to start session:', err);
+      const code = err instanceof Error ? err.message : '';
+      if (code === 'journey_completed') {
+        alert('This journey is already completed. Start a new journey to continue.');
+      }
     } finally {
       setStarting(false);
     }
-  }, [profile, journey, sessions, currentPhase, starting, setActiveSession, setSessions, setMessages]);
+  }, [profile, journey, sessions, starting, setActiveSession, setSessions, setMessages]);
 
   const handleResumeSession = useCallback(
     async (session: MindCoachSession) => {

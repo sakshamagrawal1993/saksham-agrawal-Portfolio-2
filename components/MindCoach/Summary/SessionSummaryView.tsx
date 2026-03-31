@@ -38,6 +38,8 @@ function getNextFocusStorageKey(profileId: string) {
 
 function nextActionLabel(action?: string): string {
   switch (action) {
+    case 'complete_journey':
+      return 'Celebrate this milestone and maintain your practices weekly.';
     case 'advance':
       return 'Continue to the next phase milestone.';
     case 'revisit':
@@ -81,6 +83,8 @@ export const SessionSummaryView: React.FC<SessionSummaryViewProps> = ({
   const [completedTaskKeys, setCompletedTaskKeys] = useState<Record<string, boolean>>({});
   const [showPathwayPhases, setShowPathwayPhases] = useState(false);
   const [activePathwayPhase, setActivePathwayPhase] = useState(0);
+  const [showJourneyLetterDrawer, setShowJourneyLetterDrawer] = useState(false);
+  const [revealJourneyLetter, setRevealJourneyLetter] = useState(false);
   const [selectedNextFocus, setSelectedNextFocus] = useState<string | null>(() => {
     if (profile?.id) {
       return localStorage.getItem(getNextFocusStorageKey(profile.id));
@@ -144,7 +148,9 @@ export const SessionSummaryView: React.FC<SessionSummaryViewProps> = ({
       ? Math.min(100, Math.round((completedInPhase / minInPhase) * 100))
       : null;
   const transitionExplanation =
-    phaseTransitionResult?.phase_gate_reason === 'blocked_by_risk'
+    phaseTransitionResult?.phase_gate_reason === 'journey_completed'
+      ? 'You completed all planned phases in this pathway. This journey cycle is complete.'
+      : phaseTransitionResult?.phase_gate_reason === 'blocked_by_risk'
       ? 'We are prioritizing safety and stabilization before progression.'
       : phaseTransitionResult?.phase_gate_reason === 'objective_not_met'
         ? 'Objective for this session is not fully met yet, so revisit is queued.'
@@ -206,6 +212,16 @@ export const SessionSummaryView: React.FC<SessionSummaryViewProps> = ({
   const isPathwayUnselected =
     (activeSession?.pathway == null || activeSession?.pathway === 'engagement_rapport_and_assessment') &&
     (journey?.pathway == null || journey?.pathway === 'engagement_rapport_and_assessment');
+  const journeyCompletionMessage =
+    summaryView?.journey_completion_message &&
+    typeof summaryView.journey_completion_message === 'object' &&
+    typeof summaryView.journey_completion_message.Heading === 'string' &&
+    typeof summaryView.journey_completion_message.Description === 'string'
+      ? {
+          Heading: String(summaryView.journey_completion_message.Heading),
+          Description: String(summaryView.journey_completion_message.Description),
+        }
+      : null;
 
   const shouldShowPathwayPreview =
     isPathwayUnselected && isNewPathway && pathwayPreview && pathwayPhases.length > 0;
@@ -359,6 +375,57 @@ export const SessionSummaryView: React.FC<SessionSummaryViewProps> = ({
               Or journal for 2 minutes
             </button>
           )}
+          {journeyCompletionMessage && (
+            <>
+              <button
+                type="button"
+                onPointerDown={() => {
+                  setRevealJourneyLetter(false);
+                  setShowJourneyLetterDrawer((prev) => !prev);
+                }}
+                onClick={() => {
+                  setRevealJourneyLetter(false);
+                  setShowJourneyLetterDrawer((prev) => !prev);
+                }}
+                style={{ touchAction: 'manipulation' }}
+                className="w-full mt-3 py-3 rounded-2xl border border-[#D9D3CB] bg-white/70 text-[#2C2A26] text-sm font-semibold hover:bg-white transition-colors"
+              >
+                {showJourneyLetterDrawer ? 'Hide your personal letter' : 'Open your personal letter'}
+              </button>
+              {showJourneyLetterDrawer && (
+                <div className="mt-3 rounded-2xl border border-[#D9D3CB] bg-white/90 p-4">
+                  {!revealJourneyLetter ? (
+                    <div className="text-center">
+                      <p className="text-[11px] uppercase tracking-wide text-[#2C2A26]/45 mb-2">A note for you</p>
+                      <div className="mx-auto w-full rounded-xl border border-[#E8E4DE] bg-[#FBF8F4] px-4 py-5">
+                        <p className="text-sm text-[#2C2A26]/70">Your personal completion letter is ready.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setRevealJourneyLetter(true)}
+                        className="w-full mt-3 py-2.5 rounded-xl bg-[#6B8F71] text-white text-sm font-semibold"
+                      >
+                        Open letter
+                      </button>
+                    </div>
+                  ) : (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.35, ease: 'easeOut' }}
+                      className="rounded-xl border border-[#E8E4DE] bg-white p-4"
+                    >
+                      <p className="text-[11px] uppercase tracking-wide text-[#2C2A26]/45 mb-2">Personal completion note</p>
+                      <h3 className="text-lg font-semibold text-[#2C2A26] mb-2">{journeyCompletionMessage.Heading}</h3>
+                      <p className="text-sm text-[#2C2A26]/80 leading-relaxed whitespace-pre-wrap">
+                        {journeyCompletionMessage.Description}
+                      </p>
+                    </motion.div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
         </motion.div>
 
         {/* ── TIER 2: Expandable — progress, pathway, next focus ── */}
@@ -390,7 +457,9 @@ export const SessionSummaryView: React.FC<SessionSummaryViewProps> = ({
                       Your progress
                     </p>
                     <p className="text-sm text-[#2C2A26]/75 mb-2">
-                      {phaseTransitionResult.advanced
+                      {phaseTransitionResult.phase_gate_reason === 'journey_completed'
+                        ? 'Congratulations. You completed this full journey cycle and reached your integration milestone.'
+                        : phaseTransitionResult.advanced
                         ? `You unlocked Phase ${(phaseTransitionResult.new_phase_index ?? 0) + 1}. Keep momentum with one small action tonight.`
                         : `You're progressing in this phase (${phaseTransitionResult.completed_in_phase ?? 0}/${phaseTransitionResult.min_sessions_required ?? 0} sessions).`}
                     </p>
