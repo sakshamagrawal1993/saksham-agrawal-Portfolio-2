@@ -182,7 +182,7 @@ interface TherapistChatProps {
 }
 
 const NEXT_FOCUS_STORAGE_KEY_PREFIX = 'mind_coach_next_focus_intent';
-const CHAT_RESPONSE_TIMEOUT_MS = 20_000;
+const CHAT_RESPONSE_TIMEOUT_MS = 60_000;
 
 function getNextFocusStorageKey(profileId: string) {
   return `${NEXT_FOCUS_STORAGE_KEY_PREFIX}:${profileId}`;
@@ -1365,9 +1365,28 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
         </button>
       </div>
 
-      {!isEngagementDiscovery && journey && (
-        <PhaseProgressStepper journey={journey} sessions={sessions} />
-      )}
+      {!isEngagementDiscovery && journey && (() => {
+        let computedProgress = 0;
+        for (let i = messages.length - 1; i >= 0; i--) {
+          const p = messages[i]?.dynamic_content?.current_objective_progress;
+          if (typeof p === 'number') {
+            computedProgress = p;
+            break;
+          }
+        }
+        if (computedProgress === 0 && activeSession) {
+          const count = activeSession.message_count || 0;
+          computedProgress = Math.min(85, Math.round((count / 25) * 100));
+        }
+
+        return (
+          <PhaseProgressStepper 
+            journey={journey} 
+            sessions={sessions} 
+            currentObjectiveProgress={computedProgress} 
+          />
+        );
+      })()}
 
       {chatError && (
         <div

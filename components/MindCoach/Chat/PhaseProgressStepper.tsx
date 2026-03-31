@@ -6,9 +6,10 @@ import { supabase } from '../../../lib/supabaseClient';
 interface PhaseProgressStepperProps {
   journey: MindCoachJourney;
   sessions: MindCoachSession[];
+  currentObjectiveProgress?: number;
 }
 
-export const PhaseProgressStepper: React.FC<PhaseProgressStepperProps> = ({ journey, sessions }) => {
+export const PhaseProgressStepper: React.FC<PhaseProgressStepperProps> = ({ journey, sessions, currentObjectiveProgress }) => {
   const normalized = useMemo(() => normalizeJourneyPhaseState(journey), [journey]);
   const phases = normalized.phases ?? [];
   const currentPhase = normalized.current_phase;
@@ -24,7 +25,7 @@ export const PhaseProgressStepper: React.FC<PhaseProgressStepperProps> = ({ jour
       }
       const { data } = await supabase
         .from('mind_coach_journey_sessions')
-        .select('phase_number,session_order,status,attempt_count')
+        .select('phase_number,session_order,status,attempt_count,topic,description')
         .eq('journey_id', journey.id)
         .eq('phase_number', currentPhase)
         .in('status', ['planned', 'in_progress', 'completed', 'revisit', 'blocked'])
@@ -65,6 +66,11 @@ export const PhaseProgressStepper: React.FC<PhaseProgressStepperProps> = ({ jour
     runtimeSessionOrders.size > 0 ? runtimeSessionOrders.size : (currentPhaseData?.sessions?.length ?? 3),
   );
   const currentCompletedResolved = runtimeCompletedOrders.size > 0 ? runtimeCompletedOrders.size : currentCompleted;
+
+  const currentSessionRow = latestRows.find(
+    (r) => r.status === 'in_progress' || r.status === 'revisit' || r.status === 'planned'
+  ) || latestRows[0];
+  const sessionGoalTopic = currentSessionRow?.topic || currentPhaseData?.sessions?.[0]?.topic || 'Exploration';
 
   return (
     <div className="shrink-0 px-4 pt-2.5 pb-2 border-b border-[#E8E4DE] bg-[#FAFAF7]">
@@ -114,18 +120,7 @@ export const PhaseProgressStepper: React.FC<PhaseProgressStepperProps> = ({ jour
           {currentCompletedResolved}/{currentTarget} sessions
         </p>
       </div>
-      {journey.phase_transition_result?.phase_gate_reason && (
-        <p className="mt-1 text-[10px] text-[#2C2A26]/40">
-          {journey.phase_transition_result.phase_gate_reason === 'blocked_by_risk'
-            ? 'Risk hold active; stabilizing before progression.'
-            : journey.phase_transition_result.phase_gate_reason === 'objective_not_met'
-              ? 'Objective not met yet; revisit remains active.'
-              : journey.phase_transition_result.phase_gate_reason === 'readiness_not_ready'
-                ? 'Readiness still building before phase transition.'
-                : ''}
-        </p>
-      )}
-      <div className="mt-1.5 flex gap-1">
+      <div className="mt-1 flex gap-1">
         {Array.from({ length: currentTarget }, (_, idx) => (
           <span
             key={idx}
@@ -135,6 +130,37 @@ export const PhaseProgressStepper: React.FC<PhaseProgressStepperProps> = ({ jour
           />
         ))}
       </div>
+      <div className="mt-2.5 p-2 bg-white rounded-lg border border-[#E8E4DE]">
+        <div className="flex items-center justify-between mb-1.5">
+          <p className="text-[11px] font-medium text-[#2C2A26]">
+            Session Goal: {sessionGoalTopic}
+          </p>
+          {currentObjectiveProgress !== undefined && (
+            <p className="text-[10px] text-[#2C2A26]/45 font-medium">
+              {currentObjectiveProgress}%
+            </p>
+          )}
+        </div>
+        {currentObjectiveProgress !== undefined && (
+          <div className="w-full h-1.5 bg-[#F5F0EB] rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-[#D4A574] rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${currentObjectiveProgress}%` }}
+            />
+          </div>
+        )}
+      </div>
+      {journey.phase_transition_result?.phase_gate_reason && (
+        <p className="mt-2 text-[10px] text-[#2C2A26]/40">
+          {journey.phase_transition_result.phase_gate_reason === 'blocked_by_risk'
+            ? 'Risk hold active; stabilizing before progression.'
+            : journey.phase_transition_result.phase_gate_reason === 'objective_not_met'
+              ? 'Objective not met yet; revisit remains active.'
+              : journey.phase_transition_result.phase_gate_reason === 'readiness_not_ready'
+                ? 'Readiness still building before phase transition.'
+                : ''}
+        </p>
+      )}
     </div>
   );
 };

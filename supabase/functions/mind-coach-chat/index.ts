@@ -300,12 +300,12 @@ serve(async (req) => {
 
     // 5. Forward to n8n (server context is authoritative; client hints fill gaps)
     const configuredN8nTimeout = Number.parseInt(
-      Deno.env.get('MC_N8N_CHAT_TIMEOUT_MS') || '20000',
+      Deno.env.get('MC_N8N_CHAT_TIMEOUT_MS') || '60000',
       10,
     );
     const n8nTimeoutMs = Number.isFinite(configuredN8nTimeout)
       ? Math.max(5000, Math.min(180000, configuredN8nTimeout))
-      : 20000;
+      : 60000;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), n8nTimeoutMs);
 

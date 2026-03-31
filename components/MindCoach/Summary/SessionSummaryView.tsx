@@ -263,6 +263,39 @@ export const SessionSummaryView: React.FC<SessionSummaryViewProps> = ({
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 py-6 space-y-6 relative z-10">
+        {/* ── CELEBRATION BANNERS ── */}
+        {phaseTransitionResult?.phase_gate_reason === 'journey_completed' && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+            className="rounded-2xl p-6 border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-orange-50 shadow-lg shadow-amber-500/10 text-center relative overflow-hidden"
+          >
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-300 via-orange-400 to-amber-300" />
+            <div className="text-4xl mb-3 animate-bounce">🌟</div>
+            <h2 className="text-xl font-bold text-amber-800 mb-2">Journey Completed!</h2>
+            <p className="text-sm text-amber-900/80 leading-relaxed font-medium">
+              Congratulations! You have successfully completed all phases in this pathway. We are incredibly proud of your progress.
+            </p>
+          </motion.div>
+        )}
+
+        {phaseTransitionResult?.advanced && phaseTransitionResult?.phase_gate_reason !== 'journey_completed' && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+            className="rounded-2xl p-6 border-2 border-[#6B8F71]/40 bg-gradient-to-br from-[#E8F3E9] to-[#F2F7F2] shadow-lg shadow-[#6B8F71]/10 text-center relative overflow-hidden"
+          >
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#6B8F71]/40 via-[#6B8F71] to-[#6B8F71]/40" />
+            <div className="text-4xl mb-3">🎉</div>
+            <h2 className="text-xl font-bold text-[#4A6B50] mb-2">Phase {(phaseTransitionResult.new_phase_index ?? 0) + 1} Unlocked!</h2>
+            <p className="text-sm text-[#4A6B50]/80 leading-relaxed font-medium">
+              Congratulations! You've leveled up and advanced to your next milestone.
+            </p>
+          </motion.div>
+        )}
+
         {/* ── TIER 1: Warm reflection + takeaway + next step ── */}
         <motion.div
           initial={{ opacity: 0, y: 15 }}
