@@ -1552,7 +1552,9 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                handleSend();
+                if (!isLoading && !endingSession) {
+                  handleSend();
+                }
               }
             }}
           />

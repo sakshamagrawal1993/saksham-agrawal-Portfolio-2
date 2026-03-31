@@ -168,8 +168,9 @@ export interface ChatMessage {
   guardrail_status: 'passed' | 'corrected' | 'blocked' | null;
   created_at: string;
   dynamic_content?: {
-    type: DynamicContentType;
-    payload: any;
+    type?: DynamicContentType;
+    payload?: any;
+    current_objective_progress?: number;
   };
 }
 

@@ -370,23 +370,41 @@ export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, o
                     const phaseNumber = Number.isFinite(p.phaseNumber) ? Number(p.phaseNumber) : i + 1;
                     const phaseTemplates = templatesByPhase.get(phaseNumber) ?? [];
                     if (phaseTemplates.length > 0) {
-                        return phaseTemplates.map((tpl) => ({
-                            session_number: tpl.session_order,
-                            topic: tpl.title,
-                            title: tpl.title,
-                            objective: tpl.goal,
-                            description: tpl.description,
-                            success_signal: `Completion score at or above ${
-                                tpl.min_completion_score != null ? Math.round(tpl.min_completion_score * 100) : 70
-                            }%.`,
-                            fallback_strategy: tpl.fallback_strategy,
-                        }));
+                        return phaseTemplates.map((tpl) => {
+                            let desc = tpl.description;
+                            if (desc === p.goal) {
+                                desc = tpl.session_order === 1
+                                    ? `Begin this phase by grounding in the core objective: ${p.goal}`
+                                    : tpl.session_order === 2
+                                        ? `Deepen work in this phase with applied reflection and guided practice: ${p.goal}`
+                                        : `Close this phase session by integrating learning and documenting progress toward the phase objective: ${p.goal}`;
+                            }
+                            return {
+                                session_number: tpl.session_order,
+                                topic: tpl.title,
+                                title: tpl.title,
+                                objective: tpl.goal,
+                                description: desc,
+                                success_signal: `Completion score at or above ${
+                                    tpl.min_completion_score != null ? Math.round(tpl.min_completion_score * 100) : 70
+                                }%.`,
+                                fallback_strategy: tpl.fallback_strategy,
+                            };
+                        });
                     }
-                    return Array.from({ length: p.sessions }, (_, si) => ({
-                        session_number: si + 1,
-                        topic: `Session ${si + 1}`,
-                        description: p.goal,
-                    }));
+                    return Array.from({ length: p.sessions }, (_, si) => {
+                        const defaultSessionDesc = si === 0 
+                            ? `Begin this phase by grounding in the core objective: ${p.goal}`
+                            : si === 1 
+                                ? `Deepen work in this phase with applied reflection and guided practice: ${p.goal}`
+                                : `Close this phase session by integrating learning and documenting progress toward the phase objective: ${p.goal}`;
+
+                        return {
+                            session_number: si + 1,
+                            topic: `Session ${si + 1}`,
+                            description: defaultSessionDesc,
+                        };
+                    });
                 })(),
             }));
 

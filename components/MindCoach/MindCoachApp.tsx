@@ -101,6 +101,29 @@ const MindCoachApp: React.FC = () => {
       return;
     }
 
+    // Check if it's an invalid UUID (likely a manual tab navigation like /mind-coach/journey)
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(profileId)) {
+      supabase
+        .from('mind_coach_profiles')
+        .select('id')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data) {
+            const validTabs = ['home', 'sessions', 'journey', 'assessments', 'journal', 'diary', 'exercises', 'toolkit'];
+            if (validTabs.includes(profileId)) {
+              useMindCoachStore.getState().setActiveTab(profileId as TabId);
+            }
+            navigate(`/mind-coach/${data.id}`, { replace: true });
+          } else {
+            navigate('/mind-coach', { replace: true });
+          }
+        });
+      return;
+    }
+
     const switchingProfile =
       prevProfileIdRef.current !== undefined && prevProfileIdRef.current !== profileId;
     prevProfileIdRef.current = profileId;

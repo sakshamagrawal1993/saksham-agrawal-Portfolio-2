@@ -20,6 +20,8 @@ const PHASE_IMAGES: Record<number, string> = {
 
 function transitionReasonLabel(reason?: string): string {
   switch (reason) {
+    case 'objective_ready_and_phase_requirements_met':
+      return 'Objective, readiness, and phase requirements were met. You advanced.';
     case 'blocked_by_risk':
       return 'Paused due to elevated risk. Stabilization comes first.';
     case 'objective_not_met':
@@ -296,6 +298,13 @@ export const JourneyScreen: React.FC = () => {
           const newFeatures = UNLOCK_MAP[unlockPhaseKey]?.filter(
             (f) => !UNLOCK_MAP[unlockPhaseKey - 1]?.includes(f)
           );
+          const showUnlockBadge =
+            !isPlaceholder &&
+            hasChosenPathway &&
+            isCurrent &&
+            journey?.phase_transition_result?.advanced === true &&
+            Boolean(badge) &&
+            Boolean(newFeatures?.length);
 
           return (
             <motion.div
@@ -440,7 +449,7 @@ export const JourneyScreen: React.FC = () => {
                 )}
 
                 {/* Feature unlock badge */}
-                {!isPlaceholder && hasChosenPathway && badge && newFeatures && newFeatures.length > 0 && (
+                {showUnlockBadge && (
                   <div className="mt-3 flex items-center gap-1.5 px-3 py-1.5 bg-[#B4A7D6]/10 rounded-lg w-fit border border-[#B4A7D6]/20">
                     <span className="text-[10px] text-[#B4A7D6] font-semibold uppercase tracking-wider">{badge}</span>
                   </div>

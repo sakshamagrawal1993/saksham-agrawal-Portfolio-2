@@ -104,7 +104,14 @@ serve(async (req) => {
     const n8nWebhookUrl = Deno.env.get('MC_N8N_CHAT_WEBHOOK_URL') || 'https://n8n.saksham-experiments.com/webhook/mind-coach-chat';
     const n8nDiscoveryWebhookUrl = Deno.env.get('MC_N8N_DISCOVERY_WEBHOOK_URL') || n8nWebhookUrl;
     const n8nSecret = Deno.env.get('MC_N8N_WEBHOOK_SECRET') || 'placeholder-secret';
-    const enableSyncDiscovery = /^(1|true|yes)$/i.test(Deno.env.get('MC_SYNC_DISCOVERY') || '');
+    const configuredSyncDiscovery = /^(1|true|yes)$/i.test(Deno.env.get('MC_SYNC_DISCOVERY') || '');
+    const isEngagementRapportPhase =
+      !pathway || pathway === 'engagement_rapport_and_assessment';
+    // Product rule: during Engagement & Rapport, discovery must run synchronously.
+    // After pathway assignment, fallback to environment-controlled behavior.
+    const enableSyncDiscovery = isEngagementRapportPhase
+      ? true
+      : configuredSyncDiscovery;
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -498,7 +505,7 @@ serve(async (req) => {
       (!pathway || pathway === 'engagement_rapport_and_assessment') &&
       typeof newCount === 'number' &&
       newCount >= 20 &&
-      newCount % 5 === 0;
+      (newCount % 4 === 0 || newCount % 5 === 0);
     if (shouldQueueAsyncDiscovery) {
       const asyncDiscoveryTask = (async () => {
         const asyncController = new AbortController();
