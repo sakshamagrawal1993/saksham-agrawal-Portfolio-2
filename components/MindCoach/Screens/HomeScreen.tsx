@@ -1,7 +1,23 @@
-import React, { useMemo, useCallback, useState } from 'react';
+import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, CheckCircle2, BookOpen, Wind, Brain, Flower2, Moon, MessageCircle as MsgIcon, Shield, Target, Heart, Sparkles, Settings } from 'lucide-react';
+import {
+  ArrowRight,
+  CheckCircle2,
+  BookOpen,
+  Wind,
+  Brain,
+  Flower2,
+  Moon,
+  MessageCircle as MsgIcon,
+  Shield,
+  Target,
+  Heart,
+  Sparkles,
+  Settings,
+  X,
+  UserCircle,
+} from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer, YAxis, CartesianGrid } from 'recharts';
 import { supabase } from '../../../lib/supabaseClient';
 import {
@@ -55,7 +71,8 @@ export const HomeScreen: React.FC = () => {
   const navigate = useNavigate();
   const [showConfirm, setShowConfirm] = useState(false);
   const [showProposal, setShowProposal] = useState(false);
-  const [showDeleteSection, setShowDeleteSection] = useState(false);
+  const [showSettingsDrawer, setShowSettingsDrawer] = useState(false);
+  const [authEmail, setAuthEmail] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isContinuingSession, setIsContinuingSession] = useState(false);
 
@@ -91,6 +108,40 @@ export const HomeScreen: React.FC = () => {
   };
   const therapistName = THERAPIST_NAMES[profile?.therapist_persona ?? 'maya'];
   const firstName = profile?.name?.split(' ')[0] ?? 'there';
+
+  useEffect(() => {
+    if (!showSettingsDrawer) return;
+    let cancelled = false;
+    void supabase.auth.getUser().then(({ data }) => {
+      if (!cancelled) setAuthEmail(data.user?.email ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [showSettingsDrawer]);
+
+  useEffect(() => {
+    if (!showSettingsDrawer) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowSettingsDrawer(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showSettingsDrawer]);
+
+  const pathwayLabel = useMemo(() => {
+    const p = journey?.pathway;
+    if (!p || p === 'engagement_rapport_and_assessment') return null;
+    return PATHWAY_LABELS[p as keyof typeof PATHWAY_LABELS] ?? p.replace(/_/g, ' ');
+  }, [journey?.pathway]);
+
+  const journeyStateLabel = useMemo(() => {
+    const s = journey?.journey_state;
+    if (!s) return 'Active';
+    if (s === 'completed') return 'Completed';
+    if (s === 'archived') return 'Archived';
+    return s.replace(/_/g, ' ');
+  }, [journey?.journey_state]);
 
   const TASK_ICONS: Record<TaskType, React.ElementType> = {
     journaling: BookOpen,
@@ -238,9 +289,9 @@ export const HomeScreen: React.FC = () => {
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="relative pt-1">
           <button
             type="button"
-            onClick={() => setShowDeleteSection((prev) => !prev)}
+            onClick={() => setShowSettingsDrawer(true)}
             className="absolute right-0 top-0 w-8 h-8 rounded-full flex items-center justify-center text-[#2C2A26]/30 hover:text-[#2C2A26]/60 hover:bg-[#F5F0EB] transition-colors"
-            aria-label="Settings"
+            aria-label="Open settings"
           >
             <Settings size={18} />
           </button>
@@ -637,39 +688,6 @@ export const HomeScreen: React.FC = () => {
         </motion.div>
         )}
 
-        {/* ── Settings section (collapsed) ── */}
-        {/* ── Settings section ── */}
-        <div className="mt-6">
-        <button
-          onClick={() => setShowDeleteSection(!showDeleteSection)}
-          className="w-full flex items-center justify-between text-sm font-medium text-[#2C2A26]/60 py-2"
-        >
-          Privacy & Data
-        </button>
-        
-        <AnimatePresence>
-          {showDeleteSection && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden"
-            >
-              <div className="flex flex-col items-center gap-3 py-4">
-                <button
-                  onClick={() => setShowConfirm(true)}
-                  className="px-5 py-2 text-xs font-medium text-red-500 hover:bg-red-50 rounded-xl transition-colors border border-red-200"
-                >
-                  Delete my profile
-                </button>
-                <p className="text-[11px] text-[#2C2A26]/30 text-center max-w-[260px]">
-                  This permanently removes all chat history, journal entries, and progress.
-                </p>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-        </div>
       </div>
 
       {/* Final Overlay Screens */}
@@ -682,6 +700,145 @@ export const HomeScreen: React.FC = () => {
               setActiveTab('sessions');
             }}
           />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showSettingsDrawer && (
+          <div className="fixed inset-0 z-[45] flex justify-end">
+            <motion.button
+              type="button"
+              aria-label="Close settings"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="absolute inset-0 bg-[#2C2A26]/35 backdrop-blur-[2px]"
+              onClick={() => setShowSettingsDrawer(false)}
+            />
+            <motion.aside
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="mind-coach-settings-title"
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+              className="relative z-[46] flex h-full w-[min(100%,22rem)] flex-col border-l border-[#E8E4DE] bg-[#FBF8F4] shadow-[-8px_0_32px_rgba(44,42,38,0.08)]"
+            >
+              <div className="zen-glass flex shrink-0 items-center justify-between gap-3 border-b border-white/50 px-4 py-3 backdrop-blur-md">
+                <div className="min-w-0">
+                  <p id="mind-coach-settings-title" className="text-sm font-semibold text-[#2C2A26]">
+                    Settings
+                  </p>
+                  <p className="text-[11px] text-[#2C2A26]/45 truncate">Account & privacy</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowSettingsDrawer(false)}
+                  className="shrink-0 rounded-full p-2 text-[#2C2A26]/45 hover:bg-white/60 hover:text-[#2C2A26]"
+                  aria-label="Close"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
+                <section className="zen-glass rounded-2xl border border-white/60 p-4 shadow-sm">
+                  <div className="flex items-center gap-2 mb-3">
+                    <UserCircle size={18} className="text-[#6B8F71]" />
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[#2C2A26]/45">
+                      Account
+                    </p>
+                  </div>
+                  <dl className="space-y-2.5 text-sm">
+                    <div>
+                      <dt className="text-[10px] uppercase tracking-wide text-[#2C2A26]/40">Name</dt>
+                      <dd className="text-[#2C2A26] font-medium">{profile?.name ?? '—'}</dd>
+                    </div>
+                    {authEmail && (
+                      <div>
+                        <dt className="text-[10px] uppercase tracking-wide text-[#2C2A26]/40">Email</dt>
+                        <dd className="text-[#2C2A26]/80 break-all">{authEmail}</dd>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <dt className="text-[10px] uppercase tracking-wide text-[#2C2A26]/40">Age</dt>
+                        <dd className="text-[#2C2A26]/80">{profile?.age != null ? String(profile.age) : '—'}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-[10px] uppercase tracking-wide text-[#2C2A26]/40">Gender</dt>
+                        <dd className="text-[#2C2A26]/80">{profile?.gender?.trim() ? profile.gender : '—'}</dd>
+                      </div>
+                    </div>
+                    <div>
+                      <dt className="text-[10px] uppercase tracking-wide text-[#2C2A26]/40">Therapist</dt>
+                      <dd className="text-[#2C2A26]/80">{therapistName}</dd>
+                    </div>
+                    {pathwayLabel && (
+                      <div>
+                        <dt className="text-[10px] uppercase tracking-wide text-[#2C2A26]/40">Pathway</dt>
+                        <dd className="text-[#2C2A26]/80">{pathwayLabel}</dd>
+                      </div>
+                    )}
+                    {journey && (
+                      <div>
+                        <dt className="text-[10px] uppercase tracking-wide text-[#2C2A26]/40">Journey</dt>
+                        <dd className="text-[#2C2A26]/80">
+                          {journey.title || 'Your journey'} · {journeyStateLabel}
+                        </dd>
+                      </div>
+                    )}
+                    <div>
+                      <dt className="text-[10px] uppercase tracking-wide text-[#2C2A26]/40 mb-1">Focus areas</dt>
+                      <dd>
+                        {profile?.concerns?.length ? (
+                          <ul className="flex flex-wrap gap-1.5">
+                            {profile.concerns.map((c) => (
+                              <li
+                                key={c}
+                                className="rounded-full bg-[#F5F0EB] px-2.5 py-0.5 text-[11px] text-[#2C2A26]/75"
+                              >
+                                {c}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <span className="text-[#2C2A26]/50">—</span>
+                        )}
+                      </dd>
+                    </div>
+                  </dl>
+                </section>
+
+                <section className="zen-glass rounded-2xl border border-white/60 p-4 shadow-sm">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Shield size={18} className="text-[#6B8F71]" />
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[#2C2A26]/45">
+                      Privacy & data
+                    </p>
+                  </div>
+                  <p className="text-xs text-[#2C2A26]/60 leading-relaxed mb-4">
+                    Your conversations and journal stay tied to this Mind Coach profile. You can remove everything at any time.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowSettingsDrawer(false);
+                      setShowConfirm(true);
+                    }}
+                    className="w-full rounded-xl border border-red-200 bg-white/80 px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+                  >
+                    Delete my profile
+                  </button>
+                  <p className="mt-2 text-[10px] text-[#2C2A26]/40 text-center leading-relaxed">
+                    Permanently removes chat history, journal, mood data, and progress.
+                  </p>
+                </section>
+              </div>
+            </motion.aside>
+          </div>
         )}
       </AnimatePresence>
 
