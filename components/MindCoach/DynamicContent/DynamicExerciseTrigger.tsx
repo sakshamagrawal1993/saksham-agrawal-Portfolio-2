@@ -48,6 +48,8 @@ export const DynamicExerciseTrigger: React.FC<DynamicExerciseTriggerProps> = ({ 
   }
 
   if (!exercise) {
+    if (payload.endsWith('_pathway')) return null;
+
     return (
       <div className="p-3 bg-[#F5F0EB] text-[#2C2A26] rounded-xl text-xs italic opacity-70">
         Exercise &quot;{payload}&quot; not found.
