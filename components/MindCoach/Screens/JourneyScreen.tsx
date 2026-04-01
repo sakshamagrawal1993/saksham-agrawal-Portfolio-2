@@ -225,8 +225,8 @@ export const JourneyScreen: React.FC = () => {
     : overallProgressPercentRaw;
   const overallProgressLabel =
     partialProgressUnits > 0.05 && completedProgressUnits < plannedSessions
-      ? `${completedProgressUnits}/${plannedSessions} sessions · in progress`
-      : `${completedProgressUnits}/${plannedSessions} sessions`;
+      ? `${Math.floor(completedProgressUnits)}/${plannedSessions} sessions · in progress`
+      : `${Math.floor(completedProgressUnits)}/${plannedSessions} sessions`;
 
   if (!journey || phases.length === 0) {
     return (
@@ -434,7 +434,7 @@ export const JourneyScreen: React.FC = () => {
                   )}
                   {!isPlaceholder && hasChosenPathway && (
                     <p className="text-[10px] font-semibold uppercase tracking-wider text-[#6B8F71]/60 mt-2">
-                      {completedInPhaseResolved}/{totalInPhase} sessions
+                      {Math.floor(completedInPhaseResolved)}/{totalInPhase} sessions
                     </p>
                   )}
                   {!isPlaceholder && hasChosenPathway && isCurrent && activeRuntimeSession?.status && activeRuntimeSession.status !== 'planned' && (
