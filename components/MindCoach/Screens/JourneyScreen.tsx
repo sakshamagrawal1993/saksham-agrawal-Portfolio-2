@@ -3,6 +3,14 @@ import { motion } from 'framer-motion';
 import { Check, Lock, Sparkles, Footprints } from 'lucide-react';
 import { useMindCoachStore, UNLOCK_MAP } from '../../../store/mindCoachStore';
 import { supabase } from '../../../lib/supabaseClient';
+import {
+  countLatticeCompletedSlots,
+  dedupeJourneySessionRows,
+  pathwayTemplateSlotCount,
+  phaseSessionSlotTotal,
+  plannedSessionsAfterPathwayChosen,
+} from '../shared/mindCoachJourneyProgress';
+import { messageCountHeuristicProgress } from '../shared/sessionObjectiveProgress';
 import '../Atmosphere/MindCoachZen.css';
 
 const FEATURE_BADGES: Record<number, string> = {
@@ -125,7 +133,9 @@ export const JourneyScreen: React.FC = () => {
       }
       const { data } = await supabase
         .from('mind_coach_journey_sessions')
-        .select('phase_number,session_order,status,attempt_count,generated_title,generated_description')
+        .select(
+          'phase_number,session_order,status,attempt_count,linked_session_id,generated_title,generated_goal,generated_description',
+        )
         .eq('journey_id', journey.id)
         .in('status', ['planned', 'in_progress', 'completed', 'revisit', 'blocked'])
         .order('phase_number', { ascending: true })
@@ -150,10 +160,21 @@ export const JourneyScreen: React.FC = () => {
     }
     return map;
   }, [journeySessionRows]);
+
+  const dedupedJourneySlots = useMemo(
+    () => dedupeJourneySessionRows(journeySessionRows),
+    [journeySessionRows],
+  );
+  const templateSlots = pathwayTemplateSlotCount(phases);
+
+  /**
+   * After pathway selection, engagement is one conceptual milestone — do not multiply by every
+   * historical engagement chat row (that inflated denominators like 5.2/13).
+   */
   const plannedSessions = hasChosenPathway
-    ? engagementTotalCount +
-      phases.reduce((sum, phase) => sum + Math.max(1, phase.sessions?.length ?? 1), 0)
-    : phases.reduce((sum, phase) => sum + Math.max(1, phase.sessions?.length ?? 1), 0);
+    ? plannedSessionsAfterPathwayChosen(dedupedJourneySlots, templateSlots)
+    : Math.max(1, engagementSessions.length) + templateSlots;
+
   const relevantSessions = sessions.filter((s) => {
     if (s.journey_id === journey?.id) return true;
     return hasChosenPathway && s.pathway === 'engagement_rapport_and_assessment';
@@ -161,27 +182,51 @@ export const JourneyScreen: React.FC = () => {
   const completedSessions = relevantSessions.filter(
     (s) => s.session_state === 'completed' && Boolean(s.ended_at),
   );
-  const inFlightSessions = relevantSessions.filter(
-    (s) => !(s.session_state === 'completed' && Boolean(s.ended_at)),
-  );
-  const partialProgressUnits = inFlightSessions.reduce((sum, session) => {
-    const messageProgress = Math.min(0.75, Number(session.message_count ?? 0) / 12);
+
+  const engagementMilestoneDone = hasChosenPathway ? 1 : Math.min(1, engagementCompletedCount);
+  const pathwaySlotsCompleted = dedupedJourneySlots.filter((r) => r.status === 'completed').length;
+  const completedProgressUnits = engagementMilestoneDone + pathwaySlotsCompleted;
+
+  /** At most one in-flight chat for this journey — avoids summing 0.35 per stray session. */
+  const openJourneyChat = useMemo(() => {
+    if (!journey?.id) return null;
+    const candidates = sessions
+      .filter(
+        (s) =>
+          s.journey_id === journey.id &&
+          !(s.session_state === 'completed' && Boolean(s.ended_at)),
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.started_at || 0).getTime() - new Date(a.started_at || 0).getTime(),
+      );
+    return candidates[0] ?? null;
+  }, [journey?.id, sessions]);
+
+  const partialProgressUnits = (() => {
+    if (!openJourneyChat) return 0;
+    const messageProgress = Math.min(0.75, Number(openJourneyChat.message_count ?? 0) / 12);
     const stateBaseline =
-      session.session_state === 'wrapping_up'
+      openJourneyChat.session_state === 'wrapping_up'
         ? 0.75
-        : session.session_state === 'active'
+        : openJourneyChat.session_state === 'active'
           ? 0.35
-          : session.session_state === 'intake'
+          : openJourneyChat.session_state === 'intake'
             ? 0.2
             : 0.1;
-    return sum + Math.min(0.9, Math.max(messageProgress, stateBaseline));
-  }, 0);
-  const overallProgressUnits = Math.min(plannedSessions, completedSessions.length + partialProgressUnits);
-  const overallProgressPercent =
-    plannedSessions > 0 ? Math.min(100, Math.round((overallProgressUnits / plannedSessions) * 100)) : 0;
-  const overallProgressLabel = Number.isInteger(overallProgressUnits)
-    ? `${overallProgressUnits}/${plannedSessions} sessions`
-    : `${overallProgressUnits.toFixed(1)}/${plannedSessions} sessions`;
+    return Math.min(0.85, Math.max(messageProgress, stateBaseline));
+  })();
+
+  const overallProgressForBar = Math.min(plannedSessions, completedProgressUnits + partialProgressUnits);
+  const overallProgressPercentRaw =
+    plannedSessions > 0 ? Math.min(100, Math.round((overallProgressForBar / plannedSessions) * 100)) : 0;
+  const overallProgressPercent = openJourneyChat
+    ? Math.min(99, overallProgressPercentRaw)
+    : overallProgressPercentRaw;
+  const overallProgressLabel =
+    partialProgressUnits > 0.05 && completedProgressUnits < plannedSessions
+      ? `${completedProgressUnits}/${plannedSessions} sessions · in progress`
+      : `${completedProgressUnits}/${plannedSessions} sessions`;
 
   if (!journey || phases.length === 0) {
     return (
@@ -285,15 +330,15 @@ export const JourneyScreen: React.FC = () => {
           const latestRows = [...latestByOrder.values()].sort(
             (a, b) => Number(a.session_order) - Number(b.session_order),
           );
+          const templatePhaseSlots = Math.max(1, phase.sessions?.length ?? 3);
           const totalInPhase = isEngagementPhase
             ? engagementTotalCount
-            : latestRows.length > 0
-              ? latestRows.length
-              : (phase.sessions?.length ?? 3);
-          const completedInPhaseResolved = Math.min(
-            totalInPhase,
-            latestRows.filter((r) => r.status === 'completed').length || completedInPhase,
-          );
+            : phaseSessionSlotTotal(templatePhaseSlots, latestByOrder);
+          const completedInPhaseResolved = isEngagementPhase
+            ? Math.min(totalInPhase, engagementCompletedCount)
+            : latestByOrder.size > 0
+              ? countLatticeCompletedSlots(latestByOrder, totalInPhase)
+              : Math.min(totalInPhase, completedInPhase);
           const activeRuntimeSession =
             latestRows.find((r) => r.status === 'in_progress' || r.status === 'revisit' || r.status === 'blocked') ??
             latestRows.find((r) => r.status === 'planned') ??
@@ -402,30 +447,82 @@ export const JourneyScreen: React.FC = () => {
                     </p>
                   )}
 
-                {/* Expanded session cards for current phase */}
-                {!isPlaceholder && hasChosenPathway && isCurrent && phase.sessions && phase.sessions.length > 0 && (
+                {/* One card per template session slot; lattice row + template goal per order */}
+                {!isPlaceholder && hasChosenPathway && isCurrent && totalInPhase >= 1 && !isEngagementPhase && (
                   <div className="mt-3 space-y-2">
-                    {phase.sessions.map((s, sIdx) => {
-                      const isDone = sIdx < completedInPhaseResolved;
-                      const isNext = sIdx === completedInPhaseResolved;
-                      const nextSessionTitle =
-                        isNext && activeRuntimeSession?.generated_title
-                          ? activeRuntimeSession.generated_title
-                          : s.topic;
-                      const nextSessionDescription =
-                        isNext && activeRuntimeSession?.generated_description
-                          ? activeRuntimeSession.generated_description
-                          : s.description;
+                    {(() => {
+                      let firstIncomplete: number | null = null;
+                      for (let o = 1; o <= totalInPhase; o += 1) {
+                        if (latestByOrder.get(o)?.status !== 'completed') {
+                          firstIncomplete = o;
+                          break;
+                        }
+                      }
+                      return Array.from({ length: totalInPhase }, (_, i) => {
+                      const order = i + 1;
+                      const row = latestByOrder.get(order);
+                      const tpl =
+                        phase.sessions?.find((s) => s.session_number === order) ?? phase.sessions?.[i];
+                      const isDone = row?.status === 'completed';
+                      const isNext = firstIncomplete != null && order === firstIncomplete;
+                      const title =
+                        (typeof row?.generated_title === 'string' && row.generated_title.trim()) ||
+                        (typeof tpl?.topic === 'string' && !/^session\s*\d+$/i.test(String(tpl.topic).trim())
+                          ? tpl.topic
+                          : null) ||
+                        `Session ${order}`;
+                      const detail =
+                        (typeof row?.generated_goal === 'string' && row.generated_goal.trim()) ||
+                        (typeof row?.generated_description === 'string' && row.generated_description.trim()) ||
+                        (typeof tpl?.description === 'string' ? tpl.description : '') ||
+                        '';
+                      const statusNote =
+                        row?.status === 'revisit'
+                          ? 'Revisit — goal not met last time'
+                          : row?.status === 'blocked'
+                            ? 'Stabilization hold'
+                            : row?.status === 'in_progress'
+                              ? 'In progress'
+                              : row?.status === 'planned' || !row
+                                ? 'Not started'
+                                : null;
+                      const linkedChat = row?.linked_session_id
+                        ? sessions.find((s) => s.id === row.linked_session_id)
+                        : null;
+                      const phaseOpenFallback =
+                        !linkedChat && isNext && sourcePhaseNum != null
+                          ? sessions
+                              .filter(
+                                (s) =>
+                                  s.journey_id === journey.id &&
+                                  s.phase_number === sourcePhaseNum &&
+                                  !(s.session_state === 'completed' && s.ended_at),
+                              )
+                              .sort(
+                                (a, b) =>
+                                  new Date(b.started_at || 0).getTime() -
+                                  new Date(a.started_at || 0).getTime(),
+                              )[0]
+                          : null;
+                      const chatForPartial = linkedChat ?? phaseOpenFallback;
+                      const slotPartialPct =
+                        !isDone && isNext && chatForPartial
+                          ? Math.min(
+                              99,
+                              messageCountHeuristicProgress(chatForPartial.message_count ?? 0),
+                            )
+                          : 0;
                       return (
                         <button
-                          key={sIdx}
+                          key={`slot-${order}-${row?.attempt_count ?? 0}`}
+                          type="button"
                           onClick={isNext ? () => setActiveTab('sessions') : undefined}
                           className={`w-full text-left rounded-xl p-3 border transition-colors ${
                             isDone
                               ? 'bg-[#6B8F71]/5 border-[#6B8F71]/15'
                               : isNext
                                 ? 'bg-white border-[#6B8F71]/25 hover:border-[#6B8F71]/50 cursor-pointer'
-                                : 'bg-[#F5F0EB]/50 border-[#E8E4DE] opacity-60'
+                                : 'bg-[#F5F0EB]/50 border-[#E8E4DE] opacity-70'
                           }`}
                         >
                           <div className="flex items-center gap-2">
@@ -441,17 +538,27 @@ export const JourneyScreen: React.FC = () => {
                                 isDone ? 'text-[#6B8F71]' : 'text-[#2C2A26]'
                               }`}
                             >
-                              {nextSessionTitle}
+                              {title}
                             </span>
                           </div>
-                          {isNext && (
-                            <p className="text-[10px] text-[#2C2A26]/40 mt-1 ml-0">
-                              {nextSessionDescription}
-                            </p>
-                          )}
+                          {detail ? (
+                            <p className="text-[10px] text-[#2C2A26]/50 mt-1 leading-relaxed">{detail}</p>
+                          ) : null}
+                          {!isDone && statusNote ? (
+                            <p className="text-[10px] text-[#B45309]/80 mt-1 font-medium">{statusNote}</p>
+                          ) : null}
+                          {slotPartialPct > 0 ? (
+                            <div className="mt-2 h-0.5 w-full bg-[#E8E4DE]/80 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-[#6B8F71]/85 rounded-full transition-all duration-500"
+                                style={{ width: `${slotPartialPct}%` }}
+                              />
+                            </div>
+                          ) : null}
                         </button>
                       );
-                    })}
+                    });
+                    })()}
                   </div>
                 )}
 

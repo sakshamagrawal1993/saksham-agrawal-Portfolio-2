@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, MessageCircle, Clock } from 'lucide-react';
 import { supabase } from '../../../lib/supabaseClient';
@@ -23,6 +23,13 @@ export const SessionsScreen: React.FC = () => {
   const currentPhase = useMindCoachStore((s) => s.currentPhaseNumber());
   const [starting, setStarting] = useState(false);
   const [showProposal, setShowProposal] = useState(false);
+
+  const hasChosenPathway =
+    journey?.pathway != null && journey.pathway !== 'engagement_rapport_and_assessment';
+
+  useEffect(() => {
+    if (hasChosenPathway) setShowProposal(false);
+  }, [hasChosenPathway]);
 
   const completedSessions = sessions.filter((s) => s.session_state === 'completed');
   const inProgressSessions = sessions

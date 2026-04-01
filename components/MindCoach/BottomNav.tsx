@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Home, MessageCircle, MoreHorizontal, BookOpen, BookHeart, Wind, ClipboardList, X } from 'lucide-react';
+import { Home, MessageCircle, MoreHorizontal, BookOpen, BookHeart, Wind, ClipboardList, Map, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useMindCoachStore, UNLOCK_MAP, type TabId, type MindCoachSession, type ChatMessage as ChatMessageType } from '../../store/mindCoachStore';
 import { openOrCreateInProgressSession } from './shared/sessionLifecycle';
@@ -10,6 +10,7 @@ const PRIMARY_TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
 ];
 
 const MORE_ITEMS: { id: TabId; label: string; icon: React.ElementType; feature: string }[] = [
+  { id: 'journey', label: 'Journey', icon: Map, feature: 'chat' },
   { id: 'journal', label: 'Journal', icon: BookOpen, feature: 'journal' },
   { id: 'diary', label: 'History', icon: BookHeart, feature: 'chat' },
   { id: 'exercises', label: 'Exercises', icon: Wind, feature: 'exercises' },

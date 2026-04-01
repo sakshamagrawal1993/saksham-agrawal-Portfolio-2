@@ -27,6 +27,13 @@ import {
 import { PlanProposalModal } from '../PlanProposalModal';
 import { PATHWAY_LABELS } from '../shared/pathwayLabels';
 import { openOrCreateInProgressSession } from '../shared/sessionLifecycle';
+import {
+  countLatticeCompletedSlots,
+  latestBySessionOrder,
+  latestJourneySessionRowsForPhase,
+  phaseSessionSlotTotal,
+} from '../shared/mindCoachJourneyProgress';
+import { messageCountHeuristicProgress } from '../shared/sessionObjectiveProgress';
 import '../Atmosphere/MindCoachZen.css';
 
 const MOOD_EMOJIS = [
@@ -78,17 +85,101 @@ export const HomeScreen: React.FC = () => {
 
   const phases = journey?.phases ?? [];
   const currentPhaseData = phases[currentPhase - 1];
+
+  const hasChosenPathway = journey?.pathway != null && journey.pathway !== 'engagement_rapport_and_assessment';
+  const displayCurrentPhase = hasChosenPathway ? currentPhase + 1 : currentPhase;
+
+  const [journeySessionRows, setJourneySessionRows] = useState<
+    { phase_number: number; session_order: number; status: string; attempt_count?: number }[]
+  >([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!journey?.id) {
+        setJourneySessionRows([]);
+        return;
+      }
+      const { data } = await supabase
+        .from('mind_coach_journey_sessions')
+        .select('phase_number,session_order,status,attempt_count')
+        .eq('journey_id', journey.id)
+        .in('status', ['planned', 'in_progress', 'completed', 'revisit', 'blocked'])
+        .order('phase_number', { ascending: true })
+        .order('session_order', { ascending: true })
+        .order('attempt_count', { ascending: false });
+      if (!cancelled) setJourneySessionRows(data ?? []);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [journey?.id]);
+
+  const latestCurrentPhaseRows = useMemo(
+    () =>
+      journey?.id && hasChosenPathway
+        ? latestJourneySessionRowsForPhase(journeySessionRows, currentPhase)
+        : [],
+    [journey?.id, hasChosenPathway, journeySessionRows, currentPhase],
+  );
+
+  const latestByOrderCurrentPhase = useMemo(
+    () => latestBySessionOrder(latestCurrentPhaseRows),
+    [latestCurrentPhaseRows],
+  );
+
   const completedInPhaseRaw = sessions.filter(
     (s) =>
       s.session_state === 'completed' &&
       s.phase_number === currentPhase &&
       s.journey_id === (journey?.id ?? null),
   ).length;
-  const totalInPhase = Math.max(1, currentPhaseData?.sessions?.length ?? 3);
-  const completedInPhase = Math.min(totalInPhase, completedInPhaseRaw);
+  const templatePhaseSlots = Math.max(1, currentPhaseData?.sessions?.length ?? 3);
+  const totalInPhase = hasChosenPathway
+    ? phaseSessionSlotTotal(templatePhaseSlots, latestByOrderCurrentPhase)
+    : templatePhaseSlots;
+  const latticeCompletedCurrent = countLatticeCompletedSlots(latestByOrderCurrentPhase, totalInPhase);
+  const completedInPhase =
+    hasChosenPathway && latestByOrderCurrentPhase.size > 0
+      ? latticeCompletedCurrent
+      : Math.min(totalInPhase, completedInPhaseRaw);
 
-  const hasChosenPathway = journey?.pathway != null && journey.pathway !== 'engagement_rapport_and_assessment';
-  const displayCurrentPhase = hasChosenPathway ? currentPhase + 1 : currentPhase;
+  const openSessionForProgressBar = useMemo(() => {
+    if (!journey?.id) return null;
+    const incomplete = (s: (typeof sessions)[number]) =>
+      !(s.session_state === 'completed' && s.ended_at);
+    if (hasChosenPathway) {
+      return (
+        sessions
+          .filter(
+            (s) =>
+              s.journey_id === journey.id && s.phase_number === currentPhase && incomplete(s),
+          )
+          .sort(
+            (a, b) =>
+              new Date(b.started_at || 0).getTime() - new Date(a.started_at || 0).getTime(),
+          )[0] ?? null
+      );
+    }
+    return (
+      sessions
+        .filter(
+          (s) =>
+            s.journey_id === journey.id &&
+            s.pathway === 'engagement_rapport_and_assessment' &&
+            incomplete(s),
+        )
+        .sort(
+          (a, b) =>
+            new Date(b.started_at || 0).getTime() - new Date(a.started_at || 0).getTime(),
+        )[0] ?? null
+    );
+  }, [journey?.id, hasChosenPathway, sessions, currentPhase]);
+
+  const activeSlotPartialPct =
+    openSessionForProgressBar && completedInPhase < totalInPhase
+      ? Math.min(99, messageCountHeuristicProgress(openSessionForProgressBar.message_count ?? 0))
+      : 0;
 
   const proposedPathway = useMemo(() => {
     const candidate = journey?.discovery_state?.suggested_pathway;
@@ -128,6 +219,10 @@ export const HomeScreen: React.FC = () => {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [showSettingsDrawer]);
+
+  useEffect(() => {
+    if (hasChosenPathway) setShowProposal(false);
+  }, [hasChosenPathway]);
 
   const pathwayLabel = useMemo(() => {
     const p = journey?.pathway;
@@ -232,20 +327,23 @@ export const HomeScreen: React.FC = () => {
     const engagementCompletedSessions = sessions.filter(
       (s) => s.pathway === 'engagement_rapport_and_assessment' && s.session_state === 'completed',
     ).length;
-    const engagementTotalSessions = Math.max(
-      1,
-      sessions.filter((s) => s.pathway === 'engagement_rapport_and_assessment').length,
-    );
     const pathwayPhases = phases.map((phase, idx) => {
       const phaseNumber = phase.phase_number || idx + 1;
       const displayPhaseNumber = phaseNumber + 1;
-      const completed = sessions.filter(
+      const latestRows = latestJourneySessionRowsForPhase(journeySessionRows, phaseNumber);
+      const byOrder = latestBySessionOrder(latestRows);
+      const templateTotal = Math.max(1, phase.sessions?.length ?? 3);
+      const total = phaseSessionSlotTotal(templateTotal, byOrder);
+      const completedFromSessions = sessions.filter(
         (s) =>
           s.session_state === 'completed' &&
           s.phase_number === phaseNumber &&
           s.journey_id === (journey?.id ?? null),
       ).length;
-      const total = Math.max(1, phase.sessions?.length ?? 3);
+      const completed =
+        byOrder.size > 0
+          ? countLatticeCompletedSlots(byOrder, total)
+          : Math.min(total, completedFromSessions);
       return {
         phaseNumber: displayPhaseNumber,
         title: phase.title || `Phase ${phaseNumber}`,
@@ -262,14 +360,14 @@ export const HomeScreen: React.FC = () => {
         phaseNumber: 1,
         title: 'Engagement & Rapport',
         goal: 'Establish trust, safety, and understanding before pathway work begins.',
-        completed: engagementCompletedSessions,
-        total: engagementTotalSessions,
+        completed: Math.min(1, engagementCompletedSessions),
+        total: 1,
         isCompleted: true,
         isCurrent: false,
       },
       ...pathwayPhases,
     ];
-  }, [hasChosenPathway, phases, sessions, displayCurrentPhase]);
+  }, [hasChosenPathway, phases, sessions, displayCurrentPhase, journeySessionRows]);
 
   return (
     <div className="relative px-6 pt-8 pb-24 overflow-x-hidden bg-gradient-to-b from-[#FBF8F4] via-[#F9F5EF] to-transparent">
@@ -385,10 +483,17 @@ export const HomeScreen: React.FC = () => {
                 {Array.from({ length: totalInPhase }, (_, idx) => (
                   <span
                     key={idx}
-                    className={`h-1.5 flex-1 rounded-full ${
-                      idx < completedInPhase ? 'bg-[#6B8F71]' : 'bg-[#E8E4DE]'
-                    }`}
-                  />
+                    className="h-1.5 flex-1 rounded-full relative overflow-hidden bg-[#E8E4DE]"
+                  >
+                    {idx < completedInPhase ? (
+                      <span className="absolute inset-0 rounded-full bg-[#6B8F71]" />
+                    ) : idx === completedInPhase && activeSlotPartialPct > 0 ? (
+                      <span
+                        className="absolute inset-y-0 left-0 rounded-full bg-[#6B8F71]/90"
+                        style={{ width: `${activeSlotPartialPct}%` }}
+                      />
+                    ) : null}
+                  </span>
                 ))}
               </div>
             </div>
@@ -477,10 +582,17 @@ export const HomeScreen: React.FC = () => {
                 {Array.from({ length: totalInPhase }, (_, idx) => (
                   <span
                     key={idx}
-                    className={`h-1.5 flex-1 rounded-full ${
-                      idx < completedInPhase ? 'bg-[#6B8F71]' : 'bg-[#E8E4DE]'
-                    }`}
-                  />
+                    className="h-1.5 flex-1 rounded-full relative overflow-hidden bg-[#E8E4DE]"
+                  >
+                    {idx < completedInPhase ? (
+                      <span className="absolute inset-0 rounded-full bg-[#6B8F71]" />
+                    ) : idx === completedInPhase && activeSlotPartialPct > 0 ? (
+                      <span
+                        className="absolute inset-y-0 left-0 rounded-full bg-[#6B8F71]/90"
+                        style={{ width: `${activeSlotPartialPct}%` }}
+                      />
+                    ) : null}
+                  </span>
                 ))}
               </div>
             </div>

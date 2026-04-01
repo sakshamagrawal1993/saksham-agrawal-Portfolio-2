@@ -6,6 +6,15 @@ export const THERAPY_PROPOSAL_MIN_MESSAGE_COUNT = 20;
 /** Pathway confidence at or above this is treated as “ready” for plan formulation (matches discovery UI labels). */
 export const THERAPY_PROPOSAL_CONFIDENCE_READY = 80;
 
+/**
+ * Pathway session: "End session" enables when model progress ≥ this, or when n8n sets is_session_close.
+ * Aligns with message-count heuristic cap (85) so both paths can unlock together.
+ */
+export const SESSION_GOAL_MET_PROGRESS_THRESHOLD = 85;
+
+/** Engagement: End session also enables when plan-reveal meter reaches this (pathway surfacing). */
+export const ENGAGEMENT_END_SESSION_PLAN_REVEAL_MIN = 88;
+
 /** Hero image for the therapy proposal bottom drawer (Supabase public storage). */
 export const MIND_COACH_PROPOSAL_DRAWER_IMAGE =
   'https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/mind%20coach/Generated_image.jpg';

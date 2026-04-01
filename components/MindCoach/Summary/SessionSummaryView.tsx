@@ -296,6 +296,22 @@ export const SessionSummaryView: React.FC<SessionSummaryViewProps> = ({
           </motion.div>
         )}
 
+        {title === 'Session Complete' &&
+          phaseTransitionResult?.phase_gate_reason !== 'journey_completed' &&
+          !phaseTransitionResult?.advanced && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ type: 'spring', stiffness: 220, damping: 24 }}
+              className="rounded-2xl border border-[#6B8F71]/20 bg-[#F2F7F2]/90 px-4 py-3.5 text-center"
+            >
+              <p className="text-sm font-semibold text-[#4A6B50]">Nice work finishing this session</p>
+              <p className="text-xs text-[#2C2A26]/58 mt-1 leading-relaxed">
+                You chose to close intentionally — that keeps your journey honest and steady.
+              </p>
+            </motion.div>
+          )}
+
         {/* ── TIER 1: Warm reflection + takeaway + next step ── */}
         <motion.div
           initial={{ opacity: 0, y: 15 }}

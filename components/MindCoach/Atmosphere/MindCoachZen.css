@@ -39,6 +39,21 @@
   animation: zen-float 6s ease-in-out infinite;
 }
 
+/* End session CTA — subtle pulse when session goal is met */
+@keyframes mc-end-session-ready {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(107, 143, 113, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(107, 143, 113, 0.12);
+  }
+}
+
+.mc-end-session-ready {
+  animation: mc-end-session-ready 2.2s ease-in-out infinite;
+}
+
 @keyframes serene-fade-in {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }

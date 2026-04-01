@@ -11,11 +11,17 @@ import {
 } from '../../../store/mindCoachStore';
 import { ChatMessage } from './ChatMessage';
 import {
+  ENGAGEMENT_END_SESSION_PLAN_REVEAL_MIN,
   MIND_COACH_DUMMY_SESSION_SUMMARY,
+  SESSION_GOAL_MET_PROGRESS_THRESHOLD,
   THERAPIST_CONFIG,
   THERAPY_PROPOSAL_CONFIDENCE_READY,
   THERAPY_PROPOSAL_MIN_MESSAGE_COUNT,
 } from '../MindCoachConstants';
+import {
+  computeSessionObjectiveProgressPercent,
+  displaySessionProgressForOpenSession,
+} from '../shared/sessionObjectiveProgress';
 import { PhaseProgressStepper } from './PhaseProgressStepper';
 import { SessionSummaryView } from '../Summary/SessionSummaryView';
 import { getCountryNameFromCode, resolveCountryCodeFromClient, toTelHref } from '../shared/locationCountry';
@@ -222,6 +228,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
   const sessions = useMindCoachStore((s) => s.sessions);
   const setCrisisDetected = useMindCoachStore((s) => s.setCrisisDetected);
   const setIsSessionClose = useMindCoachStore((s) => s.setIsSessionClose);
+  const isSessionClose = useMindCoachStore((s) => s.isSessionClose);
   const isCrisisDetected = useMindCoachStore((s) => s.isCrisisDetected);
   const memories = useMindCoachStore((s) => s.memories);
   const activeTasks = useMindCoachStore((s) => s.activeTasks);
@@ -241,6 +248,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
     return !localStorage.getItem(`mc_safe_exit_seen_${profile.id}`);
   });
   const scrollRef = useRef<HTMLDivElement>(null);
+  const previousActiveSessionIdRef = useRef<string | undefined>(undefined);
   /** When n8n succeeded but assistant row failed — retry uses this bundle. */
   const pendingAfterN8nRef = useRef<{
     assistantMsg: ChatMessageType;
@@ -373,6 +381,44 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
       typeof ds.confidence === 'number'
     );
   }, [journey?.discovery_state?.suggested_pathway, journey?.discovery_state?.confidence]);
+
+  const messageCountForObjective = Math.max(
+    activeSession?.message_count ?? 0,
+    messages.length,
+  );
+
+  const sessionObjectiveProgressRaw = useMemo(() => {
+    if (!activeSession || isEngagementDiscovery) return 0;
+    return computeSessionObjectiveProgressPercent(messages, messageCountForObjective);
+  }, [activeSession, isEngagementDiscovery, messages, messageCountForObjective]);
+
+  const canEndSession = useMemo(() => {
+    if (sessionCrisisFlag) return true;
+    if (isSessionClose) return true;
+    if (isEngagementDiscovery) {
+      return (
+        canViewTherapyProposal ||
+        planRevealProgress >= ENGAGEMENT_END_SESSION_PLAN_REVEAL_MIN
+      );
+    }
+    return sessionObjectiveProgressRaw >= SESSION_GOAL_MET_PROGRESS_THRESHOLD;
+  }, [
+    sessionCrisisFlag,
+    isSessionClose,
+    isEngagementDiscovery,
+    canViewTherapyProposal,
+    planRevealProgress,
+    sessionObjectiveProgressRaw,
+  ]);
+
+  useEffect(() => {
+    const id = activeSession?.id;
+    const prev = previousActiveSessionIdRef.current;
+    if (prev !== undefined && prev !== id) {
+      setIsSessionClose(false);
+    }
+    previousActiveSessionIdRef.current = id;
+  }, [activeSession?.id, setIsSessionClose]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -852,8 +898,14 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
   const prefillAppliedForSessionRef = useRef<Set<string>>(new Set());
   const trackedPathwayCardViewsRef = useRef<Set<string>>(new Set());
 
+  const sessionProgressDisplayed = useMemo(
+    () => displaySessionProgressForOpenSession(sessionObjectiveProgressRaw, !showSummary),
+    [sessionObjectiveProgressRaw, showSummary],
+  );
+
   const handleEndSession = async () => {
     if (endingSession) return;
+    if (!canEndSession) return;
     setEndingSession(true);
 
     let effectiveSession: MindCoachSession | null = activeSession ?? null;
@@ -957,60 +1009,75 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
         .map((m) => `${m.role === 'user' ? 'Client' : 'Therapist'}: ${m.content ?? ''}`)
         .join('\n');
 
-      const { data, error } = await supabase.functions.invoke('mind-coach-session-end', {
-        body: {
-          session_id: effectiveSession.id,
-          profile_id: effectiveProfileId,
-          messages: messagesPayload,
-          transcript,
-          profile: profile
-            ? {
-                id: profile.id,
-                name: profile.name,
-                age: profile.age,
-                gender: profile.gender,
-                concerns: profile.concerns,
-                therapist_persona: profile.therapist_persona,
-              }
-            : null,
-          session: {
-            pathway: effectiveSession.pathway,
-            dynamic_theme: effectiveSession.dynamic_theme,
-            session_number: effectiveSession.session_number,
-          },
-          currentPhase:
-            journey && Array.isArray(journey.phases)
-              ? journey.phases[journey.current_phase_index ?? Math.max(0, (journey.current_phase || 1) - 1)] ?? null
-              : null,
-          phase_context: journey
-            ? {
-                current_phase_index: journey.current_phase_index ?? Math.max(0, (journey.current_phase || 1) - 1),
-                total_phases: Array.isArray(journey.phases) ? journey.phases.length : 0,
-                current_phase: journey.phases?.[journey.current_phase_index ?? 0] ?? null,
-                next_phase: journey.phases?.[(journey.current_phase_index ?? 0) + 1] ?? null,
-              }
-            : null,
-          memories: memories.map((m) => ({
-            memory_text: m.memory_text,
-            memory_type: m.memory_type,
-            created_at: m.created_at,
-          })),
-          current_memory: memories[0]
-            ? {
-                memory_text: memories[0].memory_text,
-                memory_type: memories[0].memory_type,
-                created_at: memories[0].created_at,
-              }
-            : null,
-          recent_case_notes: recentCaseNotes.map((n) => n.key_insight).filter(Boolean),
-          active_tasks: activeTasks,
-          mood_entries: moodEntries.map((m) => ({
-            score: m.score,
-            notes: m.notes,
-            created_at: m.created_at,
-          })),
+      const sessionEndBody = {
+        session_id: effectiveSession.id,
+        profile_id: effectiveProfileId,
+        messages: messagesPayload,
+        transcript,
+        profile: profile
+          ? {
+              id: profile.id,
+              name: profile.name,
+              age: profile.age,
+              gender: profile.gender,
+              concerns: profile.concerns,
+              therapist_persona: profile.therapist_persona,
+            }
+          : null,
+        session: {
+          pathway: effectiveSession.pathway,
+          dynamic_theme: effectiveSession.dynamic_theme,
+          session_number: effectiveSession.session_number,
         },
-      });
+        currentPhase:
+          journey && Array.isArray(journey.phases)
+            ? journey.phases[journey.current_phase_index ?? Math.max(0, (journey.current_phase || 1) - 1)] ?? null
+            : null,
+        phase_context: journey
+          ? {
+              current_phase_index: journey.current_phase_index ?? Math.max(0, (journey.current_phase || 1) - 1),
+              total_phases: Array.isArray(journey.phases) ? journey.phases.length : 0,
+              current_phase: journey.phases?.[journey.current_phase_index ?? 0] ?? null,
+              next_phase: journey.phases?.[(journey.current_phase_index ?? 0) + 1] ?? null,
+            }
+          : null,
+        memories: memories.map((m) => ({
+          memory_text: m.memory_text,
+          memory_type: m.memory_type,
+          created_at: m.created_at,
+        })),
+        current_memory: memories[0]
+          ? {
+              memory_text: memories[0].memory_text,
+              memory_type: memories[0].memory_type,
+              created_at: memories[0].created_at,
+            }
+          : null,
+        recent_case_notes: recentCaseNotes.map((n) => n.key_insight).filter(Boolean),
+        active_tasks: activeTasks,
+        mood_entries: moodEntries.map((m) => ({
+          score: m.score,
+          notes: m.notes,
+          created_at: m.created_at,
+        })),
+      };
+
+      let data: unknown = null;
+      let error: unknown = null;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const res = await supabase.functions.invoke('mind-coach-session-end', {
+          body: sessionEndBody,
+        });
+        data = res.data;
+        error = res.error;
+        const payloadErr =
+          res.data &&
+          typeof res.data === 'object' &&
+          'error' in (res.data as object) &&
+          (res.data as { error?: unknown }).error != null;
+        if (!res.error && !payloadErr) break;
+        if (attempt === 0) await new Promise((r) => setTimeout(r, 1600));
+      }
       const basePayload =
         Array.isArray(data) && data[0] && typeof data[0] === 'object'
           ? (data[0] as Record<string, unknown>)
@@ -1355,38 +1422,33 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
             <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-red-500" />
           </button>
         )}
-        <button
+        <motion.button
           type="button"
-          onClick={handleEndSession}
-          disabled={endingSession}
-          className="relative z-10 shrink-0 text-xs font-semibold text-[#2C2A26]/60 hover:text-[#2C2A26] disabled:opacity-50 py-2 px-3 rounded-lg hover:bg-[#F5F0EB] transition-colors"
+          onClick={() => void handleEndSession()}
+          disabled={endingSession || !canEndSession}
+          title={
+            !canEndSession
+              ? 'Keep going until your session goal is met — watch progress above.'
+              : undefined
+          }
+          className={`relative z-10 shrink-0 text-xs font-semibold py-2 px-3 rounded-lg transition-colors disabled:opacity-45 disabled:cursor-not-allowed ${
+            canEndSession && !endingSession
+              ? 'text-[#4A6B50] bg-[#E8F3E9]/80 hover:bg-[#E8F3E9] mc-end-session-ready'
+              : 'text-[#2C2A26]/45 hover:text-[#2C2A26]/70 hover:bg-[#F5F0EB]/80'
+          }`}
         >
           {endingSession ? 'Ending…' : 'End session'}
-        </button>
+        </motion.button>
       </div>
 
-      {!isEngagementDiscovery && journey && (() => {
-        let computedProgress = 0;
-        for (let i = messages.length - 1; i >= 0; i--) {
-          const p = messages[i]?.dynamic_content?.current_objective_progress;
-          if (typeof p === 'number') {
-            computedProgress = p;
-            break;
-          }
-        }
-        if (computedProgress === 0 && activeSession) {
-          const count = activeSession.message_count || 0;
-          computedProgress = Math.min(85, Math.round((count / 25) * 100));
-        }
-
-        return (
-          <PhaseProgressStepper 
-            journey={journey} 
-            sessions={sessions} 
-            currentObjectiveProgress={computedProgress} 
-          />
-        );
-      })()}
+      {!isEngagementDiscovery && journey && (
+        <PhaseProgressStepper
+          journey={journey}
+          sessions={sessions}
+          activeSession={activeSession}
+          currentObjectiveProgress={sessionProgressDisplayed}
+        />
+      )}
 
       {chatError && (
         <div
@@ -1426,7 +1488,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
           <div
             className="px-4 pt-2"
             role="progressbar"
-            aria-valuenow={Math.round(planRevealProgress)}
+            aria-valuenow={Math.round(Math.min(99, planRevealProgress))}
             aria-valuemin={0}
             aria-valuemax={100}
             aria-labelledby="mind-coach-plan-unlock-label"
@@ -1435,7 +1497,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
               <motion.div
                 className="h-full bg-[#6B8F71] rounded-full"
                 initial={false}
-                animate={{ width: `${planRevealProgress}%` }}
+                animate={{ width: `${Math.min(99, planRevealProgress)}%` }}
                 transition={{ type: 'spring', stiffness: 140, damping: 22 }}
               />
             </div>

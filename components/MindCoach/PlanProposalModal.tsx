@@ -248,11 +248,16 @@ export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, o
     const [sessionTemplates, setSessionTemplates] = useState<SessionTemplateRow[] | null>(null);
 
     const suggestedPathwayId = useMemo(() => {
+        const chosen =
+            journey?.pathway && journey.pathway !== 'engagement_rapport_and_assessment'
+                ? journey.pathway
+                : null;
+        if (chosen) return chosen;
         if (activeSession?.pathway && activeSession.pathway !== 'engagement_rapport_and_assessment') {
             return activeSession.pathway;
         }
         return journey?.discovery_state?.suggested_pathway ?? 'engagement_rapport_and_assessment';
-    }, [activeSession?.pathway, journey?.discovery_state?.suggested_pathway]);
+    }, [activeSession?.pathway, journey?.pathway, journey?.discovery_state?.suggested_pathway]);
     const [selectedPathwayId, setSelectedPathwayId] = useState(suggestedPathwayId);
 
     useEffect(() => {
@@ -431,7 +436,7 @@ export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, o
                     .map((tpl) => ({
                         journey_id: routeData.id,
                         profile_id: profile.id,
-                        pathway_name: selectedPathwayId,
+                        pathway_name: acceptedPathwayId,
                         session_template_id: tpl.id,
                         phase_number: tpl.phase_number,
                         session_order: tpl.session_order,
@@ -536,7 +541,9 @@ export const PlanProposalModal: React.FC<PlanProposalModalProps> = ({ onClose, o
                 <div className="px-5 pt-2 pb-4 bg-[#FAFAF7] shrink-0 -mt-6 relative">
                     <p className="text-[11px] font-semibold text-[#6B8F71] uppercase tracking-wide mb-1.5">Suggested pathway</p>
                     <h2 className="text-xl font-semibold text-[#2C2A26] leading-snug mb-2">
-                        {planTitle}
+                        {showPostAccept && postAcceptDetails?.pathwayName
+                            ? postAcceptDetails.pathwayName
+                            : planTitle}
                     </h2>
                     <p className="text-sm text-[#2C2A26]/70 leading-relaxed">
                         Based on what you&apos;ve shared about{' '}
