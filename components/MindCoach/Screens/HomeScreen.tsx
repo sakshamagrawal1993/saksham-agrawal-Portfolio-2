@@ -751,36 +751,31 @@ export const HomeScreen: React.FC = () => {
             </p>
             <span className="text-[10px] text-[#2C2A26]/45 bg-white/80 border border-[#E8E4DE] rounded-full px-2 py-0.5">
               Last {Math.min(7, moodChartData.length)} check-ins
-            </span>
-          </div>
-          <p className="mb-2 text-[10px] text-[#2C2A26]/45">
-            😢 · 😕 · 😐 · 🙂 · 😊
-          </p>
-          <ResponsiveContainer width="100%" height={90}>
-            <AreaChart data={moodChartData}>
-              <CartesianGrid
-                vertical={false}
-                strokeDasharray="3 3"
-                stroke="#DCD5CB"
-                strokeOpacity={0.7}
-              />
-              <YAxis
-                type="number"
-                domain={[1, 5]}
-                ticks={[1, 2, 3, 4, 5]}
-                width={28}
-                axisLine={false}
-                tickLine={false}
-                tick={{ fontSize: 14, fill: '#2C2A26' }}
-                tickFormatter={(value) => {
-                  if (Number(value) === 1) return '😢';
-                  if (Number(value) === 2) return '😕';
-                  if (Number(value) === 3) return '😐';
-                  if (Number(value) === 4) return '🙂';
-                  if (Number(value) === 5) return '😊';
-                  return '';
-                }}
-              />
+          </span>
+        </div>
+        <ResponsiveContainer width="100%" height={90}>
+          <AreaChart data={moodChartData}>
+            <CartesianGrid
+              vertical={false}
+              strokeDasharray="3 3"
+              stroke="#DCD5CB"
+              strokeOpacity={0.7}
+            />
+            <YAxis
+              type="number"
+              domain={[1, 5]}
+              ticks={[1, 3, 5]}
+              width={22}
+              axisLine={false}
+              tickLine={false}
+              tick={{ fontSize: 13, fill: '#2C2A26' }}
+              tickFormatter={(value) => {
+                if (Number(value) === 1) return '😢';
+                if (Number(value) === 3) return '😐';
+                if (Number(value) === 5) return '😊';
+                return '';
+              }}
+            />
               <defs>
                 <linearGradient id="moodGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#6B8F71" stopOpacity={0.2} />
