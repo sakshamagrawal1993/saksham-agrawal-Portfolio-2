@@ -1,0 +1,51 @@
+[
+  {
+    "id": "CASE-101",
+    "title": "Severe headache and neck stiffness",
+    "case_text": "A 34-year-old female presents to the emergency department complaining of a progressively worsening, severe headache for the past 24 hours. She describes it as the 'worst headache of my life'. Associated symptoms include photophobia, nausea, and vomiting. On examination, the patient is febrile (38.8°C), lethargic but arousable, and exhibits marked nuchal rigidity. Kernig's and Brudzinski's signs are positive. No focal neurological deficits are noted.",
+    "ground_truth": "Bacterial Meningitis",
+    "links": {
+      "see_also": ["CASE-102", "CASE-104"],
+      "same_theme_as": ["CASE-104"]
+    }
+  },
+  {
+    "id": "CASE-102",
+    "title": "Chest pain radiating to the left arm",
+    "case_text": "A 58-year-old male with a history of hypertension and hyperlipidemia presents with sudden onset, crushing substernal chest pain that began 45 minutes ago while mowing the lawn. The pain radiates to his left arm and jaw. He complains of diaphoresis, shortness of breath, and feeling faint. Blood pressure is 155/95 mmHg, heart rate is 110 bpm. ECG shows ST-segment elevation in leads II, III, and aVF.",
+    "ground_truth": "Acute Inferior Myocardial Infarction",
+    "links": {
+      "see_also": ["CASE-101"],
+      "same_theme_as": ["CASE-104"]
+    }
+  },
+  {
+    "id": "CASE-103",
+    "title": "Right lower quadrant abdominal pain",
+    "case_text": "A 22-year-old male presents with a 12-hour history of abdominal pain. The pain initially started in the periumbilical region but has migrated to the right lower quadrant over the past 4 hours. He reports anorexia, nausea without vomiting, and low-grade fever (37.9°C). Examination reveals localized tenderness at McBurney's point with guarding and rebound tenderness. Rovsing's sign is positive. WBC count is elevated at 14,000/µL with a left shift.",
+    "ground_truth": "Acute Appendicitis",
+    "links": {
+      "see_also": ["CASE-104"],
+      "sibling_of": ["CASE-105"]
+    }
+  },
+  {
+    "id": "CASE-104",
+    "title": "Progressive shortness of breath and cough",
+    "case_text": "A 65-year-old man with a 40 pack-year smoking history presents with a 3-day history of progressively worsening shortness of breath and a cough productive of yellowish-green sputum. He reports subjective fevers and chills. Vital signs reveal tachypnea (24 breaths/min), tachycardia (115 bpm), fever (38.5°C), and oxygen saturation of 88% on room air. Auscultation demonstrates coarse crepitations (crackles) in the right lower lobe of the lung.",
+    "ground_truth": "Community-Acquired Pneumonia",
+    "links": {
+      "see_also": ["CASE-101", "CASE-103", "CASE-105"],
+      "references": ["CASE-102"]
+    }
+  },
+  {
+    "id": "CASE-105",
+    "title": "Polyuria, polydipsia, and weight loss",
+    "case_text": "A 14-year-old boy is brought to the clinic by his parents due to a 3-week history of passing large volumes of urine frequently (polyuria), excessive thirst (polydipsia), and a 5 lbs weight loss despite an increased appetite. He also complains of recent fatigue and blurred vision. Urinalysis dipstick is strongly positive for both glucose and ketones. A random capillary blood glucose reading in the clinic is 350 mg/dL.",
+    "ground_truth": "Type 1 Diabetes Mellitus (new onset)",
+    "links": {
+      "see_also": ["CASE-104"]
+    }
+  }
+]

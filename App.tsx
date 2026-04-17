@@ -34,6 +34,7 @@ const PlaygroundLayout = lazy(() => import('./components/HealthTwin/Playground/P
 const MindCoachLanding = lazy(() => import('./components/MindCoach/MindCoachLanding'));
 const MindCoachApp = lazy(() => import('./components/MindCoach/MindCoachApp'));
 
+const MedicalBenchmarkApp = lazy(() => import('./src/components/MedicalBenchmark/MedicalBenchmarkApp'));
 const PortfolioPage = lazy(() => import('./components/PortfolioPage'));
 
 const LoadingFallback = () => (
@@ -218,6 +219,11 @@ function App() {
               </Suspense>
             } />
             <Route path="/project/:id" element={<ProjectPage />} />
+            <Route path="/medical-benchmark" element={
+              <Suspense fallback={<LoadingFallback />}>
+                <MedicalBenchmarkApp onBack={() => navigate('/#work')} />
+              </Suspense>
+            } />
 
             {/* Unified Journal/Blog Routes */}
             <Route path="/journal" element={
@@ -257,8 +263,8 @@ function App() {
           </Routes>
         </main>
 
-        {!['/ticketflow', '/insightslm', '/login'].includes(location.pathname) && !location.pathname.startsWith('/health-twin') && !location.pathname.startsWith('/mind-coach') && <Footer onLinkClick={handleNavClick} />}
-        {!['/runner'].includes(location.pathname) && !location.pathname.startsWith('/health-twin') && !location.pathname.startsWith('/mind-coach') && <Assistant />}
+        {!['/ticketflow', '/insightslm', '/login', '/medical-benchmark'].includes(location.pathname) && !location.pathname.startsWith('/health-twin') && !location.pathname.startsWith('/mind-coach') && <Footer onLinkClick={handleNavClick} />}
+        {!['/runner', '/medical-benchmark'].includes(location.pathname) && !location.pathname.startsWith('/health-twin') && !location.pathname.startsWith('/mind-coach') && <Assistant />}
       </div>
     </AuthProvider>
   );
