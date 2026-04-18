@@ -20,10 +20,10 @@ const About: React.FC = () => {
         </div>
         <div className="md:w-2/3 max-w-2xl">
           <p className="text-lg md:text-xl text-[#5D5A53] font-light leading-relaxed mb-8">
-            I am Saksham, a Senior Product Manager obsessed with building scalable solutions in Fintech and Healthcare.
+            I am Saksham, a Product Leader with 7+ years of experience directing product strategy, scaling operations, and driving P&L impact across high-growth Fintech and cutting-edge AI sectors.
           </p>
           <p className="text-lg md:text-xl text-[#5D5A53] font-light leading-relaxed mb-8">
-            With an MBA in Strategy & Finance and a deep technical understanding of AI, I bridge the gap between complex engineering challenges and tangible business value. Whether it's launching a neo-banking credit card or architecting an AI therapist, my philosophy remains the same: <strong>Solve real problems with clarity and precision.</strong>
+            With an MBA in Strategy & Finance and a deep technical understanding of AI, I bridge the gap between complex engineering challenges and tangible business value. From architecting Agentic AI healthcare solutions to managing a high-volume consumer lending portfolio, my philosophy remains the same: <strong>Solve real problems with clarity and precision.</strong>
           </p>
 
           <div className="mb-12">
@@ -58,9 +58,9 @@ const About: React.FC = () => {
               <h4 className="font-serif text-[#2C2A26] text-xl mb-4">Core Competencies</h4>
               <ul className="text-[#5D5A53] font-light space-y-2">
                 <li>Product Vision & Strategy</li>
-                <li>Go-To-Market (GTM)</li>
+                <li>Agentic AI & Orchestration</li>
                 <li>0-to-1 Product Innovation</li>
-                <li>Data Analytics (SQL, Mixpanel)</li>
+                <li>AI Evals & Observability</li>
               </ul>
             </div>
           </div>

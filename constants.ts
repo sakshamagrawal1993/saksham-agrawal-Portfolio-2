@@ -8,52 +8,56 @@
 import { Project, JournalArticle } from './types';
 
 // Placeholder PDF Base64. In production, replace this with a link to the actual file like "/Saksham_Agrawal_Resume.pdf"
-export const RESUME_DATA_URI = "https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/Resume/Saksham_Agrawal_Resume_26_11_2025.pdf";
+export const RESUME_DATA_URI = "https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/Resume/Saksham_Agrawal_Resume_10_04.pdf";
 
 export const EXPERIENCE = [
   {
     company: "Jivi AI",
-    role: "Senior Product Manager",
+    role: "Director, Product Management",
     period: "Dec '24 - Present",
-    location: "Gurugram, India",
+    location: "Delhi, India",
     description: [
-      "Leading product for Health Twin, unifying data across biomarkers to create a connected care platform using Agentic RAG and Knowledge Graphs.",
-      "Launched Jivi Mind Coach (AI Therapist) supporting 100+ languages; implemented emergency monitoring with F1 score of 0.99.",
-      "Scaled Jivi Mind Coach to ~800 therapies/day with 4% conversion rate.",
-      "Built agent-orchestration platform reducing time-to-market for AI agents by ~50%."
+      "Architected Health Twin, a centralized platform unifying 500+ biomarker data points using Agentic RAG. Leading the strategic integration with the world's largest smartphone OEM.",
+      "Launched Jivi Mind Coach, a voice-first AI therapist scaling to ~800 therapies/day, and established an observability framework with 0.99 F1 score.",
+      "Led multi-agent triaging workflow for Dr. Jivi, achieving top-3 diagnostic accuracy of 94.77% in USMLE/NEJM benchmarking.",
+      "Built multimodal agent-orchestration platform empowering non-tech teams to compose AI agents, reducing TTM by ~50%.",
+      "Architected a stateful memory management system integrating episodic session context and long-term user profiles for deep personalization.",
+      "Drove user acquisition to 3.7M+ users through performance marketing and PLG freemium models, reducing CAC by 75%.",
+      "Leveraged LLM-native development tools to build and deploy functional full-stack prototypes, streamlining technical feasibility and demos."
     ]
   },
   {
     company: "BharatPe",
     role: "Senior Product Manager, Consumer Lending",
     period: "Jun '22 - Dec '24",
-    location: "New Delhi, India",
+    location: "Delhi, India",
     description: [
-      "Co-led 0-1 launch of BharatPe Unity Bank co-branded credit card; scaled to ~1000 cards monthly with avg transaction value of Rs. 20,000.",
-      "Managed Postpe cards (3rd largest BNPL player) with 1.2 million cards; increased transaction success rate from 72% to 84%.",
-      "Spearheaded Personal Loan product with real-time disbursals, scaling to ~Rs 2.5 Cr/day.",
-      "Defined roadmap for compliance with RBI's Digital Lending Guidelines."
+      "Led a cross-functional team of business, design, engineering, and risk to successfully launch Co-branded Credit Cards (0-to-1). Scaled acquisition to ~1,000 cards/month with an average transaction value exceeding INR 20k.",
+      "Managed Postpe cards (1.2M+ active cards) and CCMS platform integrations. Spearheaded a team of 2 APMs to disburse INR 420 Cr/month with an AUM of ~INR 680 Cr.",
+      "Increased transaction success rate from 72% to 84%, generating an additional INR 30 Cr/month in disbursals.",
+      "Spearheaded Personal Loan product from concept to launch with E-Nach validation and real-time disbursals, scaling portfolio to INR 2.5 Cr/day.",
+      "Pioneered industry-first 'EMI on QR' feature, unlocking a new INR 1 Cr/day portfolio in consumer durable loans.",
+      "Defined and executed the comprehensive strategic roadmap for strict compliance with RBI's Digital Lending Guidelines."
     ]
   },
   {
     company: "Xiaomi India",
-    role: "Product Strategy Manager, Financial Services",
+    role: "Product Strategy, Xiaomi Financial Services",
     period: "Jul '20 - May '22",
-    location: "Bengaluru, India",
+    location: "Delhi, India",
     description: [
-      "Developed strategy for Mi Pay, boosting Total Payment Value by 42% to 94 Cr/month.",
-      "Launched 'Mi Credit Lite' (Device Financing), onboarding 800+ retail outlets and growing disbursements 50% MoM.",
-      "Managed P&L and roadmap for Prepaid Cards and Wearable Payments."
+      "Architected strategy and roadmap for Xiaomi's Financial Services ecosystem, including Mi Pay.",
+      "Launched Device Financing with Home Credit, completing 2,000+ contracts within 3 months.",
+      "Analyzed user behavior in Mi Pay, boosting Total Payment Value by 42% to INR 94 Cr monthly."
     ]
   },
   {
     company: "McKinsey & Company",
-    role: "Product Owner (Summer Intern)",
+    role: "Product Owner (Internship)",
     period: "Apr '19 - May '19",
-    location: "Bengaluru, India",
+    location: "Gurgaon, India",
     description: [
-      "Led development of 'McK Academy' client-facing Learning Management app.",
-      "Created product roadmap and implemented using SCRUM methodology."
+      "Led the Agile/Scrum development and successful launch of the client-facing Learning Management mobile app for the McKinsey Academy."
     ]
   },
   {
@@ -62,18 +66,17 @@ export const EXPERIENCE = [
     period: "Feb '18 - May '18",
     location: "Gurgaon, India",
     description: [
-      "Orchestrated strategic realignment of a 1,000-person sales force across 7 brand portfolios.",
-      "Optimized market coverage and territorial alignment."
+      "Orchestrated strategic realignment of a 1,000-person sales force across 7 brand portfolios following the J&J-Actelion merger, optimizing market coverage through data-driven analysis."
     ]
   },
   {
     company: "Stellium Consulting",
     role: "Associate Consultant",
     period: "Jul '16 - Sep '17",
-    location: "Jaipur, India",
+    location: "Delhi, India",
     description: [
-      "Led India's first RFID-integrated SAP EWM implementation for a major textile client, increasing throughput by 18%.",
-      "Implemented SAP EWM solution for automobile spares, decreasing inbound time by 15%."
+      "Led India's first RFID-integrated SAP EWM implementation for a major textile client, increasing operational throughput by 18%.",
+      "Implemented SAP EWM at an automobile spares warehouse, increasing throughput by 23% and decreasing inbound time by 15%."
     ]
   }
 ];

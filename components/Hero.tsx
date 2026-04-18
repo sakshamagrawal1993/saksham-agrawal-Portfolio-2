@@ -47,7 +47,7 @@ const Hero: React.FC = () => {
       <div className="relative z-10 h-full flex flex-col justify-center items-start px-6 md:px-24 max-w-[1800px] mx-auto">
         <div className="animate-fade-in-up w-full md:w-2/3">
           <span className="block text-xs md:text-sm font-medium uppercase tracking-[0.2em] text-white/80 mb-6 px-4 py-2 border border-white/20 rounded-full w-fit">
-            Senior Product Manager
+            Director, Product Management
           </span>
           <h1 className="text-6xl md:text-8xl lg:text-9xl font-serif font-normal text-[#F5F2EB] italic tracking-tight mb-8 drop-shadow-sm leading-[1.1]">
             <TypingAnimation
@@ -66,8 +66,8 @@ const Hero: React.FC = () => {
             />
           </h1>
           <p className="max-w-xl text-lg md:text-xl text-white/90 font-light leading-relaxed mb-12 border-l border-white/30 pl-6">
-            Building the next generation of AI & Fintech products.
-            Currently transforming Healthcare at Jivi.ai.
+            Building the next generation of Agentic AI & Fintech products.
+            Currently transforming Healthcare at Jivi AI as Director, Product Management.
           </p>
 
           <div className="flex gap-4">
