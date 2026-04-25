@@ -185,7 +185,7 @@ const PostViewer: React.FC<PostViewerProps> = ({ content }) => {
         const raw = (p.textContent || '').replace(/\s+/g, ' ').trim();
         if (raw.startsWith('graph TD A[User Problem]')) {
           const img = document.createElement('img');
-          img.src = '/journal/golden_hammer_decision_flow.svg';
+          img.src = '/images/golden_hammer_decision_flow.svg';
           img.alt = 'Golden Hammer Decision Flow';
           img.loading = 'lazy';
           p.replaceWith(img);
@@ -193,7 +193,7 @@ const PostViewer: React.FC<PostViewerProps> = ({ content }) => {
         }
         if (raw.startsWith('graph LR Input')) {
           const img = document.createElement('img');
-          img.src = '/journal/hybrid_first_fallback_flow.svg';
+          img.src = '/images/hybrid_first_fallback_flow.svg';
           img.alt = 'Hybrid First Fallback Flow';
           img.loading = 'lazy';
           p.replaceWith(img);
