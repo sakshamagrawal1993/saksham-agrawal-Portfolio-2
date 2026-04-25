@@ -165,7 +165,7 @@ export const PROJECTS: Project[] = [
     ],
 
     techStack: ['Banking Integration', 'Credit Risk', 'Go-To-Market', 'Stakeholder Mgmt'],
-    demoUrl: '#',
+    demoUrl: '/unity-card',
 
   },
   {

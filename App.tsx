@@ -37,6 +37,10 @@ const MindCoachApp = lazy(() => import('./components/MindCoach/MindCoachApp'));
 const MedicalBenchmarkApp = lazy(() => import('./src/components/MedicalBenchmark/MedicalBenchmarkApp'));
 const PortfolioPage = lazy(() => import('./components/PortfolioPage'));
 
+const UnityCardLanding = lazy(() => import('./components/UnityCard/UnityCardLanding'));
+const UnityCardOnboarding = lazy(() => import('./components/UnityCard/UnityCardOnboarding'));
+const UnityCardDashboard = lazy(() => import('./components/UnityCard/UnityCardDashboard'));
+
 const LoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-[#F5F2EB] font-serif italic text-[#2C2A26]/50">
     Loading...
@@ -224,6 +228,23 @@ function App() {
                 <MedicalBenchmarkApp onBack={() => navigate('/#work')} />
               </Suspense>
             } />
+            
+            {/* Unity Card Demo Routes */}
+            <Route path="/unity-card" element={
+              <Suspense fallback={<LoadingFallback />}>
+                <UnityCardLanding />
+              </Suspense>
+            } />
+            <Route path="/unity-card/onboarding" element={
+              <Suspense fallback={<LoadingFallback />}>
+                <UnityCardOnboarding />
+              </Suspense>
+            } />
+            <Route path="/unity-card/dashboard" element={
+              <Suspense fallback={<LoadingFallback />}>
+                <UnityCardDashboard />
+              </Suspense>
+            } />
 
             {/* Unified Journal/Blog Routes */}
             <Route path="/journal" element={
@@ -263,8 +284,8 @@ function App() {
           </Routes>
         </main>
 
-        {!['/ticketflow', '/insightslm', '/login', '/medical-benchmark'].includes(location.pathname) && !location.pathname.startsWith('/health-twin') && !location.pathname.startsWith('/mind-coach') && <Footer onLinkClick={handleNavClick} />}
-        {!['/runner', '/medical-benchmark'].includes(location.pathname) && !location.pathname.startsWith('/health-twin') && !location.pathname.startsWith('/mind-coach') && <Assistant />}
+        {!['/ticketflow', '/insightslm', '/login', '/medical-benchmark'].includes(location.pathname) && !location.pathname.startsWith('/health-twin') && !location.pathname.startsWith('/mind-coach') && !location.pathname.startsWith('/unity-card') && <Footer onLinkClick={handleNavClick} />}
+        {!['/runner', '/medical-benchmark'].includes(location.pathname) && !location.pathname.startsWith('/health-twin') && !location.pathname.startsWith('/mind-coach') && !location.pathname.startsWith('/unity-card') && <Assistant />}
       </div>
     </AuthProvider>
   );
