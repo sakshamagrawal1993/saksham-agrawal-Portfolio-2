@@ -176,6 +176,30 @@ const PostViewer: React.FC<PostViewerProps> = ({ content }) => {
         }
       });
 
+      // Some legacy records flattened Mermaid into plain paragraph text.
+      // Detect known graph signatures and replace with static SVG fallbacks.
+      const paragraphs = Array.from(
+        containerRef.current.querySelectorAll<HTMLParagraphElement>('p')
+      );
+      paragraphs.forEach((p) => {
+        const raw = (p.textContent || '').replace(/\s+/g, ' ').trim();
+        if (raw.startsWith('graph TD A[User Problem]')) {
+          const img = document.createElement('img');
+          img.src = '/journal/golden_hammer_decision_flow.svg';
+          img.alt = 'Golden Hammer Decision Flow';
+          img.loading = 'lazy';
+          p.replaceWith(img);
+          return;
+        }
+        if (raw.startsWith('graph LR Input')) {
+          const img = document.createElement('img');
+          img.src = '/journal/hybrid_first_fallback_flow.svg';
+          img.alt = 'Hybrid First Fallback Flow';
+          img.loading = 'lazy';
+          p.replaceWith(img);
+        }
+      });
+
       const mermaidBlocks = Array.from(
         containerRef.current.querySelectorAll<HTMLElement>('.mermaid')
       );
