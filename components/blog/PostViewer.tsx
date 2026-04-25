@@ -5,6 +5,84 @@ interface PostViewerProps {
   content: any;
 }
 
+function escapeHtml(raw: string): string {
+  return raw
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function applyMarks(text: string, marks?: Array<{ type: string; attrs?: Record<string, any> }>): string {
+  if (!marks || marks.length === 0) return text;
+  return marks.reduce((acc, mark) => {
+    switch (mark.type) {
+      case 'bold':
+        return `<strong>${acc}</strong>`;
+      case 'italic':
+        return `<em>${acc}</em>`;
+      case 'underline':
+        return `<u>${acc}</u>`;
+      case 'strike':
+        return `<s>${acc}</s>`;
+      case 'code':
+        return `<code>${acc}</code>`;
+      case 'link': {
+        const href = escapeHtml(mark.attrs?.href || '#');
+        return `<a href="${href}" target="_blank" rel="noopener">${acc}</a>`;
+      }
+      default:
+        return acc;
+    }
+  }, text);
+}
+
+function renderLegacyNodes(nodes?: any[]): string {
+  if (!nodes || !Array.isArray(nodes)) return '';
+
+  return nodes
+    .map((node) => {
+      const children = renderLegacyNodes(node.content);
+      switch (node.type) {
+        case 'text':
+          return applyMarks(escapeHtml(node.text || ''), node.marks);
+        case 'paragraph':
+          return `<p class="mb-5 text-[#5D5A53] leading-relaxed">${children || ''}</p>`;
+        case 'heading': {
+          const level = Number(node.attrs?.level || 2);
+          const safeLevel = Math.min(4, Math.max(1, level));
+          return `<h${safeLevel}>${children || ''}</h${safeLevel}>`;
+        }
+        case 'bulletList':
+          return `<ul>${children}</ul>`;
+        case 'orderedList':
+          return `<ol>${children}</ol>`;
+        case 'listItem':
+          return `<li>${children}</li>`;
+        case 'blockquote':
+          return `<blockquote>${children}</blockquote>`;
+        case 'hardBreak':
+          return '<br />';
+        case 'horizontalRule':
+          return '<hr class="my-10 border-[#D4C5A9]" />';
+        case 'codeBlock':
+          return `<pre><code>${escapeHtml(
+            (node.content || []).map((n: any) => n.text || '').join('')
+          )}</code></pre>`;
+        case 'image': {
+          const src = escapeHtml(node.attrs?.src || '');
+          const alt = escapeHtml(node.attrs?.alt || '');
+          if (!src) return '';
+          return `<img src="${src}" alt="${alt}" loading="lazy" />`;
+        }
+        default:
+          return children;
+      }
+    })
+    .join('');
+}
+
 /**
  * PostViewer renders article content stored in the `posts` table.
  * Content is stored as an HTML string produced by the seed script's
@@ -24,7 +102,15 @@ const PostViewer: React.FC<PostViewerProps> = ({ content }) => {
       if (content.trim().startsWith('"') || content.trim().startsWith('{')) {
         try {
           const parsed = JSON.parse(content);
-          normalized = typeof parsed === 'string' ? parsed : content;
+          if (typeof parsed === 'string') {
+            normalized = parsed;
+          } else if (parsed?.type === 'doc') {
+            normalized = renderLegacyNodes(parsed.content);
+          } else if (typeof parsed?.html === 'string') {
+            normalized = parsed.html;
+          } else {
+            normalized = content;
+          }
         } catch {
           normalized = content;
         }
@@ -32,8 +118,15 @@ const PostViewer: React.FC<PostViewerProps> = ({ content }) => {
         normalized = content;
       }
     } else if (content && typeof content === 'object') {
-      // Legacy Tiptap JSON — convert to readable placeholder
-      normalized = `<p class="text-[#5D5A53] italic">Content is in legacy format. Please re-seed this article.</p>`;
+      if (content?.type === 'doc') {
+        normalized = renderLegacyNodes(content.content);
+      } else if (typeof content?.html === 'string') {
+        normalized = content.html;
+      } else if (typeof content?.content === 'string') {
+        normalized = content.content;
+      } else {
+        normalized = `<p class="text-[#5D5A53] italic">Unsupported content format.</p>`;
+      }
     } else {
       normalized = '';
     }
