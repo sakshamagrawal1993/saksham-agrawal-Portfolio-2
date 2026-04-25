@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Briefcase, IndianRupee, PieChart } from 'lucide-react';
 import { useUnityCardStore } from '../../../store/unityCardStore';
