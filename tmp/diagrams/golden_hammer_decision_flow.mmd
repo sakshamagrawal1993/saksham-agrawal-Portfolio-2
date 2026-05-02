@@ -1,0 +1,9 @@
+flowchart LR
+  classDef process fill:#0f766e,stroke:#0f766e,color:#e2e8f0,stroke-width:2px;
+  classDef decision fill:#0369a1,stroke:#0369a1,color:#e2e8f0,stroke-width:2px;
+
+  A[User Problem]:::process --> B{Can 2005 tech solve<br/>around 80%?}:::decision
+  B -->|Yes| C[Deterministic Solution]:::process
+  B -->|No| D{Is it Type III<br/>or Type IV?}:::decision
+  D -->|Yes| E[Proceed to Phase 1]:::process
+  D -->|No| F[Re-evaluate Problem]:::process

@@ -83,6 +83,19 @@ export const EXPERIENCE = [
 
 export const PROJECTS: Project[] = [
   {
+    id: 'trading-agents',
+    name: 'Trading Agents',
+    tagline: 'Multi-Agent Fintech Researcher.',
+    description: 'A sophisticated agentic research platform to analyze markets, debate positions, and manage portfolio risk using LLMs.',
+    longDescription: 'Trading Agents is a full-stack AI orchestration platform. It uses a network of autonomous agents (Market Analyst, News Analyst, Bull/Bear debaters, and a Portfolio Manager) connected via n8n and Supabase to formulate robust trading decisions in real-time.',
+    role: 'Creator & Architect',
+    category: 'AI / Fintech',
+    imageUrl: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&q=80&w=1000',
+    gallery: [],
+    techStack: ['n8n', 'Supabase', 'React', 'OpenAI'],
+    demoUrl: '/trading-agents'
+  },
+  {
     id: 'insightslm',
     name: 'InsightsLM',
     tagline: 'AI Notebook for Research',

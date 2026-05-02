@@ -1,0 +1,19 @@
+-- Add RL columns to trading_sessions
+ALTER TABLE trading_sessions
+ADD COLUMN IF NOT EXISTS execution_price NUMERIC,
+ADD COLUMN IF NOT EXISTS outcome TEXT, -- 'WIN', 'LOSS', 'PENDING'
+ADD COLUMN IF NOT EXISTS evaluated BOOLEAN DEFAULT FALSE;
+
+-- Create agent_lessons table
+CREATE TABLE IF NOT EXISTS agent_lessons (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    session_id UUID REFERENCES trading_sessions(id) ON DELETE CASCADE,
+    ticker TEXT NOT NULL,
+    lesson TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Ensure RLS is configured appropriately if needed
+ALTER TABLE agent_lessons ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable read access for all users" ON agent_lessons FOR SELECT USING (true);
+CREATE POLICY "Enable insert for all users" ON agent_lessons FOR INSERT WITH CHECK (true);

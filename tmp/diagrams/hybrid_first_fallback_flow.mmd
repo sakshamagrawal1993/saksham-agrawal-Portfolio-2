@@ -1,0 +1,7 @@
+flowchart LR
+  classDef process fill:#0f766e,stroke:#0f766e,color:#e2e8f0,stroke-width:2px;
+  classDef decision fill:#0369a1,stroke:#0369a1,color:#e2e8f0,stroke-width:2px;
+
+  A[Input]:::process --> B{Deterministic<br/>Match?}:::decision
+  B -->|Yes| C[Output]:::process
+  B -->|No| D[LLM Processing]:::process --> E[Deterministic Validator]:::process --> F[Output]:::process
