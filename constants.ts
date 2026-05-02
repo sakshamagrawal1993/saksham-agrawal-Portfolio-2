@@ -83,6 +83,19 @@ export const EXPERIENCE = [
 
 export const PROJECTS: Project[] = [
   {
+    id: 'ai-gate',
+    name: 'AI Gating Lab',
+    tagline: 'Phase 0 decision engine for AI products.',
+    description: 'An interactive DICE and taxonomy evaluator that decides whether a workflow should be built with deterministic code, classical ML, or LLM/agentic systems.',
+    longDescription: 'AI Gating Lab turns the article "The Gating Decision — Should You Build with AI?" into a working portfolio demo. A user can pick a sample idea or submit their own workflow, the concept is stored in Supabase, an edge-function proxy can trigger n8n evaluation logic, and the returned result is rendered as a visual decision dashboard showing taxonomy class, DICE scores, reliability vs stakes posture, and the recommended level of automation.',
+    role: 'Product Architect & Full Stack Builder',
+    category: 'Strategy',
+    imageUrl: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=1000',
+    gallery: [],
+    techStack: ['React', 'Supabase', 'n8n', 'Recharts', 'Decision Science'],
+    demoUrl: '/ai-gate'
+  },
+  {
     id: 'trading-agents',
     name: 'Trading Agents',
     tagline: 'Multi-Agent Fintech Researcher.',
