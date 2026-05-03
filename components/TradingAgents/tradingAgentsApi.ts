@@ -25,10 +25,26 @@ export type TradingAgentsAction =
 
 export const TRADING_AGENTS_FUNCTION = 'trading-agents-proxy';
 
-/** Override with VITE_TRADING_AGENTS_VPS_WS_URL. On HTTPS pages, ws:// may be blocked; use wss:// or a same-origin proxy. */
-export const TRADING_AGENTS_VPS_WS_URL =
-  (import.meta as any).env.VITE_TRADING_AGENTS_VPS_WS_URL ||
-  'ws://72.61.231.160:8001/ws';
+/**
+ * VPS WebSocket for live quotes. Browsers forbid ws:// from https:// pages (mixed content).
+ * Production: set VITE_TRADING_AGENTS_VPS_WS_URL=wss://<your-traefik-host>/ws
+ * Dev over http://localhost: default falls back to raw VPS ws:// (or set the env to match).
+ */
+function resolveTradingAgentsVpsWsUrl(): string {
+  const envUrl = (import.meta as any).env?.VITE_TRADING_AGENTS_VPS_WS_URL as string | undefined;
+  if (envUrl?.trim()) return envUrl.trim();
+
+  if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+    console.error(
+      '[TradingAgents] HTTPS requires a secure WebSocket. Set VITE_TRADING_AGENTS_VPS_WS_URL to wss://…/ws (TLS via Traefik or similar). ws:// to an IP is blocked by the browser.',
+    );
+    return '';
+  }
+
+  return 'ws://72.61.231.160:8001/ws';
+}
+
+export const TRADING_AGENTS_VPS_WS_URL = resolveTradingAgentsVpsWsUrl();
 
 export const invokeTradingAgents = async <T,>(body: TradingAgentsAction): Promise<T> => {
   const { data, error } = await supabase.functions.invoke(TRADING_AGENTS_FUNCTION, { body });
