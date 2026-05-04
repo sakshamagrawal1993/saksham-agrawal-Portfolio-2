@@ -640,7 +640,11 @@ serve(async (req) => {
         ticker,
         tickers: body.tickers,
         session_id,
-        date: date || new Date().toISOString().split('T')[0]
+        date: date || new Date().toISOString().split('T')[0],
+        execution_price:
+          body.execution_price === undefined || body.execution_price === null
+            ? null
+            : Number(body.execution_price),
       }),
       })
 
