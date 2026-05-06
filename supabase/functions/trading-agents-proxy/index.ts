@@ -82,6 +82,35 @@ const normalizeTickerForProviders = (symbol: string) => {
   return symbol;
 };
 
+type OrchestrationMarket = 'us' | 'india' | 'crypto';
+
+const parseCryptoTickerStyle = (sym: string): boolean => {
+  const s = sym.toLowerCase().replace(/\s+/g, '');
+  if (/^([a-z0-9]{2,10})[/-]?usdt$/i.test(s)) return true;
+  if (/^([a-z0-9]{2,10})[/-]?(usd|eur|gbp|jpy)$/i.test(s)) return true;
+  if (/^(btc|eth|sol|xrp|doge|ada|bnb|avax)$/i.test(s)) return true;
+  return false;
+};
+
+const inferMarketFromTicker = (ticker: string): OrchestrationMarket => {
+  const t = (ticker || '').trim();
+  if (!t) return 'us';
+  const u = t.toUpperCase();
+  if (u.endsWith('.NS') || u.endsWith('.BO')) return 'india';
+  if (parseCryptoTickerStyle(t)) return 'crypto';
+  return 'us';
+};
+
+const normalizeOrchestrationMarket = (raw: unknown, ticker: string): OrchestrationMarket => {
+  if (typeof raw === 'string') {
+    const m = raw.trim().toLowerCase();
+    if (m === 'india' || m === 'in' || m === 'nse' || m === 'bse') return 'india';
+    if (m === 'crypto' || m === 'cryptocurrency') return 'crypto';
+    if (m === 'us' || m === 'usa') return 'us';
+  }
+  return inferMarketFromTicker(ticker || '');
+};
+
 const persistWorkflowResult = async (
   supabase: any,
   sessionId: string | undefined,
@@ -631,6 +660,12 @@ serve(async (req) => {
       n8nHeaders['x-trading-agents-secret'] = n8nSecret;
     }
 
+    const tickerForMarket =
+      (typeof ticker === 'string' && ticker.trim()) ||
+      (typeof body.tickers === 'string' && body.tickers.split(',')[0]?.trim()) ||
+      '';
+    const market = normalizeOrchestrationMarket(body.market, tickerForMarket);
+
     const callN8n = async () => {
       const n8nResponse = await fetch(n8nWebhookUrl, {
       method: 'POST',
@@ -645,6 +680,7 @@ serve(async (req) => {
           body.execution_price === undefined || body.execution_price === null
             ? null
             : Number(body.execution_price),
+        market,
       }),
       })
 

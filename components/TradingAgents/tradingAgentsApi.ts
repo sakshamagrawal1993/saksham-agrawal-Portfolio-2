@@ -20,7 +20,7 @@ export type TradingAgentsAction =
   | { action: 'batch_quote'; symbols: string }
   | { action: 'get_finnhub_token' }
   | { action: 'quote'; ticker: string }
-  | { action: 'run'; ticker: string; session_id: string; execution_price: number }
+  | { action: 'run'; ticker: string; session_id: string; execution_price: number; market?: 'us' | 'india' | 'crypto' }
   | { action: 'recon'; tickers: string };
 
 export const TRADING_AGENTS_FUNCTION = 'trading-agents-proxy';

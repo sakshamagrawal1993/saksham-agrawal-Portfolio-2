@@ -1017,6 +1017,7 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
         ticker: runTicker,
         session_id: newSessionId,
         execution_price: currentPrice,
+        market: market === 'US' ? 'us' : market === 'IN' ? 'india' : 'crypto',
       });
     } catch (error: any) {
       console.error(error);
