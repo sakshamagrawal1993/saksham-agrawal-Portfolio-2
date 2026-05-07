@@ -623,6 +623,7 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
 
   /** Live log channel for the active run (subscribe before Edge invoke to avoid missing early INSERTs). */
   const logChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const sessionChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   useEffect(() => {
     if (activeTab !== 'scorecard') return;
@@ -1056,8 +1057,47 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
         supabase.removeChannel(logChannelRef.current);
         logChannelRef.current = null;
       }
+      if (sessionChannelRef.current) {
+        supabase.removeChannel(sessionChannelRef.current);
+        sessionChannelRef.current = null;
+      }
     };
   }, []);
+
+  const mergeFormattedLogs = (incoming: { id: string; agent: string; message: string; time: string }[]) => {
+    setLogs((prev) => {
+      const merged = new Map(prev.map((log) => [log.id, log]));
+      incoming.forEach((log) => merged.set(log.id, log));
+      return Array.from(merged.values());
+    });
+  };
+
+  const syncSessionLogs = async (runSessionId: string, runTicker: string) => {
+    const { data } = await supabase
+      .from('trading_logs')
+      .select('*')
+      .eq('session_id', runSessionId)
+      .order('created_at', { ascending: true });
+
+    if (!data || data.length === 0) return;
+
+    mergeFormattedLogs(data.map(formatAgentLog));
+
+    const decisionLog = [...data]
+      .reverse()
+      .find((log) => log.agent_role === 'Portfolio Manager' && log.log_type === 'decision');
+
+    if (decisionLog) {
+      const decisionData = parsePortfolioDecision(decisionLog.content);
+      setFinalDecision({
+        ticker: runTicker,
+        decision: decisionData?.decision || 'HOLD',
+        confidence: decisionData?.confidence || 'Medium',
+        thesis: decisionData?.thesis || decisionLog.content,
+      });
+      setIsRunning(false);
+    }
+  };
 
   const fetchVpsProfileFromNetwork = async (sym: string) => {
     const data = await invokeTradingAgents<Record<string, unknown>>({
@@ -1162,6 +1202,10 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
       supabase.removeChannel(logChannelRef.current);
       logChannelRef.current = null;
     }
+    if (sessionChannelRef.current) {
+      supabase.removeChannel(sessionChannelRef.current);
+      sessionChannelRef.current = null;
+    }
 
     const newSessionId = crypto.randomUUID();
     setSessionId(newSessionId);
@@ -1187,7 +1231,7 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
         },
         (payload) => {
           const newLog = payload.new as AgentLog;
-          setLogs((prev) => [...prev, formatAgentLog(newLog)]);
+          mergeFormattedLogs([formatAgentLog(newLog)]);
           if (newLog.agent_role === 'Portfolio Manager' && newLog.content.includes('decision')) {
             setIsRunning(false);
             const decisionData = parsePortfolioDecision(newLog.content);
@@ -1223,6 +1267,44 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
 
     logChannelRef.current = channel;
 
+    const sessionChannel = supabase
+      .channel(`session-${newSessionId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'trading_sessions',
+          filter: `id=eq.${newSessionId}`,
+        },
+        (payload) => {
+          const row = payload.new as {
+            status?: string;
+            final_decision?: string | null;
+            executive_summary?: string | null;
+            investment_thesis?: string | null;
+          };
+
+          void syncSessionLogs(newSessionId, runTicker);
+
+          if (row.status === 'failed') {
+            setIsRunning(false);
+          }
+
+          if (row.status === 'completed' && row.final_decision && !finalDecision) {
+            setFinalDecision((prev: any) => prev ?? ({
+              ticker: runTicker,
+              decision: row.final_decision || 'HOLD',
+              confidence: 'Medium',
+              thesis: row.investment_thesis || row.executive_summary || 'Analysis completed.',
+            }));
+          }
+        }
+      );
+
+    sessionChannel.subscribe();
+    sessionChannelRef.current = sessionChannel;
+
     setLogs((prev) => [
       ...prev,
       {
@@ -1243,6 +1325,8 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
         execution_price: currentPrice,
         market: market === 'US' ? 'us' : market === 'IN' ? 'india' : 'crypto',
       });
+
+      void syncSessionLogs(newSessionId, runTicker);
     } catch (error: any) {
       console.error(error);
       setLogs((prev) => [
