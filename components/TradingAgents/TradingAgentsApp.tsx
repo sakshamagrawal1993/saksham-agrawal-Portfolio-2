@@ -20,6 +20,30 @@ interface TradingAgentsAppProps {
   onBack: () => void;
 }
 
+type FlowAgentId =
+  | 'technical'
+  | 'news'
+  | 'fundamentals'
+  | 'social'
+  | 'bull'
+  | 'bear'
+  | 'manager'
+  | 'portfolio';
+
+type FlowStepState = 'pending' | 'active' | 'completed';
+
+type FlowStep = {
+  id: FlowAgentId;
+  label: string;
+  shortLabel: string;
+};
+
+type FlowPhase = {
+  id: 'analysts' | 'debate' | 'manager' | 'portfolio';
+  label: string;
+  stepIds: FlowAgentId[];
+};
+
 type EquityInstrument = { symbol: string; name: string };
 
 const US_INSTRUMENTS: EquityInstrument[] = [
@@ -361,6 +385,206 @@ function FeedStatusPill({
     return <span className="text-xs font-bold text-emerald-600">Connected · Finnhub</span>;
   }
   return <span className="text-xs font-bold text-red-600">Unable to connect</span>;
+}
+
+const FLOW_STEPS: FlowStep[] = [
+  { id: 'technical', label: 'Technical Analyst', shortLabel: 'Technical' },
+  { id: 'news', label: 'News Analyst', shortLabel: 'News' },
+  { id: 'fundamentals', label: 'Fundamentals Analyst', shortLabel: 'Fundamentals' },
+  { id: 'social', label: 'Social Media Analyst', shortLabel: 'Social' },
+  { id: 'bull', label: 'Bull Researcher', shortLabel: 'Bull' },
+  { id: 'bear', label: 'Bear Researcher', shortLabel: 'Bear' },
+  { id: 'manager', label: 'Research Manager', shortLabel: 'Manager' },
+  { id: 'portfolio', label: 'Portfolio Manager', shortLabel: 'Portfolio' },
+];
+
+const FLOW_PHASES: FlowPhase[] = [
+  {
+    id: 'analysts',
+    label: 'Analysts fan out',
+    stepIds: ['technical', 'news', 'fundamentals', 'social'],
+  },
+  {
+    id: 'debate',
+    label: 'Debate forms',
+    stepIds: ['bull', 'bear'],
+  },
+  {
+    id: 'manager',
+    label: 'Manager synthesizes',
+    stepIds: ['manager'],
+  },
+  {
+    id: 'portfolio',
+    label: 'Decision lands',
+    stepIds: ['portfolio'],
+  },
+];
+
+const AGENT_ROLE_TO_FLOW_STEP: Record<string, FlowAgentId> = {
+  'technical analyst': 'technical',
+  'news analyst': 'news',
+  'fundamentals analyst': 'fundamentals',
+  'social media analyst': 'social',
+  'social analyst': 'social',
+  'bull researcher': 'bull',
+  'bear researcher': 'bear',
+  'research manager': 'manager',
+  'portfolio manager': 'portfolio',
+};
+
+function normalizeAgentRole(agent: string): string {
+  return agent.trim().toLowerCase();
+}
+
+function buildFlowState(
+  sourceLogs: { agent: string }[],
+  running: boolean,
+): {
+  states: Record<FlowAgentId, FlowStepState>;
+  activePhaseLabel: string | null;
+  completedCount: number;
+} {
+  const states = Object.fromEntries(
+    FLOW_STEPS.map((step) => [step.id, 'pending']),
+  ) as Record<FlowAgentId, FlowStepState>;
+
+  sourceLogs.forEach((log) => {
+    const stepId = AGENT_ROLE_TO_FLOW_STEP[normalizeAgentRole(log.agent)];
+    if (stepId) states[stepId] = 'completed';
+  });
+
+  if (running) {
+    for (const phase of FLOW_PHASES) {
+      const allDone = phase.stepIds.every((stepId) => states[stepId] === 'completed');
+      if (!allDone) {
+        phase.stepIds.forEach((stepId) => {
+          if (states[stepId] !== 'completed') states[stepId] = 'active';
+        });
+        return {
+          states,
+          activePhaseLabel: phase.label,
+          completedCount: FLOW_STEPS.filter((step) => states[step.id] === 'completed').length,
+        };
+      }
+    }
+  }
+
+  return {
+    states,
+    activePhaseLabel: null,
+    completedCount: FLOW_STEPS.filter((step) => states[step.id] === 'completed').length,
+  };
+}
+
+function AgentWorkflowStrip({
+  logs,
+  isRunning,
+  sessionId,
+  mode,
+}: {
+  logs: { id: string; agent: string; message: string; time: string }[];
+  isRunning: boolean;
+  sessionId: string | null;
+  mode: 'live' | 'history';
+}) {
+  const { states, activePhaseLabel, completedCount } = buildFlowState(logs, isRunning);
+
+  return (
+    <div className="border border-[#EBE7DE] bg-white px-5 py-5 md:px-6">
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#A8A29E]">
+            Agent Workflow
+          </p>
+          <h2 className="mt-1 font-serif text-xl text-[#2C2A26]">
+            {mode === 'history'
+              ? 'Completed research path'
+              : isRunning
+                ? activePhaseLabel ?? 'Finalizing decision'
+                : completedCount > 0
+                  ? 'Last completed run'
+                  : 'Standby before execution'}
+          </h2>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] font-bold uppercase tracking-[0.22em] text-[#A8A29E]">
+          <span>{completedCount}/{FLOW_STEPS.length} complete</span>
+          {sessionId && <span className="font-mono normal-case tracking-normal">{sessionId.slice(0, 8)}</span>}
+        </div>
+      </div>
+
+      <div className="mt-5 overflow-x-auto pb-1">
+        <div className="flex min-w-max items-center gap-2">
+          {FLOW_STEPS.map((step, index) => {
+            const state = states[step.id];
+            const isActive = state === 'active';
+            const isCompleted = state === 'completed';
+            const connectorComplete =
+              index > 0 &&
+              (states[FLOW_STEPS[index - 1].id] === 'completed' ||
+                states[FLOW_STEPS[index - 1].id] === 'active') &&
+              (isCompleted || isActive);
+
+            return (
+              <React.Fragment key={step.id}>
+                {index > 0 && (
+                  <div className="relative h-px w-8 shrink-0 overflow-hidden bg-[#E7E1D5] md:w-10">
+                    <div
+                      className={`absolute inset-y-0 left-0 transition-all duration-500 ${
+                        connectorComplete ? 'w-full bg-[#2C2A26]' : 'w-0 bg-[#2C2A26]'
+                      }`}
+                    />
+                  </div>
+                )}
+                <div
+                  className={`relative flex min-h-[86px] w-[124px] shrink-0 flex-col justify-between rounded-sm border px-3 py-3 transition-all duration-300 ${
+                    isCompleted
+                      ? 'border-[#2C2A26] bg-[#F5F2EB] shadow-[3px_3px_0px_0px_rgba(44,42,38,0.12)]'
+                      : isActive
+                        ? 'border-[#2C2A26] bg-[#FAF6EC] shadow-[5px_5px_0px_0px_rgba(44,42,38,0.16)]'
+                        : 'border-[#EBE7DE] bg-white'
+                  }`}
+                >
+                  {isActive && (
+                    <div className="pointer-events-none absolute inset-0 rounded-sm border border-[#D9CDB1] animate-pulse" />
+                  )}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#A8A29E]">
+                      {String(index + 1).padStart(2, '0')}
+                    </span>
+                    <span
+                      className={`h-2.5 w-2.5 rounded-full ${
+                        isCompleted
+                          ? 'bg-emerald-600'
+                          : isActive
+                            ? 'bg-amber-500 animate-pulse'
+                            : 'bg-[#E7E1D5]'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold leading-snug text-[#2C2A26]">{step.shortLabel}</p>
+                    <p className="mt-1 text-[10px] leading-tight text-[#8B857C]">{step.label}</p>
+                  </div>
+                  <p
+                    className={`text-[9px] font-bold uppercase tracking-[0.22em] ${
+                      isCompleted
+                        ? 'text-emerald-700'
+                        : isActive
+                          ? 'text-amber-700'
+                          : 'text-[#C1BAAE]'
+                    }`}
+                  >
+                    {isCompleted ? 'Done' : isActive ? 'Working' : 'Queued'}
+                  </p>
+                </div>
+              </React.Fragment>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
@@ -1655,6 +1879,14 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
 
         {/* Main Content Area */}
         <div className="col-span-12 lg:col-span-9 space-y-8">
+          {(activeTab === 'watchlist' || activeTab === 'history') && (
+            <AgentWorkflowStrip
+              logs={activeTab === 'history' ? historyLogs : logs}
+              isRunning={activeTab === 'watchlist' ? isRunning : false}
+              sessionId={activeTab === 'history' ? selectedHistorySession?.id ?? null : sessionId}
+              mode={activeTab === 'history' ? 'history' : 'live'}
+            />
+          )}
           
           {/* Results Dashboard */}
           {(activeTab === 'history' ? selectedHistorySession?.decision : finalDecision) && (
