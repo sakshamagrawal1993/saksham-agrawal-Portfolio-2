@@ -518,11 +518,13 @@ function AgentWorkflowStrip({
   isRunning,
   sessionId,
   mode,
+  date,
 }: {
   logs: { id: string; agent: string; message: string; time: string }[];
   isRunning: boolean;
   sessionId: string | null;
   mode: 'live' | 'history';
+  date?: string | null;
 }) {
   const { states, activePhaseLabel, completedCount } = buildFlowState(logs, isRunning);
 
@@ -544,6 +546,7 @@ function AgentWorkflowStrip({
           </h2>
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] font-bold uppercase tracking-[0.22em] text-[#A8A29E]">
+          {date && <span>{date}</span>}
           <span>{completedCount}/{FLOW_STEPS.length} complete</span>
           {sessionId && <span className="font-mono normal-case tracking-normal">{sessionId.slice(0, 8)}</span>}
         </div>
@@ -632,6 +635,7 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
   const [finalDecision, setFinalDecision] = useState<any>(null);
   const [showFinalReport, setShowFinalReport] = useState(false);
   const [runWarning, setRunWarning] = useState<string | null>(null);
+  const [lastRunDate, setLastRunDate] = useState<string | null>(null);
   const [clockNowMs, setClockNowMs] = useState(() => Date.now());
 
   // History State
@@ -830,6 +834,7 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
               confidence: 'High', // Defaulting to high for historical runs
               thesis: latestSession.investment_thesis || latestSession.executive_summary || 'Analysis completed.'
             });
+            setLastRunDate(new Date(latestSession.created_at).toLocaleDateString());
             setRunWarning(null);
           }
         } else {
@@ -1423,6 +1428,7 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
     setFinalDecision(null);
     setShowFinalReport(false);
     setRunWarning(null);
+    setLastRunDate(new Date().toLocaleDateString());
 
     if (logChannelRef.current) {
       supabase.removeChannel(logChannelRef.current);
@@ -2213,6 +2219,7 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
               isRunning={activeTab === 'watchlist' ? isRunning : false}
               sessionId={activeTab === 'history' ? selectedHistorySession?.id ?? null : sessionId}
               mode={activeTab === 'history' ? 'history' : 'live'}
+              date={activeTab === 'history' ? (selectedHistorySession?.created_at ? new Date(selectedHistorySession.created_at).toLocaleDateString() : null) : lastRunDate}
             />
           )}
           
