@@ -178,6 +178,9 @@ const TOP_20_CRYPTO = [
 
 const TOP_50_US = US_INSTRUMENTS.map((i) => i.symbol);
 const TOP_50_IN = IN_INSTRUMENTS.map((i) => i.symbol);
+const RUN_SYNC_INTERVAL_MS = 8000;
+const RUN_NO_AGENT_WARNING_MS = 30000;
+const RUN_NO_AGENT_TIMEOUT_MS = 120000;
 
 const EQUITY_NAME_BY_SYMBOL: Record<string, string> = Object.fromEntries([
   ...US_INSTRUMENTS.map((i) => [i.symbol, i.name] as const),
@@ -594,6 +597,7 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [logs, setLogs] = useState<{ id: string, agent: string, message: string, time: string }[]>([]);
   const [finalDecision, setFinalDecision] = useState<any>(null);
+  const [runWarning, setRunWarning] = useState<string | null>(null);
 
   // History State
   const [activeTab, setActiveTab] = useState<'watchlist' | 'history' | 'scorecard'>('watchlist');
@@ -624,6 +628,21 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
   /** Live log channel for the active run (subscribe before Edge invoke to avoid missing early INSERTs). */
   const logChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const sessionChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const runMetaRef = useRef<{
+    sessionId: string | null;
+    ticker: string;
+    startedAt: number;
+    firstAgentLogAt: number | null;
+    warningShown: boolean;
+    timeoutShown: boolean;
+  }>({
+    sessionId: null,
+    ticker: '',
+    startedAt: 0,
+    firstAgentLogAt: null,
+    warningShown: false,
+    timeoutShown: false,
+  });
 
   useEffect(() => {
     if (activeTab !== 'scorecard') return;
@@ -1065,10 +1084,32 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
   }, []);
 
   const mergeFormattedLogs = (incoming: { id: string; agent: string; message: string; time: string }[]) => {
+    if (incoming.some((log) => normalizeAgentRole(log.agent) !== 'system')) {
+      if (!runMetaRef.current.firstAgentLogAt) {
+        runMetaRef.current.firstAgentLogAt = Date.now();
+      }
+      setRunWarning(null);
+    }
     setLogs((prev) => {
       const merged = new Map(prev.map((log) => [log.id, log]));
       incoming.forEach((log) => merged.set(log.id, log));
       return Array.from(merged.values());
+    });
+  };
+
+  const appendSystemLog = (message: string) => {
+    setLogs((prev) => {
+      const last = prev[prev.length - 1];
+      if (last?.agent === 'System' && last.message === message) return prev;
+      return [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          agent: 'System',
+          message,
+          time: new Date().toLocaleTimeString(),
+        },
+      ];
     });
   };
 
@@ -1079,25 +1120,80 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
       .eq('session_id', runSessionId)
       .order('created_at', { ascending: true });
 
-    if (!data || data.length === 0) return;
+    if (data && data.length > 0) {
+      mergeFormattedLogs(data.map(formatAgentLog));
 
-    mergeFormattedLogs(data.map(formatAgentLog));
+      const decisionLog = [...data]
+        .reverse()
+        .find((log) => log.agent_role === 'Portfolio Manager' && log.log_type === 'decision');
 
-    const decisionLog = [...data]
-      .reverse()
-      .find((log) => log.agent_role === 'Portfolio Manager' && log.log_type === 'decision');
+      if (decisionLog) {
+        const decisionData = parsePortfolioDecision(decisionLog.content);
+        setFinalDecision({
+          ticker: runTicker,
+          decision: decisionData?.decision || 'HOLD',
+          confidence: decisionData?.confidence || 'Medium',
+          thesis: decisionData?.thesis || decisionLog.content,
+        });
+        setRunWarning(null);
+        setIsRunning(false);
+      }
+    }
 
-    if (decisionLog) {
-      const decisionData = parsePortfolioDecision(decisionLog.content);
-      setFinalDecision({
-        ticker: runTicker,
-        decision: decisionData?.decision || 'HOLD',
-        confidence: decisionData?.confidence || 'Medium',
-        thesis: decisionData?.thesis || decisionLog.content,
-      });
+    const { data: session } = await supabase
+      .from('trading_sessions')
+      .select('status, final_decision, executive_summary, investment_thesis')
+      .eq('id', runSessionId)
+      .maybeSingle();
+
+    if (!session) return;
+
+    if (session.status === 'failed') {
+      setRunWarning('Workflow failed. Check trading_logs for error details.');
+      appendSystemLog('Run failed in backend workflow. Check Trading Logs table for details.');
+      setIsRunning(false);
+      return;
+    }
+
+    if (session.status === 'completed') {
+      if (session.final_decision) {
+        setFinalDecision((prev: any) => prev ?? ({
+          ticker: runTicker,
+          decision: session.final_decision || 'HOLD',
+          confidence: 'Medium',
+          thesis: session.investment_thesis || session.executive_summary || 'Analysis completed.',
+        }));
+      }
+      setRunWarning(null);
       setIsRunning(false);
     }
   };
+
+  useEffect(() => {
+    if (!isRunning || !sessionId) return;
+
+    const interval = setInterval(() => {
+      const runMeta = runMetaRef.current;
+      const elapsed = Date.now() - runMeta.startedAt;
+
+      void syncSessionLogs(sessionId, runMeta.ticker || ticker);
+
+      if (!runMeta.firstAgentLogAt && elapsed >= RUN_NO_AGENT_WARNING_MS && !runMeta.warningShown) {
+        runMeta.warningShown = true;
+        setRunWarning('No agent logs received yet. Realtime may be delayed; polling backend state.');
+        appendSystemLog('No live agent logs yet. Falling back to periodic backend polling.');
+      }
+
+      if (!runMeta.firstAgentLogAt && elapsed >= RUN_NO_AGENT_TIMEOUT_MS && !runMeta.timeoutShown) {
+        runMeta.timeoutShown = true;
+        setRunWarning('No agent output detected for this run. Verify n8n log writes and session_id wiring.');
+        appendSystemLog('No agent output after 2 minutes. Stopping spinner to avoid silent hang.');
+        setIsRunning(false);
+      }
+    }, RUN_SYNC_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [isRunning, sessionId, ticker]);
 
   const fetchVpsProfileFromNetwork = async (sym: string) => {
     const data = await invokeTradingAgents<Record<string, unknown>>({
@@ -1197,6 +1293,7 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
     setActiveTab('watchlist');
     setLogs([]);
     setFinalDecision(null);
+    setRunWarning(null);
 
     if (logChannelRef.current) {
       supabase.removeChannel(logChannelRef.current);
@@ -1209,6 +1306,14 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
 
     const newSessionId = crypto.randomUUID();
     setSessionId(newSessionId);
+    runMetaRef.current = {
+      sessionId: newSessionId,
+      ticker: runTicker,
+      startedAt: Date.now(),
+      firstAgentLogAt: null,
+      warningShown: false,
+      timeoutShown: false,
+    };
 
     setLogs([
       {
@@ -1234,6 +1339,7 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
           mergeFormattedLogs([formatAgentLog(newLog)]);
           if (newLog.agent_role === 'Portfolio Manager' && newLog.content.includes('decision')) {
             setIsRunning(false);
+            setRunWarning(null);
             const decisionData = parsePortfolioDecision(newLog.content);
             setFinalDecision({
               ticker: runTicker,
@@ -1329,15 +1435,8 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
       void syncSessionLogs(newSessionId, runTicker);
     } catch (error: any) {
       console.error(error);
-      setLogs((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString(),
-          agent: 'System',
-          message: `Error: ${error.message}`,
-          time: new Date().toLocaleTimeString(),
-        },
-      ]);
+      appendSystemLog(`Error: ${error.message}`);
+      setRunWarning('Edge invocation failed before workflow logs were received.');
       setIsRunning(false);
     }
   };
@@ -2041,6 +2140,11 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
             </div>
             
             <div className="p-6 font-mono text-sm overflow-y-auto flex-1 space-y-4 bg-white">
+              {activeTab === 'watchlist' && runWarning && (
+                <div className="rounded-sm border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  {runWarning}
+                </div>
+              )}
               {((activeTab === 'history' ? historyLogs : logs).length === 0) && (!isRunning || activeTab === 'history') && (
                 <div className="h-full flex flex-col items-center justify-center text-[#A8A29E] italic font-serif">
                   <Activity className="w-8 h-8 mb-4 opacity-50" />
