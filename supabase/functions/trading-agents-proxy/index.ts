@@ -259,7 +259,7 @@ serve(async (req) => {
       // ─── Tier 1: TwelveData (batched in chunks of 8 symbols) ────────────────
       if (twelveDataKey) {
         try {
-          const quotes: { symbol: string; price: number; isRest: boolean }[] = [];
+          const quotes: { symbol: string; price: number; isRest: boolean; previousClose?: number }[] = [];
           const tdChunks: string[][] = [];
           for (let i = 0; i < symbolList.length; i += 8) {
             tdChunks.push(symbolList.slice(i, i + 8));
@@ -278,7 +278,7 @@ serve(async (req) => {
 
             if (tdData && !tdData.code && typeof tdData === 'object') {
               if (chunk.length === 1) {
-                if (tdData.price) quotes.push({ symbol: chunk[0], price: parseFloat(tdData.price), isRest: true });
+                  if (tdData.price) quotes.push({ symbol: chunk[0], price: parseFloat(tdData.price), isRest: true });
               } else {
                 for (let i = 0; i < chunk.length; i++) {
                   const key = Object.keys(tdData)[i];
@@ -300,12 +300,12 @@ serve(async (req) => {
       // ─── Tier 2 (US only): Finnhub REST — uses the key we already have ───────
       if (!isIndianMarket && finnhubKey) {
         try {
-          const quotes: { symbol: string; price: number; isRest: boolean }[] = [];
+          const quotes: { symbol: string; price: number; isRest: boolean; previousClose?: number }[] = [];
           await Promise.allSettled(symbolList.slice(0, 10).map(async (sym) => {
             const r = await fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${finnhubKey}`);
             const d = await r.json();
             // Finnhub returns { c: currentPrice, pc: prevClose, ... }; c=0 means no data
-            if (d?.c && d.c > 0) quotes.push({ symbol: sym, price: d.c, isRest: true });
+            if (d?.c && d.c > 0) quotes.push({ symbol: sym, price: d.c, previousClose: d.pc, isRest: true });
           }));
           if (quotes.length > 0) {
             return jsonResponse({ quotes });
@@ -318,7 +318,7 @@ serve(async (req) => {
       // ─── Tier 3: Yahoo Finance PUBLIC API (no key) — US + Indian .NS ─────────
       try {
         const batchList = symbolList.slice(0, 50);
-        const quotes: { symbol: string; price: number; isRest: boolean }[] = [];
+        const quotes: { symbol: string; price: number; isRest: boolean; previousClose?: number }[] = [];
 
         if (isIndianMarket) {
           // Indian stocks: v8/finance/chart works without auth (individual calls in parallel)
@@ -330,8 +330,10 @@ serve(async (req) => {
               );
               if (r.ok) {
                 const d = await r.json();
-                const price = d?.chart?.result?.[0]?.meta?.regularMarketPrice;
-                if (price) quotes.push({ symbol: sym, price, isRest: true });
+                const meta = d?.chart?.result?.[0]?.meta;
+                const price = meta?.regularMarketPrice;
+                const previousClose = meta?.previousClose ?? meta?.chartPreviousClose;
+                if (price) quotes.push({ symbol: sym, price, previousClose, isRest: true });
               }
             } catch (_) {}
           }));
@@ -345,7 +347,12 @@ serve(async (req) => {
             const yhData = await yhRes.json();
             const results = yhData?.quoteResponse?.result || [];
             results.filter((q: any) => q?.regularMarketPrice)
-              .forEach((q: any) => quotes.push({ symbol: q.symbol, price: q.regularMarketPrice, isRest: true }));
+              .forEach((q: any) => quotes.push({
+                symbol: q.symbol,
+                price: q.regularMarketPrice,
+                previousClose: q.regularMarketPreviousClose,
+                isRest: true
+              }));
           }
         }
 
@@ -615,6 +622,61 @@ serve(async (req) => {
               });
           }
         }
+      }
+
+      // Attempt 3: Yahoo Finance public endpoints (no key)
+      try {
+        const isIndian = ticker.endsWith('.NS') || ticker.endsWith('.BO');
+        if (isIndian) {
+          const yahooRes = await fetch(
+            `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=5d`,
+            { headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' } }
+          );
+
+          if (yahooRes.ok) {
+            const yahooData = await yahooRes.json();
+            const meta = yahooData?.chart?.result?.[0]?.meta;
+            const price = meta?.regularMarketPrice;
+            const previousClose = meta?.previousClose ?? meta?.chartPreviousClose;
+            if (price) {
+              const change = previousClose ? price - previousClose : 0;
+              const changePercent = previousClose ? (change / previousClose) * 100 : 0;
+              return jsonResponse({
+                ticker,
+                price,
+                currency: meta?.currency ?? 'INR',
+                previousClose,
+                change,
+                changePercent,
+              });
+            }
+          }
+        } else {
+          const yahooRes = await fetch(
+            `https://query2.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(ticker)}`,
+            { headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' } }
+          );
+
+          if (yahooRes.ok) {
+            const yahooData = await yahooRes.json();
+            const quote = yahooData?.quoteResponse?.result?.[0];
+            if (quote?.regularMarketPrice) {
+              const previousClose = quote?.regularMarketPreviousClose;
+              const change = previousClose ? quote.regularMarketPrice - previousClose : 0;
+              const changePercent = previousClose ? (change / previousClose) * 100 : 0;
+              return jsonResponse({
+                ticker: quote.symbol ?? ticker,
+                price: quote.regularMarketPrice,
+                currency: quote.currency,
+                previousClose,
+                change,
+                changePercent,
+              });
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Yahoo public quote fallback failed:", e);
       }
 
       return jsonResponse({ error: 'Failed to fetch quote from all available providers.' }, 500);

@@ -178,9 +178,9 @@ const TOP_20_CRYPTO = [
 
 const TOP_50_US = US_INSTRUMENTS.map((i) => i.symbol);
 const TOP_50_IN = IN_INSTRUMENTS.map((i) => i.symbol);
-const RUN_SYNC_INTERVAL_MS = 8000;
-const RUN_NO_AGENT_WARNING_MS = 30000;
-const RUN_NO_AGENT_TIMEOUT_MS = 120000;
+const RUN_SYNC_INTERVAL_MS = 2000;
+const RUN_NO_AGENT_WARNING_MS = 15000;
+const RUN_NO_AGENT_TIMEOUT_MS = 180000;
 
 const EQUITY_NAME_BY_SYMBOL: Record<string, string> = Object.fromEntries([
   ...US_INSTRUMENTS.map((i) => [i.symbol, i.name] as const),
@@ -461,9 +461,10 @@ function buildFlowState(
     for (const phase of FLOW_PHASES) {
       const allDone = phase.stepIds.every((stepId) => states[stepId] === 'completed');
       if (!allDone) {
-        phase.stepIds.forEach((stepId) => {
-          if (states[stepId] !== 'completed') states[stepId] = 'active';
-        });
+        const nextStepId = phase.stepIds.find((stepId) => states[stepId] !== 'completed');
+        if (nextStepId) {
+          states[nextStepId] = 'active';
+        }
         return {
           states,
           activePhaseLabel: phase.label,
@@ -597,7 +598,9 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [logs, setLogs] = useState<{ id: string, agent: string, message: string, time: string }[]>([]);
   const [finalDecision, setFinalDecision] = useState<any>(null);
+  const [showFinalReport, setShowFinalReport] = useState(false);
   const [runWarning, setRunWarning] = useState<string | null>(null);
+  const [clockNowMs, setClockNowMs] = useState(() => Date.now());
 
   // History State
   const [activeTab, setActiveTab] = useState<'watchlist' | 'history' | 'scorecard'>('watchlist');
@@ -690,6 +693,44 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
   const [wsStatus, setWsStatus] = useState<'disconnected' | 'connecting' | 'connected'>('connecting');
   const [yhWsStatus, setYhWsStatus] = useState<'disconnected' | 'connecting' | 'connected'>('connecting');
 
+  useEffect(() => {
+    const interval = setInterval(() => setClockNowMs(Date.now()), 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const currentTime = new Date(clockNowMs);
+  const nseSessionOpen = isNSESessionOpen(currentTime);
+  const nyseSessionOpen = isNYSERegularSessionOpen(currentTime);
+  const activeStreamQuote = wsPrices[ticker];
+  const activeIndiaQuote =
+    market === 'IN'
+      ? activeStreamQuote
+        ? {
+            price: activeStreamQuote.price,
+            change:
+              typeof activeQuote?.change === 'number'
+                ? activeQuote.change
+                : activeStreamQuote.prev
+                  ? activeStreamQuote.price - activeStreamQuote.prev
+                  : 0,
+            changePercent:
+              typeof activeQuote?.changePercent === 'number'
+                ? activeQuote.changePercent
+                : activeStreamQuote.prev
+                  ? ((activeStreamQuote.price - activeStreamQuote.prev) / activeStreamQuote.prev) * 100
+                  : 0,
+            isLast: !!activeStreamQuote.isRest || !nseSessionOpen,
+          }
+        : activeQuote
+          ? {
+              price: activeQuote.price,
+              change: activeQuote.change ?? 0,
+              changePercent: activeQuote.changePercent ?? 0,
+              isLast: !nseSessionOpen,
+            }
+          : null
+      : null;
+
   const watchlists: Record<string, string[]> = {
     US: TOP_50_US,
     IN: TOP_50_IN,
@@ -756,7 +797,7 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
     }
   };
 
-  const isMarketOpen = () => isNYSERegularSessionOpen();
+  const isMarketOpen = () => nyseSessionOpen;
 
   // Fetch REST fallback prices from proxy (which calls FMP/Polygon server-side)
   const fetchRestPrices = async (tickers: string[]) => {
@@ -766,9 +807,10 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
       if (Array.isArray(data.quotes)) {
         data.quotes.forEach((q: any) => {
           if (q.symbol && q.price) {
+            const current = livePricesRef.current[q.symbol];
             livePricesRef.current[q.symbol] = {
               price: q.price,
-              prev: q.price,
+              prev: typeof q.previousClose === 'number' ? q.previousClose : current?.price ?? q.price,
               time: Date.now(),
               isRest: true
             };
@@ -1047,11 +1089,7 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
 
   // Active Quote Fetcher (Yahoo fallback for Indian Market)
   useEffect(() => {
-    if (market === 'US') {
-       // Using WS for US, no need to fetch active quote unless we want daily change. 
-       // For this demo, we'll just rely on WS prices.
-       return;
-    }
+    if (market !== 'IN') return;
 
     const fetchQuote = async () => {
       if (!ticker) return;
@@ -1137,6 +1175,7 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
         });
         setRunWarning(null);
         setIsRunning(false);
+        appendSystemLog('Analysis complete. Final report is ready to review.');
       }
     }
 
@@ -1166,6 +1205,7 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
       }
       setRunWarning(null);
       setIsRunning(false);
+      appendSystemLog('Analysis complete. Final report is ready to review.');
     }
   };
 
@@ -1293,6 +1333,7 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
     setActiveTab('watchlist');
     setLogs([]);
     setFinalDecision(null);
+    setShowFinalReport(false);
     setRunWarning(null);
 
     if (logChannelRef.current) {
@@ -1340,6 +1381,7 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
           if (newLog.agent_role === 'Portfolio Manager' && newLog.content.includes('decision')) {
             setIsRunning(false);
             setRunWarning(null);
+            appendSystemLog('Analysis complete. Final report is ready to review.');
             const decisionData = parsePortfolioDecision(newLog.content);
             setFinalDecision({
               ticker: runTicker,
@@ -1558,18 +1600,25 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
                   <div className="animate-pulse flex space-x-4 w-full">
                     <div className="h-8 bg-[#EBE7DE] rounded w-1/2"></div>
                   </div>
-                ) : activeQuote ? (
-                  <>
-                    <div className="text-2xl font-mono font-bold text-[#2C2A26]">
-                      {activeQuote.price.toFixed(2)}
+                ) : activeIndiaQuote ? (
+                  <div className="flex w-full items-center justify-between gap-3">
+                    <div className="flex flex-col gap-1">
+                      <div className="text-2xl font-mono font-bold text-[#2C2A26]">
+                        ₹{activeIndiaQuote.price.toFixed(2)}
+                      </div>
+                      {activeIndiaQuote.isLast && (
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-[#A8A29E]">
+                          Last available quote
+                        </span>
+                      )}
                     </div>
                     <div className={`flex items-center gap-1 font-mono text-xs font-bold ${
-                      (activeQuote.change ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-600'
+                      (activeIndiaQuote.change ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-600'
                     }`}>
-                      {(activeQuote.change ?? 0) >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                      {activeQuote.changePercent?.toFixed(2)}%
+                      {(activeIndiaQuote.change ?? 0) >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                      {activeIndiaQuote.changePercent?.toFixed(2)}%
                     </div>
-                  </>
+                  </div>
                 ) : (
                   <div className="text-[#A8A29E] text-xs font-mono uppercase tracking-widest">
                     Quote Unavailable
@@ -1583,7 +1632,7 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
                       <div className="text-2xl font-mono font-bold text-[#2C2A26]">
                         ${wsPrices[ticker].price.toFixed(2)}
                       </div>
-                      {isNYSERegularSessionOpen() ? (
+                      {nyseSessionOpen ? (
                         <div
                           className={`shrink-0 text-xs font-mono font-bold px-2 py-1 rounded-sm ${
                             wsPrices[ticker].price > wsPrices[ticker].prev
@@ -1817,9 +1866,9 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
                   const subLabel = instrumentSecondaryLabel(t, market);
                   const equitySessionOpen =
                     market === 'US'
-                      ? isNYSERegularSessionOpen()
+                      ? nyseSessionOpen
                       : market === 'IN'
-                        ? isNSESessionOpen()
+                        ? nseSessionOpen
                         : true;
 
                   // 24h change for crypto (from Binance open price)
@@ -1883,8 +1932,8 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
                             <span
                               className={`font-mono text-sm font-bold transition-colors duration-300 ${
                                 wsData.isRest ||
-                                (market === 'US' && !isNYSERegularSessionOpen()) ||
-                                (market === 'IN' && !isNSESessionOpen())
+                                (market === 'US' && !nyseSessionOpen) ||
+                                (market === 'IN' && !nseSessionOpen)
                                   ? 'text-[#5D5A53]'
                                   : wsData.price > wsData.prev
                                     ? 'text-emerald-600'
@@ -1896,8 +1945,8 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
                               {market === 'IN' ? '₹' : '$'}{wsData.price.toFixed(2)}
                             </span>
                             {(wsData.isRest ||
-                              (market === 'US' && !isNYSERegularSessionOpen()) ||
-                              (market === 'IN' && !isNSESessionOpen())) && (
+                              (market === 'US' && !nyseSessionOpen) ||
+                              (market === 'IN' && !nseSessionOpen)) && (
                               <span className="text-[8px] uppercase tracking-widest text-[#A8A29E]">Last</span>
                             )}
                           </div>
@@ -2072,7 +2121,25 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
           )}
           
           {/* Results Dashboard */}
-          {(activeTab === 'history' ? selectedHistorySession?.decision : finalDecision) && (
+          {activeTab === 'watchlist' && finalDecision && !isRunning && !showFinalReport && (
+            <div className="border border-emerald-200 bg-emerald-50 px-5 py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-emerald-800">Analysis Complete</p>
+                <p className="mt-1 text-sm text-emerald-900">
+                  Sub-agent execution is finished. Review the final portfolio report when you are ready.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowFinalReport(true)}
+                className="shrink-0 border border-emerald-700 bg-white px-4 py-2 text-xs font-bold uppercase tracking-widest text-emerald-900 transition-colors hover:bg-emerald-100"
+              >
+                View Final Report
+              </button>
+            </div>
+          )}
+
+          {(activeTab === 'history' ? selectedHistorySession?.decision : (finalDecision && showFinalReport)) && (
             <div className="bg-white border-2 border-[#2C2A26] p-8 shadow-[8px_8px_0px_0px_rgba(44,42,38,1)] relative overflow-hidden animate-fade-in-up">
               <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
                 <Activity className="w-64 h-64 text-[#2C2A26]" />
