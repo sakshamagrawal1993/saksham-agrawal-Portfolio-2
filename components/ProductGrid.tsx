@@ -25,7 +25,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({ onProductClick, featuredOnly 
   const filteredProjects = useMemo(() => {
     if (featuredOnly) {
       // Show only specific featured items in order
-      const featuredIds = ['insightslm', 'runner', 'digital-twin', 'mind-coach'];
+      const featuredIds = ['digital-twin', 'trading-agents', 'mind-coach', 'insightslm'];
       return featuredIds.map(id => PROJECTS.find(p => p.id === id)).filter((p): p is Project => !!p);
     }
 
@@ -47,8 +47,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({ onProductClick, featuredOnly 
           {featuredOnly && (
             <button
               onClick={() => {
-                window.scrollTo({ top: 0, behavior: 'instant' });
-                navigate('/portfolio');
+                window.location.href = '/portfolio';
               }}
               className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[#2C2A26] hover:opacity-60 transition-opacity mt-8 md:mt-0"
             >
