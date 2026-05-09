@@ -276,6 +276,38 @@ function isNSESessionOpen(now = new Date()): boolean {
   return mins >= 9 * 60 + 15 && mins < 15 * 60 + 30;
 }
 
+function isWeekendInTimeZone(now: Date, timeZone: 'America/New_York' | 'Asia/Kolkata'): boolean {
+  const day = now.toLocaleDateString('en-US', { timeZone, weekday: 'short' });
+  return day.startsWith('Sat') || day.startsWith('Sun');
+}
+
+function getEquitySessionBadge(
+  market: 'US' | 'IN',
+  now = new Date(),
+): {
+  open: boolean;
+  badge: string;
+  quoteLabel: string;
+} {
+  if (market === 'US') {
+    const open = isNYSERegularSessionOpen(now);
+    const weekend = isWeekendInTimeZone(now, 'America/New_York');
+    return {
+      open,
+      badge: open ? 'Market open' : weekend ? 'Weekend' : 'Market closed',
+      quoteLabel: open ? 'Live' : weekend ? 'Last close' : 'Last',
+    };
+  }
+
+  const open = isNSESessionOpen(now);
+  const weekend = isWeekendInTimeZone(now, 'Asia/Kolkata');
+  return {
+    open,
+    badge: open ? 'Market open' : weekend ? 'Weekend' : 'Market closed',
+    quoteLabel: open ? 'Live' : weekend ? 'Last close' : 'Last',
+  };
+}
+
 function formatCap(n: number | undefined): string {
   if (n == null || Number.isNaN(n)) return '—';
   if (n >= 1e12) return `${(n / 1e12).toFixed(2)}T`;
@@ -701,6 +733,8 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
   const currentTime = new Date(clockNowMs);
   const nseSessionOpen = isNSESessionOpen(currentTime);
   const nyseSessionOpen = isNYSERegularSessionOpen(currentTime);
+  const indiaSessionBadge = getEquitySessionBadge('IN', currentTime);
+  const usSessionBadge = getEquitySessionBadge('US', currentTime);
   const activeStreamQuote = wsPrices[ticker];
   const activeIndiaQuote =
     market === 'IN'
@@ -1608,7 +1642,7 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
                       </div>
                       {activeIndiaQuote.isLast && (
                         <span className="text-[9px] font-bold uppercase tracking-widest text-[#A8A29E]">
-                          Last available quote
+                          {indiaSessionBadge.quoteLabel}
                         </span>
                       )}
                     </div>
@@ -1632,7 +1666,7 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
                       <div className="text-2xl font-mono font-bold text-[#2C2A26]">
                         ${wsPrices[ticker].price.toFixed(2)}
                       </div>
-                      {nyseSessionOpen ? (
+                      {usSessionBadge.open ? (
                         <div
                           className={`shrink-0 text-xs font-mono font-bold px-2 py-1 rounded-sm ${
                             wsPrices[ticker].price > wsPrices[ticker].prev
@@ -1646,7 +1680,7 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
                         </div>
                       ) : (
                         <div className="shrink-0 text-xs font-mono font-bold px-2 py-1 rounded-sm bg-[#EBE7DE] text-[#5D5A53]">
-                          LAST
+                          {usSessionBadge.quoteLabel.toUpperCase()}
                         </div>
                       )}
                     </div>
@@ -1866,10 +1900,16 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
                   const subLabel = instrumentSecondaryLabel(t, market);
                   const equitySessionOpen =
                     market === 'US'
-                      ? nyseSessionOpen
+                      ? usSessionBadge.open
                       : market === 'IN'
-                        ? nseSessionOpen
+                        ? indiaSessionBadge.open
                         : true;
+                  const equitySessionBadge =
+                    market === 'US'
+                      ? usSessionBadge
+                      : market === 'IN'
+                        ? indiaSessionBadge
+                        : null;
 
                   // 24h change for crypto (from Binance open price)
                   const change24h = wsData?.open && wsData.price
@@ -1909,9 +1949,9 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
                           <span className="font-mono text-[10px] font-medium tabular-nums text-[#A8A29E]">
                             {tickerLine}
                           </span>
-                          {(market === 'US' || market === 'IN') && !equitySessionOpen && (
+                          {(market === 'US' || market === 'IN') && !equitySessionOpen && equitySessionBadge && (
                             <span className="mt-1 inline-flex w-fit rounded px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-amber-900 bg-amber-100 border border-amber-200/80">
-                              Market closed
+                              {equitySessionBadge.badge}
                             </span>
                           )}
                         </div>
@@ -1947,7 +1987,9 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
                             {(wsData.isRest ||
                               (market === 'US' && !nyseSessionOpen) ||
                               (market === 'IN' && !nseSessionOpen)) && (
-                              <span className="text-[8px] uppercase tracking-widest text-[#A8A29E]">Last</span>
+                              <span className="text-[8px] uppercase tracking-widest text-[#A8A29E]">
+                                {equitySessionBadge?.quoteLabel ?? 'Last'}
+                              </span>
                             )}
                           </div>
                         ) : (market === 'US' || market === 'IN') ? (
