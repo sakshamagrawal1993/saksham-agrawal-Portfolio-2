@@ -792,6 +792,60 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
     setVpsProfileOpen(false);
   }, [ticker]);
 
+  // Effect to load most recent session logs for the current ticker for immediate visibility
+  useEffect(() => {
+    if (activeTab !== 'watchlist' || isRunning || !ticker) return;
+
+    const fetchLatestSessionData = async () => {
+      try {
+        const { data: sessions, error: sessionErr } = await supabase
+          .from('trading_sessions')
+          .select('*')
+          .eq('ticker', ticker)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (sessionErr) throw sessionErr;
+
+        if (sessions && sessions.length > 0) {
+          const latestSession = sessions[0];
+          setSessionId(latestSession.id);
+
+          // Fetch logs for this session
+          const { data: sessionLogs, error: logErr } = await supabase
+            .from('trading_logs')
+            .select('*')
+            .eq('session_id', latestSession.id)
+            .order('created_at', { ascending: true });
+
+          if (logErr) throw logErr;
+
+          if (sessionLogs) {
+            setLogs(sessionLogs.map(formatAgentLog));
+            
+            // Set final decision from session record
+            setFinalDecision({
+              ticker: latestSession.ticker,
+              decision: latestSession.final_decision || 'HOLD',
+              confidence: 'High', // Defaulting to high for historical runs
+              thesis: latestSession.investment_thesis || latestSession.executive_summary || 'Analysis completed.'
+            });
+            setRunWarning(null);
+          }
+        } else {
+          // No history for this ticker
+          setLogs([]);
+          setFinalDecision(null);
+          setSessionId(null);
+        }
+      } catch (err) {
+        console.error('Error fetching latest session data:', err);
+      }
+    };
+
+    fetchLatestSessionData();
+  }, [ticker, activeTab, isRunning]);
+
   useEffect(() => {
     if (activeTab === 'history') {
       const fetchHistory = async () => {
@@ -2248,7 +2302,7 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
               )}
             </div>
             
-            <div className="p-6 font-mono text-sm overflow-y-auto flex-1 space-y-4 bg-white">
+            <div className="p-6 font-mono text-sm overflow-y-auto overflow-x-hidden flex-1 space-y-4 bg-white">
               {activeTab === 'watchlist' && runWarning && (
                 <div className="rounded-sm border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
                   {runWarning}
@@ -2265,7 +2319,7 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
                   <span className="text-[#A8A29E] shrink-0 w-24">{log.time}</span>
                   <div className="flex-1">
                     <span className="text-[#2C2A26] font-bold uppercase text-[10px] tracking-widest block mb-1">{log.agent}</span>
-                    <span className="text-[#5D5A53]">{log.message}</span>
+                    <span className="text-[#5D5A53] whitespace-pre-wrap break-all">{log.message}</span>
                   </div>
                 </div>
               ))}
