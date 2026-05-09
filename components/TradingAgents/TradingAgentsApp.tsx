@@ -2315,11 +2315,13 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
                 </div>
               )}
               {(activeTab === 'history' ? historyLogs : logs).map((log) => (
-                <div key={log.id} className="flex gap-6 animate-in fade-in slide-in-from-bottom-2 duration-300 border-l-2 border-[#EBE7DE] pl-4">
+                <div key={log.id} className="flex min-w-0 gap-6 animate-in fade-in slide-in-from-bottom-2 duration-300 border-l-2 border-[#EBE7DE] pl-4">
                   <span className="text-[#A8A29E] shrink-0 w-24">{log.time}</span>
-                  <div className="flex-1">
+                  <div className="min-w-0 flex-1">
                     <span className="text-[#2C2A26] font-bold uppercase text-[10px] tracking-widest block mb-1">{log.agent}</span>
-                    <span className="text-[#5D5A53] whitespace-pre-wrap break-all">{log.message}</span>
+                    <span className="block min-w-0 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-[#5D5A53]">
+                      {log.message}
+                    </span>
                   </div>
                 </div>
               ))}
