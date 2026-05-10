@@ -827,12 +827,24 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
           if (sessionLogs) {
             setLogs(sessionLogs.map(formatAgentLog));
             
+            let parsedThesis = latestSession.investment_thesis || latestSession.executive_summary;
+            let parsedConfidence = 'High';
+            let parsedDecision = latestSession.final_decision || 'HOLD';
+            
+            const finalLog = sessionLogs.find(l => l.agent_role === 'Portfolio Manager' && (l.log_type === 'decision' || l.content.includes('decision') || l.content.includes('HOLD') || l.content.includes('BUY') || l.content.includes('SELL')));
+            if (finalLog) {
+              const decisionData = parsePortfolioDecision(finalLog.content) as any;
+              parsedDecision = decisionData?.decision || decisionData?.final_decision || parsedDecision;
+              parsedThesis = decisionData?.thesis || decisionData?.executive_summary || decisionData?.investment_thesis || finalLog.content;
+              parsedConfidence = decisionData?.confidence || parsedConfidence;
+            }
+            
             // Set final decision from session record
             setFinalDecision({
               ticker: latestSession.ticker,
-              decision: latestSession.final_decision || 'HOLD',
-              confidence: 'High', // Defaulting to high for historical runs
-              thesis: latestSession.investment_thesis || latestSession.executive_summary || 'Analysis completed.'
+              decision: parsedDecision,
+              confidence: parsedConfidence,
+              thesis: parsedThesis || 'Analysis completed.'
             });
             setLastRunDate(new Date(latestSession.created_at).toLocaleDateString());
             setRunWarning(null);
