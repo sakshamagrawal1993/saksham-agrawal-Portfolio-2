@@ -1259,12 +1259,12 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
         .find((log) => log.agent_role === 'Portfolio Manager' && log.log_type === 'decision');
 
       if (decisionLog) {
-        const decisionData = parsePortfolioDecision(decisionLog.content);
+        const decisionData = parsePortfolioDecision(decisionLog.content) as any;
         setFinalDecision({
           ticker: runTicker,
-          decision: decisionData?.decision || 'HOLD',
+          decision: decisionData?.decision || decisionData?.final_decision || 'HOLD',
           confidence: decisionData?.confidence || 'Medium',
-          thesis: decisionData?.thesis || decisionLog.content,
+          thesis: decisionData?.thesis || decisionData?.executive_summary || decisionData?.investment_thesis || decisionLog.content,
         });
         setRunWarning(null);
         setIsRunning(false);
@@ -1472,16 +1472,16 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
         (payload) => {
           const newLog = payload.new as AgentLog;
           mergeFormattedLogs([formatAgentLog(newLog)]);
-          if (newLog.agent_role === 'Portfolio Manager' && newLog.content.includes('decision')) {
+          if (newLog.agent_role === 'Portfolio Manager' && (newLog.log_type === 'decision' || newLog.content.includes('decision') || newLog.content.includes('HOLD') || newLog.content.includes('BUY') || newLog.content.includes('SELL'))) {
             setIsRunning(false);
             setRunWarning(null);
             appendSystemLog('Analysis complete. Final report is ready to review.');
-            const decisionData = parsePortfolioDecision(newLog.content);
+            const decisionData = parsePortfolioDecision(newLog.content) as any;
             setFinalDecision({
               ticker: runTicker,
-              decision: decisionData?.decision || 'HOLD',
+              decision: decisionData?.decision || decisionData?.final_decision || 'HOLD',
               confidence: decisionData?.confidence || 'Medium',
-              thesis: decisionData?.thesis || newLog.content,
+              thesis: decisionData?.thesis || decisionData?.executive_summary || decisionData?.investment_thesis || newLog.content,
             });
           }
         }
@@ -1533,13 +1533,18 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
             setIsRunning(false);
           }
 
-          if (row.status === 'completed' && row.final_decision && !finalDecision) {
-            setFinalDecision((prev: any) => prev ?? ({
-              ticker: runTicker,
-              decision: row.final_decision || 'HOLD',
-              confidence: 'Medium',
-              thesis: row.investment_thesis || row.executive_summary || 'Analysis completed.',
-            }));
+          if (row.status === 'completed' && row.final_decision) {
+            supabase.from('trading_sessions').select('investment_thesis, executive_summary').eq('id', newSessionId).single().then(({data}) => {
+              setFinalDecision((prev: any) => {
+                if (prev && prev.thesis && prev.thesis !== 'Analysis completed.' && !prev.thesis.startsWith('{')) return prev;
+                return {
+                  ticker: runTicker,
+                  decision: row.final_decision || 'HOLD',
+                  confidence: 'Medium',
+                  thesis: data?.investment_thesis || data?.executive_summary || row.investment_thesis || row.executive_summary || 'Analysis completed.',
+                };
+              });
+            });
           }
         }
       );
