@@ -34,7 +34,7 @@ const Journal: React.FC = () => {
             <h2 className="text-4xl md:text-6xl font-serif text-[#2C2A26]">The Journal</h2>
           </div>
           <button
-            onClick={() => navigate('/journal')}
+            onClick={() => window.location.href = '/journal'}
             className="hidden md:flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[#2C2A26] hover:opacity-60 transition-opacity mt-8 md:mt-0"
           >
             View All Articles
@@ -85,7 +85,7 @@ const Journal: React.FC = () => {
 
         <div className="mt-12 md:hidden flex justify-center">
           <button
-            onClick={() => navigate('/journal')}
+            onClick={() => window.location.href = '/journal'}
             className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[#2C2A26] hover:opacity-60 transition-opacity"
           >
             View All Articles
