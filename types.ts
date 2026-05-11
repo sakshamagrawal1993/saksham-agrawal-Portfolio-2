@@ -18,7 +18,7 @@ export interface Project {
   techStack: string[];
   repoUrl?: string;
   demoUrl?: string;
-
+  status?: 'completed' | 'under-development';
 }
 
 export interface JournalArticle {

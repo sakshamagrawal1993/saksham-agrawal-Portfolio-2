@@ -29,8 +29,20 @@ const ProductGrid: React.FC<ProductGridProps> = ({ onProductClick, featuredOnly 
       return featuredIds.map(id => PROJECTS.find(p => p.id === id)).filter((p): p is Project => !!p);
     }
 
-    if (activeCategory === 'All') return PROJECTS;
-    return PROJECTS.filter(p => p.category === activeCategory);
+    const filtered = activeCategory === 'All'
+      ? PROJECTS
+      : PROJECTS.filter(p => p.category === activeCategory);
+
+    const statusRank: Record<string, number> = {
+      completed: 0,
+      'under-development': 1,
+    };
+
+    return [...filtered].sort((a, b) => {
+      const aRank = statusRank[a.status ?? ''] ?? 2;
+      const bRank = statusRank[b.status ?? ''] ?? 2;
+      return aRank - bRank;
+    });
   }, [activeCategory, featuredOnly]);
 
   return (

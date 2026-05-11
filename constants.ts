@@ -93,7 +93,8 @@ export const PROJECTS: Project[] = [
     imageUrl: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=1000',
     gallery: [],
     techStack: ['React', 'Supabase', 'n8n', 'Recharts', 'Decision Science'],
-    demoUrl: '/ai-gate'
+    demoUrl: '/ai-gate',
+    status: 'under-development'
   },
   {
     id: 'trading-agents',
@@ -106,7 +107,8 @@ export const PROJECTS: Project[] = [
     imageUrl: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&q=80&w=1000',
     gallery: [],
     techStack: ['n8n', 'Supabase', 'React', 'OpenAI'],
-    demoUrl: '/trading-agents'
+    demoUrl: '/trading-agents',
+    status: 'completed'
   },
   {
     id: 'insightslm',
@@ -119,7 +121,8 @@ export const PROJECTS: Project[] = [
     imageUrl: 'https://images.unsplash.com/photo-1518186285589-2f7649de83e0?auto=format&fit=crop&q=80&w=1000',
     gallery: [],
     techStack: ['React', 'Supabase', 'N8N', 'RAG'],
-    demoUrl: '/insightslm'
+    demoUrl: '/insightslm',
+    status: 'completed'
   },
   {
     id: 'ticketflow',
@@ -132,7 +135,8 @@ export const PROJECTS: Project[] = [
     imageUrl: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&q=80&w=1000', // Placeholder or use a specific one
     gallery: [],
     techStack: ['React', 'TypeScript', 'Tailwind CSS', 'Analytics'],
-    demoUrl: '/ticketflow'
+    demoUrl: '/ticketflow',
+    status: 'completed'
   },
   {
     id: 'runner',
@@ -145,7 +149,8 @@ export const PROJECTS: Project[] = [
     imageUrl: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=1000',
     gallery: [],
     techStack: ['React Three Fiber', 'Three.js', 'Zustand', 'WebGL'],
-    demoUrl: '/runner'
+    demoUrl: '/runner',
+    status: 'completed'
   },
   {
     id: 'digital-twin',
@@ -160,7 +165,8 @@ export const PROJECTS: Project[] = [
       'https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&q=80&w=1000'
     ],
     techStack: ['Agentic RAG', 'Knowledge Graphs', 'EHR Integration', 'Healthcare Data'],
-    demoUrl: '/health-twin'
+    demoUrl: '/health-twin',
+    status: 'completed'
   },
   {
     id: 'mind-coach',
@@ -175,7 +181,8 @@ export const PROJECTS: Project[] = [
       'https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?auto=format&fit=crop&q=80&w=1000'
     ],
     techStack: ['LLMs', 'Safety Guardrails', 'Multilingual Support', 'PLG'],
-    demoUrl: '/mind-coach'
+    demoUrl: '/mind-coach',
+    status: 'completed'
   },
   {
     id: 'p3',
@@ -237,7 +244,8 @@ export const PROJECTS: Project[] = [
       'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&q=80&w=1000'
     ],
     techStack: ['Python', 'React Native', 'TensorFlow', 'Finance API'],
-    demoUrl: '#'
+    demoUrl: '#',
+    status: 'under-development'
   },
   {
     id: 'p7',
@@ -252,7 +260,8 @@ export const PROJECTS: Project[] = [
       'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?auto=format&fit=crop&q=80&w=1000'
     ],
     techStack: ['Solidity', 'Ethereum', 'Node.js', 'Web3.js'],
-    demoUrl: '#'
+    demoUrl: '#',
+    status: 'under-development'
   },
   {
     id: 'p8',
@@ -267,7 +276,8 @@ export const PROJECTS: Project[] = [
       'https://images.unsplash.com/photo-1611162617474-5b21e879e113?auto=format&fit=crop&q=80&w=1000'
     ],
     techStack: ['OpenAI API', 'React', 'Node.js', 'Analytics'],
-    demoUrl: '#'
+    demoUrl: '#',
+    status: 'under-development'
   }
 ];
 

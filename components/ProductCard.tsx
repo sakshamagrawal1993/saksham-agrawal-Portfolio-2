@@ -17,6 +17,12 @@ interface ProjectCardProps {
 }
 
 const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) => {
+  const statusLabel = project.status === 'completed'
+    ? { text: 'Completed', className: 'bg-[#DFF3E4] text-[#216E39] border-[#9AC7A6]' }
+    : project.status === 'under-development'
+      ? { text: 'Under Development', className: 'bg-[#FCE8D5] text-[#A6571B] border-[#E6AF79]' }
+      : null;
+
   return (
     <div className="group relative rounded-3xl h-full w-full p-4 cursor-pointer" onClick={() => onClick(project)}>
       <GlowingEffect blur={0} borderWidth={3} spread={80} glow={true} disabled={false} proximity={64} inactiveZone={0.01} />
@@ -54,8 +60,17 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) => {
 
         <div className="text-left">
           <div className="flex justify-between items-start mb-2">
-            <h3 className="text-3xl font-serif font-medium text-[#2C2A26] group-hover:opacity-70 transition-opacity">{project.name}</h3>
-            <span className="text-xs font-bold uppercase tracking-widest border border-[#A8A29E] px-2 py-1 text-[#5D5A53] rounded">{project.category}</span>
+            <div className="pr-4">
+              <h3 className="text-3xl font-serif font-medium text-[#2C2A26] group-hover:opacity-70 transition-opacity">{project.name}</h3>
+            </div>
+            <div className="flex flex-col items-end gap-2 shrink-0">
+              {statusLabel && (
+                <span className={`text-[11px] font-bold uppercase tracking-[0.16em] border px-2.5 py-1 rounded-full ${statusLabel.className}`}>
+                  {statusLabel.text}
+                </span>
+              )}
+              <span className="text-xs font-bold uppercase tracking-widest border border-[#A8A29E] px-2 py-1 text-[#5D5A53] rounded">{project.category}</span>
+            </div>
           </div>
           <p className="text-lg font-light text-[#5D5A53] mb-3 tracking-wide">{project.tagline}</p>
           <div className="flex flex-wrap gap-2 mt-4">
