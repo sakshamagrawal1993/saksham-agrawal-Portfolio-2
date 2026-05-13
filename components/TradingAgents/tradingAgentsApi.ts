@@ -20,8 +20,10 @@ export type TradingAgentsAction =
   | { action: 'batch_quote'; symbols: string }
   | { action: 'get_finnhub_token' }
   | { action: 'quote'; ticker: string }
-  | { action: 'run'; ticker: string; session_id: string; execution_price: number; market?: 'us' | 'india' | 'crypto' }
-  | { action: 'recon'; tickers: string };
+  | { action: 'run'; ticker: string; session_id: string; execution_price: number; market?: 'us' | 'india' | 'crypto'; execution_price_source?: string; evaluation_horizon?: string }
+  | { action: 'recon'; tickers: string }
+  | { action: 'lessons_context'; ticker: string; market?: 'us' | 'india' | 'crypto'; limit?: number }
+  | { action: 'evaluate'; limit?: number };
 
 export const TRADING_AGENTS_FUNCTION = 'trading-agents-proxy';
 

@@ -46,6 +46,50 @@ type FlowPhase = {
 
 type EquityInstrument = { symbol: string; name: string };
 
+type ScorecardStats = {
+  wins: number;
+  losses: number;
+  neutral: number;
+  invalid: number;
+  pending: number;
+  evaluated: number;
+  rate: number;
+  avgReturn: number | null;
+  avgAlpha: number | null;
+};
+
+type EvaluationRow = {
+  id: string;
+  ticker: string;
+  market?: string | null;
+  created_at: string;
+  final_decision?: string | null;
+  outcome?: string | null;
+  evaluation_status?: string | null;
+  directional_result?: string | null;
+  raw_return_pct?: number | null;
+  benchmark_return_pct?: number | null;
+  alpha_return_pct?: number | null;
+  entry_price?: number | null;
+  exit_price?: number | null;
+  entry_price_source?: string | null;
+  exit_price_source?: string | null;
+  evaluated_at?: string | null;
+  evaluation_due_at?: string | null;
+};
+
+const EMPTY_SCORECARD_STATS: ScorecardStats = {
+  wins: 0,
+  losses: 0,
+  neutral: 0,
+  invalid: 0,
+  pending: 0,
+  evaluated: 0,
+  rate: 0,
+  avgReturn: null,
+  avgAlpha: null,
+};
+
 const US_INSTRUMENTS: EquityInstrument[] = [
   { symbol: 'AAPL', name: 'Apple Inc.' },
   { symbol: 'MSFT', name: 'Microsoft Corporation' },
@@ -321,6 +365,28 @@ function formatDividendYield(v: number): string {
   if (Number.isNaN(v)) return '—';
   const pct = v > 1 ? v : v * 100;
   return `${pct.toFixed(2)}%`;
+}
+
+function formatPct(value?: number | null, digits = 2): string {
+  if (value == null || Number.isNaN(Number(value))) return '—';
+  const sign = value > 0 ? '+' : '';
+  return `${sign}${Number(value).toFixed(digits)}%`;
+}
+
+function formatPrice(value?: number | null): string {
+  if (value == null || Number.isNaN(Number(value))) return '—';
+  return Number(value).toLocaleString(undefined, {
+    maximumFractionDigits: Number(value) >= 1000 ? 2 : 4,
+  });
+}
+
+function evaluationBadgeClass(status?: string | null, outcome?: string | null): string {
+  const key = String(outcome || status || '').toLowerCase();
+  if (key === 'win' || key === 'evaluated') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+  if (key === 'loss' || key === 'error') return 'bg-red-50 text-red-700 border-red-200';
+  if (key === 'neutral') return 'bg-amber-50 text-amber-700 border-amber-200';
+  if (key === 'invalid') return 'bg-stone-100 text-stone-500 border-stone-200';
+  return 'bg-[#FAF8F3] text-[#8C857A] border-[#EBE7DE]';
 }
 
 const VPS_PROFILE_CACHE_MS = 10 * 60 * 1000;
@@ -649,7 +715,8 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
   const [activeOpportunities, setActiveOpportunities] = useState<string[]>([]);
 
   // Scorecard State
-  const [scorecardStats, setScorecardStats] = useState({ wins: 0, losses: 0, rate: 0 });
+  const [scorecardStats, setScorecardStats] = useState<ScorecardStats>(EMPTY_SCORECARD_STATS);
+  const [evaluationRows, setEvaluationRows] = useState<EvaluationRow[]>([]);
   const [lessons, setLessons] = useState<any[]>([]);
   /** On-demand profile from VPS yfinance `/research` (same data shape as deep_research). */
   const [vpsProfile, setVpsProfile] = useState<Record<string, unknown> | null>(null);
@@ -687,22 +754,53 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
     if (activeTab !== 'scorecard') return;
 
     const fetchScorecard = async () => {
-      // Fetch stats
       const { data: sessions } = await supabase
         .from('trading_sessions')
-        .select('outcome')
-        .not('outcome', 'is', null);
+        .select('id,ticker,market,created_at,final_decision,outcome,evaluation_status,directional_result,raw_return_pct,benchmark_return_pct,alpha_return_pct,entry_price,exit_price,entry_price_source,exit_price_source,evaluated_at,evaluation_due_at')
+        .order('created_at', { ascending: false })
+        .limit(50);
 
-      if (sessions && sessions.length > 0) {
-        let w = 0; let l = 0;
-        sessions.forEach(s => {
-          if (s.outcome === 'WIN') w++;
-          if (s.outcome === 'LOSS') l++;
-        });
-        setScorecardStats({ wins: w, losses: l, rate: (w + l) > 0 ? Math.round((w / (w + l)) * 100) : 0 });
-      }
+      const rows = (sessions || []) as EvaluationRow[];
+      setEvaluationRows(rows);
 
-      // Fetch lessons
+      let wins = 0;
+      let losses = 0;
+      let neutral = 0;
+      let invalid = 0;
+      let pending = 0;
+      const evaluatedReturns: number[] = [];
+      const evaluatedAlphas: number[] = [];
+
+      rows.forEach((session) => {
+        const outcome = String(session.outcome || '').toUpperCase();
+        const status = String(session.evaluation_status || '').toLowerCase();
+        if (outcome === 'WIN') wins++;
+        else if (outcome === 'LOSS') losses++;
+        else if (outcome === 'NEUTRAL' || session.directional_result === 'neutral') neutral++;
+        else if (outcome === 'INVALID' || status === 'invalid') invalid++;
+        else if (status !== 'evaluated') pending++;
+
+        if (typeof session.raw_return_pct === 'number') evaluatedReturns.push(session.raw_return_pct);
+        if (typeof session.alpha_return_pct === 'number') evaluatedAlphas.push(session.alpha_return_pct);
+      });
+
+      const directionalTotal = wins + losses;
+      setScorecardStats({
+        wins,
+        losses,
+        neutral,
+        invalid,
+        pending,
+        evaluated: wins + losses + neutral,
+        rate: directionalTotal > 0 ? Math.round((wins / directionalTotal) * 100) : 0,
+        avgReturn: evaluatedReturns.length
+          ? evaluatedReturns.reduce((sum, value) => sum + value, 0) / evaluatedReturns.length
+          : null,
+        avgAlpha: evaluatedAlphas.length
+          ? evaluatedAlphas.reduce((sum, value) => sum + value, 0) / evaluatedAlphas.length
+          : null,
+      });
+
       const { data: lessonsData } = await supabase
         .from('agent_lessons')
         .select('*')
@@ -1576,12 +1674,23 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
 
     try {
       const currentPrice = wsPrices[runTicker]?.price || activeQuote?.price || 0;
+      const executionPriceSource = wsPrices[runTicker]?.isRest
+        ? 'batch_quote'
+        : market === 'CRYPTO'
+          ? 'binance_ws'
+          : wsPrices[runTicker]?.price
+            ? 'vps_ws'
+            : activeQuote?.price
+              ? 'quote'
+              : 'manual_fallback';
 
       await invokeTradingAgents<{ success?: boolean; queued?: boolean }>({
         action: 'run',
         ticker: runTicker,
         session_id: newSessionId,
         execution_price: currentPrice,
+        execution_price_source: executionPriceSource,
+        evaluation_horizon: '24h',
         market: market === 'US' ? 'us' : market === 'IN' ? 'india' : 'crypto',
       });
 
@@ -2130,7 +2239,14 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
                           </div>
                           <span className="text-[10px] text-[#A8A29E] shrink-0">{new Date(session.created_at).toLocaleDateString()}</span>
                         </div>
-                        <span className="text-[10px] uppercase tracking-widest text-[#5D5A53]">{session.status}</span>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="text-[10px] uppercase tracking-widest text-[#5D5A53]">{session.status}</span>
+                          {(session.evaluation_status || session.outcome) && (
+                            <span className={`border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest ${evaluationBadgeClass(session.evaluation_status, session.outcome)}`}>
+                              {session.outcome || session.evaluation_status}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     );
                   })
@@ -2138,8 +2254,18 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
               ) : (
                 <div className="flex flex-col space-y-4">
                   <div className="p-4 border border-[#EBE7DE] bg-white">
-                    <h3 className="text-[10px] font-bold uppercase tracking-widest text-[#5D5A53] mb-2">Agent Win/Loss Ratio</h3>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <div>
+                        <h3 className="text-[10px] font-bold uppercase tracking-widest text-[#5D5A53]">Evaluation Dashboard</h3>
+                        <p className="mt-1 text-[11px] leading-relaxed text-[#8C857A]">
+                          Directional win rate excludes neutral, invalid, and still-pending runs.
+                        </p>
+                      </div>
+                      <span className="rounded-full border border-[#EBE7DE] bg-[#FAF8F3] px-2 py-1 text-[9px] uppercase tracking-widest text-[#8C857A]">
+                        Phase 3
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
                       <div className="flex flex-col items-center">
                         <span className="text-2xl font-bold text-emerald-600">{scorecardStats.wins}</span>
                         <span className="text-[10px] uppercase tracking-widest text-[#A8A29E]">Wins</span>
@@ -2152,7 +2278,91 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
                         <span className="text-2xl font-bold text-[#5D5A53]">{scorecardStats.rate}%</span>
                         <span className="text-[10px] uppercase tracking-widest text-[#A8A29E]">Win Rate</span>
                       </div>
+                      <div className="flex flex-col items-center">
+                        <span className="text-xl font-bold text-amber-600">{scorecardStats.neutral}</span>
+                        <span className="text-[10px] uppercase tracking-widest text-[#A8A29E]">Neutral</span>
+                      </div>
+                      <div className="flex flex-col items-center">
+                        <span className="text-xl font-bold text-[#5D5A53]">{formatPct(scorecardStats.avgReturn)}</span>
+                        <span className="text-[10px] uppercase tracking-widest text-[#A8A29E]">Avg Return</span>
+                      </div>
+                      <div className="flex flex-col items-center">
+                        <span className="text-xl font-bold text-[#5D5A53]">{formatPct(scorecardStats.avgAlpha)}</span>
+                        <span className="text-[10px] uppercase tracking-widest text-[#A8A29E]">Avg Alpha</span>
+                      </div>
                     </div>
+                    {(scorecardStats.pending > 0 || scorecardStats.invalid > 0) && (
+                      <div className="mt-3 flex flex-wrap gap-2 text-[10px] uppercase tracking-widest">
+                        {scorecardStats.pending > 0 && (
+                          <span className="border border-[#EBE7DE] bg-[#FAF8F3] px-2 py-1 text-[#8C857A]">
+                            {scorecardStats.pending} pending
+                          </span>
+                        )}
+                        {scorecardStats.invalid > 0 && (
+                          <span className="border border-stone-200 bg-stone-100 px-2 py-1 text-stone-500">
+                            {scorecardStats.invalid} invalid
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-4 border border-[#EBE7DE] bg-white">
+                    <h3 className="text-[10px] font-bold uppercase tracking-widest text-[#5D5A53] mb-3">Evaluated Runs</h3>
+                    {evaluationRows.length === 0 ? (
+                      <div className="text-xs text-[#A8A29E] italic">No runs available yet.</div>
+                    ) : (
+                      <div className="space-y-2">
+                        {evaluationRows.slice(0, 8).map((row) => {
+                          const instrumentName = resolveInstrumentName(row.ticker);
+                          const statusLabel = row.outcome || row.evaluation_status || 'pending';
+                          return (
+                            <div key={row.id} className="border border-[#EBE7DE] bg-[#FAF8F3] p-3">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-mono text-xs font-bold text-[#2C2A26]">{row.ticker}</span>
+                                    <span className={`border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest ${evaluationBadgeClass(row.evaluation_status, row.outcome)}`}>
+                                      {statusLabel}
+                                    </span>
+                                  </div>
+                                  {instrumentName && (
+                                    <div className="mt-0.5 truncate text-[10px] text-[#A8A29E]">{instrumentName}</div>
+                                  )}
+                                </div>
+                                <div className="text-right text-[10px] uppercase tracking-widest text-[#8C857A]">
+                                  {row.final_decision || 'Decision N/A'}
+                                </div>
+                              </div>
+                              <div className="mt-3 grid grid-cols-3 gap-2 text-[10px]">
+                                <div>
+                                  <div className="uppercase tracking-widest text-[#A8A29E]">Entry / Exit</div>
+                                  <div className="font-mono text-[#5D5A53]">
+                                    {formatPrice(row.entry_price)} {'->'} {formatPrice(row.exit_price)}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="uppercase tracking-widest text-[#A8A29E]">Return</div>
+                                  <div className={`font-mono ${Number(row.raw_return_pct || 0) >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                                    {formatPct(row.raw_return_pct)}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="uppercase tracking-widest text-[#A8A29E]">Alpha</div>
+                                  <div className={`font-mono ${Number(row.alpha_return_pct || 0) >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                                    {formatPct(row.alpha_return_pct)}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="mt-2 flex flex-wrap gap-2 text-[9px] uppercase tracking-widest text-[#A8A29E]">
+                                {row.entry_price_source && <span>Entry: {row.entry_price_source}</span>}
+                                {row.exit_price_source && <span>Exit: {row.exit_price_source}</span>}
+                                {row.evaluation_due_at && <span>Due {new Date(row.evaluation_due_at).toLocaleDateString()}</span>}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                   <div className="p-4 border border-[#EBE7DE] bg-white">
                     <h3 className="text-[10px] font-bold uppercase tracking-widest text-[#5D5A53] mb-2">Recent Lessons Learned</h3>
@@ -2166,6 +2376,11 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
                            <li key={lesson.id} className="text-xs text-[#5D5A53] border-l-2 border-amber-400 pl-2">
                              <span className="font-bold font-mono">{lesson.ticker}</span>
                              {ln && <span className="text-[#A8A29E] font-normal"> — {ln}</span>}
+                             {lesson.lesson_type && (
+                               <span className="ml-1 rounded-full bg-[#FAF8F3] px-1.5 py-0.5 text-[9px] uppercase tracking-widest text-[#A8A29E]">
+                                 {lesson.lesson_type}
+                               </span>
+                             )}
                              <span className="font-normal">: {lesson.lesson}</span>
                            </li>
                            );

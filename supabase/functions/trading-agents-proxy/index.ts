@@ -18,6 +18,9 @@ type PortfolioDecision = {
   decision?: string;
   confidence?: string;
   thesis?: string;
+  risk_flags?: string[];
+  signal_tags?: string[];
+  evaluation_horizon?: string;
 };
 
 const jsonResponse = (payload: unknown, status = 200) =>
@@ -83,6 +86,31 @@ const normalizeTickerForProviders = (symbol: string) => {
 };
 
 type OrchestrationMarket = 'us' | 'india' | 'crypto';
+type EvaluationStatus = 'pending' | 'waiting_for_market' | 'evaluated' | 'invalid' | 'error';
+type DirectionalResult = 'correct' | 'incorrect' | 'neutral' | 'not_applicable';
+
+type MarketCalendar = {
+  market: OrchestrationMarket;
+  timeZone: string;
+  openHour: number;
+  openMinute: number;
+  closeHour: number;
+  closeMinute: number;
+  holidayDates: Set<string>;
+  earlyCloseDates?: Record<string, { hour: number; minute: number }>;
+};
+
+type PricePoint = {
+  price: number;
+  source: string;
+  marketTimestamp: string;
+};
+
+type LessonContext = {
+  lessons: any[];
+  text: string;
+  by_role: Record<string, string>;
+};
 
 const parseCryptoTickerStyle = (sym: string): boolean => {
   const s = sym.toLowerCase().replace(/\s+/g, '');
@@ -111,6 +139,740 @@ const normalizeOrchestrationMarket = (raw: unknown, ticker: string): Orchestrati
   return inferMarketFromTicker(ticker || '');
 };
 
+const toNumber = (value: unknown): number | null => {
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+};
+
+const roundMetric = (value: number | null, decimals = 4) => {
+  if (value === null || !Number.isFinite(value)) return null;
+  const factor = 10 ** decimals;
+  return Math.round(value * factor) / factor;
+};
+
+const normalizeDecision = (value: unknown): 'BUY' | 'SELL' | 'HOLD' | null => {
+  const raw = String(value ?? '').trim().toUpperCase();
+  if (raw.includes('BUY')) return 'BUY';
+  if (raw.includes('SELL')) return 'SELL';
+  if (raw.includes('HOLD')) return 'HOLD';
+  return null;
+};
+
+const parseListEnv = (name: string, fallback: string[]) => {
+  const configured = Deno.env.get(name);
+  if (!configured) return new Set(fallback);
+  return new Set(
+    configured
+      .split(',')
+      .map((v) => v.trim())
+      .filter(Boolean),
+  );
+};
+
+// 2026 defaults are seeded from the official exchange calendars available as of May 2026.
+// Operators can override without redeploying via TRADING_AGENTS_NYSE_HOLIDAYS / TRADING_AGENTS_NSE_HOLIDAYS.
+const NYSE_2026_HOLIDAYS = [
+  '2026-01-01',
+  '2026-01-19',
+  '2026-02-16',
+  '2026-04-03',
+  '2026-05-25',
+  '2026-06-19',
+  '2026-07-03',
+  '2026-09-07',
+  '2026-11-26',
+  '2026-12-25',
+];
+
+const NSE_2026_HOLIDAYS = [
+  '2026-01-15',
+  '2026-01-26',
+  '2026-02-15',
+  '2026-03-03',
+  '2026-03-21',
+  '2026-03-26',
+  '2026-03-31',
+  '2026-04-03',
+  '2026-04-14',
+  '2026-05-01',
+  '2026-05-28',
+  '2026-06-26',
+  '2026-08-15',
+  '2026-09-14',
+  '2026-10-02',
+  '2026-10-20',
+  '2026-11-08',
+  '2026-11-10',
+  '2026-11-24',
+  '2026-12-25',
+];
+
+const getMarketCalendar = (market: OrchestrationMarket): MarketCalendar | null => {
+  if (market === 'crypto') return null;
+  if (market === 'india') {
+    return {
+      market,
+      timeZone: 'Asia/Kolkata',
+      openHour: 9,
+      openMinute: 15,
+      closeHour: 15,
+      closeMinute: 30,
+      holidayDates: parseListEnv('TRADING_AGENTS_NSE_HOLIDAYS', NSE_2026_HOLIDAYS),
+    };
+  }
+  return {
+    market,
+    timeZone: 'America/New_York',
+    openHour: 9,
+    openMinute: 30,
+    closeHour: 16,
+    closeMinute: 0,
+    holidayDates: parseListEnv('TRADING_AGENTS_NYSE_HOLIDAYS', NYSE_2026_HOLIDAYS),
+    earlyCloseDates: {
+      '2026-07-02': { hour: 13, minute: 0 },
+      '2026-11-27': { hour: 13, minute: 0 },
+      '2026-12-24': { hour: 13, minute: 0 },
+    },
+  };
+};
+
+const getZonedParts = (date: Date, timeZone: string) => {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(date);
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  return {
+    year: get('year'),
+    month: get('month'),
+    day: get('day'),
+    hour: get('hour'),
+    minute: get('minute'),
+    second: get('second'),
+  };
+};
+
+const dateKeyFromParts = (parts: { year: number; month: number; day: number }) =>
+  `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;
+
+const makeZonedDate = (
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  timeZone: string,
+) => {
+  const desired = Date.UTC(year, month - 1, day, hour, minute, 0, 0);
+  let adjusted = new Date(desired);
+  for (let i = 0; i < 3; i++) {
+    const actualParts = getZonedParts(adjusted, timeZone);
+    const actual = Date.UTC(
+      actualParts.year,
+      actualParts.month - 1,
+      actualParts.day,
+      actualParts.hour,
+      actualParts.minute,
+      actualParts.second,
+      0,
+    );
+    adjusted = new Date(adjusted.getTime() + (desired - actual));
+  }
+  return adjusted;
+};
+
+const isTradingDate = (parts: { year: number; month: number; day: number }, calendar: MarketCalendar) => {
+  const dateKey = dateKeyFromParts(parts);
+  const day = new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).getUTCDay();
+  return day !== 0 && day !== 6 && !calendar.holidayDates.has(dateKey);
+};
+
+const getSessionWindow = (parts: { year: number; month: number; day: number }, calendar: MarketCalendar) => {
+  const dateKey = dateKeyFromParts(parts);
+  const earlyClose = calendar.earlyCloseDates?.[dateKey];
+  const open = makeZonedDate(
+    parts.year,
+    parts.month,
+    parts.day,
+    calendar.openHour,
+    calendar.openMinute,
+    calendar.timeZone,
+  );
+  const close = makeZonedDate(
+    parts.year,
+    parts.month,
+    parts.day,
+    earlyClose?.hour ?? calendar.closeHour,
+    earlyClose?.minute ?? calendar.closeMinute,
+    calendar.timeZone,
+  );
+  return { open, close };
+};
+
+const rollToTradableTime = (date: Date, market: OrchestrationMarket) => {
+  const calendar = getMarketCalendar(market);
+  if (!calendar) return date;
+
+  let candidate = date;
+  for (let i = 0; i < 370; i++) {
+    const parts = getZonedParts(candidate, calendar.timeZone);
+    if (isTradingDate(parts, calendar)) {
+      const { open, close } = getSessionWindow(parts, calendar);
+      if (candidate < open) return open;
+      if (candidate <= close) return candidate;
+    }
+
+    const nextParts = getZonedParts(
+      makeZonedDate(parts.year, parts.month, parts.day + 1, 12, 0, calendar.timeZone),
+      calendar.timeZone,
+    );
+    candidate = makeZonedDate(
+      nextParts.year,
+      nextParts.month,
+      nextParts.day,
+      calendar.openHour,
+      calendar.openMinute,
+      calendar.timeZone,
+    );
+  }
+  throw new Error(`Could not resolve next tradable time for ${market}`);
+};
+
+const isInsideRegularSession = (date: Date, market: OrchestrationMarket) => {
+  const calendar = getMarketCalendar(market);
+  if (!calendar) return true;
+  const parts = getZonedParts(date, calendar.timeZone);
+  if (!isTradingDate(parts, calendar)) return false;
+  const { open, close } = getSessionWindow(parts, calendar);
+  return date >= open && date <= close;
+};
+
+const resolveEntryTimestamp = (session: any, market: OrchestrationMarket) => {
+  const existing = session.entry_market_timestamp ? new Date(session.entry_market_timestamp) : null;
+  if (existing && Number.isFinite(existing.getTime())) return existing;
+  const createdAt = new Date(session.created_at);
+  if (market === 'crypto' || isInsideRegularSession(createdAt, market)) return createdAt;
+  return rollToTradableTime(createdAt, market);
+};
+
+const resolveDueTimestamp = (entryAt: Date, market: OrchestrationMarket, horizon = '24h') => {
+  const hours = Number(String(horizon).match(/(\d+(?:\.\d+)?)h/)?.[1] ?? 24);
+  const rawDue = new Date(entryAt.getTime() + hours * 60 * 60 * 1000);
+  return market === 'crypto' ? rawDue : rollToTradableTime(rawDue, market);
+};
+
+const yahooSymbolForCrypto = (symbol: string) => {
+  const upper = String(symbol || '').trim().toUpperCase();
+  const usdt = upper.match(/^([A-Z0-9]{2,10})USDT$/);
+  if (usdt) return `${usdt[1]}-USD`;
+  if (/^(BTC|ETH|SOL|XRP|DOGE|ADA|BNB|AVAX)$/.test(upper)) return `${upper}-USD`;
+  return upper;
+};
+
+const binanceSymbolFromTicker = (symbol: string) => {
+  const upper = String(symbol || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (!upper) return 'BTCUSDT';
+  if (upper.endsWith('USDT')) return upper;
+  if (upper.endsWith('USD')) return `${upper.replace(/USD$/, '')}USDT`;
+  return `${upper}USDT`;
+};
+
+const fetchYahooPriceAtOrAfter = async (
+  symbol: string,
+  target: Date,
+  sourceLabel: string,
+  windowHours = 30,
+): Promise<PricePoint | null> => {
+  const targetSeconds = Math.floor(target.getTime() / 1000);
+  const period1 = Math.max(0, targetSeconds - 300);
+  const period2 = targetSeconds + windowHours * 60 * 60;
+  const intervals = ['5m', '15m', '1h'];
+
+  for (const interval of intervals) {
+    const url =
+      `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}` +
+      `?period1=${period1}&period2=${period2}&interval=${interval}&includePrePost=false`;
+    try {
+      const response = await fetch(url, {
+        headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json' },
+      });
+      if (!response.ok) continue;
+      const payload = await response.json();
+      const result = payload?.chart?.result?.[0];
+      const timestamps = Array.isArray(result?.timestamp) ? result.timestamp : [];
+      const quote = result?.indicators?.quote?.[0] || {};
+      const closes = Array.isArray(quote.close) ? quote.close : [];
+      const opens = Array.isArray(quote.open) ? quote.open : [];
+      for (let i = 0; i < timestamps.length; i++) {
+        const candleTime = Number(timestamps[i]) * 1000;
+        const price = toNumber(closes[i]) ?? toNumber(opens[i]);
+        if (price && candleTime >= target.getTime()) {
+          return {
+            price,
+            source: `${sourceLabel}:yahoo_chart_${interval}`,
+            marketTimestamp: new Date(candleTime).toISOString(),
+          };
+        }
+      }
+    } catch (error) {
+      console.error(`Yahoo chart price fetch failed for ${symbol}:`, error);
+    }
+  }
+
+  return null;
+};
+
+const fetchBinancePriceAtOrAfter = async (
+  ticker: string,
+  target: Date,
+  windowMinutes = 60,
+): Promise<PricePoint | null> => {
+  const symbol = binanceSymbolFromTicker(ticker);
+  const startTime = target.getTime();
+  const endTime = startTime + windowMinutes * 60 * 1000;
+  const url =
+    `https://api.binance.com/api/v3/klines?symbol=${encodeURIComponent(symbol)}` +
+    `&interval=1m&startTime=${startTime}&endTime=${endTime}&limit=1`;
+  try {
+    const response = await fetch(url, { headers: { Accept: 'application/json' } });
+    if (!response.ok) return null;
+    const rows = await response.json();
+    const row = Array.isArray(rows) ? rows[0] : null;
+    if (!Array.isArray(row)) return null;
+    const price = toNumber(row[4]) ?? toNumber(row[1]);
+    const timestamp = Number(row[0]);
+    if (!price || !Number.isFinite(timestamp)) return null;
+    return {
+      price,
+      source: `binance_klines_1m:${symbol}`,
+      marketTimestamp: new Date(timestamp).toISOString(),
+    };
+  } catch (error) {
+    console.error(`Binance price fetch failed for ${ticker}:`, error);
+    return null;
+  }
+};
+
+const fetchPriceAtOrAfter = async (
+  ticker: string,
+  market: OrchestrationMarket,
+  target: Date,
+  purpose: 'entry' | 'exit' | 'benchmark',
+): Promise<PricePoint | null> => {
+  if (market === 'crypto') {
+    const binance = await fetchBinancePriceAtOrAfter(ticker, target, purpose === 'exit' ? 180 : 60);
+    if (binance) return { ...binance, source: `${purpose}:${binance.source}` };
+    return fetchYahooPriceAtOrAfter(yahooSymbolForCrypto(ticker), target, `${purpose}:crypto_fallback`, 6);
+  }
+  return fetchYahooPriceAtOrAfter(ticker, target, purpose, purpose === 'exit' ? 48 : 8);
+};
+
+const getBenchmarkSymbol = (ticker: string, market: OrchestrationMarket) => {
+  if (market === 'us') return 'SPY';
+  if (market === 'india') return '^NSEI';
+  const upper = String(ticker || '').toUpperCase();
+  return upper.startsWith('BTC') ? null : 'BTCUSDT';
+};
+
+const getNoTradeBandPct = (market: OrchestrationMarket) => {
+  if (market === 'india') return 0.35;
+  if (market === 'crypto') return 0.75;
+  return 0.25;
+};
+
+const computeDirectionalOutcome = (
+  decision: 'BUY' | 'SELL' | 'HOLD' | null,
+  rawReturnPct: number,
+  market: OrchestrationMarket,
+): { outcome: 'WIN' | 'LOSS' | 'NEUTRAL' | 'INVALID'; directionalResult: DirectionalResult } => {
+  if (!decision) return { outcome: 'INVALID', directionalResult: 'not_applicable' };
+  const band = getNoTradeBandPct(market);
+  if (decision === 'HOLD') return { outcome: 'NEUTRAL', directionalResult: 'neutral' };
+  if (Math.abs(rawReturnPct) <= band) return { outcome: 'NEUTRAL', directionalResult: 'neutral' };
+  if (decision === 'BUY') {
+    return rawReturnPct > band
+      ? { outcome: 'WIN', directionalResult: 'correct' }
+      : { outcome: 'LOSS', directionalResult: 'incorrect' };
+  }
+  return rawReturnPct < -band
+    ? { outcome: 'WIN', directionalResult: 'correct' }
+    : { outcome: 'LOSS', directionalResult: 'incorrect' };
+};
+
+const confidenceToScore = (confidence: unknown) => {
+  const value = String(confidence ?? '').toLowerCase();
+  if (value.includes('high')) return 0.85;
+  if (value.includes('low')) return 0.35;
+  if (value.includes('medium')) return 0.6;
+  return null;
+};
+
+const writeEvaluationEvent = async (supabase: any, sessionId: string, eventType: string, details: Record<string, unknown>) => {
+  try {
+    await supabase.from('trading_evaluation_events').insert({
+      session_id: sessionId,
+      event_type: eventType,
+      details,
+    });
+  } catch (error) {
+    console.error(`Could not write evaluation event ${eventType}:`, error);
+  }
+};
+
+const buildFallbackLesson = (
+  ticker: string,
+  decision: string,
+  outcome: string,
+  rawReturnPct: number,
+  alphaReturnPct: number | null,
+) => {
+  const result = outcome === 'WIN' ? 'worked' : outcome === 'LOSS' ? 'missed' : 'was inconclusive';
+  const alphaText = alphaReturnPct === null ? 'without benchmark alpha' : `with ${roundMetric(alphaReturnPct, 2)}% alpha`;
+  return `${ticker} ${decision} ${result}: price moved ${roundMetric(rawReturnPct, 2)}% ${alphaText}; recalibrate similar signals next run.`;
+};
+
+const generateEvaluationLesson = async (
+  supabase: any,
+  session: any,
+  decision: string,
+  evidence: Record<string, unknown>,
+) => {
+  const openaiKey = Deno.env.get('OPENAI_API_KEY');
+  const fallback = buildFallbackLesson(
+    session.ticker,
+    decision,
+    String(evidence.outcome),
+    Number(evidence.raw_return_pct ?? 0),
+    evidence.alpha_return_pct === null ? null : Number(evidence.alpha_return_pct),
+  );
+
+  let lesson = fallback;
+  let qualityScore = 0.55;
+  if (openaiKey) {
+    try {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${openaiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content:
+                'You are a trading evaluation mentor. Return one concise lesson under 28 words. Prefer measurable signal feedback over generic advice.',
+            },
+            {
+              role: 'user',
+              content: JSON.stringify({
+                ticker: session.ticker,
+                thesis: session.investment_thesis || session.executive_summary || null,
+                evidence,
+              }),
+            },
+          ],
+          max_tokens: 80,
+        }),
+      });
+      if (response.ok) {
+        const payload = await response.json();
+        const candidate = String(payload?.choices?.[0]?.message?.content ?? '').trim();
+        if (candidate) {
+          lesson = candidate.replace(/^["']|["']$/g, '');
+          qualityScore = 0.75;
+        }
+      }
+    } catch (error) {
+      console.error('Failed to generate OpenAI evaluation lesson:', error);
+    }
+  }
+
+  const signalTags = Array.isArray((evidence as any).signal_tags) ? (evidence as any).signal_tags : [];
+  await supabase.from('agent_lessons').insert({
+    session_id: session.id,
+    source_session_id: session.id,
+    ticker: session.ticker,
+    lesson,
+    lesson_type: 'portfolio',
+    evidence,
+    applies_to_market: session.market || evidence.market || 'all',
+    applies_to_ticker: session.ticker,
+    signal_tags: signalTags,
+    quality_score: qualityScore,
+  });
+};
+
+const getDecisionForSession = async (supabase: any, session: any) => {
+  if (session.final_decision) {
+    return {
+      decision: normalizeDecision(session.final_decision),
+      confidence: session.confidence_bucket || null,
+      thesis: session.investment_thesis || session.executive_summary || null,
+      evaluation_horizon: session.evaluation_horizon || '24h',
+      signalTags: [] as string[],
+    };
+  }
+
+  const { data: logs } = await supabase
+    .from('trading_logs')
+    .select('content')
+    .eq('session_id', session.id)
+    .eq('agent_role', 'Portfolio Manager')
+    .eq('log_type', 'decision')
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  const parsed = parsePortfolioDecision(logs?.[0]?.content);
+  return {
+    decision: normalizeDecision(parsed?.decision),
+    confidence: parsed?.confidence || null,
+    thesis: parsed?.thesis || session.investment_thesis || session.executive_summary || null,
+    evaluation_horizon: parsed?.evaluation_horizon || session.evaluation_horizon || '24h',
+    signalTags: Array.isArray(parsed?.signal_tags) ? parsed.signal_tags : [],
+  };
+};
+
+const markEvaluationState = async (
+  supabase: any,
+  sessionId: string,
+  status: EvaluationStatus,
+  updates: Record<string, unknown> = {},
+) => {
+  await supabase
+    .from('trading_sessions')
+    .update({
+      evaluation_status: status,
+      evaluation_error: status === 'error' || status === 'invalid' ? updates.evaluation_error ?? null : null,
+      updated_at: new Date().toISOString(),
+      ...updates,
+    })
+    .eq('id', sessionId);
+};
+
+const evaluateSession = async (supabase: any, session: any, now = new Date()) => {
+  const market = normalizeOrchestrationMarket(session.market, session.ticker);
+  const decisionInfo = await getDecisionForSession(supabase, session);
+  const decision = decisionInfo.decision;
+  if (!decision) {
+    await markEvaluationState(supabase, session.id, 'invalid', {
+      evaluated: true,
+      outcome: 'INVALID',
+      directional_result: 'not_applicable',
+      evaluated_at: now.toISOString(),
+      evaluation_error: 'Missing parseable BUY/SELL/HOLD decision.',
+    });
+    await writeEvaluationEvent(supabase, session.id, 'invalid_decision', { final_decision: session.final_decision });
+    return 'invalid';
+  }
+
+  const entryAt = resolveEntryTimestamp(session, market);
+  const horizon = session.evaluation_horizon || decisionInfo.evaluation_horizon || '24h';
+  const dueAt = session.evaluation_due_at ? new Date(session.evaluation_due_at) : resolveDueTimestamp(entryAt, market, horizon);
+
+  if (entryAt > now || dueAt > now) {
+    await markEvaluationState(supabase, session.id, entryAt > now ? 'waiting_for_market' : 'pending', {
+      market,
+      evaluation_horizon: horizon,
+      evaluation_due_at: dueAt.toISOString(),
+      entry_market_timestamp: entryAt.toISOString(),
+    });
+    await writeEvaluationEvent(supabase, session.id, 'not_due', {
+      entry_market_timestamp: entryAt.toISOString(),
+      evaluation_due_at: dueAt.toISOString(),
+    });
+    return 'pending';
+  }
+
+  let entry: PricePoint | null = null;
+  const existingEntryPrice = toNumber(session.entry_price ?? session.execution_price);
+  const entryTimestamp = session.entry_market_timestamp ? new Date(session.entry_market_timestamp) : entryAt;
+  const canUseRecordedEntry = existingEntryPrice && (market === 'crypto' || isInsideRegularSession(new Date(session.created_at), market));
+  if (session.entry_price && session.entry_market_timestamp) {
+    entry = {
+      price: Number(session.entry_price),
+      source: session.entry_price_source || 'recorded_entry',
+      marketTimestamp: new Date(session.entry_market_timestamp).toISOString(),
+    };
+  } else {
+    entry = await fetchPriceAtOrAfter(session.ticker, market, entryTimestamp, 'entry');
+    if (!entry && canUseRecordedEntry) {
+      entry = {
+        price: Number(existingEntryPrice),
+        source: session.entry_price_source || 'frontend_execution_price',
+        marketTimestamp: entryTimestamp.toISOString(),
+      };
+    }
+  }
+
+  if (!entry) {
+    await markEvaluationState(supabase, session.id, 'waiting_for_market', {
+      market,
+      evaluation_horizon: horizon,
+      evaluation_due_at: dueAt.toISOString(),
+      entry_market_timestamp: entryAt.toISOString(),
+      evaluation_error: 'Entry price unavailable. Will retry.',
+    });
+    await writeEvaluationEvent(supabase, session.id, 'entry_price_missing', { target: entryAt.toISOString() });
+    return 'waiting';
+  }
+
+  const exit = await fetchPriceAtOrAfter(session.ticker, market, dueAt, 'exit');
+  if (!exit) {
+    await markEvaluationState(supabase, session.id, 'waiting_for_market', {
+      market,
+      evaluation_horizon: horizon,
+      evaluation_due_at: dueAt.toISOString(),
+      entry_price: entry.price,
+      entry_price_source: entry.source,
+      entry_market_timestamp: entry.marketTimestamp,
+      evaluation_error: 'Exit price unavailable. Will retry.',
+    });
+    await writeEvaluationEvent(supabase, session.id, 'exit_price_missing', { target: dueAt.toISOString() });
+    return 'waiting';
+  }
+
+  const benchmarkSymbol = getBenchmarkSymbol(session.ticker, market);
+  let benchmarkEntry: PricePoint | null = null;
+  let benchmarkExit: PricePoint | null = null;
+  if (benchmarkSymbol) {
+    benchmarkEntry = await fetchPriceAtOrAfter(benchmarkSymbol, market, entryAt, 'benchmark');
+    benchmarkExit = await fetchPriceAtOrAfter(benchmarkSymbol, market, dueAt, 'benchmark');
+  }
+
+  const rawReturnPct = ((exit.price - entry.price) / entry.price) * 100;
+  const benchmarkReturnPct =
+    benchmarkEntry && benchmarkExit
+      ? ((benchmarkExit.price - benchmarkEntry.price) / benchmarkEntry.price) * 100
+      : null;
+  const alphaReturnPct = benchmarkReturnPct === null ? null : rawReturnPct - benchmarkReturnPct;
+  const directional = computeDirectionalOutcome(decision, rawReturnPct, market);
+
+  const evidence = {
+    market,
+    decision,
+    confidence: decisionInfo.confidence,
+    outcome: directional.outcome,
+    directional_result: directional.directionalResult,
+    entry_price: roundMetric(entry.price, 6),
+    entry_price_source: entry.source,
+    entry_market_timestamp: entry.marketTimestamp,
+    exit_price: roundMetric(exit.price, 6),
+    exit_price_source: exit.source,
+    exit_market_timestamp: exit.marketTimestamp,
+    raw_return_pct: roundMetric(rawReturnPct, 4),
+    benchmark_symbol: benchmarkSymbol,
+    benchmark_return_pct: roundMetric(benchmarkReturnPct, 4),
+    alpha_return_pct: roundMetric(alphaReturnPct, 4),
+    no_trade_band_pct: getNoTradeBandPct(market),
+    signal_tags: decisionInfo.signalTags,
+  };
+
+  await supabase
+    .from('trading_sessions')
+    .update({
+      market,
+      evaluation_status: 'evaluated',
+      evaluation_horizon: horizon,
+      evaluation_due_at: dueAt.toISOString(),
+      entry_price: entry.price,
+      entry_price_source: entry.source,
+      entry_market_timestamp: entry.marketTimestamp,
+      exit_price: exit.price,
+      exit_price_source: exit.source,
+      exit_market_timestamp: exit.marketTimestamp,
+      raw_return_pct: roundMetric(rawReturnPct, 6),
+      benchmark_symbol: benchmarkSymbol,
+      benchmark_entry_price: benchmarkEntry?.price ?? null,
+      benchmark_exit_price: benchmarkExit?.price ?? null,
+      benchmark_return_pct: roundMetric(benchmarkReturnPct, 6),
+      alpha_return_pct: roundMetric(alphaReturnPct, 6),
+      directional_result: directional.directionalResult,
+      confidence_bucket: decisionInfo.confidence,
+      confidence_score: confidenceToScore(decisionInfo.confidence),
+      outcome: directional.outcome,
+      evaluated: true,
+      evaluated_at: now.toISOString(),
+      evaluation_error: null,
+      updated_at: now.toISOString(),
+    })
+    .eq('id', session.id);
+
+  await writeEvaluationEvent(supabase, session.id, 'evaluated', evidence);
+  await generateEvaluationLesson(supabase, session, decision, evidence);
+  return 'evaluated';
+};
+
+const buildLessonsContext = async (
+  supabase: any,
+  ticker: string,
+  market: OrchestrationMarket,
+  limit = 8,
+): Promise<LessonContext> => {
+  const { data, error } = await supabase
+    .from('agent_lessons')
+    .select('id,ticker,lesson,lesson_type,evidence,applies_to_market,applies_to_ticker,signal_tags,quality_score,created_at')
+    .order('created_at', { ascending: false })
+    .limit(40);
+
+  if (error) throw error;
+  const upperTicker = String(ticker || '').toUpperCase();
+  const relevant = (data || [])
+    .filter((lesson: any) => {
+      const lessonMarket = String(lesson.applies_to_market || 'all').toLowerCase();
+      const lessonTicker = String(lesson.applies_to_ticker || lesson.ticker || '').toUpperCase();
+      return lessonMarket === 'all' || lessonMarket === market || lessonTicker === upperTicker;
+    })
+    .slice(0, limit);
+
+  const toLine = (lesson: any) => {
+    const type = lesson.lesson_type || 'portfolio';
+    const tags = Array.isArray(lesson.signal_tags) && lesson.signal_tags.length
+      ? ` [${lesson.signal_tags.slice(0, 3).join(', ')}]`
+      : '';
+    return `- ${lesson.ticker || lesson.applies_to_ticker || 'ALL'} / ${type}${tags}: ${lesson.lesson}`;
+  };
+
+  const byRole: Record<string, string> = {
+    technical: relevant
+      .filter((l: any) => ['technical', 'market_structure', 'portfolio'].includes(l.lesson_type || 'portfolio'))
+      .slice(0, 4)
+      .map(toLine)
+      .join('\n'),
+    news: relevant
+      .filter((l: any) => ['news', 'portfolio'].includes(l.lesson_type || 'portfolio'))
+      .slice(0, 4)
+      .map(toLine)
+      .join('\n'),
+    fundamentals: relevant
+      .filter((l: any) => ['fundamentals', 'portfolio'].includes(l.lesson_type || 'portfolio'))
+      .slice(0, 4)
+      .map(toLine)
+      .join('\n'),
+    social: relevant
+      .filter((l: any) => ['social', 'portfolio'].includes(l.lesson_type || 'portfolio'))
+      .slice(0, 4)
+      .map(toLine)
+      .join('\n'),
+    portfolio: relevant.slice(0, 6).map(toLine).join('\n'),
+  };
+
+  return {
+    lessons: relevant,
+    text: relevant.length
+      ? `Prior evaluated lessons for ${ticker} (${market}):\n${relevant.map(toLine).join('\n')}`
+      : `No prior evaluated lessons found for ${ticker} (${market}).`,
+    by_role: byRole,
+  };
+};
+
 const persistWorkflowResult = async (
   supabase: any,
   sessionId: string | undefined,
@@ -134,7 +896,10 @@ const persistWorkflowResult = async (
   const content = JSON.stringify({
     decision: decision.decision,
     confidence: decision.confidence || 'Medium',
-    thesis: decision.thesis || result.executive_summary || ''
+    thesis: decision.thesis || result.executive_summary || '',
+    risk_flags: Array.isArray(decision.risk_flags) ? decision.risk_flags : [],
+    signal_tags: Array.isArray(decision.signal_tags) ? decision.signal_tags : [],
+    evaluation_horizon: decision.evaluation_horizon || '24h',
   });
 
   await supabase.from('trading_logs').insert({
@@ -147,6 +912,8 @@ const persistWorkflowResult = async (
   await supabase.from('trading_sessions').update({
     status: 'completed',
     final_decision: decision.decision,
+    confidence_bucket: decision.confidence || null,
+    evaluation_horizon: decision.evaluation_horizon || '24h',
     executive_summary: decision.thesis || result.executive_summary || null,
     investment_thesis: decision.thesis || null,
     updated_at: new Date().toISOString()
@@ -372,110 +1139,56 @@ serve(async (req) => {
       if (forbidden) return forbidden;
 
       const supabase = getServiceClient();
-      
-      const { data: unevaluated, error: fetchErr } = await supabase
+      const batchLimit = Math.max(1, Math.min(Number(body.limit || 20), 50));
+      const { data: evaluationQueue, error: fetchErr } = await supabase
         .from('trading_sessions')
         .select('*')
         .eq('status', 'completed')
-        .eq('evaluated', false)
-        .lt('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()); // Older than 24 hours
+        .or('evaluated.eq.false,evaluation_status.in.(pending,waiting_for_market,error)')
+        .order('created_at', { ascending: true })
+        .limit(batchLimit);
         
       if (fetchErr) throw fetchErr;
 
-      // Real evaluation logic
-      let evaluatedCount = 0;
-      for (const session of unevaluated || []) {
-         try {
-           const entryPrice = parseFloat(session.execution_price);
-           if (!entryPrice) {
-             // If no entry price was recorded, we can't evaluate accurately
-             await supabase.from('trading_sessions').update({ evaluated: true, outcome: 'INVALID' }).eq('id', session.id);
-             continue;
-           }
+      const summary: Record<string, number> = {
+        queued: evaluationQueue?.length ?? 0,
+        evaluated: 0,
+        pending: 0,
+        waiting: 0,
+        invalid: 0,
+        errors: 0,
+      };
 
-           const startTime = Math.floor(new Date(session.created_at).getTime() / 1000);
-           const endTime = startTime + (24 * 60 * 60); // 24 hours later
-           
-           // Fetch price at 24h mark (or closest following price)
-           // We ask for a small window around the 24h mark
-           const yhUrl = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(session.ticker)}?period1=${endTime}&period2=${endTime + 86400}&interval=1h`;
-           const yhRes = await fetch(yhUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-           
-           if (yhRes.ok) {
-             const yhData = await yhRes.json();
-             const result = yhData?.chart?.result?.[0];
-             const timestamps = result?.timestamp || [];
-             const prices = result?.indicators?.quote?.[0]?.close || [];
-             
-             let exitPrice = null;
-             if (prices.length > 0) {
-               // Get the first available price at or after the 24h mark
-               exitPrice = prices.find((p: any) => p !== null);
-             }
-
-             if (exitPrice) {
-               const win = exitPrice > entryPrice;
-               const outcome = win ? 'WIN' : 'LOSS';
-               
-               await supabase.from('trading_sessions').update({ 
-                 evaluated: true, 
-                 outcome: outcome 
-               }).eq('id', session.id);
-
-               // ─── Generate Agent Lesson (The RL Loop) ─────────────────────
-               const openaiKey = Deno.env.get('OPENAI_API_KEY');
-               if (openaiKey) {
-                 try {
-                   // Fetch the portfolio manager's decision/thesis from logs
-                   const { data: logs } = await supabase
-                     .from('trading_logs')
-                     .select('content')
-                     .eq('session_id', session.id)
-                     .eq('agent_role', 'Portfolio Manager')
-                     .eq('log_type', 'decision')
-                     .limit(1);
-                   
-                   const thesis = logs?.[0]?.content || session.investment_thesis || "No specific thesis recorded.";
-                   
-                   const lessonRes = await fetch('https://api.openai.com/v1/chat/completions', {
-                     method: 'POST',
-                     headers: {
-                       'Authorization': `Bearer ${openaiKey}`,
-                       'Content-Type': 'application/json'
-                     },
-                     body: JSON.stringify({
-                       model: 'gpt-4o-mini',
-                       messages: [
-                         { role: 'system', content: 'You are a Trading Mentor. Compare a predicted trading thesis with the actual 24-hour outcome and provide a single, punchy lesson (max 20 words) for the agent to improve.' },
-                         { role: 'user', content: `Ticker: ${session.ticker}\nOutcome: ${outcome} (Entry: ${entryPrice}, Exit: ${exitPrice})\nPredicted Thesis: ${thesis}` }
-                       ],
-                       max_tokens: 50
-                     })
-                   });
-                   
-                   if (lessonRes.ok) {
-                     const lessonData = await lessonRes.json();
-                     const lesson = lessonData.choices[0].message.content;
-                     await supabase.from('agent_lessons').insert({
-                       session_id: session.id,
-                       ticker: session.ticker,
-                       lesson: lesson.trim()
-                     });
-                   }
-                 } catch (e) {
-                   console.error('Failed to generate lesson:', e);
-                 }
-               }
-
-               evaluatedCount++;
-             }
-           }
-         } catch (e) {
-           console.error(`Evaluation failed for session ${session.id}:`, e);
-         }
+      for (const session of evaluationQueue || []) {
+        try {
+          const result = await evaluateSession(supabase, session);
+          if (result === 'evaluated') summary.evaluated++;
+          else if (result === 'pending') summary.pending++;
+          else if (result === 'waiting') summary.waiting++;
+          else if (result === 'invalid') summary.invalid++;
+        } catch (e) {
+          console.error(`Evaluation failed for session ${session.id}:`, e);
+          summary.errors++;
+          await markEvaluationState(supabase, session.id, 'error', {
+            evaluation_error: getErrorMessage(e),
+          });
+          await writeEvaluationEvent(supabase, session.id, 'evaluation_error', {
+            error: getErrorMessage(e),
+          });
+        }
       }
 
-      return jsonResponse({ success: true, evaluated: evaluatedCount });
+      return jsonResponse({ success: true, ...summary });
+    }
+
+    if (action === 'lessons_context') {
+      if (!ticker) {
+        return jsonResponse({ error: 'Ticker is required' }, 400);
+      }
+      const supabase = getServiceClient();
+      const market = normalizeOrchestrationMarket(body.market, ticker);
+      const context = await buildLessonsContext(supabase, ticker, market, Number(body.limit || 8));
+      return jsonResponse(context);
     }
 
     if (!ticker && action !== 'recon') {
@@ -692,13 +1405,30 @@ serve(async (req) => {
        return jsonResponse({ error: 'Internal Server Error: Missing N8N config' }, 500)
     }
 
+    const tickerForMarket =
+      (typeof ticker === 'string' && ticker.trim()) ||
+      (typeof body.tickers === 'string' && body.tickers.split(',')[0]?.trim()) ||
+      '';
+    const market = normalizeOrchestrationMarket(body.market, tickerForMarket);
     const supabase = action === 'run' ? getServiceClient() : null;
+    const lessonsContext = action === 'run' && supabase && ticker
+      ? await buildLessonsContext(supabase, ticker, market).catch((error) => {
+          console.error('Could not build lessons context:', error);
+          return null;
+        })
+      : null;
+
     if (action === 'run' && supabase && session_id) {
       const { error: sessionErr } = await supabase.from('trading_sessions').upsert({
         id: session_id,
         ticker,
+        market,
         status: 'running',
         execution_price: body.execution_price ?? null,
+        entry_price: body.execution_price ?? null,
+        entry_price_source: body.execution_price_source || 'frontend_quote',
+        evaluation_status: 'pending',
+        evaluation_horizon: body.evaluation_horizon || '24h',
         evaluated: false,
         updated_at: new Date().toISOString()
       });
@@ -722,12 +1452,6 @@ serve(async (req) => {
       n8nHeaders['x-trading-agents-secret'] = n8nSecret;
     }
 
-    const tickerForMarket =
-      (typeof ticker === 'string' && ticker.trim()) ||
-      (typeof body.tickers === 'string' && body.tickers.split(',')[0]?.trim()) ||
-      '';
-    const market = normalizeOrchestrationMarket(body.market, tickerForMarket);
-
     const callN8n = async () => {
       const n8nResponse = await fetch(n8nWebhookUrl, {
       method: 'POST',
@@ -743,6 +1467,8 @@ serve(async (req) => {
             ? null
             : Number(body.execution_price),
         market,
+        lessons_context: lessonsContext?.text ?? '',
+        lessons_by_role: lessonsContext?.by_role ?? {},
       }),
       })
 

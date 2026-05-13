@@ -1,19 +1,28 @@
 import { supabase } from '../../lib/supabaseClient';
 import type {
+  AgentOutput,
   AutomationLevel,
+  DiceDimension,
+  DiceDimensionKey,
   DiceScores,
   FrameworkScore,
   GatingDecisionLabel,
+  GatingEvaluationHistoryItem,
   GatingEvaluationResponse,
   GatingEvaluationResult,
   IdeaPreset,
+  LegitimacyResult,
+  RedFlagResult,
   ReliabilityResult,
+  ResultSource,
   RouteRecommendation,
   TaxonomyResult,
   TaxonomyType,
 } from './aiGateTypes';
 
 export const AI_GATE_FUNCTION = 'ai-gating-evaluate';
+
+const SCHEMA_VERSION = 'ai-gate-result-v2';
 
 export const IDEA_PRESETS: IdeaPreset[] = [
   {
@@ -51,15 +60,195 @@ export const IDEA_PRESETS: IdeaPreset[] = [
     ideaText: 'Draft a clinician-facing visit summary from free-text notes, prior history, and test results while flagging missing red-flag symptoms for review.',
     hint: 'High value, but human review must stay in the loop.',
   },
+  {
+    id: 'invoice-audit',
+    title: 'Invoice Exception Audit',
+    subtitle: 'Finance controls',
+    ideaText: 'Review vendor invoices against purchase orders, flag mismatched line items, draft an explanation, and route exceptions to finance reviewers.',
+    hint: 'A hybrid test for deterministic checks plus language explanation.',
+  },
+  {
+    id: 'meeting-brief',
+    title: 'Sales Meeting Brief',
+    subtitle: 'Account prep assistant',
+    ideaText: 'Summarize CRM notes, recent emails, support tickets, and news before a sales meeting, then suggest three account-specific talking points.',
+    hint: 'Good bounded language workflow with low direct stakes.',
+  },
+  {
+    id: 'refund-approvals',
+    title: 'Refund Approval Bot',
+    subtitle: 'Customer policy gate',
+    ideaText: 'Decide whether a customer refund should be approved based on order history, policy rules, account tier, complaint text, and fraud signals.',
+    hint: 'Useful for testing autonomy boundaries and policy validators.',
+  },
+  {
+    id: 'contract-risk',
+    title: 'Contract Risk Screener',
+    subtitle: 'Legal review support',
+    ideaText: 'Read supplier contracts, extract risky clauses, compare them against approved fallback language, and prepare a review memo for legal counsel.',
+    hint: 'Type III/IV with explainability and review requirements.',
+  },
+  {
+    id: 'pricing-recommendation',
+    title: 'Dynamic Pricing Advisor',
+    subtitle: 'Revenue workflow',
+    ideaText: 'Recommend weekly price changes using inventory levels, competitor prices, demand forecasts, margin targets, and promotional constraints.',
+    hint: 'Structured inference may beat an LLM-first architecture.',
+  },
+  {
+    id: 'candidate-screening',
+    title: 'Candidate Screening Assistant',
+    subtitle: 'Hiring workflow',
+    ideaText: 'Review resumes and job descriptions, identify relevant experience, draft interview questions, and flag candidates for recruiter review.',
+    hint: 'Bias, explainability, and human review matter.',
+  },
+  {
+    id: 'incident-postmortem',
+    title: 'Incident Postmortem Drafting',
+    subtitle: 'Engineering operations',
+    ideaText: 'Analyze incident timeline logs, Slack updates, deployment metadata, and support tickets to draft a postmortem with action items.',
+    hint: 'Good fit for bounded synthesis with evidence grounding.',
+  },
+  {
+    id: 'medical-prior-auth',
+    title: 'Prior Authorization Assistant',
+    subtitle: 'Healthcare ops',
+    ideaText: 'Review clinical notes and insurance policy rules to prepare a prior authorization packet and identify missing documentation for staff.',
+    hint: 'High value, but not autonomous due to clinical and compliance risk.',
+  },
+  {
+    id: 'knowledge-base-maintenance',
+    title: 'Knowledge Base Maintainer',
+    subtitle: 'Support content ops',
+    ideaText: 'Detect outdated help-center articles from support ticket trends, product changelogs, and user feedback, then draft updates for review.',
+    hint: 'Low-stakes language workflow with strong economics.',
+  },
+  {
+    id: 'expense-policy',
+    title: 'Expense Policy Checker',
+    subtitle: 'Back-office automation',
+    ideaText: 'Check employee expense claims against travel policy, receipt fields, merchant metadata, and exception rules before routing approvals.',
+    hint: 'Often deterministic first, with AI only for messy receipt text.',
+  },
 ];
 
+export const DICE_SCORE_MEANINGS: Record<DiceDimensionKey, Record<number, string>> = {
+  determinism: {
+    1: 'One correct answer; explicit rules should own the path.',
+    2: 'Mostly deterministic with a messy edge-case layer.',
+    3: 'Fixed outcome, but wording or interpretation varies.',
+    4: 'Judgment-heavy with several acceptable outputs.',
+    5: 'Creative or subjective; variance is part of the value.',
+  },
+  inputComplexity: {
+    1: 'Structured, finite inputs such as fields or dropdowns.',
+    2: 'Mostly structured with a small amount of messy text.',
+    3: 'Schema exists, but values and patterns are varied.',
+    4: 'Unstructured language/documents with bounded scope.',
+    5: 'Open-ended, multi-source, highly variable context.',
+  },
+  costOfError: {
+    1: 'Catastrophic or non-recoverable failure path.',
+    2: 'High consequence; human review is mandatory.',
+    3: 'Material but recoverable business/user impact.',
+    4: 'Low-to-moderate impact with clear rollback paths.',
+    5: 'Low stakes; individual errors are cheap.',
+  },
+  economics: {
+    1: 'Negative unit economics versus simpler methods.',
+    2: 'Research-only value; weak production ROI.',
+    3: 'Borderline; needs strict pilot scope.',
+    4: 'Positive unit economics with manageable ops cost.',
+    5: 'Structural advantage that simpler systems cannot match.',
+  },
+};
+
+const DICE_LABELS: Record<DiceDimensionKey, string> = {
+  determinism: 'Determinism',
+  inputComplexity: 'Input Complexity',
+  costOfError: 'Cost of Error',
+  economics: 'Economics',
+};
+
+const buildDiceDimensions = (
+  scores: Pick<DiceScores, 'determinism' | 'inputComplexity' | 'costOfError' | 'economics'>,
+  rationale?: DiceScores['rationale']
+): DiceDimension[] =>
+  (['determinism', 'inputComplexity', 'costOfError', 'economics'] as DiceDimensionKey[]).map((key) => {
+    const score = scores[key];
+    return {
+      key,
+      label: DICE_LABELS[key],
+      score,
+      scoreMeaning: DICE_SCORE_MEANINGS[key][score] || 'Score meaning unavailable.',
+      reasoning: rationale?.[key] || 'Reasoning was not provided by the assessment.',
+    };
+  });
+
 const clamp = (value: number, min = 1, max = 5) => Math.max(min, Math.min(max, value));
+const clampScore = (value: number) => Math.max(0, Math.min(100, Math.round(value)));
 
 const hashString = (value: string) =>
   Array.from(value).reduce((acc, char) => acc + char.charCodeAt(0), 0);
 
 const keywordCount = (text: string, keywords: string[]) =>
   keywords.reduce((count, keyword) => count + (text.includes(keyword) ? 1 : 0), 0);
+
+const redactIdeaText = (ideaText: string) =>
+  ideaText
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[email redacted]')
+    .replace(/\+?\d[\d\s().-]{7,}\d/g, '[phone redacted]')
+    .replace(/\b\d{3}[-.\s]?\d{2}[-.\s]?\d{4}\b/g, '[id redacted]')
+    .trim();
+
+const makeTitle = (title: string, ideaText: string) => {
+  const cleanTitle = title.trim();
+  if (cleanTitle && cleanTitle.toLowerCase() !== 'custom idea') return cleanTitle.slice(0, 90);
+  const firstSentence = ideaText.split(/[.!?\n]/)[0]?.trim() || ideaText.trim();
+  return firstSentence.length > 90 ? `${firstSentence.slice(0, 87)}...` : firstSentence || 'Custom Idea';
+};
+
+const getAnonymousSessionId = () => {
+  if (typeof window === 'undefined') return undefined;
+  const key = 'ai_gate_session_id';
+  const existing = window.localStorage.getItem(key);
+  if (existing) return existing;
+  const generated = crypto.randomUUID ? crypto.randomUUID() : `ai-gate-${Date.now()}`;
+  window.localStorage.setItem(key, generated);
+  return generated;
+};
+
+const assessLegitimacy = (title: string, ideaText: string): LegitimacyResult => {
+  const redactedIdeaText = redactIdeaText(ideaText);
+  const generatedTitle = makeTitle(title, redactedIdeaText);
+  if (ideaText.trim().length < 40) {
+    return {
+      isLegitimate: false,
+      status: 'needs_more_detail',
+      confidence: 0.94,
+      category: 'insufficient_context',
+      publicVisibility: 'show',
+      redactedIdeaText,
+      generatedTitle,
+      rejectionReason: 'The idea is too short to evaluate reliably.',
+      improvementPrompt: 'Describe the user, input, decision, and output you expect.',
+      flags: ['too_short'],
+    };
+  }
+
+  return {
+    isLegitimate: true,
+    status: 'accepted',
+    confidence: redactedIdeaText === ideaText.trim() ? 0.9 : 0.82,
+    category: 'product_idea',
+    publicVisibility: redactedIdeaText === ideaText.trim() ? 'show' : 'show_redacted',
+    redactedIdeaText,
+    generatedTitle,
+    rejectionReason: null,
+    improvementPrompt: null,
+    flags: redactedIdeaText === ideaText.trim() ? [] : ['possible_sensitive_data'],
+  };
+};
 
 const computeTaxonomy = (
   structuredSignals: number,
@@ -94,6 +283,12 @@ const computeTaxonomy = (
     type,
     title: titles[type],
     reasoning: reasons[type],
+    inputStructure: structured ? 'structured' : 'unstructured',
+    solutionSpecifiability: highSpec ? 'high' : 'low',
+    decompositionNotes:
+      structuredSignals > 0 && unstructuredSignals > 0
+        ? 'Decompose deterministic sub-tasks from language or reasoning sub-tasks before choosing an architecture.'
+        : 'The dominant workflow can be assessed as one problem type for the first gate.',
   };
 };
 
@@ -121,25 +316,34 @@ const computeDice = (
     'Type IV': 5,
   };
 
-  const determinism = clamp(
-    determinismBase[taxonomy] + Math.sign(judgmentSignals - specifiableSignals)
-  );
-  const inputComplexity = clamp(
-    complexityBase[taxonomy] + Math.sign(unstructuredSignals - structuredSignals)
-  );
-  const costOfError = clamp(
-    3 + lowStakesSignals - highStakesSignals
-  );
-  const economics = clamp(
-    2 + scaleSignals + ((textHash % 3) === 0 ? 1 : 0) - (highStakesSignals > 1 ? 1 : 0)
-  );
+  const determinism = clamp(determinismBase[taxonomy] + Math.sign(judgmentSignals - specifiableSignals));
+  const inputComplexity = clamp(complexityBase[taxonomy] + Math.sign(unstructuredSignals - structuredSignals));
+  const costOfError = clamp(3 + lowStakesSignals - highStakesSignals);
+  const economics = clamp(2 + scaleSignals + ((textHash % 3) === 0 ? 1 : 0) - (highStakesSignals > 1 ? 1 : 0));
+  const total = determinism + inputComplexity + costOfError + economics;
 
   return {
     determinism,
     inputComplexity,
     costOfError,
     economics,
-    total: determinism + inputComplexity + costOfError + economics,
+    total,
+    rav: determinism + inputComplexity + economics - costOfError,
+    rationale: {
+      determinism: determinism <= 2 ? 'The decision path appears rule-heavy.' : 'The task allows judgment or multiple valid outputs.',
+      inputComplexity: inputComplexity >= 4 ? 'Inputs are likely unstructured or semantically varied.' : 'Inputs appear structured enough for simpler methods.',
+      costOfError: costOfError <= 2 ? 'Failures could create material user, financial, legal, or safety risk.' : 'Individual errors look recoverable.',
+      economics: economics >= 4 ? 'Scale or labor savings can justify operational AI cost.' : 'The value case needs tighter proof before scaling.',
+    },
+    dimensions: buildDiceDimensions(
+      { determinism, inputComplexity, costOfError, economics },
+      {
+        determinism: determinism <= 2 ? 'The decision path appears rule-heavy.' : 'The task allows judgment or multiple valid outputs.',
+        inputComplexity: inputComplexity >= 4 ? 'Inputs are likely unstructured or semantically varied.' : 'Inputs appear structured enough for simpler methods.',
+        costOfError: costOfError <= 2 ? 'Failures could create material user, financial, legal, or safety risk.' : 'Individual errors look recoverable.',
+        economics: economics >= 4 ? 'Scale or labor savings can justify operational AI cost.' : 'The value case needs tighter proof before scaling.',
+      }
+    ),
   };
 };
 
@@ -149,19 +353,34 @@ const computeReliability = (dice: DiceScores): ReliabilityResult => {
 
   let quadrant = 'High Reliability + Low Stakes';
   let strategy = 'Autonomous AI with monitoring';
+  let humanReviewRequirement = 'Sampled audit is sufficient if the action is reversible.';
 
   if (requirement >= 4 && stakes >= 4) {
     quadrant = 'High Reliability + High Stakes';
     strategy = 'Deterministic validators plus mandatory expert review';
+    humanReviewRequirement = 'Human approval is required before any external action.';
   } else if (requirement < 4 && stakes >= 4) {
     quadrant = 'Low Reliability + High Stakes';
     strategy = 'Reject autonomy; redesign the workflow or narrow scope';
+    humanReviewRequirement = 'AI may draft or triage only; it should not decide.';
   } else if (requirement < 4 && stakes < 4) {
     quadrant = 'Low Reliability + Low Stakes';
     strategy = 'User-driven AI or experimental assistive mode';
+    humanReviewRequirement = 'Human review can be optional if output stays low-impact.';
   }
 
-  return { requirement, stakes, quadrant, strategy };
+  return {
+    requirement,
+    stakes,
+    quadrant,
+    strategy,
+    humanReviewRequirement,
+    quadrantReasoning: `Reliability need is ${requirement}/5 and failure stakes are ${stakes}/5, placing the idea in ${quadrant}.`,
+    axisMeanings: {
+      requirement: requirement >= 4 ? 'The product needs consistently correct outputs before users can trust it.' : 'The product can tolerate exploratory or imperfect outputs.',
+      stakes: stakes >= 4 ? 'A wrong answer can create high user, financial, legal, safety, or compliance impact.' : 'A wrong answer is likely recoverable or low impact.',
+    },
+  };
 };
 
 const computeRoute = (taxonomy: TaxonomyType, dice: DiceScores): RouteRecommendation => {
@@ -209,14 +428,45 @@ const computeRoute = (taxonomy: TaxonomyType, dice: DiceScores): RouteRecommenda
   return { solver, decisionLabel, automationLevel, reasoning };
 };
 
+const computeRedFlags = (ideaText: string, taxonomy: TaxonomyType, dice: DiceScores): RedFlagResult[] => {
+  const text = ideaText.toLowerCase();
+  return [
+    {
+      key: 'golden_hammer',
+      label: 'Golden Hammer',
+      severity: taxonomy === 'Type I' ? 'high' : 'medium',
+      triggered: taxonomy === 'Type I' || text.includes('use ai') || text.includes('llm'),
+      explanation: 'The idea may be starting from AI as the tool instead of proving AI is needed.',
+      mitigation: 'Compare against a deterministic or classical ML baseline before approving model work.',
+    },
+    {
+      key: 'zero_tolerance',
+      label: 'Zero Tolerance',
+      severity: dice.costOfError <= 2 ? 'high' : 'low',
+      triggered: dice.costOfError <= 2,
+      explanation: 'The workflow has a high consequence path where probabilistic errors are costly.',
+      mitigation: 'Restrict AI to drafting or analysis and require human approval or deterministic validation.',
+    },
+    {
+      key: 'overkill_architecture',
+      label: 'Overkill Architecture',
+      severity: taxonomy === 'Type I' || taxonomy === 'Type II' ? 'medium' : 'low',
+      triggered: taxonomy === 'Type I' || taxonomy === 'Type II',
+      explanation: 'A multi-agent or LLM-first build may be more complex than the problem requires.',
+      mitigation: 'Use the smallest viable solver and reserve agents for genuinely open-ended reasoning.',
+    },
+  ];
+};
+
 const computeFrameworks = (
   taxonomy: TaxonomyResult,
   dice: DiceScores,
   reliability: ReliabilityResult,
-  route: RouteRecommendation
+  route: RouteRecommendation,
+  redFlags: RedFlagResult[]
 ): FrameworkScore[] => {
   const diceScore = Math.round((dice.total / 20) * 100);
-  const governanceScore = clamp(Math.round((dice.costOfError + dice.economics) * 10), 0, 100);
+  const governanceScore = clampScore((dice.costOfError + dice.economics) * 10 - redFlags.filter((flag) => flag.triggered).length * 8);
   const routeScoreMap: Record<AutomationLevel, number> = {
     'Deterministic only': 22,
     'Classical ML first': 58,
@@ -263,7 +513,7 @@ const computeFrameworks = (
       key: 'governance',
       label: 'Governance Readiness',
       score: governanceScore,
-      summary: 'This reflects how much monitoring, validation, and human review you will need to operate safely.',
+      summary: 'This reflects monitoring, review, privacy, cost, and rollback readiness.',
     },
     {
       key: 'automation',
@@ -274,7 +524,80 @@ const computeFrameworks = (
   ];
 };
 
+const buildRejectedResult = (title: string, ideaText: string, legitimacy: LegitimacyResult): GatingEvaluationResult => ({
+  schemaVersion: SCHEMA_VERSION,
+  title: legitimacy.generatedTitle || title,
+  ideaText: legitimacy.redactedIdeaText || ideaText,
+  summary: legitimacy.rejectionReason || 'The submission was rejected by the legitimacy gate.',
+  legitimacy,
+  taxonomy: {
+    type: 'Type I',
+    title: 'Deterministic Execution',
+    reasoning: 'No taxonomy evaluation was run because the submission did not pass the legitimacy gate.',
+    inputStructure: 'unknown',
+    solutionSpecifiability: 'unknown',
+    decompositionNotes: 'Resubmit with a concrete user, input, decision, and output.',
+  },
+  dice: {
+    determinism: 1,
+    inputComplexity: 1,
+    costOfError: 1,
+    economics: 1,
+    total: 4,
+    rav: 2,
+    dimensions: buildDiceDimensions(
+      { determinism: 1, inputComplexity: 1, costOfError: 1, economics: 1 },
+      {
+        determinism: 'Not evaluated because the idea did not pass the legitimacy gate.',
+        inputComplexity: 'Not evaluated because the idea did not pass the legitimacy gate.',
+        costOfError: 'Not evaluated because the idea did not pass the legitimacy gate.',
+        economics: 'Not evaluated because the idea did not pass the legitimacy gate.',
+      }
+    ),
+  },
+  reliability: {
+    requirement: 1,
+    stakes: 1,
+    quadrant: 'Low Reliability + Low Stakes',
+    strategy: 'Do not evaluate until the idea is made concrete.',
+    humanReviewRequirement: 'No review required; user should revise the submission.',
+    quadrantReasoning: 'The framework agents did not run because the submission was rejected before assessment.',
+    axisMeanings: {
+      requirement: 'Not evaluated.',
+      stakes: 'Not evaluated.',
+    },
+  },
+  redFlags: [],
+  frameworks: [],
+  route: {
+    solver: 'Deterministic software',
+    decisionLabel: 'DEFER',
+    automationLevel: 'Deterministic only',
+    reasoning: 'The idea needs more detail or violates the submission gate.',
+  },
+  conclusion: legitimacy.rejectionReason || 'This submission cannot be evaluated yet.',
+  buildRecommendation: legitimacy.improvementPrompt || 'Rewrite the idea with a concrete workflow and try again.',
+  governanceNotes: [
+    'The legitimacy gate runs before framework agents to avoid wasting workflow cost.',
+    'Unsafe, spam, and prompt-injection submissions should be hidden from public history.',
+    'Public history should show only safe or redacted rejected submissions.',
+  ],
+  agentOutputs: [
+    {
+      key: 'legitimacy',
+      agentName: 'Legitimacy Decider',
+      status: 'rejected',
+      summary: legitimacy.rejectionReason || 'Rejected by the legitimacy gate.',
+      output: legitimacy as unknown as Record<string, unknown>,
+    },
+  ],
+  simulated: true,
+});
+
 export const simulateAiGateEvaluation = (title: string, ideaText: string): GatingEvaluationResult => {
+  const legitimacy = assessLegitimacy(title, ideaText);
+  if (!legitimacy.isLegitimate) return buildRejectedResult(title, ideaText, legitimacy);
+
   const text = ideaText.toLowerCase();
   const textHash = hashString(text);
 
@@ -363,12 +686,7 @@ export const simulateAiGateEvaluation = (title: string, ideaText: string): Gatin
     'every',
   ]);
 
-  const taxonomy = computeTaxonomy(
-    structuredSignals,
-    unstructuredSignals,
-    specifiableSignals,
-    judgmentSignals
-  );
+  const taxonomy = computeTaxonomy(structuredSignals, unstructuredSignals, specifiableSignals, judgmentSignals);
   const dice = computeDice(
     taxonomy.type,
     structuredSignals,
@@ -382,14 +700,73 @@ export const simulateAiGateEvaluation = (title: string, ideaText: string): Gatin
   );
   const reliability = computeReliability(dice);
   const route = computeRoute(taxonomy.type, dice);
-  const frameworks = computeFrameworks(taxonomy, dice, reliability, route);
+  const redFlags = computeRedFlags(ideaText, taxonomy.type, dice);
+  const frameworks = computeFrameworks(taxonomy, dice, reliability, route, redFlags);
 
-  const summary = `This idea maps to ${taxonomy.title.toLowerCase()} and should ${route.decisionLabel === 'REJECT' ? 'not' : ''} be built around an LLM-first decision path.`;
+  const agentOutputs: AgentOutput[] = [
+    {
+      key: 'legitimacy',
+      agentName: 'Legitimacy Decider',
+      status: 'completed',
+      summary: 'Accepted as a product or workflow idea.',
+      output: legitimacy as unknown as Record<string, unknown>,
+    },
+    {
+      key: 'taxonomy',
+      agentName: 'Problem Taxonomy Agent',
+      status: 'completed',
+      summary: `${taxonomy.type}: ${taxonomy.title}.`,
+      output: taxonomy as unknown as Record<string, unknown>,
+    },
+    {
+      key: 'dice',
+      agentName: 'DICE Agent',
+      status: 'completed',
+      summary: `DICE total ${dice.total}/20 with RAV ${dice.rav}.`,
+      output: dice as unknown as Record<string, unknown>,
+    },
+    {
+      key: 'reliability',
+      agentName: 'Reliability-Stakes Agent',
+      status: 'completed',
+      summary: reliability.quadrant,
+      output: reliability as unknown as Record<string, unknown>,
+    },
+    {
+      key: 'anti_patterns',
+      agentName: 'Anti-Pattern Agent',
+      status: 'completed',
+      summary: `${redFlags.filter((flag) => flag.triggered).length} red flags triggered.`,
+      output: { redFlags },
+    },
+    {
+      key: 'economics_readiness',
+      agentName: 'Economics and Readiness Agent',
+      status: 'completed',
+      summary: `Economics ${dice.economics}/5; governance burden follows cost-of-error ${dice.costOfError}/5.`,
+      output: {
+        economics: dice.economics,
+        readinessGaps: [
+          'Define a golden evaluation set.',
+          'Add rollback and cost controls before production rollout.',
+        ],
+      },
+    },
+    {
+      key: 'synthesis',
+      agentName: 'Synthesis and Route Agent',
+      status: 'completed',
+      summary: `${route.decisionLabel}: ${route.solver}.`,
+      output: route as unknown as Record<string, unknown>,
+    },
+  ];
+
+  const summary = `This idea maps to ${taxonomy.title.toLowerCase()} and should ${route.decisionLabel === 'REJECT' ? 'not ' : ''}be built around an LLM-first decision path.`;
   const buildRecommendation =
     route.decisionLabel === 'REJECT'
       ? 'Keep AI out of the core decision path. If desired, use AI only for paraphrasing or user-facing explanations.'
       : route.decisionLabel === 'DEFER'
-        ? 'The use case is interesting, but the governance and unit economics are not yet strong enough for a production-grade AI rollout.'
+        ? 'The use case is interesting, but governance and unit economics are not yet strong enough for a production-grade AI rollout.'
         : `Proceed with ${route.automationLevel.toLowerCase()} and keep the harness deterministic around the model.`;
 
   const conclusion =
@@ -397,15 +774,19 @@ export const simulateAiGateEvaluation = (title: string, ideaText: string): Gatin
       ? 'This is a classic case where AI would add variance and cost without improving the underlying product outcome.'
       : route.decisionLabel === 'DEFER'
         ? 'There is promise here, but the right next step is a tightly scoped pilot with explicit kill criteria.'
-        : `The right build is not “AI everywhere”; it is ${route.solver.toLowerCase()} with carefully chosen autonomy boundaries.`;
+        : `The right build is not "AI everywhere"; it is ${route.solver.toLowerCase()} with carefully chosen autonomy boundaries.`;
 
   return {
-    title,
-    ideaText,
+    schemaVersion: SCHEMA_VERSION,
+    workflowExecutionId: null,
+    title: legitimacy.generatedTitle || title,
+    ideaText: legitimacy.redactedIdeaText || ideaText,
     summary,
+    legitimacy,
     taxonomy,
     dice,
     reliability,
+    redFlags,
     frameworks,
     route,
     buildRecommendation,
@@ -413,8 +794,9 @@ export const simulateAiGateEvaluation = (title: string, ideaText: string): Gatin
     governanceNotes: [
       'Keep the control flow deterministic; let the model handle reasoning, not state management.',
       'Define an eval set before broad rollout so the gate is evidence-based rather than intuitive.',
-      'Instrument human override, fallback rates, and error categories from day one.',
+      'Instrument human override, fallback rates, public-history redaction, and error categories from day one.',
     ],
+    agentOutputs,
     simulated: true,
   };
 };
@@ -424,6 +806,73 @@ const normalizeFunctionPayload = (payload: any): any => {
   if (payload?.body) return normalizeFunctionPayload(payload.body);
   if (payload?.data) return normalizeFunctionPayload(payload.data);
   return payload;
+};
+
+const normalizeAgentOutputs = (value: any): AgentOutput[] =>
+  Array.isArray(value)
+    ? value.map((item, index) => ({
+        key: String(item.key || item.agentKey || `agent_${index + 1}`),
+        agentName: String(item.agentName || item.name || `Agent ${index + 1}`),
+        status: item.status || 'completed',
+        summary: String(item.summary || ''),
+        output: item.output && typeof item.output === 'object' ? item.output : item,
+        startedAt: item.startedAt ?? item.started_at ?? null,
+        completedAt: item.completedAt ?? item.completed_at ?? null,
+        durationMs: Number.isFinite(Number(item.durationMs ?? item.duration_ms))
+          ? Number(item.durationMs ?? item.duration_ms)
+          : null,
+      }))
+    : [];
+
+export const normalizeAiGateResult = (result: any): GatingEvaluationResult => {
+  const base = result || {};
+  const fallback = simulateAiGateEvaluation(String(base.title || 'Custom Idea'), String(base.ideaText || base.idea_text || 'A product workflow idea that should be evaluated for AI suitability.'));
+  return {
+    ...fallback,
+    ...base,
+    schemaVersion: base.schemaVersion || base.schema_version || fallback.schemaVersion,
+    workflowExecutionId: base.workflowExecutionId || base.workflow_execution_id || null,
+    legitimacy: base.legitimacy || fallback.legitimacy,
+    taxonomy: {
+      ...fallback.taxonomy,
+      ...(base.taxonomy || {}),
+    },
+    dice: {
+      ...fallback.dice,
+      ...(base.dice || {}),
+      dimensions: Array.isArray(base.dice?.dimensions)
+        ? base.dice.dimensions
+        : buildDiceDimensions(
+            {
+              determinism: Number(base.dice?.determinism ?? fallback.dice.determinism),
+              inputComplexity: Number(base.dice?.inputComplexity ?? fallback.dice.inputComplexity),
+              costOfError: Number(base.dice?.costOfError ?? fallback.dice.costOfError),
+              economics: Number(base.dice?.economics ?? fallback.dice.economics),
+            },
+            base.dice?.rationale || fallback.dice.rationale
+          ),
+    },
+    reliability: {
+      ...fallback.reliability,
+      ...(base.reliability || {}),
+      quadrantReasoning:
+        base.reliability?.quadrantReasoning ||
+        base.reliability?.quadrant_reasoning ||
+        fallback.reliability.quadrantReasoning,
+      axisMeanings:
+        base.reliability?.axisMeanings ||
+        base.reliability?.axis_meanings ||
+        fallback.reliability.axisMeanings,
+    },
+    redFlags: Array.isArray(base.redFlags) ? base.redFlags : Array.isArray(base.red_flags) ? base.red_flags : fallback.redFlags,
+    frameworks: Array.isArray(base.frameworks) ? base.frameworks : fallback.frameworks,
+    route: {
+      ...fallback.route,
+      ...(base.route || {}),
+    },
+    governanceNotes: Array.isArray(base.governanceNotes) ? base.governanceNotes : fallback.governanceNotes,
+    agentOutputs: normalizeAgentOutputs(base.agentOutputs || base.agent_outputs || fallback.agentOutputs),
+  };
 };
 
 export const evaluateIdeaWithAiGate = async (params: {
@@ -439,6 +888,10 @@ export const evaluateIdeaWithAiGate = async (params: {
         idea_text: params.ideaText,
         source: params.source,
         preset_id: params.presetId ?? null,
+        user_session_id: getAnonymousSessionId(),
+        client_metadata: {
+          user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+        },
       },
     });
 
@@ -446,16 +899,148 @@ export const evaluateIdeaWithAiGate = async (params: {
 
     const normalized = normalizeFunctionPayload(data);
     if (normalized?.result && normalized?.assessmentId && normalized?.ideaId) {
-      return normalized as GatingEvaluationResponse;
+      const result = normalizeAiGateResult(normalized.result);
+      return {
+        ...normalized,
+        result,
+        legitimacy: normalized.legitimacy || result.legitimacy,
+        agentOutputs: normalizeAgentOutputs(normalized.agentOutputs || result.agentOutputs),
+      } as GatingEvaluationResponse;
     }
     throw new Error('Unexpected response format from AI gate function.');
   } catch {
     const fallback = simulateAiGateEvaluation(params.title, params.ideaText);
+    const now = new Date().toISOString();
     return {
       ideaId: `preview-${Date.now()}`,
       assessmentId: `preview-${Date.now() + 1}`,
-      status: 'preview',
+      status: fallback.legitimacy?.isLegitimate === false ? 'rejected' : 'preview',
+      resultSource: fallback.legitimacy?.isLegitimate === false ? 'decider' : 'fallback',
+      schemaVersion: SCHEMA_VERSION,
+      workflowExecutionId: null,
+      createdAt: now,
+      completedAt: now,
+      durationMs: 0,
+      legitimacy: fallback.legitimacy,
+      agentOutputs: fallback.agentOutputs,
       result: fallback,
     };
   }
+};
+
+const mapHistoryRow = (row: any): GatingEvaluationHistoryItem => {
+  const idea = row.idea || row.ai_gate_ideas || {};
+  const result = row.result_payload ? normalizeAiGateResult(row.result_payload) : null;
+  const legitimacy = row.legitimacy_payload && Object.keys(row.legitimacy_payload).length
+    ? row.legitimacy_payload as LegitimacyResult
+    : result?.legitimacy;
+  const title = idea.display_title || legitimacy?.generatedTitle || result?.title || idea.title || 'Untitled idea';
+  const ideaText = idea.public_idea_text || legitimacy?.redactedIdeaText || result?.ideaText || idea.idea_text || '';
+  const diceTotal = result?.dice?.total ?? null;
+
+  return {
+    ideaId: String(row.idea_id || idea.id || ''),
+    assessmentId: String(row.id),
+    title,
+    ideaText,
+    source: String(idea.source || 'custom'),
+    presetId: idea.preset_id ?? null,
+    status: row.status,
+    decisionLabel: row.decision_label,
+    taxonomyType: idea.taxonomy_type || result?.taxonomy?.type || null,
+    recommendedSolver: row.recommended_solver || result?.route?.solver || null,
+    automationLevel: row.automation_level || result?.route?.automationLevel || null,
+    diceTotal,
+    resultSource: row.result_source as ResultSource,
+    publicVisibility: idea.public_visibility,
+    createdAt: row.created_at || idea.created_at,
+    completedAt: row.completed_at || row.updated_at || null,
+    durationMs: row.duration_ms ?? null,
+    legitimacy,
+    agentOutputs: normalizeAgentOutputs(row.agent_outputs || result?.agentOutputs),
+    result,
+  };
+};
+
+const visibleHistory = (data: any[] | null | undefined) =>
+  (data || [])
+    .map(mapHistoryRow)
+    .filter((item) => item.publicVisibility !== 'hide')
+    .filter((item) => ['completed', 'rejected', 'preview'].includes(String(item.status)));
+
+export const listAiGateHistory = async (limit = 30): Promise<GatingEvaluationHistoryItem[]> => {
+  const { data, error } = await supabase
+    .from('ai_gate_assessments')
+    .select(`
+      id,
+      idea_id,
+      status,
+      decision_label,
+      recommended_solver,
+      automation_level,
+      result_payload,
+      legitimacy_payload,
+      agent_outputs,
+      result_source,
+      created_at,
+      updated_at,
+      completed_at,
+      duration_ms,
+      idea:ai_gate_ideas (
+        id,
+        title,
+        display_title,
+        idea_text,
+        public_idea_text,
+        source,
+        preset_id,
+        taxonomy_type,
+        legitimacy_status,
+        public_visibility,
+        created_at,
+        updated_at
+      )
+    `)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (!error) return visibleHistory(data);
+
+  const missingV2Column =
+    error.message?.includes('schema cache') ||
+    error.message?.includes('does not exist') ||
+    error.message?.includes('Could not find') ||
+    error.message?.includes('relationship');
+
+  if (!missingV2Column) throw error;
+
+  const fallback = await supabase
+    .from('ai_gate_assessments')
+    .select(`
+      id,
+      idea_id,
+      status,
+      decision_label,
+      recommended_solver,
+      automation_level,
+      framework_scores,
+      result_payload,
+      created_at,
+      updated_at,
+      idea:ai_gate_ideas (
+        id,
+        title,
+        idea_text,
+        source,
+        preset_id,
+        taxonomy_type,
+        created_at,
+        updated_at
+      )
+    `)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (fallback.error) throw fallback.error;
+  return visibleHistory(fallback.data);
 };
