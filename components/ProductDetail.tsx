@@ -8,6 +8,7 @@ import React from 'react';
 import { Project } from '../types';
 import CreditCard from './ui/credit-card';
 import { ShaderAnimation } from './ui/shader-animation';
+import { useNavigate } from 'react-router-dom';
 
 interface ProjectDetailProps {
   project: Project;
@@ -15,6 +16,15 @@ interface ProjectDetailProps {
 }
 
 const ProductDetail: React.FC<ProjectDetailProps> = ({ project, onBack }) => {
+  const navigate = useNavigate();
+  const openLiveDemo = () => {
+    if (!project.demoUrl) return;
+    if (project.demoUrl.startsWith('/')) {
+      navigate(project.demoUrl);
+      return;
+    }
+    window.open(project.demoUrl, '_blank', 'noopener,noreferrer');
+  };
 
   return (
     <div className="pt-4 md:pt-24 min-h-screen bg-[#F5F2EB] animate-fade-in-up">
@@ -70,31 +80,11 @@ const ProductDetail: React.FC<ProjectDetailProps> = ({ project, onBack }) => {
             <div className="flex gap-4 mb-8">
               {project.demoUrl && (
                 <button
-                  onClick={() => {
-                    if (project.demoUrl?.startsWith('/')) {
-                      // Use React Router for internal paths to avoid page reload and validation issues
-                      // We need to access navigate from parent or use hack, but ProductDetail is a component
-                      // Better to pass a handler or use window.location.assign if reload is intended, 
-                      // but for SPA feel, we should use internal navigation.
-                      // Since we don't have navigate prop here, we can fallback to window.location 
-                      // or better, change the "Live Demo" button to be an anchor tag if external, or use Link if internal?
-                      // Actually, let's keep it simple. The 404 is server config.
-                      // But to be cleaner, let's try to use internal nav if possible.
-                      // Reverting to just window.location.href is fine IF server is configured.
-                      window.location.href = project.demoUrl;
-                    } else {
-                      window.open(project.demoUrl, '_blank');
-                    }
-                  }}
+                  onClick={openLiveDemo}
                   className="flex-1 py-4 bg-[#2C2A26] text-[#F5F2EB] text-center uppercase tracking-widest text-sm font-medium hover:bg-[#433E38] transition-colors"
                 >
                   Live Demo
                 </button>
-              )}
-              {project.repoUrl && (
-                <a href={project.repoUrl} className="flex-1 py-4 border border-[#2C2A26] text-[#2C2A26] text-center uppercase tracking-widest text-sm font-medium hover:bg-[#2C2A26] hover:text-[#F5F2EB] transition-colors">
-                  View Code
-                </a>
               )}
             </div>
 
