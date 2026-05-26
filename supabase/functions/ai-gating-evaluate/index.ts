@@ -1057,13 +1057,18 @@ serve(async (req) => {
     let workflowPayload: WorkflowPayload | null = null;
     let resultSource: ResultSource = 'n8n';
 
-    if (n8nWebhookUrl) {
+    if (n8nWebhookUrl && n8nSecret) {
       try {
+        const normalizedPath = new URL(n8nWebhookUrl).pathname.toLowerCase();
+        if (normalizedPath.includes('trading-agents-run')) {
+          throw new Error('AI Gate webhook is incorrectly pointed to Trading Agents workflow');
+        }
+
         const n8nResponse = await fetch(n8nWebhookUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            ...(n8nSecret ? { 'x-n8n-secret': n8nSecret } : {}),
+            'x-n8n-secret': n8nSecret,
           },
           body: JSON.stringify({
             schema_version: REQUEST_SCHEMA_VERSION,
@@ -1093,6 +1098,8 @@ serve(async (req) => {
       } catch (error) {
         console.warn(`AI Gate n8n call failed, using fallback: ${error instanceof Error ? error.message : String(error)}`);
       }
+    } else if (n8nWebhookUrl && !n8nSecret) {
+      console.warn('AI_GATE_N8N_WEBHOOK_SECRET is missing; using fallback evaluator');
     }
 
     if (!workflowPayload) {

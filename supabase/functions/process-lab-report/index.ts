@@ -1,8 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
 // Get secrets explicitly for the Health Twin Webhook
-const N8N_HEALTH_WEBHOOK_URL = Deno.env.get('N8N_Health_Twin_WEBHOOK_LAB_URL')
-const N8N_WEBHOOK_SECRET = Deno.env.get('N8N_WEBHOOK_SECRET')
+const N8N_HEALTH_WEBHOOK_URL = Deno.env.get('N8N_HEALTH_TWIN_LAB_WEBHOOK_URL') || Deno.env.get('N8N_Health_Twin_WEBHOOK_LAB_URL')
+const N8N_HEALTH_WEBHOOK_SECRET = Deno.env.get('N8N_HEALTH_TWIN_LAB_WEBHOOK_SECRET') || Deno.env.get('N8N_WEBHOOK_SECRET')
 
 serve(async (req) => {
   // 1. Handle CORS
@@ -29,9 +29,20 @@ serve(async (req) => {
       throw new Error('Missing required fields (file_url, twin_id, file_id)')
     }
 
-    if (!N8N_HEALTH_WEBHOOK_URL || !N8N_WEBHOOK_SECRET) {
+    if (!N8N_HEALTH_WEBHOOK_URL || !N8N_HEALTH_WEBHOOK_SECRET) {
       console.error('Missing N8N configuration secrets for Health Twin Webhook')
       throw new Error('Server configuration error')
+    }
+
+    const normalizedPath = (() => {
+      try {
+        return new URL(N8N_HEALTH_WEBHOOK_URL).pathname.toLowerCase()
+      } catch {
+        throw new Error('Invalid Health Twin lab webhook URL configuration')
+      }
+    })()
+    if (normalizedPath.includes('trading-agents-run')) {
+      throw new Error('Health Twin lab webhook is incorrectly pointed to Trading Agents workflow')
     }
 
     // 4. Call n8n Webhook (Synchronous)
@@ -42,7 +53,7 @@ serve(async (req) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-n8n-secret': N8N_WEBHOOK_SECRET
+        'x-n8n-secret': N8N_HEALTH_WEBHOOK_SECRET
       },
       body: JSON.stringify({
         file_url,

@@ -99,7 +99,10 @@ serve(async (req) => {
     );
     
     const n8nWebhookUrl = Deno.env.get('MC_N8N_SESSION_END_WEBHOOK_URL') || 'https://your-n8n-instance.com/webhook/mind-coach-session-end';
-    const n8nSecret = Deno.env.get('MC_N8N_WEBHOOK_SECRET') || 'placeholder-secret';
+    const n8nSecret =
+      Deno.env.get('MC_N8N_WEBHOOK_SECRET') ||
+      Deno.env.get('N8N_WEBHOOK_SECRET') ||
+      'placeholder-secret';
 
     const [sessionRes, messagesRes, profileRes, memoriesRes, caseNotesRes, tasksRes, assessmentsRes, moodRes] = await Promise.all([
         supabaseAdmin.from('mind_coach_sessions').select('*').eq('id', session_id).single(),

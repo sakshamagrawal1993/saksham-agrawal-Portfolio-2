@@ -407,3 +407,8 @@ entrypoint = "./functions/trading-agents-proxy/index.ts"
 enabled = true
 verify_jwt = false
 entrypoint = "./functions/ai-gating-evaluate/index.ts"
+
+[functions.fno-copilot-proxy]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/fno-copilot-proxy/index.ts"

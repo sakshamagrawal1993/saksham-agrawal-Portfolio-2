@@ -43,6 +43,7 @@ const UnityCardOnboarding = lazy(() => import('./components/UnityCard/UnityCardO
 const UnityCardDashboard = lazy(() => import('./components/UnityCard/UnityCardDashboard'));
 
 const TradingAgentsApp = lazy(() => import('./components/TradingAgents/TradingAgentsApp'));
+const FnOCopilotApp = lazy(() => import('./components/FnOCopilot/FnOCopilotApp'));
 
 const LoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-[#F5F2EB] font-serif italic text-[#2C2A26]/50">
@@ -261,6 +262,12 @@ function App() {
               </Suspense>
             } />
 
+            <Route path="/fno-copilot" element={
+              <Suspense fallback={<LoadingFallback />}>
+                <FnOCopilotApp />
+              </Suspense>
+            } />
+
             {/* Unified Journal/Blog Routes */}
             <Route path="/journal" element={
               <Suspense fallback={<LoadingFallback />}>
@@ -299,8 +306,8 @@ function App() {
           </Routes>
         </main>
 
-        {!['/ticketflow', '/insightslm', '/login', '/medical-benchmark', '/trading-agents', '/ai-gate'].includes(location.pathname) && !location.pathname.startsWith('/health-twin') && !location.pathname.startsWith('/mind-coach') && !location.pathname.startsWith('/unity-card') && <Footer onLinkClick={handleNavClick} />}
-        {!['/runner', '/medical-benchmark', '/trading-agents', '/ai-gate'].includes(location.pathname) && !location.pathname.startsWith('/health-twin') && !location.pathname.startsWith('/mind-coach') && !location.pathname.startsWith('/unity-card') && <Assistant />}
+        {!['/ticketflow', '/insightslm', '/login', '/medical-benchmark', '/trading-agents', '/ai-gate', '/fno-copilot'].includes(location.pathname) && !location.pathname.startsWith('/health-twin') && !location.pathname.startsWith('/mind-coach') && !location.pathname.startsWith('/unity-card') && <Footer onLinkClick={handleNavClick} />}
+        {!['/runner', '/medical-benchmark', '/trading-agents', '/ai-gate', '/fno-copilot'].includes(location.pathname) && !location.pathname.startsWith('/health-twin') && !location.pathname.startsWith('/mind-coach') && !location.pathname.startsWith('/unity-card') && <Assistant />}
       </div>
     </AuthProvider>
   );

@@ -1,0 +1,30 @@
+INSTRUMENT = {
+    "symbol": "NIFTY",
+    "name": "Nifty 50 Index Options",
+    "lot_size": 50,
+    "expiry": "2026-05-28",
+    "spot": 22842.25,
+    "previous_close": 22705.10,
+    "snapshot_ts": "2026-05-26T10:12:00+05:30",
+}
+
+CHAIN = [
+    {"strike": 22400, "type": "CE", "bid": 502, "ask": 510, "ltp": 506, "volume": 42100, "oi": 108500, "oi_change": 8200, "iv": 0.152, "delta": 0.82, "gamma": 0.0009, "theta": -8.2, "vega": 10.4, "rho": 3.4},
+    {"strike": 22400, "type": "PE", "bid": 36, "ask": 38, "ltp": 37, "volume": 36900, "oi": 164000, "oi_change": 22100, "iv": 0.182, "delta": -0.16, "gamma": 0.0007, "theta": -5.1, "vega": 8.3, "rho": -1.1},
+    {"strike": 22500, "type": "CE", "bid": 412, "ask": 418, "ltp": 415, "volume": 53100, "oi": 142000, "oi_change": 9600, "iv": 0.151, "delta": 0.76, "gamma": 0.001, "theta": -8.8, "vega": 12.1, "rho": 3.2},
+    {"strike": 22500, "type": "PE", "bid": 55, "ask": 58, "ltp": 56.5, "volume": 49300, "oi": 221000, "oi_change": 35500, "iv": 0.178, "delta": -0.21, "gamma": 0.0009, "theta": -6.2, "vega": 10.1, "rho": -1.4},
+    {"strike": 22600, "type": "CE", "bid": 322, "ask": 329, "ltp": 325.5, "volume": 63200, "oi": 184000, "oi_change": 11800, "iv": 0.149, "delta": 0.68, "gamma": 0.0012, "theta": -9.4, "vega": 14.4, "rho": 2.9},
+    {"strike": 22600, "type": "PE", "bid": 82, "ask": 86, "ltp": 84, "volume": 58900, "oi": 273000, "oi_change": 41400, "iv": 0.174, "delta": -0.28, "gamma": 0.0011, "theta": -7.1, "vega": 12.8, "rho": -1.9},
+    {"strike": 22700, "type": "CE", "bid": 238, "ask": 244, "ltp": 241, "volume": 80400, "oi": 243000, "oi_change": 18600, "iv": 0.146, "delta": 0.58, "gamma": 0.0014, "theta": -10.2, "vega": 16.9, "rho": 2.5},
+    {"strike": 22700, "type": "PE", "bid": 123, "ask": 128, "ltp": 125.5, "volume": 70200, "oi": 338000, "oi_change": 54600, "iv": 0.171, "delta": -0.37, "gamma": 0.0013, "theta": -8.4, "vega": 15.7, "rho": -2.3},
+    {"strike": 22800, "type": "CE", "bid": 171, "ask": 176, "ltp": 173.5, "volume": 111300, "oi": 355000, "oi_change": 29300, "iv": 0.144, "delta": 0.49, "gamma": 0.0016, "theta": -11.1, "vega": 18.3, "rho": 2.1},
+    {"strike": 22800, "type": "PE", "bid": 166, "ask": 172, "ltp": 169, "volume": 103200, "oi": 397000, "oi_change": 66800, "iv": 0.168, "delta": -0.47, "gamma": 0.0015, "theta": -9.5, "vega": 17.8, "rho": -2.7},
+    {"strike": 22900, "type": "CE", "bid": 112, "ask": 117, "ltp": 114.5, "volume": 125000, "oi": 432000, "oi_change": 44200, "iv": 0.142, "delta": 0.38, "gamma": 0.0015, "theta": -10.6, "vega": 17.5, "rho": 1.7},
+    {"strike": 22900, "type": "PE", "bid": 231, "ask": 238, "ltp": 234.5, "volume": 77700, "oi": 291000, "oi_change": 24400, "iv": 0.169, "delta": -0.57, "gamma": 0.0014, "theta": -10.2, "vega": 16.6, "rho": -3.0},
+    {"strike": 23000, "type": "CE", "bid": 71, "ask": 75, "ltp": 73, "volume": 139000, "oi": 628000, "oi_change": 78200, "iv": 0.145, "delta": 0.29, "gamma": 0.0013, "theta": -9.6, "vega": 14.2, "rho": 1.2},
+    {"strike": 23000, "type": "PE", "bid": 303, "ask": 312, "ltp": 307.5, "volume": 55100, "oi": 238000, "oi_change": 12200, "iv": 0.172, "delta": -0.66, "gamma": 0.0012, "theta": -9.8, "vega": 14.4, "rho": -3.4},
+    {"strike": 23100, "type": "CE", "bid": 43, "ask": 46, "ltp": 44.5, "volume": 98800, "oi": 492000, "oi_change": 39400, "iv": 0.149, "delta": 0.21, "gamma": 0.001, "theta": -8.3, "vega": 11.3, "rho": 0.8},
+    {"strike": 23100, "type": "PE", "bid": 389, "ask": 400, "ltp": 394.5, "volume": 33900, "oi": 171000, "oi_change": 7200, "iv": 0.176, "delta": -0.74, "gamma": 0.001, "theta": -9.1, "vega": 11.7, "rho": -3.7},
+    {"strike": 23200, "type": "CE", "bid": 25, "ask": 28, "ltp": 26.5, "volume": 77100, "oi": 387000, "oi_change": 22500, "iv": 0.154, "delta": 0.15, "gamma": 0.0008, "theta": -7.1, "vega": 8.9, "rho": 0.5},
+    {"strike": 23200, "type": "PE", "bid": 480, "ask": 494, "ltp": 487, "volume": 23100, "oi": 126000, "oi_change": 4100, "iv": 0.181, "delta": -0.81, "gamma": 0.0008, "theta": -8.4, "vega": 9.3, "rho": -4.0},
+]

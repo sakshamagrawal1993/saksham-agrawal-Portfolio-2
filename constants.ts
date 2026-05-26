@@ -121,8 +121,8 @@ export const PROJECTS: Project[] = [
     imageUrl: 'https://images.unsplash.com/photo-1642543492481-44e81e3914a7?auto=format&fit=crop&q=80&w=1000',
     gallery: [],
     techStack: ['React', 'Supabase', 'n8n', 'VPS Quant Service'],
-    repoUrl: 'https://github.com/sakshamagrawal1993/fno-copilot',
-    demoUrl: 'https://fno-copilot.vercel.app',
+    repoUrl: 'https://github.com/sakshamagrawal1993/saksham-agrawal-Portfolio-2',
+    demoUrl: '/fno-copilot',
     status: 'under-development'
   },
   {

@@ -210,7 +210,10 @@ serve(async (req) => {
 
     // Delegate pathway routing to n8n
     const n8nWebhookUrl = Deno.env.get('MC_N8N_JOURNEY_WEBHOOK_URL') || 'https://your-n8n-instance.com/webhook/mind-coach-journey';
-    const n8nSecret = Deno.env.get('MC_N8N_WEBHOOK_SECRET') || 'placeholder-secret';
+    const n8nSecret =
+      Deno.env.get('MC_N8N_WEBHOOK_SECRET') ||
+      Deno.env.get('N8N_WEBHOOK_SECRET') ||
+      'placeholder-secret';
 
     const webhookResponse = await fetch(n8nWebhookUrl, {
       method: 'POST',

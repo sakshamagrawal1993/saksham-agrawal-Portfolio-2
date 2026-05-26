@@ -4,8 +4,13 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 // Get secrets (Assuming a separate webhook for chat, or same one with a 'type' field)
 // For clarity, let's assume a separate variable or we pass 'type': 'chat' to the main one.
 // Let's use a dedicated secret for the chat webhook URL if provided, otherwise fallback.
-const N8N_CHAT_WEBHOOK_URL = Deno.env.get('N8N_WEBHOOK_CHAT_URL') || Deno.env.get('N8N_WEBHOOK_URL')
-const N8N_WEBHOOK_SECRET = Deno.env.get('N8N_WEBHOOK_SECRET')
+const N8N_CHAT_WEBHOOK_URL =
+  Deno.env.get('INSIGHTSLM_CHAT_WEBHOOK_URL') ||
+  Deno.env.get('N8N_WEBHOOK_CHAT_URL') ||
+  Deno.env.get('N8N_WEBHOOK_URL')
+const N8N_WEBHOOK_SECRET =
+  Deno.env.get('INSIGHTSLM_CHAT_WEBHOOK_SECRET') ||
+  Deno.env.get('N8N_WEBHOOK_SECRET')
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -29,6 +34,17 @@ serve(async (req) => {
 
     if (!N8N_CHAT_WEBHOOK_URL || !N8N_WEBHOOK_SECRET) {
       throw new Error('Server configuration error')
+    }
+
+    const normalizedPath = (() => {
+      try {
+        return new URL(N8N_CHAT_WEBHOOK_URL).pathname.toLowerCase()
+      } catch {
+        throw new Error('Invalid InsightsLM chat webhook URL configuration')
+      }
+    })()
+    if (normalizedPath.includes('trading-agents-run')) {
+      throw new Error('InsightsLM chat webhook is incorrectly pointed to Trading Agents workflow')
     }
 
     // 1. Get/Create Session

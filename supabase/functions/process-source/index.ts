@@ -2,8 +2,12 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 // Get secrets
-const N8N_WEBHOOK_URL = Deno.env.get('N8N_WEBHOOK_URL')
-const N8N_WEBHOOK_SECRET = Deno.env.get('N8N_WEBHOOK_SECRET')
+const INSIGHTSLM_SOURCE_WEBHOOK_URL =
+  Deno.env.get('INSIGHTSLM_SOURCE_WEBHOOK_URL') ||
+  Deno.env.get('N8N_WEBHOOK_URL')
+const INSIGHTSLM_SOURCE_WEBHOOK_SECRET =
+  Deno.env.get('INSIGHTSLM_SOURCE_WEBHOOK_SECRET') ||
+  Deno.env.get('N8N_WEBHOOK_SECRET')
 
 serve(async (req) => {
   // 1. Handle CORS
@@ -31,20 +35,31 @@ serve(async (req) => {
       throw new Error('Missing required fields (source_id, notebook_id, file_url)')
     }
 
-    if (!N8N_WEBHOOK_URL || !N8N_WEBHOOK_SECRET) {
+    if (!INSIGHTSLM_SOURCE_WEBHOOK_URL || !INSIGHTSLM_SOURCE_WEBHOOK_SECRET) {
       console.error('Missing N8N configuration secrets')
       throw new Error('Server configuration error')
+    }
+
+    const normalizedPath = (() => {
+      try {
+        return new URL(INSIGHTSLM_SOURCE_WEBHOOK_URL).pathname.toLowerCase()
+      } catch {
+        throw new Error('Invalid InsightsLM source webhook URL configuration')
+      }
+    })()
+    if (normalizedPath.includes('trading-agents-run')) {
+      throw new Error('InsightsLM source webhook is incorrectly pointed to Trading Agents workflow')
     }
 
     // 4. Call n8n Webhook (Synchronous)
     console.log(`Triggering n8n for source: ${source_id}`)
     
     // We await the response here to return it to the client
-    const n8nResponse = await fetch(N8N_WEBHOOK_URL, {
+    const n8nResponse = await fetch(INSIGHTSLM_SOURCE_WEBHOOK_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-n8n-secret': N8N_WEBHOOK_SECRET
+        'x-n8n-secret': INSIGHTSLM_SOURCE_WEBHOOK_SECRET
       },
       body: JSON.stringify({
         source_id,

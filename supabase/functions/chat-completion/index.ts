@@ -24,13 +24,34 @@ serve(async (req) => {
       );
     }
 
-    const n8nWebhookUrl = Deno.env.get('N8N_WEBHOOK_URL');
-    const n8nSecret = Deno.env.get('N8N_WEBHOOK_SECRET');
+    const n8nWebhookUrl =
+      Deno.env.get('N8N_HEALTH_TWIN_CHAT_WEBHOOK_URL') ||
+      Deno.env.get('N8N_WEBHOOK_CHAT_URL');
+    const n8nSecret =
+      Deno.env.get('N8N_HEALTH_TWIN_CHAT_WEBHOOK_SECRET') ||
+      Deno.env.get('N8N_WEBHOOK_SECRET');
 
     if (!n8nWebhookUrl || !n8nSecret) {
-      console.error('Missing N8N_WEBHOOK_URL or N8N_WEBHOOK_SECRET environment variables');
+      console.error('Missing Health Twin chat webhook URL or secret environment variables');
       return new Response(
         JSON.stringify({ error: 'System configuration error' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      );
+    }
+
+    let normalizedWebhookPath = '';
+    try {
+      normalizedWebhookPath = new URL(n8nWebhookUrl).pathname.toLowerCase();
+    } catch {
+      return new Response(
+        JSON.stringify({ error: 'Invalid Health Twin chat webhook URL configuration' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      );
+    }
+
+    if (normalizedWebhookPath.includes('trading-agents-run')) {
+      return new Response(
+        JSON.stringify({ error: 'Health Twin chat webhook is incorrectly pointed to Trading Agents workflow' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
       );
     }

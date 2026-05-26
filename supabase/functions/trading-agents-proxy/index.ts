@@ -6,6 +6,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-trading-agents-admin-token',
 }
 
+const TRADING_AGENTS_WEBHOOK_SECRET =
+  Deno.env.get('TRADING_AGENTS_N8N_WEBHOOK_SECRET') ||
+  Deno.env.get('N8N_WEBHOOK_SECRET');
+
 type AgentLogInput = {
   agent_role?: string;
   agent?: string;
@@ -956,7 +960,7 @@ serve(async (req) => {
      * Body: { "action": "append_agent_log", "session_id": "<uuid>", "agent_role": "...", "content": "..." }
      */
     if (action === 'append_agent_log') {
-      const n8nSecret = Deno.env.get('N8N_WEBHOOK_SECRET');
+      const n8nSecret = TRADING_AGENTS_WEBHOOK_SECRET;
       if (!n8nSecret || req.headers.get('x-trading-agents-secret') !== n8nSecret) {
         return jsonResponse({ error: 'Forbidden' }, 403);
       }
@@ -1397,8 +1401,12 @@ serve(async (req) => {
 
     // Default action: Trigger n8n
     const n8nWebhookUrl = action === 'recon'
-      ? Deno.env.get('N8N_RECON_WEBHOOK_URL') || Deno.env.get('N8N_WEBHOOK_URL')
-      : Deno.env.get('N8N_WEBHOOK_URL')
+      ? Deno.env.get('TRADING_AGENTS_RECON_WEBHOOK_URL') ||
+        Deno.env.get('N8N_RECON_WEBHOOK_URL') ||
+        Deno.env.get('TRADING_AGENTS_RUN_WEBHOOK_URL') ||
+        Deno.env.get('N8N_WEBHOOK_URL')
+      : Deno.env.get('TRADING_AGENTS_RUN_WEBHOOK_URL') ||
+        Deno.env.get('N8N_WEBHOOK_URL')
     
     if (!n8nWebhookUrl) {
        console.error("N8N_WEBHOOK_URL is not set");
@@ -1447,7 +1455,7 @@ serve(async (req) => {
     const n8nHeaders: Record<string, string> = {
       'Content-Type': 'application/json',
     };
-    const n8nSecret = Deno.env.get('N8N_WEBHOOK_SECRET');
+    const n8nSecret = TRADING_AGENTS_WEBHOOK_SECRET;
     if (n8nSecret) {
       n8nHeaders['x-trading-agents-secret'] = n8nSecret;
     }

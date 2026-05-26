@@ -103,7 +103,10 @@ serve(async (req) => {
 
     const n8nWebhookUrl = Deno.env.get('MC_N8N_CHAT_WEBHOOK_URL') || 'https://n8n.saksham-experiments.com/webhook/mind-coach-chat';
     const n8nDiscoveryWebhookUrl = Deno.env.get('MC_N8N_DISCOVERY_WEBHOOK_URL') || n8nWebhookUrl;
-    const n8nSecret = Deno.env.get('MC_N8N_WEBHOOK_SECRET') || 'placeholder-secret';
+    const n8nSecret =
+      Deno.env.get('MC_N8N_WEBHOOK_SECRET') ||
+      Deno.env.get('N8N_WEBHOOK_SECRET') ||
+      'placeholder-secret';
     const configuredSyncDiscovery = /^(1|true|yes)$/i.test(Deno.env.get('MC_SYNC_DISCOVERY') || '');
     const isEngagementRapportPhase =
       !pathway || pathway === 'engagement_rapport_and_assessment';
