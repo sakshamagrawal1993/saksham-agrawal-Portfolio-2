@@ -111,6 +111,21 @@ export const PROJECTS: Project[] = [
     status: 'completed'
   },
   {
+    id: 'fno-copilot',
+    name: 'FnO Co-Pilot',
+    tagline: 'Options strategy workbench.',
+    description: 'An educational options trading copilot for option-chain analysis, AI-assisted strategy creation, backtesting, and paper trading.',
+    longDescription: 'FnO Co-Pilot is a full-stack educational platform for Indian FnO traders. It combines option-chain analytics, platform-suggested Top 5 trades, chat-assisted one-off trade creation, reusable algo strategy building, backtesting, and paper trading. The MVP uses a Vercel frontend, Supabase control plane and storage, n8n AI workflows, and a VPS quant service for calculations and scoring.',
+    role: 'Creator & Architect',
+    category: 'Fintech',
+    imageUrl: 'https://images.unsplash.com/photo-1642543492481-44e81e3914a7?auto=format&fit=crop&q=80&w=1000',
+    gallery: [],
+    techStack: ['React', 'Supabase', 'n8n', 'VPS Quant Service'],
+    repoUrl: 'https://github.com/sakshamagrawal1993/fno-copilot',
+    demoUrl: 'https://fno-copilot.vercel.app',
+    status: 'under-development'
+  },
+  {
     id: 'insightslm',
     name: 'InsightsLM',
     tagline: 'AI Notebook for Research',
