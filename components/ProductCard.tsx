@@ -38,7 +38,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) => {
       <GlowingEffect blur={0} borderWidth={3} spread={80} glow={true} disabled={false} proximity={64} inactiveZone={0.01} />
       <div className="relative z-10 flex flex-col gap-6 h-full">
 
-        <div className="relative isolate w-full aspect-[16/9] overflow-visible">
+        <div className="relative isolate w-full aspect-[16/9] shrink-0">
           {statusLabel && (
             <>
               <div
@@ -69,17 +69,17 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) => {
             </>
           )}
 
-          <div className="relative z-10 w-full h-full overflow-hidden bg-[#EBE7DE] rounded-xl">
+          <div className="absolute inset-0 z-10 overflow-hidden bg-[#EBE7DE] rounded-xl">
             {project.id === 'p3' ? (
               <div
-                className="w-full h-full flex items-center justify-center bg-[#F5F2EB]"
+                className="absolute inset-0 flex items-center justify-center bg-[#F5F2EB]"
               >
                 <div className="scale-[0.85] origin-center">
                   <CreditCard />
                 </div>
               </div>
             ) : project.id === 'digital-twin' ? (
-              <div className="w-full h-full overflow-hidden rounded-xl">
+              <div className="absolute inset-0 overflow-hidden rounded-xl">
                 <ShaderAnimation />
               </div>
             ) : (
@@ -87,7 +87,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) => {
                 <img
                   src={project.imageUrl}
                   alt={project.name}
-                  className="w-full h-full object-cover transition-transform duration-1000 ease-in-out group-hover:scale-105 grayscale-[0.2] group-hover:grayscale-0"
+                  className="absolute inset-0 h-full w-full object-cover transition-transform duration-1000 ease-in-out group-hover:scale-105 grayscale-[0.2] group-hover:grayscale-0"
                 />
                 <div className="absolute inset-0 bg-[#2C2A26]/0 group-hover:bg-[#2C2A26]/10 transition-colors duration-500 flex items-center justify-center">
                   <div className="opacity-0 group-hover:opacity-100 transition-all duration-500 translate-y-4 group-hover:translate-y-0">

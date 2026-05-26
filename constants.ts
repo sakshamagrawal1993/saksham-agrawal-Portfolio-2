@@ -224,9 +224,9 @@ export const PROJECTS: Project[] = [
     longDescription: 'Managed Postpe cards (AUM ~Rs 680 Cr). I pioneered the industry-first "EMI on QR" feature. For Personal Loans, I spearheaded the product from concept to launch with real-time disbursals, scaling to Rs 2.5 Cr/day.',
     role: 'Senior Product Manager @ BharatPe',
     category: 'Fintech',
-    imageUrl: 'https://images.unsplash.com/photo-1556742502-ec7c0e9f34b1?auto=format&fit=crop&q=80&w=1000',
+    imageUrl: 'https://images.unsplash.com/photo-1556742502-ec7c0e9f34b1?auto=format&fit=crop&q=80&w=1000&h=563',
     gallery: [
-      'https://images.unsplash.com/photo-1556742502-ec7c0e9f34b1?auto=format&fit=crop&q=80&w=1000'
+      'https://images.unsplash.com/photo-1556742502-ec7c0e9f34b1?auto=format&fit=crop&q=80&w=1000&h=563'
     ],
     techStack: ['Lending Lifecycle', 'Regulatory Compliance', 'E-Nach', 'Risk Modeling'],
     demoUrl: '#'
