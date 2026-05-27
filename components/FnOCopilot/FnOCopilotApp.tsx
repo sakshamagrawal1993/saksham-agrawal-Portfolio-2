@@ -39,7 +39,6 @@ import './styles.css';
 type Screen = 'dashboard' | 'contract' | 'analyse-trade' | 'create-trades' | 'algo-builder' | 'screener' | 'paper-trades';
 type WorkspaceMode = 'standard' | 'agent';
 type DataBackendStatus = 'local' | 'edge-online' | 'edge-error';
-type DensityMode = 'comfortable' | 'compact';
 type DetailTab = 'overview' | 'option-chain' | 'combined-oi' | 'technicals' | 'build-up' | 'quick-trades';
 type DirectionKey = 'up' | 'down' | 'rangebound' | 'volatile';
 type RiskProfile = 'Defensive' | 'Neutral' | 'Aggressive';
@@ -165,16 +164,6 @@ const agentModeLabels: Record<UserMode, string> = {
   'create-strategy': 'Create Algo',
   screener: 'Option Screener'
 };
-const screenLabels: Record<Screen, string> = {
-  dashboard: 'FnO Data',
-  contract: 'Contract',
-  'analyse-trade': 'Analyse Trade',
-  'create-trades': 'Create Trades',
-  'algo-builder': 'Create Algo',
-  screener: 'Option Screener',
-  'paper-trades': 'Paper Trades'
-};
-
 const starterChatHistory: AgentHistoryItem[] = [
   {
     id: 'starter-range',
@@ -344,7 +333,6 @@ function trendScore(contract: ContractSummary) {
 
 function FnOCopilotApp() {
   const [workspaceMode, setWorkspaceMode] = React.useState<WorkspaceMode>('standard');
-  const [density, setDensity] = React.useState<DensityMode>('comfortable');
   const [screen, setScreen] = React.useState<Screen>('dashboard');
   const [selectedContract, setSelectedContract] = React.useState<ContractSummary | null>(null);
   const [tab, setTab] = React.useState<DetailTab>('overview');
@@ -358,7 +346,7 @@ function FnOCopilotApp() {
   const [artifactHistory, setArtifactHistory] = React.useState<AgentArtifactItem[]>(starterArtifactHistory);
   const [input, setInput] = React.useState('');
   const [algoConfig, setAlgoConfig] = React.useState<AlgoStrategyConfig>(() => createDefaultAlgoConfig(defaultContract));
-  const [dataBackendStatus, setDataBackendStatus] = React.useState<DataBackendStatus>(
+  const [, setDataBackendStatus] = React.useState<DataBackendStatus>(
     isFnOCopilotEdgeEnabled() ? 'edge-online' : 'local'
   );
 
@@ -522,21 +510,22 @@ function FnOCopilotApp() {
   };
 
   return (
-    <div className={`fno-copilot-app density-${density}`}>
+    <div className="fno-copilot-app">
       <div className="app-shell">
         {workspaceMode === 'standard' && (
           <ProductNav
-            screen={screen}
             workspaceMode={workspaceMode}
-            selectedContract={selectedContract}
-            dataBackendStatus={dataBackendStatus}
-            density={density}
-            setDensity={setDensity}
             setWorkspaceMode={setWorkspaceMode}
             onDashboard={() => {
               setWorkspaceMode('standard');
               setScreen('dashboard');
             }}
+          />
+        )}
+        {workspaceMode === 'standard' && (
+          <StandardModeNavStrip
+            screen={screen}
+            onDashboard={() => setScreen('dashboard')}
             onCreateTrades={openCreateTrades}
             onCreateAlgo={openAlgoBuilder}
             onScreener={openScreener}
@@ -642,68 +631,50 @@ function FnOCopilotApp() {
 }
 
 function ProductNav({
-  screen,
   workspaceMode,
-  selectedContract,
-  dataBackendStatus,
-  density,
-  setDensity,
   setWorkspaceMode,
+  onDashboard
+}: {
+  workspaceMode: WorkspaceMode;
+  setWorkspaceMode: (mode: WorkspaceMode) => void;
+  onDashboard: () => void;
+}) {
+  return (
+    <header className="product-nav">
+      <button className="brand-row nav-brand" onClick={onDashboard}>
+        <div className="brand-mark"><Sparkles size={18} /></div>
+        <div>
+          <h1>FnO Co-Pilot</h1>
+        </div>
+      </button>
+      <div className="workspace-switch" aria-label="Workspace mode">
+        <button className={workspaceMode === 'standard' ? 'active' : ''} onClick={() => setWorkspaceMode('standard')}>Standard</button>
+        <button className={workspaceMode === 'agent' ? 'active' : ''} onClick={() => setWorkspaceMode('agent')}><Bot size={14} /> Agent</button>
+      </div>
+    </header>
+  );
+}
+
+function StandardModeNavStrip({
+  screen,
   onDashboard,
   onCreateTrades,
   onCreateAlgo,
   onScreener
 }: {
   screen: Screen;
-  workspaceMode: WorkspaceMode;
-  selectedContract: ContractSummary | null;
-  dataBackendStatus: DataBackendStatus;
-  density: DensityMode;
-  setDensity: (density: DensityMode) => void;
-  setWorkspaceMode: (mode: WorkspaceMode) => void;
   onDashboard: () => void;
   onCreateTrades: () => void;
   onCreateAlgo: () => void;
   onScreener: () => void;
 }) {
-  const contextLabel = selectedContract ? `${selectedContract.symbol} · ${selectedContract.expiry}` : 'No contract selected';
-  const backendLabel =
-    dataBackendStatus === 'edge-online'
-      ? 'Edge connected'
-      : dataBackendStatus === 'edge-error'
-        ? 'Edge fallback'
-        : 'Local demo';
   return (
-    <header className="product-nav">
-      <button className="brand-row nav-brand" onClick={onDashboard}>
-        <div className="brand-mark"><Sparkles size={18} /></div>
-        <div>
-          <p className="eyebrow">FnO Co-Pilot</p>
-          <h1>AI options workstation</h1>
-        </div>
-      </button>
-      <nav className="product-tabs" aria-label="Primary">
-        <button className={screen === 'dashboard' || screen === 'contract' || screen === 'analyse-trade' ? 'active' : ''} onClick={onDashboard}><Layers3 size={16} /> FnO Data</button>
-        <button className={screen === 'create-trades' ? 'active' : ''} onClick={onCreateTrades}><Target size={16} /> Create Trades</button>
-        <button className={screen === 'algo-builder' ? 'active' : ''} onClick={onCreateAlgo}><BrainCircuit size={16} /> Create Algo</button>
-        <button className={screen === 'screener' ? 'active' : ''} onClick={onScreener}><ListFilter size={16} /> Option Screener</button>
-      </nav>
-      <div className="workspace-switch" aria-label="Workspace mode">
-        <button className={workspaceMode === 'standard' ? 'active' : ''} onClick={() => setWorkspaceMode('standard')}>Standard</button>
-        <button className={workspaceMode === 'agent' ? 'active' : ''} onClick={() => setWorkspaceMode('agent')}><Bot size={14} /> Agent</button>
-      </div>
-      <div className="density-switch" aria-label="Density mode">
-        <button className={density === 'comfortable' ? 'active' : ''} onClick={() => setDensity('comfortable')}>Comfortable</button>
-        <button className={density === 'compact' ? 'active' : ''} onClick={() => setDensity('compact')}>Compact</button>
-      </div>
-      <div className="nav-context-chip" aria-label="Current screen context">
-        <strong>{screenLabels[screen]}</strong>
-        <span>{contextLabel}</span>
-      </div>
-      <div className="data-mode-pill" title="Market data runs locally; chat can route through Supabase Edge when configured">
-        {backendLabel}
-      </div>
-    </header>
+    <nav className="standard-nav-strip" aria-label="Primary">
+      <button className={screen === 'dashboard' || screen === 'contract' || screen === 'analyse-trade' ? 'active' : ''} onClick={onDashboard}><Layers3 size={16} /> FnO Data</button>
+      <button className={screen === 'create-trades' ? 'active' : ''} onClick={onCreateTrades}><Target size={16} /> Create Trades</button>
+      <button className={screen === 'algo-builder' ? 'active' : ''} onClick={onCreateAlgo}><BrainCircuit size={16} /> Create Algo Strategies</button>
+      <button className={screen === 'screener' ? 'active' : ''} onClick={onScreener}><ListFilter size={16} /> Option Screener</button>
+    </nav>
   );
 }
 
@@ -1196,6 +1167,50 @@ function OptionsDashboard({ onSelectContract }: { onSelectContract: (contract: C
         <Metric icon={<ShieldCheck size={18} />} label="Mode" value="Demo · Excel" />
       </section>
 
+      <section className="dashboard-grid">
+        <div className="market-panel large">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">Most active option contracts</p>
+              <h3>Pick a FnO stock or index to analyse</h3>
+            </div>
+            <div className="range-pills">
+              <button className={contractView === 'top' ? 'active' : ''} onClick={() => setContractView('top')}>Top movers</button>
+              <button className={contractView === 'all' ? 'active' : ''} onClick={() => setContractView('all')}>All contracts</button>
+              {(['All', 'Up', 'Down', 'Range', 'Volatile'] as const).map((trend) => (
+                <button key={trend} className={trendFilter === trend ? 'active' : ''} onClick={() => setTrendFilter(trend)}>{trend}</button>
+              ))}
+            </div>
+          </div>
+          <div className="contract-table">
+            <div className="contract-head">
+              <span>Underlying</span><span>Expiry</span><span>Spot</span><span>PCR</span><span>IV</span><span>MWPL</span><span>Build-up</span><span />
+            </div>
+            {visibleContracts.length ? visibleContracts.map((contract) => (
+              <button key={contract.id} className="contract-row" onClick={() => onSelectContract(contract)}>
+                <strong>{contract.symbol}<small>{contract.name}</small></strong>
+                <span>{contract.expiry}</span>
+                <span>₹{contract.spot.toLocaleString('en-IN')} <em className={contract.changePct >= 0 ? 'positive' : 'negative'}>{contract.changePct}%</em></span>
+                <span>{contract.pcr}</span>
+                <span>{contract.atmIv}%</span>
+                <span>{contract.mwpl ? `${contract.mwpl}%` : 'Index'}</span>
+                <span>{contract.buildUp}</span>
+                <ChevronRight size={16} />
+              </button>
+            )) : <div className="empty-state"><strong>No contracts found.</strong><span>Try changing trend filter or switch to All contracts.</span></div>}
+          </div>
+        </div>
+      </section>
+
+      <section className="activity-section">
+        <ActivityWidget title="Most Active by Contract" subtitle="Calls" rows={activity.callsActive} onSelect={onSelectContract} />
+        <ActivityWidget title="% Contract Gainers" subtitle="Calls" rows={activity.callsGainers} onSelect={onSelectContract} />
+        <ActivityWidget title="% OI Gainers" subtitle="Calls" rows={activity.callsOi} onSelect={onSelectContract} />
+        <ActivityWidget title="Most Active by Contract" subtitle="Puts" rows={activity.putsActive} onSelect={onSelectContract} />
+        <ActivityWidget title="% Contract Gainers" subtitle="Puts" rows={activity.putsGainers} onSelect={onSelectContract} />
+        <ActivityWidget title="% OI Gainers" subtitle="Puts" rows={activity.putsOi} onSelect={onSelectContract} />
+      </section>
+
       <section className="tab-grid">
         <ActivityHeatmap
           title="Calls activity matrix"
@@ -1307,40 +1322,7 @@ function OptionsDashboard({ onSelectContract }: { onSelectContract: (contract: C
         </ChartPanel>
       </section>
 
-      <section className="dashboard-grid">
-        <div className="market-panel large">
-          <div className="panel-header">
-            <div>
-              <p className="eyebrow">Most active option contracts</p>
-              <h3>Pick a FnO stock or index to analyse</h3>
-            </div>
-            <div className="range-pills">
-              <button className={contractView === 'top' ? 'active' : ''} onClick={() => setContractView('top')}>Top movers</button>
-              <button className={contractView === 'all' ? 'active' : ''} onClick={() => setContractView('all')}>All contracts</button>
-              {(['All', 'Up', 'Down', 'Range', 'Volatile'] as const).map((trend) => (
-                <button key={trend} className={trendFilter === trend ? 'active' : ''} onClick={() => setTrendFilter(trend)}>{trend}</button>
-              ))}
-            </div>
-          </div>
-          <div className="contract-table">
-            <div className="contract-head">
-              <span>Underlying</span><span>Expiry</span><span>Spot</span><span>PCR</span><span>IV</span><span>MWPL</span><span>Build-up</span><span />
-            </div>
-            {visibleContracts.length ? visibleContracts.map((contract) => (
-              <button key={contract.id} className="contract-row" onClick={() => onSelectContract(contract)}>
-                <strong>{contract.symbol}<small>{contract.name}</small></strong>
-                <span>{contract.expiry}</span>
-                <span>₹{contract.spot.toLocaleString('en-IN')} <em className={contract.changePct >= 0 ? 'positive' : 'negative'}>{contract.changePct}%</em></span>
-                <span>{contract.pcr}</span>
-                <span>{contract.atmIv}%</span>
-                <span>{contract.mwpl ? `${contract.mwpl}%` : 'Index'}</span>
-                <span>{contract.buildUp}</span>
-                <ChevronRight size={16} />
-              </button>
-            )) : <div className="empty-state"><strong>No contracts found.</strong><span>Try changing trend filter or switch to All contracts.</span></div>}
-          </div>
-        </div>
-
+      <section className="tab-grid">
         <div className="market-panel">
           <div className="panel-header">
             <div>
@@ -1459,6 +1441,23 @@ function IndexViewCard({ title, contract, onSelect }: { title: string; contract:
       </div>
       <small>{contract.buildUp} · OI change {contract.oiChangePct}%</small>
     </button>
+  );
+}
+
+function ActivityWidget({ title, subtitle, rows, onSelect }: { title: string; subtitle: string; rows: ReturnType<typeof buildActivityRows>; onSelect: (contract: ContractSummary) => void }) {
+  return (
+    <div className="activity-widget">
+      <p className="eyebrow">{subtitle}</p>
+      <h3>{title}</h3>
+      <div className="activity-list">
+        {rows.slice(0, 5).map((row) => (
+          <button key={`${row.symbol}-${row.type}-${row.strike}`} onClick={() => onSelect(row.contract)}>
+            <strong>{row.symbol} {row.strike} {row.type}</strong>
+            <span>₹{row.price} · OI {row.oiChangePct}% · Vol {row.volume.toLocaleString('en-IN')}</span>
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 

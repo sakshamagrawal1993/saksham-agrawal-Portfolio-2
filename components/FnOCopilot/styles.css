@@ -51,6 +51,7 @@
   z-index: 20;
   min-height: 76px;
   display: flex;
+  justify-content: space-between;
   align-items: center;
   gap: 18px;
   padding: 12px 20px;
@@ -60,12 +61,24 @@
 }
 .fno-copilot-app .nav-brand {
   gap: 12px;
-  min-width: 270px;
+  min-width: 220px;
   padding: 0;
   border: 0;
   background: transparent;
   color: var(--ink);
   text-align: left;
+}
+.fno-copilot-app .nav-brand h1 {
+  font-size: 24px;
+  line-height: 1.05;
+}
+.fno-copilot-app .standard-nav-strip {
+  display: flex;
+  gap: 8px;
+  padding: 10px 20px 14px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--line);
+  background: rgba(243, 246, 242, 0.85);
 }
 .fno-copilot-app .product-tabs {
   display: flex;
@@ -74,6 +87,7 @@
   overflow-x: auto;
 }
 .fno-copilot-app .product-tabs button,
+.fno-copilot-app .standard-nav-strip button,
 .fno-copilot-app .workspace-switch button,
 .fno-copilot-app .data-mode-pill,
 .fno-copilot-app .drawer-close,
@@ -90,8 +104,19 @@
   padding: 0 13px;
   white-space: nowrap;
 }
+.fno-copilot-app .standard-nav-strip button {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
 .fno-copilot-app .product-tabs button.active,
 .fno-copilot-app .product-tabs button:hover,
+.fno-copilot-app .standard-nav-strip button.active,
+.fno-copilot-app .standard-nav-strip button:hover,
 .fno-copilot-app .column-group-bar button.active {
   color: var(--ink);
   border-color: var(--green);
@@ -2789,18 +2814,16 @@
 .fno-copilot-app .product-nav {
     align-items: flex-start;
     flex-direction: column;
+    justify-content: flex-start;
   }
 .fno-copilot-app .nav-brand {
     min-width: 0;
   }
-.fno-copilot-app .product-tabs {
+.fno-copilot-app .standard-nav-strip {
     width: 100%;
+    padding: 10px 13px 12px;
   }
 .fno-copilot-app .workspace-switch {
-    width: 100%;
-  }
-.fno-copilot-app .density-switch,
-.fno-copilot-app .nav-context-chip {
     width: 100%;
   }
 .fno-copilot-app .sticky-col {
