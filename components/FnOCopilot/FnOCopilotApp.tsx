@@ -32,8 +32,9 @@ import {
 } from './fnoCopilotApi';
 import { assistantReply, buildWorkflowSteps, createInitialMessages, draftFromChat } from './lib/aiPlanner';
 import { aggregateGreeks, computeChainAnalytics, getAtmStrike, getQuote, mid, round, rupee } from './lib/calculations';
+import { parseLiveMarketBootstrap, type FnOLiveMarketState } from './lib/edgeMarketAdapter';
 import { generateTopTrades } from './lib/strategyEngine';
-import { CandidateTrade, ChainAnalytics, ChatMessage, Instrument, OptionChainColumnGroup, OptionQuote, UserMode } from './types';
+import { CandidateTrade, ChainAnalytics, ChatMessage, Instrument, MarketOverview, OptionChainColumnGroup, OptionQuote, UserMode } from './types';
 import './styles.css';
 
 type Screen = 'dashboard' | 'contract' | 'analyse-trade' | 'create-trades' | 'algo-builder' | 'screener' | 'paper-trades';
@@ -258,11 +259,14 @@ function createAiAlgoConfig(contract: ContractSummary, draftTitle: string): Algo
   };
 }
 
-function createMarketContext(contract: ContractSummary) {
-  const instrument = instrumentsBySymbol[contract.symbol] ?? instrumentsBySymbol[defaultContract.symbol];
-  const chain = optionChainsBySymbol[contract.symbol] ?? optionChainsBySymbol[defaultContract.symbol] ?? [];
-  const analytics = computeChainAnalytics(instrument, chain);
-  const overview = {
+function buildMarketContext(
+  contract: ContractSummary,
+  instrument: Instrument,
+  chain: OptionQuote[],
+  overviewOverride?: MarketOverview
+) {
+  const analytics = overviewOverride?.chain ?? computeChainAnalytics(instrument, chain);
+  const overview: MarketOverview = overviewOverride ?? {
     instrument,
     regime: trendToRegime(contract.trend),
     trendScore: trendScore(contract),
@@ -279,6 +283,12 @@ function createMarketContext(contract: ContractSummary) {
     baseTrades,
     tradeMatrix: buildTradeMatrix(baseTrades)
   };
+}
+
+function createMarketContext(contract: ContractSummary) {
+  const instrument = instrumentsBySymbol[contract.symbol] ?? instrumentsBySymbol[defaultContract.symbol];
+  const chain = optionChainsBySymbol[contract.symbol] ?? optionChainsBySymbol[defaultContract.symbol] ?? [];
+  return buildMarketContext(contract, instrument, chain);
 }
 
 function trendToRegime(trend: ContractSummary['trend']) {
@@ -310,9 +320,17 @@ function FnOCopilotApp() {
   const [, setDataBackendStatus] = React.useState<DataBackendStatus>(
     isFnOCopilotEdgeEnabled() ? 'edge-online' : 'local'
   );
+  const [dataMode, setDataMode] = React.useState<'demo' | 'upstox_live'>('demo');
+  const [marketStatus, setMarketStatus] = React.useState<string | undefined>();
+  const [liveMarket, setLiveMarket] = React.useState<FnOLiveMarketState | null>(null);
 
   const activeContract = selectedContract ?? defaultContract;
-  const marketContext = React.useMemo(() => createMarketContext(activeContract), [activeContract]);
+  const marketContext = React.useMemo(() => {
+    if (liveMarket?.mode === 'upstox_live' && liveMarket.symbol === activeContract.symbol) {
+      return buildMarketContext(activeContract, liveMarket.instrument, liveMarket.chain, liveMarket.overview);
+    }
+    return createMarketContext(activeContract);
+  }, [activeContract, liveMarket]);
   const { analytics, baseTrades, chain, instrument, overview, tradeMatrix } = marketContext;
   const activeTrades = tradeMatrix[direction];
   const selectedTrade = activeTrades.find((trade) => trade.id === selectedTradeId) ?? activeTrades[1] ?? activeTrades[0] ?? baseTrades[0];
@@ -336,7 +354,15 @@ function FnOCopilotApp() {
     setDataBackendStatus('edge-online');
 
     fetchFnOCopilotBootstrap()
-      .then(() => {
+      .then((data) => {
+        const live = parseLiveMarketBootstrap(data as Record<string, unknown>);
+        if (!cancelled && live) {
+          setLiveMarket(live);
+          setDataMode('upstox_live');
+          setMarketStatus(live.marketStatus);
+        } else if (!cancelled) {
+          setDataMode('demo');
+        }
         if (!cancelled) setDataBackendStatus('edge-online');
       })
       .catch(() => {
@@ -455,6 +481,8 @@ function FnOCopilotApp() {
           <ProductNav
             workspaceMode={workspaceMode}
             setWorkspaceMode={setWorkspaceMode}
+            dataMode={dataMode}
+            marketStatus={marketStatus}
             onDashboard={() => {
               setWorkspaceMode('standard');
               setScreen('dashboard');
@@ -569,10 +597,14 @@ function FnOCopilotApp() {
 function ProductNav({
   workspaceMode,
   setWorkspaceMode,
+  dataMode,
+  marketStatus,
   onDashboard
 }: {
   workspaceMode: WorkspaceMode;
   setWorkspaceMode: (mode: WorkspaceMode) => void;
+  dataMode: 'demo' | 'upstox_live';
+  marketStatus?: string;
   onDashboard: () => void;
 }) {
   return (
@@ -583,9 +615,15 @@ function ProductNav({
           <h1>FnO Co-Pilot</h1>
         </div>
       </button>
-      <div className="workspace-switch" aria-label="Workspace mode">
+      <div className="product-nav-actions">
+        <span className={`data-mode-pill ${dataMode === 'upstox_live' ? 'live' : 'demo'}`}>
+          {dataMode === 'upstox_live' ? 'Live · Upstox Analytics' : 'Demo data'}
+          {marketStatus ? ` · ${marketStatus}` : ''}
+        </span>
+        <div className="workspace-switch" aria-label="Workspace mode">
         <button className={workspaceMode === 'standard' ? 'active' : ''} onClick={() => setWorkspaceMode('standard')}>Standard</button>
         <button className={workspaceMode === 'agent' ? 'active' : ''} onClick={() => setWorkspaceMode('agent')}><Bot size={14} /> Agent</button>
+        </div>
       </div>
     </header>
   );

@@ -2,6 +2,11 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 
 @dataclass(frozen=True)
@@ -30,10 +35,11 @@ class UpstoxConfig:
 
 
 def get_upstox_config() -> UpstoxConfig:
+    token = os.getenv("UPSTOX_ANALYTICS_TOKEN") or os.getenv("UPSTOX_ACCESS_TOKEN")
     return UpstoxConfig(
         env=os.getenv("UPSTOX_ENV", "sandbox"),
         client_id=os.getenv("UPSTOX_CLIENT_ID"),
         client_secret=os.getenv("UPSTOX_CLIENT_SECRET"),
         redirect_uri=os.getenv("UPSTOX_REDIRECT_URI"),
-        access_token=os.getenv("UPSTOX_ACCESS_TOKEN"),
+        access_token=token,
     )

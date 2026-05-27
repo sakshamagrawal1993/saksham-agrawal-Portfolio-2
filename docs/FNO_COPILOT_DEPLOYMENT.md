@@ -15,6 +15,52 @@
 
 All new changes belong in **saksham-agrawal-Portfolio-2** only.
 
+## Upstox Analytics Token (read-only live data)
+
+Generate the token from [Upstox Developer Apps → Analytics](https://upstox.com/developer/apps) (1-year validity, no OAuth).
+
+### Local quant service
+
+```bash
+# services/fno-quant-service/.env  (never commit)
+UPSTOX_ENV=production
+UPSTOX_ANALYTICS_TOKEN=<your_token>
+```
+
+```bash
+cd services/fno-quant-service
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8010
+```
+
+Smoke test:
+
+```bash
+curl http://localhost:8010/health
+curl -X POST http://localhost:8010/compute/chain -H "Content-Type: application/json" -d '{"instrument":"NIFTY","mode":"live"}'
+```
+
+### Supabase Edge (production UI)
+
+The edge function reads `UPSTOX_ANALYTICS_TOKEN` and fetches live NIFTY chain data directly from Upstox (no VPS required for MVP).
+
+```bash
+npx supabase secrets set UPSTOX_ANALYTICS_TOKEN="<your_token>"
+npx supabase functions deploy fno-copilot-proxy
+```
+
+Optional: point edge at your VPS quant service instead of calling Upstox directly:
+
+```bash
+npx supabase secrets set FNO_QUANT_SERVICE_URL="https://your-vps-host:8010"
+```
+
+### VPS (optional, recommended later)
+
+You do **not** need a separate server for the first live-data test if Supabase secrets are set.  
+Your existing cloud server (used for yfinance) can later host `fno-quant-service` on port `8010` for caching, backtests, and rate-limit isolation — same pattern as Trading Agents research proxy.
+
 ## Upstox OAuth redirect
 
 Register this redirect URI in the Upstox developer console:

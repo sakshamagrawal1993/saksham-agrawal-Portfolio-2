@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.46.1";
+import { resolveLiveMarketBundle } from "./upstox_live.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -81,6 +82,8 @@ const allowedActions = new Set<Action>([
   "paper_trade_mark",
   "paper_trade_close",
   "append_workflow_log",
+  "upstox_auth_exchange",
+  "upstox_fetch_live",
 ]);
 
 const demoOverview = {
@@ -348,6 +351,80 @@ const callAskAiWorkflow = async (
   }
 };
 
+const buildDemoBootstrapPayload = () => ({
+  instruments: [
+    demoOverview.instrument,
+    {
+      symbol: "BANKNIFTY",
+      name: "Nifty Bank Index Options",
+      lotSize: 15,
+      expiry: "2026-05-28",
+      spot: 50182.4,
+      previousClose: 50014.6,
+      snapshotTs: demoOverview.instrument.snapshotTs,
+    },
+  ],
+  overview: demoOverview,
+  indexViews: [
+    { symbol: "NIFTY", spot: 22842.25, changePct: 0.6, pcr: 0.94, atmIv: 15.6, buildUp: "Long Build Up" },
+    { symbol: "BANKNIFTY", spot: 50182.4, changePct: 0.34, pcr: 1.08, atmIv: 18.4, buildUp: "Short Covering" },
+  ],
+  fiiDii: {
+    fiiCash: -1240,
+    diiCash: 1870,
+    indexFutures: "Long +6%",
+    indexOptions: "Put hedge elevated",
+  },
+  mode: "demo",
+  dataSource: "demo",
+});
+
+const buildLiveBootstrapPayload = async (symbol = "NIFTY", expiry?: string) => {
+  const live = await resolveLiveMarketBundle(symbol, expiry);
+  const spot = Number(live.instrument.spot ?? 0);
+  const previousClose = Number(live.instrument.previousClose ?? spot);
+  const changePct = previousClose ? Number((((spot - previousClose) / previousClose) * 100).toFixed(2)) : 0;
+  const analytics = live.overview.chain as Record<string, unknown>;
+
+  return {
+    instruments: [live.instrument],
+    overview: live.overview,
+    optionChain: live.optionChain,
+    indexViews: [{
+      symbol: live.instrument.symbol,
+      spot,
+      changePct,
+      pcr: analytics.pcrOi,
+      atmIv: analytics.atmIv,
+      buildUp: "Live OI snapshot",
+    }],
+    fiiDii: {
+      fiiCash: -1240,
+      diiCash: 1870,
+      indexFutures: "Long +6%",
+      indexOptions: "Put hedge elevated",
+    },
+    mode: live.mode,
+    dataSource: live.source,
+    marketStatus: live.marketStatus,
+    expiry: live.expiry,
+  };
+};
+
+const resolveBootstrapPayload = async (body: Record<string, unknown>) => {
+  const symbol = String(body.instrument || body.symbol || "NIFTY");
+  const expiry = body.expiry ? String(body.expiry) : undefined;
+  try {
+    return await buildLiveBootstrapPayload(symbol, expiry);
+  } catch (error) {
+    console.warn(
+      "Live Upstox bootstrap fallback:",
+      error instanceof Error ? error.message : String(error),
+    );
+    return buildDemoBootstrapPayload();
+  }
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -400,32 +477,8 @@ serve(async (req) => {
       action === "dashboard_overall_market" ||
       action === "options_dashboard"
     ) {
-      return envelope(action, requestId, {
-        instruments: [
-          demoOverview.instrument,
-          {
-            symbol: "BANKNIFTY",
-            name: "Nifty Bank Index Options",
-            lotSize: 15,
-            expiry: "2026-05-28",
-            spot: 50182.4,
-            previousClose: 50014.6,
-            snapshotTs: demoOverview.instrument.snapshotTs,
-          },
-        ],
-        overview: demoOverview,
-        indexViews: [
-          { symbol: "NIFTY", spot: 22842.25, changePct: 0.6, pcr: 0.94, atmIv: 15.6, buildUp: "Long Build Up" },
-          { symbol: "BANKNIFTY", spot: 50182.4, changePct: 0.34, pcr: 1.08, atmIv: 18.4, buildUp: "Short Covering" },
-        ],
-        fiiDii: {
-          fiiCash: -1240,
-          diiCash: 1870,
-          indexFutures: "Long +6%",
-          indexOptions: "Put hedge elevated",
-        },
-        mode: "demo",
-      });
+      const payload = await resolveBootstrapPayload(body as Record<string, unknown>);
+      return envelope(action, requestId, payload);
     }
 
     if (action === "dashboard_activity") {
@@ -467,6 +520,46 @@ serve(async (req) => {
       action === "technicals" ||
       action === "build_up"
     ) {
+      const symbol = String(body.instrument || "NIFTY");
+      try {
+        const live = await resolveLiveMarketBundle(symbol, body.expiry ? String(body.expiry) : undefined);
+        const analytics = live.overview.chain as Record<string, unknown>;
+        return envelope(action, requestId, {
+          instrument: live.instrument,
+          analytics,
+          snapshotTs: live.instrument.snapshotTs,
+          qualityFlags: analytics.qualityFlags ?? [],
+          tabs: ["overview", "option_chain", "combined_oi", "technicals", "build_up", "quick_trades"],
+          optionChain: live.optionChain,
+          combinedOi: live.optionChain
+            .filter((row) => row.type === "CE" || row.type === "PE")
+            .reduce((acc: Array<Record<string, unknown>>, row) => {
+              const strike = Number(row.strike);
+              const existing = acc.find((item) => Number(item.strike) === strike);
+              if (!existing) {
+                acc.push({
+                  strike,
+                  callOi: row.type === "CE" ? Number(row.oi ?? 0) : 0,
+                  putOi: row.type === "PE" ? Number(row.oi ?? 0) : 0,
+                });
+                return acc;
+              }
+              if (row.type === "CE") existing.callOi = Number(row.oi ?? 0);
+              if (row.type === "PE") existing.putOi = Number(row.oi ?? 0);
+              return acc;
+            }, []),
+          mode: live.mode,
+          dataSource: live.source,
+          marketStatus: live.marketStatus,
+          expiry: live.expiry,
+        });
+      } catch (error) {
+        console.warn(
+          "Live Upstox contract detail fallback:",
+          error instanceof Error ? error.message : String(error),
+        );
+      }
+
       return envelope(action, requestId, {
         instrument: demoOverview.instrument,
         analytics: demoOverview.chain,
@@ -734,14 +827,29 @@ serve(async (req) => {
     }
 
     if (action === "upstox_fetch_live") {
-      // Mock live data routing
-      // Real implementation would attach access token and forward to Upstox API
-      return envelope(action, requestId, {
-        source: "upstox_live_proxy",
-        data: {
-          message: "Live fetching proxy scaffolded. Waiting for valid token to proxy requests to api.upstox.com",
-        },
-      });
+      try {
+        const live = await resolveLiveMarketBundle(
+          String(body.instrument || body.symbol || "NIFTY"),
+          body.expiry ? String(body.expiry) : undefined,
+        );
+        return envelope(action, requestId, {
+          source: live.source,
+          mode: live.mode,
+          marketStatus: live.marketStatus,
+          expiry: live.expiry,
+          instrument: live.instrument,
+          optionChain: live.optionChain,
+          overview: live.overview,
+        });
+      } catch (error) {
+        return errorEnvelope(
+          action,
+          requestId,
+          "UPSTOX_FETCH_FAILED",
+          error instanceof Error ? error.message : String(error),
+          502,
+        );
+      }
     }
 
     return errorEnvelope(

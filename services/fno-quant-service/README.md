@@ -4,24 +4,16 @@ FastAPI service intended to run on the same VPS pattern as Trading Agents. It ow
 
 The MVP starts in demo mode and returns deterministic NIFTY data.
 
-## Upstox sandbox configuration
+## Upstox Analytics Token
 
-Keep Upstox credentials in the process environment only. Do not expose them
-through Vite or commit them to git.
+Copy `.env.example` to `.env` and set `UPSTOX_ANALYTICS_TOKEN` from the Upstox Developer Apps → Analytics tab. Never commit `.env`.
 
 ```bash
-UPSTOX_ENV=sandbox
-UPSTOX_CLIENT_ID=
-UPSTOX_CLIENT_SECRET=
-UPSTOX_REDIRECT_URI=https://saksham-experiments.com/fno-copilot
-UPSTOX_ACCESS_TOKEN=
+UPSTOX_ENV=production
+UPSTOX_ANALYTICS_TOKEN=<token>
 ```
 
-**OAuth note:** FnO Co-Pilot is deployed only inside the portfolio at `/fno-copilot`. The retired standalone `fno-copilot.vercel.app` URL must not be used as an Upstox redirect. See `docs/FNO_COPILOT_DEPLOYMENT.md`.
-
-`UPSTOX_CLIENT_ID` is the Upstox API Key. `UPSTOX_CLIENT_SECRET` is the Upstox
-API Secret. `UPSTOX_ACCESS_TOKEN` can be used for sandbox market-data
-experiments until the OAuth callback and token refresh flow are implemented.
+When the token is set, `mode=live` (or `auto`) uses Upstox; otherwise the service falls back to demo data.
 
 ## Local run
 

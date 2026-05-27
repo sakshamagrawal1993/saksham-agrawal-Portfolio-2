@@ -1,5 +1,5 @@
 import { supabase } from '../../lib/supabaseClient';
-import type { UserMode } from './types';
+import type { Instrument, MarketOverview, OptionQuote } from './types';
 
 export const FNO_COPILOT_FUNCTION = 'fno-copilot-proxy';
 
@@ -28,6 +28,11 @@ export type FnOCopilotEnvelope<T> = {
 
 export type FnOCopilotBootstrapData = {
   mode?: string;
+  dataSource?: string;
+  marketStatus?: string;
+  expiry?: string;
+  instrument?: Record<string, unknown>;
+  optionChain?: Array<Record<string, unknown>>;
   overview?: Record<string, unknown>;
 };
 
