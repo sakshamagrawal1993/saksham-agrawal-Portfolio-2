@@ -269,6 +269,85 @@ const requireServiceSecret = (req: Request) => {
   return req.headers.get("x-fno-copilot-secret") === expected;
 };
 
+const FNO_AI_ASK_WEBHOOK_URL =
+  Deno.env.get("FNO_COPILOT_ASK_AI_WEBHOOK_URL") ||
+  "https://n8n.saksham-experiments.com/webhook/fno-copilot-ai-ask";
+const FNO_AI_ASK_WEBHOOK_SECRET =
+  Deno.env.get("FNO_COPILOT_ASK_AI_WEBHOOK_SECRET") ||
+  Deno.env.get("N8N_WEBHOOK_SECRET") ||
+  "";
+
+const normalizeN8nBody = (payload: unknown) => {
+  if (Array.isArray(payload)) return payload[0] ?? {};
+  if (payload && typeof payload === "object") return payload as Record<string, unknown>;
+  return {};
+};
+
+const callAskAiWorkflow = async (
+  body: Record<string, unknown>,
+  requestId: string,
+) => {
+  const timeoutMs = Number(Deno.env.get("FNO_COPILOT_ASK_AI_TIMEOUT_MS") || "15000");
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), Number.isFinite(timeoutMs) ? timeoutMs : 15000);
+
+  try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "x-request-id": requestId,
+    };
+    if (FNO_AI_ASK_WEBHOOK_SECRET) {
+      headers["x-n8n-secret"] = FNO_AI_ASK_WEBHOOK_SECRET;
+    }
+
+    const response = await fetch(FNO_AI_ASK_WEBHOOK_URL, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        workflow_type: "ask_ai",
+        message: String(body.message || ""),
+        question: String(body.message || ""),
+        instrument: String(body.instrument || "NIFTY"),
+        expiry: String(body.expiry || ""),
+        request_id: requestId,
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "");
+      throw new Error(`Ask AI n8n returned ${response.status}: ${errorText.slice(0, 300)}`);
+    }
+
+    const normalized = normalizeN8nBody(await response.json());
+    const artifactPayload =
+      normalized.artifact && typeof normalized.artifact === "object"
+        ? (normalized.artifact as Record<string, unknown>)
+        : normalized;
+
+    const assistantMessage =
+      String(
+        artifactPayload.answer ||
+          normalized.answer ||
+          normalized.assistant_message ||
+          "I reviewed your Ask AI query and prepared an educational explanation.",
+      );
+
+    return {
+      state: "ready",
+      assistant_message: assistantMessage,
+      missing_inputs: [],
+      artifact: {
+        type: String(artifactPayload.artifact_type || artifactPayload.type || "answer"),
+        title: String(artifactPayload.title || "Contextual explanation"),
+        status: String(artifactPayload.status || "ready"),
+      },
+    };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -480,6 +559,18 @@ serve(async (req) => {
       action === "ai_create_algo_strategy" ||
       action === "ai_create_screener"
     ) {
+      if (action === "ai_ask") {
+        try {
+          const askPayload = await callAskAiWorkflow(body as Record<string, unknown>, requestId);
+          return envelope(action, requestId, askPayload);
+        } catch (error) {
+          console.warn(
+            "Ask AI workflow fallback:",
+            error instanceof Error ? error.message : String(error),
+          );
+        }
+      }
+
       const mode =
         action === "ai_ask"
           ? "ask_ai"

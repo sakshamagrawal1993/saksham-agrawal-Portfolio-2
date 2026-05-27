@@ -43,22 +43,11 @@ type DetailTab = 'overview' | 'option-chain' | 'combined-oi' | 'technicals' | 'b
 type DirectionKey = 'up' | 'down' | 'rangebound' | 'volatile';
 type RiskProfile = 'Defensive' | 'Neutral' | 'Aggressive';
 type ContractSummary = DemoContractSummary;
-type AgentArtifactMode = Exclude<UserMode, 'ask-ai'>;
-
 type AgentHistoryItem = {
   id: string;
   mode: UserMode;
   title: string;
   preview: string;
-  createdAt: string;
-};
-
-type AgentArtifactItem = {
-  id: string;
-  mode: AgentArtifactMode;
-  title: string;
-  description: string;
-  meta: string;
   createdAt: string;
 };
 
@@ -184,33 +173,6 @@ const starterChatHistory: AgentHistoryItem[] = [
     mode: 'ask-ai',
     title: 'Why does max pain matter?',
     preview: 'Explained max pain as expiry positioning context, not a signal by itself.',
-    createdAt: 'Earlier'
-  }
-];
-
-const starterArtifactHistory: AgentArtifactItem[] = [
-  {
-    id: 'artifact-range',
-    mode: 'create-trade',
-    title: 'NIFTY Range Credit Trade',
-    description: 'Defined-risk range trade drafted from OI walls and IV state.',
-    meta: 'Trade · POP 62%',
-    createdAt: 'Earlier'
-  },
-  {
-    id: 'artifact-algo',
-    mode: 'create-strategy',
-    title: 'Range and Liquidity Algo',
-    description: 'Reusable rules with liquidity filters, entry conditions, and exits.',
-    meta: 'Algo · 4 checks',
-    createdAt: 'Earlier'
-  },
-  {
-    id: 'artifact-screener',
-    mode: 'screener',
-    title: 'High IV Liquid Screener',
-    description: 'Saved scan for IV rank, OI change, spread, and moneyness.',
-    meta: 'Screen · 18 rows',
     createdAt: 'Earlier'
   }
 ];
@@ -343,7 +305,6 @@ function FnOCopilotApp() {
   const [messages, setMessages] = React.useState<ChatMessage[]>(createInitialMessages);
   const [submittedModes, setSubmittedModes] = React.useState<Partial<Record<UserMode, boolean>>>({});
   const [chatHistory, setChatHistory] = React.useState<AgentHistoryItem[]>(starterChatHistory);
-  const [artifactHistory, setArtifactHistory] = React.useState<AgentArtifactItem[]>(starterArtifactHistory);
   const [input, setInput] = React.useState('');
   const [algoConfig, setAlgoConfig] = React.useState<AlgoStrategyConfig>(() => createDefaultAlgoConfig(defaultContract));
   const [, setDataBackendStatus] = React.useState<DataBackendStatus>(
@@ -447,7 +408,7 @@ function FnOCopilotApp() {
     const nextDraft = draftFromChat(mode, [...messages, userMessage], allTrades, overview);
     let assistantText = assistantReply(nextDraft);
 
-    if (isFnOCopilotEdgeEnabled()) {
+    if (mode === 'ask-ai' && isFnOCopilotEdgeEnabled()) {
       try {
         const edgeReply = await fetchFnOCopilotChatReply({
           mode,
@@ -482,28 +443,6 @@ function FnOCopilotApp() {
       },
       ...current
     ].slice(0, 8));
-    if (mode !== 'ask-ai') {
-      const artifactMode = mode as AgentArtifactMode;
-      setArtifactHistory((current) => [
-        {
-          id: `artifact-${Date.now()}`,
-          mode: artifactMode,
-          title: nextDraft.title,
-          description:
-            nextDraft.status === 'ready'
-              ? 'Ready artifact generated from chat inputs.'
-              : `Needs ${nextDraft.missingInputs.slice(0, 2).join(', ') || 'more detail'}.`,
-          meta:
-            artifactMode === 'create-trade' && nextDraft.selectedTrade
-              ? `${nextDraft.selectedTrade.strategy} · Score ${nextDraft.selectedTrade.score}`
-              : artifactMode === 'create-strategy'
-                ? `Algo · ${nextDraft.entryRules.length + nextDraft.exitRules.length} rules`
-                : `Screen · ${nextDraft.filters.length} filters`,
-          createdAt: timeLabel
-        },
-        ...current
-      ].slice(0, 8));
-    }
     setSubmittedModes((current) => ({ ...current, [mode]: true }));
     setMessages((current) => [...current, userMessage, assistantMessage]);
     setInput('');
@@ -537,12 +476,9 @@ function FnOCopilotApp() {
             <AgentModeWorkspace
               mode={mode}
               setMode={setMode}
-              activeContract={activeContract}
-              overview={overview}
               draft={draft}
               messages={messages}
               chatHistory={chatHistory}
-              artifactHistory={artifactHistory}
               input={input}
               setInput={setInput}
               sendMessage={sendMessage}
@@ -681,12 +617,9 @@ function StandardModeNavStrip({
 function AgentModeWorkspace({
   mode,
   setMode,
-  activeContract,
-  overview,
   draft,
   messages,
   chatHistory,
-  artifactHistory,
   input,
   setInput,
   sendMessage,
@@ -700,12 +633,9 @@ function AgentModeWorkspace({
 }: {
   mode: UserMode;
   setMode: (mode: UserMode) => void;
-  activeContract: ContractSummary;
-  overview: ReturnType<typeof createMarketContext>['overview'];
   draft: ReturnType<typeof draftFromChat>;
   messages: ChatMessage[];
   chatHistory: AgentHistoryItem[];
-  artifactHistory: AgentArtifactItem[];
   input: string;
   setInput: (value: string) => void;
   sendMessage: () => void;
@@ -747,12 +677,6 @@ function AgentModeWorkspace({
           </div>
         </div>
         <button className="agent-new-chat" onClick={onNewChat}><span>+</span> New chat</button>
-        <nav className="agent-sidebar-nav" aria-label="Agent shortcuts">
-          <button className={mode === 'ask-ai' ? 'active' : ''} onClick={() => setMode('ask-ai')}><Bot size={15} /> Ask AI</button>
-          <button className={mode === 'create-trade' ? 'active' : ''} onClick={() => setMode('create-trade')}><Target size={15} /> Create Trades</button>
-          <button className={mode === 'create-strategy' ? 'active' : ''} onClick={() => setMode('create-strategy')}><BrainCircuit size={15} /> Create Algo</button>
-          <button className={mode === 'screener' ? 'active' : ''} onClick={() => setMode('screener')}><ListFilter size={15} /> Option Screener</button>
-        </nav>
         <div className="agent-sidebar-section">
           <p><Clock3 size={13} /> Recent chats</p>
           <div className="agent-history-list">
@@ -764,28 +688,6 @@ function AgentModeWorkspace({
             ))}
           </div>
         </div>
-        <div className="agent-sidebar-section">
-          <p><Layers3 size={13} /> Artifacts</p>
-          <div className="agent-history-list">
-            {artifactHistory.map((item) => (
-              <button key={item.id} onClick={() => setMode(item.mode)}>
-                <strong>{item.title}</strong>
-                <span>{item.meta} · {item.createdAt}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="agent-market-card">
-          <p>Market context</p>
-          <strong>{activeContract.symbol}</strong>
-          <span>{overview.regime} · IV {overview.chain.atmIv}%</span>
-          <div className="agent-context-bars">
-            <MiniBar label="PCR" value={overview.chain.pcrOi} max={2} />
-            <MiniBar label="IV" value={overview.chain.atmIv} max={120} />
-            <MiniBar label="Liq" value={overview.chain.liquidityScore} max={100} />
-          </div>
-        </div>
-        <div className="agent-sidebar-footer">FnO Co-Pilot · Educational demo</div>
       </aside>
 
       <section className={`agent-stage ${showArtifact ? 'with-artifact' : ''}`}>
@@ -807,13 +709,6 @@ function AgentModeWorkspace({
             </div>
           )}
 
-          <div className="agent-context-strip" aria-label="Current market context">
-            <span><b>Mode</b><strong>{agentModeLabels[mode]}</strong></span>
-            <span><b>Underlying</b><strong>{activeContract.symbol}</strong></span>
-            <span><b>Regime</b><strong>{overview.regime}</strong></span>
-            <span><b>PCR</b><strong>{overview.chain.pcrOi}</strong></span>
-          </div>
-
           <div className="agent-prompt-card">
             <input
               value={input}
@@ -825,7 +720,6 @@ function AgentModeWorkspace({
             />
             <div className="agent-prompt-tools">
               <button aria-label="Attach context">+</button>
-              <span>{activeContract.symbol}</span>
               <button onClick={sendMessage}><Send size={16} /></button>
             </div>
           </div>
@@ -895,17 +789,6 @@ function AgentModeWorkspace({
         )}
       </section>
     </div>
-  );
-}
-
-function MiniBar({ label, value, max }: { label: string; value: number; max: number }) {
-  const width = Math.max(4, Math.min(100, (value / max) * 100));
-  return (
-    <span>
-      <b>{label}</b>
-      <i><em style={{ width: `${width}%` }} /></i>
-      <strong>{round(value, 1)}</strong>
-    </span>
   );
 }
 
