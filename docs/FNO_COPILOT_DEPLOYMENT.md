@@ -97,3 +97,38 @@ Apply migrations if not already applied:
 ```bash
 npx supabase db push
 ```
+
+## Agent mode (session + chat + n8n orchestrator)
+
+Production Agent mode uses:
+
+| Component | Path / webhook |
+| --- | --- |
+| Session bootstrap | `{SUPABASE_URL}/functions/v1/fno-copilot-session-init` |
+| Multi-turn chat | `{SUPABASE_URL}/functions/v1/fno-copilot-chat` |
+| n8n orchestrator | `https://n8n.saksham-experiments.com/webhook/fno-copilot-orchestrator` |
+
+Deploy edge functions:
+
+```bash
+npx supabase functions deploy fno-copilot-session-init
+npx supabase functions deploy fno-copilot-chat
+```
+
+`supabase/config.toml` sets `verify_jwt = false` for both functions so the browser can call them with the Supabase publishable key.
+
+Canonical production n8n workflow IDs (see `n8n-workflows/docs/FNO_COPILOT_PRODUCTION_WORKFLOWS.md`):
+
+- Orchestrator: `yyp51iatyjXavk9h`
+- Create algo: `Rxrupl24ohSIvzZS`
+- Create trade: `0m9b9f6wQ204M3CM`
+- Screener: `jn2SFm0wJGvFveHc`
+- Ask AI: `QsxXQETqoLgERuJy`
+
+Smoke test (production):
+
+```bash
+node scripts/fno_prod_agent_e2e.mjs
+```
+
+Or open `https://saksham-experiments.com/fno-copilot?fno_debug=1`, switch to **Agent** → **Create Algo**, and confirm `fno-copilot-session-init` / `fno-copilot-chat` return HTTP 200.

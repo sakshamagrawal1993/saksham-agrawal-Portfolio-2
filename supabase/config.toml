@@ -412,3 +412,11 @@ entrypoint = "./functions/ai-gating-evaluate/index.ts"
 enabled = true
 verify_jwt = false
 entrypoint = "./functions/fno-copilot-proxy/index.ts"
+
+[functions.fno-copilot-chat]
+verify_jwt = false
+entrypoint = "./functions/fno-copilot-chat/index.ts"
+
+[functions.fno-copilot-session-init]
+verify_jwt = false
+entrypoint = "./functions/fno-copilot-session-init/index.ts"
