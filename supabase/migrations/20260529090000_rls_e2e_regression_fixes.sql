@@ -2,6 +2,7 @@
 -- Keep user-owned Health Twin writes private, while allowing signed-in users to
 -- view dependent data for twins that have explicitly been marked featured.
 
+drop policy if exists "featured_health_personal_details_select" on public.health_personal_details;
 create policy "featured_health_personal_details_select"
 on public.health_personal_details
 for select
@@ -15,6 +16,7 @@ using (
   )
 );
 
+drop policy if exists "featured_health_summary_select" on public.health_summary;
 create policy "featured_health_summary_select"
 on public.health_summary
 for select
@@ -28,6 +30,7 @@ using (
   )
 );
 
+drop policy if exists "featured_health_lab_parameters_select" on public.health_lab_parameters;
 create policy "featured_health_lab_parameters_select"
 on public.health_lab_parameters
 for select
@@ -41,6 +44,7 @@ using (
   )
 );
 
+drop policy if exists "featured_health_wearable_parameters_select" on public.health_wearable_parameters;
 create policy "featured_health_wearable_parameters_select"
 on public.health_wearable_parameters
 for select
@@ -54,6 +58,7 @@ using (
   )
 );
 
+drop policy if exists "featured_health_scores_select" on public.health_scores;
 create policy "featured_health_scores_select"
 on public.health_scores
 for select
@@ -67,6 +72,7 @@ using (
   )
 );
 
+drop policy if exists "featured_health_recommendations_select" on public.health_recommendations;
 create policy "featured_health_recommendations_select"
 on public.health_recommendations
 for select
@@ -80,6 +86,7 @@ using (
   )
 );
 
+drop policy if exists "featured_health_sources_select" on public.health_sources;
 create policy "featured_health_sources_select"
 on public.health_sources
 for select
@@ -93,6 +100,7 @@ using (
   )
 );
 
+drop policy if exists "featured_health_daily_aggregates_select" on public.health_daily_aggregates;
 create policy "featured_health_daily_aggregates_select"
 on public.health_daily_aggregates
 for select
@@ -106,6 +114,7 @@ using (
   )
 );
 
+drop policy if exists "auth_insert_own_health_daily_aggregates" on public.health_daily_aggregates;
 create policy "auth_insert_own_health_daily_aggregates"
 on public.health_daily_aggregates
 for insert
@@ -119,6 +128,7 @@ with check (
   )
 );
 
+drop policy if exists "auth_update_own_health_daily_aggregates" on public.health_daily_aggregates;
 create policy "auth_update_own_health_daily_aggregates"
 on public.health_daily_aggregates
 for update
@@ -140,6 +150,7 @@ with check (
   )
 );
 
+drop policy if exists "featured_health_wellness_programs_select" on public.health_wellness_programs;
 create policy "featured_health_wellness_programs_select"
 on public.health_wellness_programs
 for select

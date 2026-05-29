@@ -1,6 +1,7 @@
 -- Fix storage RLS gaps after public policy hardening.
 -- InsightsLM uploads use upsert:true in the client, which requires UPDATE on storage.objects.
 
+drop policy if exists "Users can update their own files" on storage.objects;
 create policy "Users can update their own files"
 on storage.objects
 for update
