@@ -275,6 +275,9 @@ const requireServiceSecret = (req: Request) => {
 const FNO_AI_ASK_WEBHOOK_URL =
   Deno.env.get("FNO_COPILOT_ASK_AI_WEBHOOK_URL") ||
   "https://n8n.saksham-experiments.com/webhook/fno-copilot-ai-ask";
+const FNO_AI_CREATE_ALGO_WEBHOOK_URL =
+  Deno.env.get("FNO_COPILOT_CREATE_ALGO_WEBHOOK_URL") ||
+  "https://n8n.saksham-experiments.com/webhook/fno-copilot-create-algo-strategy-chat";
 const FNO_AI_ASK_WEBHOOK_SECRET =
   Deno.env.get("FNO_COPILOT_ASK_AI_WEBHOOK_SECRET") ||
   Deno.env.get("N8N_WEBHOOK_SECRET") ||
@@ -346,6 +349,47 @@ const callAskAiWorkflow = async (
         status: String(artifactPayload.status || "ready"),
       },
     };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
+const callAiCreateAlgoStrategyWorkflow = async (
+  body: Record<string, unknown>,
+  requestId: string,
+) => {
+  const timeoutMs = Number(Deno.env.get("FNO_COPILOT_ASK_AI_TIMEOUT_MS") || "20000");
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), Number.isFinite(timeoutMs) ? timeoutMs : 20000);
+
+  try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "x-request-id": requestId,
+    };
+    if (FNO_AI_ASK_WEBHOOK_SECRET) {
+      headers["x-n8n-secret"] = FNO_AI_ASK_WEBHOOK_SECRET;
+    }
+
+    const response = await fetch(FNO_AI_CREATE_ALGO_WEBHOOK_URL, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        sessionId: body.sessionId || body.userId || "anonymous",
+        chatInput: String(body.message || ""),
+        currentArtifact: body.currentArtifact || null,
+        request_id: requestId,
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "");
+      throw new Error(`Upstream n8n error: ${response.status} ${errorText.slice(0, 300)}`);
+    }
+
+    const resBody = await response.json();
+    return normalizeN8nBody(resBody);
   } finally {
     clearTimeout(timeoutId);
   }
@@ -662,6 +706,31 @@ serve(async (req) => {
         } catch (error) {
           console.warn(
             "Ask AI workflow fallback:",
+            error instanceof Error ? error.message : String(error),
+          );
+        }
+      }
+
+      if (action === "ai_create_algo_strategy") {
+        try {
+          const payload = await callAiCreateAlgoStrategyWorkflow(body as Record<string, unknown>, requestId);
+          const artifactPayload = payload.updated_artifact_payload || payload.strategy || payload.artifact || payload;
+          const status = payload.status || artifactPayload?.status || "needs_input";
+          const msg = payload.assistant_reply || payload.assistant_message || "I have drafted the strategy based on your inputs. Please review it.";
+          
+          return envelope(action, requestId, {
+            assistant_message: msg,
+            state: status,
+            artifact: {
+              type: "algo_strategy",
+              title: artifactPayload?.name || artifactPayload?.title || "Draft algo strategy",
+              status: status,
+              payload: artifactPayload
+            }
+          });
+        } catch (error) {
+          console.warn(
+            "Create Algo AI workflow fallback:",
             error instanceof Error ? error.message : String(error),
           );
         }
