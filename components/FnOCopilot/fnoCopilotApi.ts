@@ -1,5 +1,5 @@
 import { supabase } from '../../lib/supabaseClient';
-import type { Instrument, MarketOverview, OptionQuote } from './types';
+import type { UserMode } from './types';
 
 export const FNO_COPILOT_FUNCTION = 'fno-copilot-proxy';
 
@@ -34,6 +34,7 @@ export type FnOCopilotBootstrapData = {
   instrument?: Record<string, unknown>;
   optionChain?: Array<Record<string, unknown>>;
   overview?: Record<string, unknown>;
+  marketInformation?: Record<string, unknown>;
 };
 
 export type FnOCopilotChatData = {
@@ -84,8 +85,12 @@ export const invokeFnOCopilot = async <T,>(
   return envelope.data as T;
 };
 
-export const fetchFnOCopilotBootstrap = () =>
-  invokeFnOCopilot<FnOCopilotBootstrapData>({ action: 'bootstrap' });
+export const fetchFnOCopilotBootstrap = (params?: { instrument?: string; expiry?: string }) =>
+  invokeFnOCopilot<FnOCopilotBootstrapData>({
+    action: 'bootstrap',
+    ...(params?.instrument ? { instrument: params.instrument } : {}),
+    ...(params?.expiry ? { expiry: params.expiry } : {}),
+  });
 
 export const fetchFnOCopilotChatReply = (params: {
   mode: UserMode;
@@ -99,3 +104,90 @@ export const fetchFnOCopilotChatReply = (params: {
     instrument: params.instrument,
     expiry: params.expiry,
   });
+
+export type AgentChatData = {
+  assistant_reply: string;
+  artifact_payload: Record<string, unknown>;
+  artifact_status: string;
+  artifact_instruction?: {
+    operation?: 'merge' | 'replace' | 'json_patch';
+    status?: string;
+    missing_inputs?: string[];
+    updated_artifact_payload?: Record<string, unknown>;
+    validation_flags?: Array<Record<string, unknown>>;
+  };
+};
+
+export type FnOWorkflowType =
+  | 'ask_ai'
+  | 'create_trade'
+  | 'create_algo_strategy'
+  | 'option_screener';
+
+export type AgentSessionInitData = {
+  session_id: string;
+  workflow_type: FnOWorkflowType;
+  artifact_id: string;
+  artifact_type: 'answer' | 'trade' | 'algo_strategy' | 'screener';
+  artifact_payload: Record<string, unknown>;
+  artifact_status: string;
+};
+
+const userModeToWorkflowType = (mode: UserMode): FnOWorkflowType => {
+  switch (mode) {
+    case 'ask-ai':
+      return 'ask_ai';
+    case 'create-strategy':
+      return 'create_algo_strategy';
+    case 'screener':
+      return 'option_screener';
+    case 'create-trade':
+    default:
+      return 'create_trade';
+  }
+};
+
+export const initAgentSession = async (params: {
+  mode: UserMode;
+  user_id?: string;
+  symbol?: string;
+  screen_context?: string;
+}): Promise<AgentSessionInitData> => {
+  const body = {
+    workflow_type: userModeToWorkflowType(params.mode),
+    user_id: params.user_id,
+    symbol: params.symbol,
+    screen_context: params.screen_context,
+  };
+  const { data, error } = await supabase.functions.invoke('fno-copilot-session-init', { body });
+  if (error) {
+    throw error;
+  }
+  if (!data?.ok) {
+    throw new Error(data?.error || 'Agent session init failed');
+  }
+  return data as AgentSessionInitData;
+};
+
+export const sendAgentChat = async (params: {
+  session_id: string;
+  message: string;
+  mode?: UserMode;
+  user_id?: string;
+}): Promise<AgentChatData> => {
+  const body = {
+    session_id: params.session_id,
+    message: params.message,
+    workflow_type: params.mode ? userModeToWorkflowType(params.mode) : undefined,
+    user_id: params.user_id,
+  };
+  const { data, error } = await supabase.functions.invoke('fno-copilot-chat', { body });
+  if (error) {
+    throw error;
+  }
+  if (!data?.ok) {
+    throw new Error(data?.error || 'Agent chat request failed');
+  }
+  return data as AgentChatData;
+};
+

@@ -3,12 +3,20 @@ const UPSTOX_API_BASE = "https://api.upstox.com/v2";
 const INSTRUMENT_KEYS: Record<string, string> = {
   NIFTY: "NSE_INDEX|Nifty 50",
   BANKNIFTY: "NSE_INDEX|Nifty Bank",
+  FINNIFTY: "NSE_INDEX|Nifty Fin Service",
+  MIDCPNIFTY: "NSE_INDEX|NIFTY MID SELECT",
+  NIFTYNEXT50: "NSE_INDEX|Nifty Next 50",
 };
 
 const INSTRUMENT_META: Record<string, { name: string; lotSize: number }> = {
   NIFTY: { name: "Nifty 50 Index Options", lotSize: 65 },
   BANKNIFTY: { name: "Nifty Bank Index Options", lotSize: 30 },
+  FINNIFTY: { name: "Nifty Financial Services Index Options", lotSize: 65 },
+  MIDCPNIFTY: { name: "Nifty Midcap Select Index Options", lotSize: 120 },
+  NIFTYNEXT50: { name: "Nifty Next 50 Index Options", lotSize: 25 },
 };
+
+const instrumentKeyCache = new Map<string, string>();
 
 type UpstoxChainRow = {
   strike_price?: number;
@@ -25,6 +33,7 @@ export type LiveMarketBundle = {
   instrument: Record<string, unknown>;
   optionChain: Record<string, unknown>[];
   overview: Record<string, unknown>;
+  marketInformation?: Record<string, unknown>;
 };
 
 export const getUpstoxAnalyticsToken = () =>
@@ -90,6 +99,160 @@ const upstoxGet = async (token: string, path: string, params?: Record<string, st
     );
   }
   return payload;
+};
+
+const scoreInstrumentMatch = (symbol: string, row: Record<string, unknown>) => {
+  const normalized = symbol.toUpperCase();
+  const tradingSymbol = String(row.trading_symbol ?? row.tradingsymbol ?? "").toUpperCase();
+  const shortName = String(row.short_name ?? "").toUpperCase();
+  const symbolValue = String(row.symbol ?? row.underlying_symbol ?? "").toUpperCase();
+  const segment = String(row.segment ?? "").toUpperCase();
+  const instrumentType = String(row.instrument_type ?? "").toUpperCase();
+  let score = 0;
+  if (tradingSymbol === normalized) score += 100;
+  if (symbolValue === normalized) score += 90;
+  if (shortName === normalized) score += 60;
+  if (segment === "NSE_EQ") score += 30;
+  if (instrumentType === "EQ" || instrumentType === "EQUITY") score += 20;
+  if (row.instrument_key) score += 10;
+  return score;
+};
+
+const searchInstruments = async (
+  token: string,
+  query: string,
+  params: Record<string, string>,
+) => {
+  const payload = await upstoxGet(token, "/instruments/search", { query, ...params });
+  return Array.isArray(payload.data) ? payload.data as Array<Record<string, unknown>> : [];
+};
+
+const resolveInstrumentKey = async (token: string, symbol: string) => {
+  const normalized = symbol.toUpperCase();
+  const staticKey = INSTRUMENT_KEYS[normalized];
+  if (staticKey) return staticKey;
+  const cached = instrumentKeyCache.get(normalized);
+  if (cached) return cached;
+
+  const eqMatches = await searchInstruments(token, normalized, {
+    exchanges: "NSE",
+    segments: "EQ",
+  });
+  const sorted = eqMatches.sort((a, b) => scoreInstrumentMatch(normalized, b) - scoreInstrumentMatch(normalized, a));
+  if (sorted.length && scoreInstrumentMatch(normalized, sorted[0]) > 0) {
+    const resolved = String(sorted[0].instrument_key ?? "");
+    if (resolved) {
+      instrumentKeyCache.set(normalized, resolved);
+      return resolved;
+    }
+  }
+
+  const foMatches = await searchInstruments(token, normalized, {
+    exchanges: "NSE",
+    segments: "FO",
+  });
+  const futureMatch = foMatches.find((row) =>
+    String(row.underlying_symbol ?? "").toUpperCase() === normalized && row.underlying_key
+  );
+  if (futureMatch?.underlying_key) {
+    const resolved = String(futureMatch.underlying_key);
+    instrumentKeyCache.set(normalized, resolved);
+    return resolved;
+  }
+
+  throw new Error(`Unsupported symbol: ${symbol}`);
+};
+
+const optionalUpstoxGet = async (
+  token: string,
+  path: string,
+  params?: Record<string, string>,
+) => {
+  try {
+    const payload = await upstoxGet(token, path, params);
+    return { ok: true as const, data: payload.data };
+  } catch (error) {
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+};
+
+const fetchMarketInformation = async (
+  token: string,
+  instrumentKey: string,
+  expiry: string,
+) => {
+  const date = new Date().toISOString().slice(0, 10);
+  const [pcr, maxPain, oi, changeOi, fii, dii] = await Promise.all([
+    optionalUpstoxGet(token, "/market/pcr", {
+      instrument_key: instrumentKey,
+      expiry,
+      date,
+      bucket_interval: "60",
+    }),
+    optionalUpstoxGet(token, "/market/max-pain", {
+      instrument_key: instrumentKey,
+      expiry,
+      date,
+      bucket_interval: "60",
+    }),
+    optionalUpstoxGet(token, "/market/oi", {
+      instrument_key: instrumentKey,
+      expiry,
+      date,
+    }),
+    optionalUpstoxGet(token, "/market/change-oi", {
+      instrument_key: instrumentKey,
+      expiry,
+      date,
+      interval: "1",
+    }),
+    optionalUpstoxGet(token, "/market/fii", {
+      data_type: "NSE_FO|INDEX_FUTURES,NSE_FO|INDEX_OPTIONS,NSE_EQ|CASH",
+      interval: "1D",
+    }),
+    optionalUpstoxGet(token, "/market/dii", {
+      data_type: "NSE_EQ|CASH",
+      interval: "1D",
+    }),
+  ]);
+
+  return {
+    asOfDate: date,
+    pcr,
+    maxPain,
+    oi,
+    changeOi,
+    fii,
+    dii,
+  };
+};
+
+const applyOfficialMarketInformation = (
+  chainAnalytics: Record<string, unknown>,
+  marketInformation: Record<string, unknown>,
+) => {
+  const pcrResult = marketInformation.pcr as { ok?: boolean; data?: Record<string, unknown> };
+  const maxPainResult = marketInformation.maxPain as { ok?: boolean; data?: Record<string, unknown> };
+  const oiResult = marketInformation.oi as { ok?: boolean; data?: Record<string, unknown> };
+
+  if (pcrResult?.ok && Number.isFinite(Number(pcrResult.data?.pcr))) {
+    chainAnalytics.pcrOi = Number(Number(pcrResult.data?.pcr).toFixed(2));
+  }
+  if (maxPainResult?.ok && Number.isFinite(Number(maxPainResult.data?.max_pain))) {
+    chainAnalytics.maxPain = Number(maxPainResult.data?.max_pain);
+  }
+  if (oiResult?.ok) {
+    const totalPuts = Number(oiResult.data?.total_puts ?? 0);
+    const totalCalls = Number(oiResult.data?.total_calls ?? 0);
+    if (totalCalls > 0) {
+      chainAnalytics.pcrOi = Number((totalPuts / totalCalls).toFixed(2));
+    }
+  }
+
+  return chainAnalytics;
 };
 
 const nearestExpiry = async (token: string, instrumentKey: string) => {
@@ -173,8 +336,7 @@ export const fetchLiveMarketBundle = async (
   const token = getUpstoxAnalyticsToken();
   if (!token) throw new Error("UPSTOX_ANALYTICS_TOKEN is not configured");
 
-  const instrumentKey = INSTRUMENT_KEYS[symbol.toUpperCase()];
-  if (!instrumentKey) throw new Error(`Unsupported symbol: ${symbol}`);
+  const instrumentKey = await resolveInstrumentKey(token, symbol);
 
   const resolvedExpiry = expiry || await nearestExpiry(token, instrumentKey);
   const payload = await upstoxGet(token, "/option/chain", {
@@ -209,7 +371,11 @@ export const fetchLiveMarketBundle = async (
     snapshotTs: quoteTs,
   };
 
-  const chainAnalytics = computeChainAnalytics(instrument, optionChain);
+  const marketInformation = await fetchMarketInformation(token, instrumentKey, resolvedExpiry);
+  const chainAnalytics = applyOfficialMarketInformation(
+    computeChainAnalytics(instrument, optionChain),
+    marketInformation,
+  );
   const statusPayload = await upstoxGet(token, "/market/status/NSE").catch(() => ({ data: { status: "unknown" } }));
   const marketStatus = String((statusPayload.data as Record<string, unknown> | undefined)?.status ?? "unknown");
 
@@ -221,6 +387,7 @@ export const fetchLiveMarketBundle = async (
     instrument,
     optionChain,
     overview: buildOverview(instrument, chainAnalytics),
+    marketInformation,
   };
 };
 
@@ -301,13 +468,23 @@ export const fetchLiveMarketFromQuantService = async (
     instrument,
     optionChain,
     overview: buildOverview(instrument, chainAnalytics),
+    marketInformation: (payload.market_information ?? payload.marketInformation ?? undefined) as Record<string, unknown> | undefined,
   };
 };
 
 export const resolveLiveMarketBundle = async (symbol = "NIFTY", expiry?: string) => {
   const quantUrl = Deno.env.get("FNO_QUANT_SERVICE_URL");
   if (quantUrl) {
-    return fetchLiveMarketFromQuantService(quantUrl, symbol, expiry);
+    try {
+      const bundle = await fetchLiveMarketFromQuantService(quantUrl, symbol, expiry);
+      if (bundle.marketInformation) return bundle;
+      console.warn("FnO quant service returned a stale payload without marketInformation; falling back to direct Upstox");
+    } catch (error) {
+      console.warn(
+        "FnO quant service unavailable, falling back to direct Upstox:",
+        error instanceof Error ? error.message : String(error),
+      );
+    }
   }
   return fetchLiveMarketBundle(symbol, expiry);
 };

@@ -16,8 +16,8 @@ export N8N_BASE_URL="https://n8n.saksham-experiments.com"
 export HEALTH_TWIN_CHAT_SECRET="<set-strong-secret>"
 export HEALTH_TWIN_LAB_SECRET="<set-strong-secret>"
 export AI_GATE_SECRET="<set-strong-secret>"
-export INSIGHTSLM_SOURCE_SECRET="<set-strong-secret>"
-export INSIGHTSLM_CHAT_SECRET="<set-strong-secret>"
+export INSIGHTSLM_SOURCE_SECRET="mTuhEe3JKWUxmUnG"   # must match n8n credential InsightsLm_Auth
+export INSIGHTSLM_CHAT_SECRET="mTuhEe3JKWUxmUnG"     # must match n8n credential InsightsLm_Auth
 export TRADING_AGENTS_SECRET="<set-strong-secret>"
 export MIND_COACH_SECRET="<set-strong-secret>"
 export FNO_COPILOT_SECRET="<set-strong-secret>"
@@ -95,17 +95,17 @@ Expected names should include:
 
 - Health Twin:
   - `N8N_HEALTH_TWIN_CHAT_WEBHOOK_URL`
-  - `N8N_HEALTH_TWIN_CHAT_WEBHOOK_SECRET`
+  - `N8N_HEALTH_TWIN_CHAT_WEBHOOK_SECRET` (must match n8n Health Twin chat credential — not `InsightsLm_Auth`)
   - `N8N_HEALTH_TWIN_LAB_WEBHOOK_URL`
-  - `N8N_HEALTH_TWIN_LAB_WEBHOOK_SECRET`
+  - `N8N_HEALTH_TWIN_LAB_WEBHOOK_SECRET` (uses `InsightsLm_Auth` in n8n)
 - AI Gate:
   - `AI_GATE_N8N_WEBHOOK_URL`
   - `AI_GATE_N8N_WEBHOOK_SECRET`
 - InsightsLM:
   - `INSIGHTSLM_SOURCE_WEBHOOK_URL`
-  - `INSIGHTSLM_SOURCE_WEBHOOK_SECRET`
+  - `INSIGHTSLM_SOURCE_WEBHOOK_SECRET` (**required** — do not rely on `N8N_WEBHOOK_SECRET` fallback unless it matches n8n `InsightsLm_Auth`)
   - `INSIGHTSLM_CHAT_WEBHOOK_URL`
-  - `INSIGHTSLM_CHAT_WEBHOOK_SECRET`
+  - `INSIGHTSLM_CHAT_WEBHOOK_SECRET` (**required** — same credential as source)
 - Trading Agents:
   - `TRADING_AGENTS_RUN_WEBHOOK_URL`
   - `TRADING_AGENTS_RECON_WEBHOOK_URL`

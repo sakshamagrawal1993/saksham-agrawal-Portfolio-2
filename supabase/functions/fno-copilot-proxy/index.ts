@@ -387,6 +387,7 @@ const buildLiveBootstrapPayload = async (symbol = "NIFTY", expiry?: string) => {
   const analytics = live.overview.chain as Record<string, unknown>;
 
   return {
+    instrument: live.instrument,
     instruments: [live.instrument],
     overview: live.overview,
     optionChain: live.optionChain,
@@ -408,6 +409,7 @@ const buildLiveBootstrapPayload = async (symbol = "NIFTY", expiry?: string) => {
     dataSource: live.source,
     marketStatus: live.marketStatus,
     expiry: live.expiry,
+    marketInformation: live.marketInformation,
   };
 };
 
@@ -531,6 +533,7 @@ serve(async (req) => {
           qualityFlags: analytics.qualityFlags ?? [],
           tabs: ["overview", "option_chain", "combined_oi", "technicals", "build_up", "quick_trades"],
           optionChain: live.optionChain,
+          marketInformation: live.marketInformation,
           combinedOi: live.optionChain
             .filter((row) => row.type === "CE" || row.type === "PE")
             .reduce((acc: Array<Record<string, unknown>>, row) => {
@@ -840,6 +843,7 @@ serve(async (req) => {
           instrument: live.instrument,
           optionChain: live.optionChain,
           overview: live.overview,
+          marketInformation: live.marketInformation,
         });
       } catch (error) {
         return errorEnvelope(

@@ -47,20 +47,62 @@ serve(async (req) => {
       throw new Error('InsightsLM chat webhook is incorrectly pointed to Trading Agents workflow')
     }
 
-    // 1. Get/Create Session
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    )
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
 
-    const { data: sessionId, error: sessionError } = await supabaseClient
-         .rpc('get_or_create_chat_session', { 
-            p_notebook_id: notebook_id,
-            p_user_id: (await supabaseClient.auth.getUser()).data.user?.id
-         });
+    const jwt = authHeader.replace('Bearer ', '').trim();
+    const { data: userData, error: userErr } = await supabaseClient.auth.getUser(jwt);
+    if (userErr || !userData.user) {
+      throw new Error('Unauthorized');
+    }
+    const userId = userData.user.id;
 
-    if (sessionError || !sessionId) {
+    const { data: notebook, error: notebookErr } = await supabaseClient
+      .from('notebooks')
+      .select('id')
+      .eq('id', notebook_id)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (notebookErr || !notebook) {
+      throw new Error('Notebook not found or unauthorized');
+    }
+
+    // 1. Get/Create Session
+    let sessionId: string | null = null;
+    const { data: existingSession, error: existingSessionErr } = await supabaseClient
+      .from('chat_sessions')
+      .select('id')
+      .eq('notebook_id', notebook_id)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingSessionErr) {
+      throw new Error('Failed to load chat session');
+    }
+
+    if (existingSession?.id) {
+      sessionId = existingSession.id;
+      await supabaseClient
+        .from('chat_sessions')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', sessionId);
+    } else {
+      const { data: createdSession, error: createSessionErr } = await supabaseClient
+        .from('chat_sessions')
+        .insert({ notebook_id, title: 'New chat' })
+        .select('id')
+        .single();
+      if (createSessionErr || !createdSession?.id) {
+        throw new Error('Failed to init chat session');
+      }
+      sessionId = createdSession.id;
+    }
+
+    if (!sessionId) {
         throw new Error('Failed to init chat session');
     }
 

@@ -123,14 +123,15 @@ export const draftFromChat = (
 
   if (mode === 'create-strategy') {
     const strategyMissing = [
-      !includesAny(userText, ['entry', 'signal', 'when']) ? 'Entry signal definition' : null,
-      !includesAny(userText, ['backtest', 'paper', 'retest']) ? 'Validation plan: backtest or paper-trade period' : null
+      !includesAny(userText, ['entry', 'signal', 'when', 'trend', 'indicator', 'rsi', 'macd']) ? 'Entry signal definition (e.g. what defines the bullish trend?)' : null,
+      !includesAny(userText, ['margin', 'capital', 'funds']) ? 'Total available margin' : null,
+      !includesAny(userText, ['loss', 'risk limit', 'max loss']) ? 'Maximum acceptable loss per trade' : null
     ].filter((item): item is string => !!item);
     return {
-      title: strategyMissing.length ? 'Draft Algo Strategy' : 'Range and Liquidity Algo Strategy',
+      title: strategyMissing.length ? 'Draft Algo Strategy: Need More Info' : 'Draft Algo Strategy: Risk & Signal Approved',
       mode,
-      status: [...missingInputs, ...strategyMissing].length ? 'needs-input' : 'ready',
-      missingInputs: [...missingInputs, ...strategyMissing],
+      status: [...strategyMissing].length ? 'needs-input' : 'ready',
+      missingInputs: [...strategyMissing],
       filters: [
         `Instrument universe: ${overview.instrument.symbol} options only in MVP`,
         'Reject if any leg has critical stale-data or missing bid-ask flag',
@@ -148,8 +149,8 @@ export const draftFromChat = (
       ],
       riskRules: [
         'One paper position per instrument in MVP',
-        'Max simulated loss must be known before entry',
-        'No averaging down and no live broker order placement'
+        'Strict margin constraints and max loss limit applied per trade',
+        'Auto-suggest spreads over naked options to cap loss if required'
       ],
       selectedTrade
     };
@@ -203,5 +204,18 @@ export const assistantReply = (draft: StrategyDraft) => {
     return `I have a complete trade artifact: ${summarizeTrade(draft.selectedTrade)} I would paper trade it only after the liquidity and freshness checks remain green.`;
   }
 
-  return 'I have enough inputs to compile this into a reusable algo strategy with filters, entry rules, exit rules, risk rules, and a backtest plan.';
+  if (draft.mode === 'create-strategy') {
+    if (draft.status === 'needs-input') {
+      if (draft.missingInputs.includes('Total available margin') || draft.missingInputs.includes('Maximum acceptable loss per trade')) {
+        return `Great. Before we build this, let's protect your capital. What is your **total available margin** for this strategy, and what is the **maximum loss** (in INR or %) you are willing to take per trade?`;
+      }
+      if (draft.missingInputs.includes('Entry signal definition (e.g. what defines the bullish trend?)')) {
+        return `I can help you build a strategy. Usually, traders identify this using technical indicators like the RSI being over 60 or the MACD crossing its signal line. How would you like to define it?`;
+      }
+      return `I need a bit more info: ${draft.missingInputs.join(', ')}.`;
+    }
+    return `Understood. I have designed a risk-defined strategy and added a safety filter to ensure we only trade highly liquid strikes. I am passing the configuration to the manual builder for your review.`;
+  }
+
+  return 'I have enough inputs to compile this artifact.';
 };

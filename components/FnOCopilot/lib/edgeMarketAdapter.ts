@@ -9,6 +9,7 @@ export type FnOLiveMarketState = {
   marketStatus?: string;
   expiry?: string;
   dataSource?: string;
+  marketInformation?: Record<string, unknown>;
 };
 
 const asNumber = (value: unknown, fallback = 0) => {
@@ -16,17 +17,27 @@ const asNumber = (value: unknown, fallback = 0) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
-export const parseInstrument = (raw: Record<string, unknown>): Instrument => ({
-  symbol: String(raw.symbol ?? 'NIFTY'),
-  name: String(raw.name ?? raw.symbol ?? 'NIFTY'),
+const asSymbol = (raw: Record<string, unknown>, fallbackSymbol: string) =>
+  String(
+    raw.symbol ??
+    raw.tradingSymbol ??
+    raw.trading_symbol ??
+    raw.underlyingSymbol ??
+    raw.underlying_symbol ??
+    fallbackSymbol
+  ).toUpperCase();
+
+export const parseInstrument = (raw: Record<string, unknown>, fallbackSymbol = 'NIFTY'): Instrument => ({
+  symbol: asSymbol(raw, fallbackSymbol),
+  name: String(raw.name ?? raw.symbol ?? raw.tradingSymbol ?? raw.trading_symbol ?? fallbackSymbol),
   lotSize: asNumber(raw.lotSize ?? raw.lot_size, 1),
   minimumLot: asNumber(raw.minimumLot ?? raw.minimum_lot ?? raw.lotSize ?? raw.lot_size, 1),
   tickSize: asNumber(raw.tickSize ?? raw.tick_size, 0.05),
   freezeQuantity: asNumber(raw.freezeQuantity ?? raw.freeze_quantity, 0),
   expiry: String(raw.expiry ?? ''),
   isWeekly: Boolean(raw.isWeekly ?? raw.is_weekly ?? true),
-  spot: asNumber(raw.spot),
-  previousClose: asNumber(raw.previousClose ?? raw.previous_close ?? raw.spot),
+  spot: asNumber(raw.spot ?? raw.underlyingSpotPrice ?? raw.underlying_spot_price),
+  previousClose: asNumber(raw.previousClose ?? raw.previous_close ?? raw.spot ?? raw.underlyingSpotPrice ?? raw.underlying_spot_price),
   snapshotTs: String(raw.snapshotTs ?? raw.snapshot_ts ?? new Date().toISOString()),
 });
 
@@ -71,15 +82,19 @@ export const parseChainAnalytics = (raw: Record<string, unknown>): ChainAnalytic
     : [],
 });
 
-export const parseLiveMarketBootstrap = (data: Record<string, unknown>): FnOLiveMarketState | null => {
+export const parseLiveMarketBootstrap = (data: Record<string, unknown>, fallbackSymbol = 'NIFTY'): FnOLiveMarketState | null => {
   if (data.mode !== 'upstox_live') return null;
-  const instrumentRaw = data.instrument as Record<string, unknown> | undefined;
+  const overviewRaw = data.overview as Record<string, unknown> | undefined;
+  const instrumentsRaw = data.instruments as Array<Record<string, unknown>> | undefined;
+  const instrumentRaw =
+    (data.instrument as Record<string, unknown> | undefined) ??
+    instrumentsRaw?.[0] ??
+    (overviewRaw?.instrument as Record<string, unknown> | undefined);
   const chainRaw = data.optionChain as Array<Record<string, unknown>> | undefined;
   if (!instrumentRaw || !chainRaw?.length) return null;
 
-  const instrument = parseInstrument(instrumentRaw);
+  const instrument = parseInstrument(instrumentRaw, fallbackSymbol);
   const chain = parseOptionChain(chainRaw);
-  const overviewRaw = data.overview as Record<string, unknown> | undefined;
   const chainAnalyticsRaw = (overviewRaw?.chain as Record<string, unknown> | undefined) ?? {};
 
   const overview: MarketOverview | undefined = overviewRaw
@@ -101,5 +116,6 @@ export const parseLiveMarketBootstrap = (data: Record<string, unknown>): FnOLive
     marketStatus: data.marketStatus ? String(data.marketStatus) : undefined,
     expiry: data.expiry ? String(data.expiry) : instrument.expiry,
     dataSource: data.dataSource ? String(data.dataSource) : 'upstox_analytics',
+    marketInformation: data.marketInformation as Record<string, unknown> | undefined,
   };
 };

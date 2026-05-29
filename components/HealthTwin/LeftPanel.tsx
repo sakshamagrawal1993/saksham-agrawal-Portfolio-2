@@ -150,10 +150,22 @@ export const LeftPanel: React.FC = () => {
             const { error: uploadError } = await supabase.storage.from('health_documents').upload(fileName, fileToUpload, { upsert: true });
             if (uploadError) throw uploadError;
 
-            const { data: { publicUrl } } = supabase.storage.from('health_documents').getPublicUrl(fileName);
+            const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+                .from('health_documents')
+                .createSignedUrl(fileName, 3600);
+            if (signedUrlError || !signedUrlData?.signedUrl) {
+                throw signedUrlError ?? new Error('Could not create a signed URL for the lab report');
+            }
+
             const { data: sourceData, error: dbError } = await supabase
                 .from('health_sources')
-                .insert({ twin_id: activeTwinId, source_type: 'lab_report', source_name: fileToUpload.name, file_url: publicUrl, status: 'processing' })
+                .insert({
+                    twin_id: activeTwinId,
+                    source_type: 'lab_report',
+                    source_name: fileToUpload.name,
+                    file_url: signedUrlData.signedUrl,
+                    status: 'processing',
+                })
                 .select().single();
             if (dbError) throw dbError;
 
@@ -162,7 +174,12 @@ export const LeftPanel: React.FC = () => {
             // Call Supabase Edge Function to securely route the payload and auth header to n8n
             try {
                 const { data: result, error: invokeError } = await supabase.functions.invoke('process-lab-report', {
-                    body: { file_url: publicUrl, twin_id: activeTwinId, file_id: sourceData.id }
+                    body: {
+                        file_url: signedUrlData.signedUrl,
+                        storage_path: fileName,
+                        twin_id: activeTwinId,
+                        file_id: sourceData.id,
+                    }
                 });
 
                 if (invokeError) throw invokeError;

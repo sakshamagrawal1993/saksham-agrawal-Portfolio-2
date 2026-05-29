@@ -21,6 +21,7 @@
 .fno-copilot-app {
   margin: 0;
   min-width: 320px;
+  overflow-x: hidden;
   color: var(--ink);
   background: var(--paper);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -60,6 +61,8 @@
   backdrop-filter: blur(12px);
 }
 .fno-copilot-app .nav-brand {
+  display: flex;
+  align-items: center;
   gap: 12px;
   min-width: 220px;
   padding: 0;
@@ -1100,6 +1103,71 @@
   display: grid;
   gap: 10px;
 }
+.fno-copilot-app .agent-algo-sections {
+  display: grid;
+  gap: 8px;
+}
+.fno-copilot-app .agent-algo-stage-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+.fno-copilot-app .agent-algo-stage-row button {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 6px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--muted);
+  text-align: center;
+}
+.fno-copilot-app .agent-algo-stage-row button.active {
+  color: var(--panel);
+  background: var(--green);
+  border-color: var(--green);
+}
+.fno-copilot-app .agent-algo-editor {
+  display: grid;
+  gap: 8px;
+}
+.fno-copilot-app .agent-algo-editor label {
+  display: grid;
+  gap: 4px;
+}
+.fno-copilot-app .agent-algo-editor label > span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.fno-copilot-app .agent-algo-editor input,
+.fno-copilot-app .agent-algo-editor textarea {
+  width: 100%;
+  min-height: 38px;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  font-size: 13px;
+}
+.fno-copilot-app .agent-algo-editor textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+.fno-copilot-app .agent-algo-check {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 8px;
+}
+.fno-copilot-app .agent-algo-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
 .fno-copilot-app .agent-leg-list {
   display: grid;
   gap: 8px;
@@ -1132,8 +1200,13 @@
   gap: 16px;
 }
 .fno-copilot-app .page-header {
+  display: flex;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 18px;
+}
+.fno-copilot-app .search-box {
+  margin-top: 14px; /* Align with h2 baseline */
 }
 .fno-copilot-app .page-header h2,
 .fno-copilot-app .contract-title h2 {
@@ -1170,6 +1243,126 @@
 }
 .fno-copilot-app .dashboard-metrics.tight {
   grid-template-columns: repeat(4, minmax(120px, 1fr));
+}
+.fno-copilot-app .beginner-flow-strip,
+.fno-copilot-app .concept-strip,
+.fno-copilot-app .decision-guide-card,
+.fno-copilot-app .newbie-assist-card {
+  padding: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.86);
+}
+.fno-copilot-app .beginner-flow-strip {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.75fr) minmax(0, 1.7fr);
+  gap: 14px;
+  align-items: center;
+}
+.fno-copilot-app .beginner-flow-strip h3,
+.fno-copilot-app .concept-strip h3,
+.fno-copilot-app .decision-guide-card h3,
+.fno-copilot-app .newbie-assist-card h3 {
+  font-size: 18px;
+}
+.fno-copilot-app .beginner-step-row,
+.fno-copilot-app .concept-grid,
+.fno-copilot-app .assist-chip-row,
+.fno-copilot-app .decision-meter-grid {
+  display: grid;
+  gap: 8px;
+}
+.fno-copilot-app .beginner-step-row {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.fno-copilot-app .beginner-step-row span,
+.fno-copilot-app .concept-grid article,
+.fno-copilot-app .decision-meter-grid span,
+.fno-copilot-app .assist-chip-row span {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+}
+.fno-copilot-app .beginner-step-row strong,
+.fno-copilot-app .concept-grid strong,
+.fno-copilot-app .decision-meter-grid b {
+  display: block;
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--green);
+  text-transform: uppercase;
+}
+.fno-copilot-app .beginner-step-row small,
+.fno-copilot-app .concept-grid small,
+.fno-copilot-app .decision-meter-grid small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+.fno-copilot-app .concept-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 12px;
+}
+.fno-copilot-app .concept-grid span {
+  display: block;
+  margin-top: 2px;
+  font-size: 14px;
+  font-weight: 750;
+}
+.fno-copilot-app .decision-guide-card,
+.fno-copilot-app .newbie-assist-card {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.1fr) minmax(260px, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+}
+.fno-copilot-app .decision-guide-card p,
+.fno-copilot-app .newbie-assist-card p {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.fno-copilot-app .decision-meter-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.fno-copilot-app .decision-meter-grid em {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink);
+  font-size: 18px;
+  font-style: normal;
+  font-weight: 900;
+}
+.fno-copilot-app .decision-guide-actions,
+.fno-copilot-app .assist-chip-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.fno-copilot-app .decision-guide-actions button {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--green);
+  background: var(--green-soft);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 850;
+}
+.fno-copilot-app .assist-chip-row span {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.fno-copilot-app .compact-assist {
+  grid-template-columns: minmax(280px, 1.4fr) minmax(260px, auto);
 }
 .fno-copilot-app .metric {
   min-height: 76px;
@@ -1434,25 +1627,43 @@
   gap: 8px;
 }
 .fno-copilot-app .contract-header {
+  display: flex;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 14px;
+}
+.fno-copilot-app .back-button,
+.fno-copilot-app .contract-actions {
+  margin-top: 14px; /* Align with h2 baseline */
 }
 .fno-copilot-app .back-button,
 .fno-copilot-app .contract-actions button,
 .fno-copilot-app .range-pills button,
 .fno-copilot-app .builder-actions button {
   height: 38px;
+  min-width: 150px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   gap: 8px;
   padding: 0 12px;
   border: 1px solid var(--line);
   background: var(--panel);
   color: var(--ink);
+  text-align: center;
+  white-space: nowrap;
 }
 .fno-copilot-app .contract-title {
   flex: 1;
 }
 .fno-copilot-app .contract-actions {
   gap: 8px;
+}
+.fno-copilot-app .range-pills button {
+  min-width: auto;
+}
+.fno-copilot-app .algo-page-header .builder-actions button {
+  min-width: 164px;
 }
 .fno-copilot-app .contract-actions button:last-child,
 .fno-copilot-app .builder-actions button:last-child {
@@ -1728,8 +1939,10 @@
 }
 .fno-copilot-app .screener-table {
   display: grid;
-  gap: 8px;
   overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
 }
 .fno-copilot-app .screener-head,
 .fno-copilot-app .screener-row {
@@ -1744,12 +1957,27 @@
   font-size: 11px;
   font-weight: 850;
   text-transform: uppercase;
+  background: var(--panel-2);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 .fno-copilot-app .screener-row {
-  min-height: 58px;
-  padding: 8px;
-  background: #fff;
-  border: 1px solid var(--line);
+  min-height: 52px;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--line);
+  transition: background 0.15s ease;
+}
+.fno-copilot-app .screener-row:last-child {
+  border-bottom: 0;
+}
+.fno-copilot-app .screener-row:nth-child(even) {
+  background: rgba(243, 246, 242, 0.4);
+}
+.fno-copilot-app .screener-row:hover {
+  background: var(--green-soft);
 }
 .fno-copilot-app .screener-row small {
   display: block;
@@ -2015,35 +2243,69 @@
   min-width: 0;
   height: 38px;
   border: 1px solid var(--line);
+  border-radius: 6px;
   background: #fff;
   color: var(--ink);
-  padding: 0 9px;
+  padding: 0 10px;
   outline: 0;
+  font-size: 13px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.fno-copilot-app .field-label input:focus,
+.fno-copilot-app .field-label select:focus,
+.fno-copilot-app .condition-row input:focus,
+.fno-copilot-app .condition-row select:focus,
+.fno-copilot-app .algo-leg-row input:focus,
+.fno-copilot-app .algo-leg-row select:focus,
+.fno-copilot-app .risk-input input:focus,
+.fno-copilot-app .risk-input select:focus {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px var(--green-soft);
+}
+.fno-copilot-app .field-label select,
+.fno-copilot-app .condition-row select,
+.fno-copilot-app .algo-leg-row select,
+.fno-copilot-app .risk-input select {
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%236c675f%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px;
 }
 .fno-copilot-app .field-label input:read-only {
   color: var(--muted);
   background: var(--panel-2);
+  border-color: transparent;
+  box-shadow: none;
 }
 .fno-copilot-app .segmented-control {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--panel-2);
+  border-radius: 6px;
+  padding: 3px;
+  gap: 3px;
 }
 .fno-copilot-app .segmented-control button {
-  min-height: 36px;
+  min-height: 32px;
   border: 0;
-  border-right: 1px solid var(--line);
+  border-radius: 4px;
   color: var(--muted);
   background: transparent;
+  font-weight: 600;
+  font-size: 13px;
+  transition: all 0.15s ease;
 }
-.fno-copilot-app .segmented-control button:last-child {
-  border-right: 0;
+.fno-copilot-app .segmented-control button:hover {
+  color: var(--ink);
 }
 .fno-copilot-app .segmented-control button.active {
-  color: var(--panel);
-  background: var(--ink);
+  color: var(--ink);
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
 }
 .fno-copilot-app .check-row {
   min-height: 38px;
@@ -2066,10 +2328,12 @@
 .fno-copilot-app .indicator-config-row {
   display: grid;
   grid-template-columns: 1.25fr 0.8fr 0.9fr 0.9fr 0.65fr;
-  gap: 10px;
-  padding: 10px;
+  gap: 12px;
+  padding: 14px;
   border: 1px solid var(--line);
   background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
 }
 .fno-copilot-app .ghost-action,
 .fno-copilot-app .condition-title button,
@@ -2303,6 +2567,188 @@
 }
 .fno-copilot-app .snapshot-tile.negative strong {
   color: var(--red);
+}
+.fno-copilot-app .upstox-readiness-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 14px;
+}
+.fno-copilot-app .live-data-card small,
+.fno-copilot-app .coverage-summary-card small {
+  color: var(--muted);
+  line-height: 1.5;
+}
+.fno-copilot-app .readiness-grid,
+.fno-copilot-app .coverage-count-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.fno-copilot-app .readiness-grid span,
+.fno-copilot-app .coverage-count {
+  min-height: 68px;
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+}
+.fno-copilot-app .readiness-grid b,
+.fno-copilot-app .coverage-count em {
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+.fno-copilot-app .readiness-grid em {
+  color: var(--ink);
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 750;
+  overflow-wrap: anywhere;
+}
+.fno-copilot-app .coverage-count b {
+  font-size: 26px;
+  line-height: 1;
+}
+.fno-copilot-app .coverage-count.covered b {
+  color: var(--green);
+}
+.fno-copilot-app .coverage-count.partial b {
+  color: var(--amber);
+}
+.fno-copilot-app .coverage-count.planned b {
+  color: var(--blue);
+}
+.fno-copilot-app .source-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.fno-copilot-app .source-chip-row span {
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.fno-copilot-app .upstox-feed-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.fno-copilot-app .upstox-feed-card {
+  min-height: 184px;
+  display: grid;
+  align-content: space-between;
+  gap: 12px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, #fff 0%, #f8faf7 100%);
+}
+.fno-copilot-app .upstox-feed-card h4 {
+  margin-top: 4px;
+  font-size: 16px;
+  line-height: 1.25;
+}
+.fno-copilot-app .upstox-feed-card p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.fno-copilot-app .coverage-status {
+  display: inline-flex;
+  width: fit-content;
+  padding: 4px 7px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+.fno-copilot-app .coverage-status.covered {
+  border-color: rgba(47, 125, 88, 0.35);
+  background: var(--green-soft);
+  color: var(--green);
+}
+.fno-copilot-app .coverage-status.partial {
+  border-color: rgba(173, 107, 29, 0.35);
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+.fno-copilot-app .coverage-status.planned {
+  border-color: rgba(45, 111, 143, 0.35);
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+.fno-copilot-app .feed-meta-row {
+  display: grid;
+  gap: 6px;
+}
+.fno-copilot-app .feed-meta-row span {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.fno-copilot-app .market-info-ladder,
+.fno-copilot-app .screen-suggestion-list {
+  display: grid;
+  gap: 9px;
+}
+.fno-copilot-app .live-info-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.fno-copilot-app .live-info-strip span {
+  display: grid;
+  gap: 4px;
+  padding: 9px;
+  border: 1px solid rgba(45, 111, 143, 0.22);
+  background: var(--blue-soft);
+}
+.fno-copilot-app .live-info-strip b {
+  color: var(--blue);
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+.fno-copilot-app .live-info-strip em {
+  color: var(--ink);
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 750;
+}
+.fno-copilot-app .market-info-ladder span,
+.fno-copilot-app .screen-suggestion-list span {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+}
+.fno-copilot-app .market-info-ladder b,
+.fno-copilot-app .screen-suggestion-list b {
+  color: var(--ink);
+  font-size: 14px;
+}
+.fno-copilot-app .market-info-ladder em,
+.fno-copilot-app .screen-suggestion-list em {
+  color: var(--muted);
+  font-size: 13px;
+  font-style: normal;
+}
+.fno-copilot-app .market-info-ladder small,
+.fno-copilot-app .screen-suggestion-list small {
+  color: var(--muted);
+  line-height: 1.45;
 }
 .fno-copilot-app .activity-heatmap {
   display: grid;
@@ -2763,7 +3209,18 @@
 .fno-copilot-app .screener-grid,
 .fno-copilot-app .feature-row,
 .fno-copilot-app .snapshot-strip,
+.fno-copilot-app .upstox-readiness-grid,
+.fno-copilot-app .readiness-grid,
+.fno-copilot-app .coverage-count-row,
+.fno-copilot-app .upstox-feed-grid,
+.fno-copilot-app .live-info-strip,
 .fno-copilot-app .overview-visual-grid,
+.fno-copilot-app .beginner-flow-strip,
+.fno-copilot-app .beginner-step-row,
+.fno-copilot-app .concept-grid,
+.fno-copilot-app .decision-guide-card,
+.fno-copilot-app .decision-meter-grid,
+.fno-copilot-app .newbie-assist-card,
 .fno-copilot-app .delta-card-row,
 .fno-copilot-app .validation-summary-grid,
 .fno-copilot-app .screener-card-grid {
@@ -2833,7 +3290,10 @@
 .fno-copilot-app .build-up-quadrant,
 .fno-copilot-app .risk-profile-row,
 .fno-copilot-app .activity-heatmap-row > div,
-.fno-copilot-app .contract-summary-strip {
+.fno-copilot-app .contract-summary-strip,
+.fno-copilot-app .beginner-step-row,
+.fno-copilot-app .concept-grid,
+.fno-copilot-app .decision-meter-grid {
     grid-template-columns: 1fr;
   }
 .fno-copilot-app .product-nav {
@@ -2922,4 +3382,280 @@
 .fno-copilot-app .builder-leg {
     grid-template-columns: 58px 1fr;
   }
+}
+
+/* Context Bar */
+.fno-copilot-app .page-context-bar {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.2fr) minmax(260px, 1fr) minmax(260px, auto);
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 12px rgba(35, 35, 32, 0.03);
+}
+.fno-copilot-app .context-primary {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+.fno-copilot-app .context-primary strong {
+  display: block;
+  font-size: 15px;
+  line-height: 1.25;
+}
+.fno-copilot-app .context-location-trail {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.fno-copilot-app .context-location-trail .crumb {
+  color: var(--muted);
+}
+.fno-copilot-app .context-location-trail .crumb-active {
+  color: var(--ink);
+  font-weight: 800;
+}
+.fno-copilot-app .context-location-trail .crumb-separator {
+  color: var(--line);
+}
+.fno-copilot-app .context-action-chips {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.fno-copilot-app .context-action-chips span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid rgba(47, 125, 88, 0.22);
+  background: var(--green-soft);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.fno-copilot-app .context-nav-links {
+  display: inline-flex;
+  gap: 6px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.fno-copilot-app .context-nav-links button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 4px 9px;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+.fno-copilot-app .context-nav-links button:hover {
+  background: var(--green-soft);
+  border-color: var(--green);
+  color: var(--green);
+  transform: translateY(-1px);
+}
+
+/* Symmetrical Option Chain Layout Styles */
+.fno-copilot-app .option-chain-table.professional-table {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  overflow-x: auto;
+  display: grid;
+  gap: 4px;
+}
+.fno-copilot-app .chain-main-header {
+  border-bottom: 2px solid var(--line);
+  background: var(--panel-2);
+}
+.fno-copilot-app .header-label {
+  padding: 8px 4px;
+  font-weight: 850;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  text-align: center;
+}
+.fno-copilot-app .header-label.calls-label {
+  background: rgba(47, 125, 88, 0.08);
+  color: var(--green);
+  border-right: 1px solid var(--line);
+}
+.fno-copilot-app .header-label.strike-label {
+  background: #edf2ef;
+  color: var(--ink);
+  font-weight: 900;
+}
+.fno-copilot-app .header-label.puts-label {
+  background: rgba(185, 79, 67, 0.08);
+  color: var(--red);
+  border-left: 1px solid var(--line);
+}
+
+.fno-copilot-app .option-chain-head {
+  background: #fdfdfd;
+  border-bottom: 1px solid var(--line);
+  font-weight: 800;
+  font-size: 11px;
+}
+.fno-copilot-app .option-chain-head span {
+  padding: 8px 4px;
+}
+
+.fno-copilot-app .option-chain-row {
+  border-bottom: 1px solid var(--line);
+  min-height: 40px;
+  font-size: 13px;
+  transition: background-color 0.15s ease;
+}
+.fno-copilot-app .option-chain-row:hover {
+  background-color: #f7f9f6 !important;
+}
+.fno-copilot-app .option-chain-row span {
+  padding: 6px 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+}
+.fno-copilot-app .option-chain-row .itm-shaded {
+  background-color: #fffbf2;
+}
+.fno-copilot-app .option-chain-row.atm {
+  background-color: #f0f7ff;
+  border-top: 1px solid var(--blue);
+  border-bottom: 1px solid var(--blue);
+}
+.fno-copilot-app .option-chain-row.atm .strike {
+  background-color: var(--blue-soft) !important;
+  color: var(--blue) !important;
+  font-weight: 900;
+}
+.fno-copilot-app .sticky-col.strike {
+  position: sticky;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #f4f6f4;
+  color: var(--ink);
+  font-weight: 800;
+  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+}
+.fno-copilot-app .option-chain-row.focus {
+  background-color: #eef7f2 !important;
+  border: 1px solid var(--green) !important;
+}
+.fno-copilot-app .buildup-badge {
+  display: inline-flex;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 800;
+  border-radius: 4px;
+}
+.fno-copilot-app .buildup-badge.long-build-up {
+  color: #1a5c37;
+  background-color: #e2f4e8;
+}
+.fno-copilot-app .buildup-badge.short-build-up {
+  color: #8c231a;
+  background-color: #fae2e0;
+}
+.fno-copilot-app .buildup-badge.short-covering {
+  color: #1d5f8c;
+  background-color: #e0f0fa;
+}
+.fno-copilot-app .buildup-badge.long-unwinding {
+  color: #8c571a;
+  background-color: #faf0e0;
+}
+
+/* Button & Headline Alignments */
+.fno-copilot-app button:not(.contract-row):not(.agent-history-list button):not(.activity-list button):not(.compact-trade-list button):not(.trade-tile):not(.top-trade-card):not(.index-pulse):not(.index-view-card) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  vertical-align: middle;
+}
+.fno-copilot-app button svg {
+  display: inline-block;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+@media (max-width: 900px) {
+  .fno-copilot-app .page-context-bar {
+    grid-template-columns: 1fr;
+  }
+  .fno-copilot-app .context-nav-links {
+    justify-content: flex-start;
+  }
+}
+
+.fno-copilot-app .fno-debug-panel {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 80;
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.92);
+  color: #e2e8f0;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.35;
+  backdrop-filter: blur(6px);
+}
+
+.fno-copilot-app .fno-debug-title {
+  margin: 0 0 6px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #94a3b8;
+}
+
+.fno-copilot-app .fno-debug-panel p {
+  margin: 3px 0;
+}
+
+.fno-copilot-app .fno-debug-table {
+  margin-top: 8px;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+  padding-top: 6px;
+  display: grid;
+  gap: 4px;
+}
+
+.fno-copilot-app .fno-debug-row {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 0.8fr 0.5fr;
+  gap: 6px;
+  align-items: center;
+  padding: 3px 0;
+  color: #cbd5e1;
+}
+
+.fno-copilot-app .fno-debug-row.active {
+  color: #f8fafc;
+  font-weight: 700;
 }

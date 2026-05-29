@@ -35,7 +35,9 @@ const NotebookLayout: React.FC<NotebookLayoutProps> = ({ notebookId, notebookTit
                 .from('chat_sessions')
                 .select('id')
                 .eq('notebook_id', notebookId)
-                .single();
+                .order('updated_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
 
             if (session) {
                 const { data: msgs, error } = await supabase
@@ -169,6 +171,23 @@ const NotebookLayout: React.FC<NotebookLayoutProps> = ({ notebookId, notebookTit
 
     const [isUploading, setIsUploading] = useState(false);
 
+    const buildProcessSourcePayload = async (source: {
+        id: string;
+        type: string;
+        title: string;
+        storage_path?: string | null;
+        source_url?: string | null;
+    }) => ({
+        source_id: source.id,
+        notebook_id: notebookId,
+        storage_path: source.storage_path ?? undefined,
+        file_url: source.storage_path
+            ? (await supabase.storage.from('InsightsLM').createSignedUrl(source.storage_path, 3600)).data?.signedUrl
+            : source.source_url ?? undefined,
+        source_type: source.type,
+        file_name: source.title,
+    });
+
     const handleAddSourceData = async (type: 'file' | 'link' | 'text', data: any) => {
         if (isUploading) return;
         setIsUploading(true);
@@ -245,11 +264,32 @@ const NotebookLayout: React.FC<NotebookLayoutProps> = ({ notebookId, notebookTit
                     source_url: url
                 };
             } else if (type === 'text') {
+                const textContent = String(data ?? '');
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) {
+                    alert('You must be logged in to add text sources.');
+                    setIsUploading(false);
+                    return;
+                }
+
+                const filePath = `${user.id}/${notebookId}/pasted-text-${crypto.randomUUID()}.txt`;
+                const { error: textUploadError } = await supabase.storage
+                    .from('InsightsLM')
+                    .upload(filePath, new Blob([textContent], { type: 'text/plain' }), { upsert: true });
+
+                if (textUploadError) {
+                    console.error('Error uploading pasted text:', textUploadError);
+                    alert('Failed to store pasted text: ' + textUploadError.message);
+                    setIsUploading(false);
+                    return;
+                }
+
                 newSourcePayload = {
                     ...newSourcePayload,
                     type: 'text',
                     title: 'Pasted Text',
-                    extracted_text: data // Storing raw text directly
+                    extracted_text: textContent,
+                    storage_path: filePath,
                 };
             }
 
@@ -276,19 +316,13 @@ const NotebookLayout: React.FC<NotebookLayoutProps> = ({ notebookId, notebookTit
                 setIsLoadingSummary(true);
 
                 // Trigger n8n processing via Edge Function (Synchronous wait)
+                const processPayload = await buildProcessSourcePayload(insertedSource);
+                if (!processPayload.file_url && !processPayload.storage_path) {
+                    throw new Error('No file URL or storage path available for processing');
+                }
+
                 const { data: fnData, error: fnError } = await supabase.functions.invoke('process-source', {
-                    body: {
-                        source_id: insertedSource.id,
-                        notebook_id: notebookId,
-                        file_url: insertedSource.storage_path ?
-                            await (async () => {
-                                const { data } = await supabase.storage.from('InsightsLM').createSignedUrl(insertedSource.storage_path, 3600);
-                                return data?.signedUrl;
-                            })()
-                            : insertedSource.source_url,
-                        source_type: insertedSource.type,
-                        file_name: insertedSource.title
-                    }
+                    body: processPayload,
                 });
 
                 // Stop loading regardless of outcome

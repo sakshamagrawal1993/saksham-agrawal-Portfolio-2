@@ -18,13 +18,13 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 SSHPASS_BIN="${SSHPASS_BIN:-/opt/homebrew/bin/sshpass}"
-SSH_BASE=(ssh -o StrictHostKeyChecking=accept-new)
+SSH_BASE=(-o StrictHostKeyChecking=accept-new)
 if [[ -n "${SSHPASS:-}" ]] && [[ -x "$SSHPASS_BIN" ]]; then
   SSH_CMD=("$SSHPASS_BIN" -e ssh "${SSH_BASE[@]}" -o PreferredAuthentications=password -o PubkeyAuthentication=no)
-  RSYNC_SSH="$SSHPASS_BIN -e ssh -o StrictHostKeyChecking=accept-new -o PreferredAuthentications=password -o PubkeyAuthentication=no"
+  RSYNC_SSH="$SSHPASS_BIN -e ssh ${SSH_BASE[*]} -o PreferredAuthentications=password -o PubkeyAuthentication=no"
 else
   SSH_CMD=(ssh "${SSH_BASE[@]}")
-  RSYNC_SSH="ssh -o StrictHostKeyChecking=accept-new"
+  RSYNC_SSH="ssh ${SSH_BASE[*]}"
 fi
 
 echo "Syncing $ROOT -> ${VPS_USER}@${VPS_HOST}:${REMOTE_DIR}"
@@ -36,7 +36,7 @@ rsync -az --delete \
   "$ROOT/" "${VPS_USER}@${VPS_HOST}:${REMOTE_DIR}/"
 
 echo "Installing deps and starting systemd unit on VPS..."
-ssh "${VPS_USER}@${VPS_HOST}" bash -s <<EOF
+"${SSH_CMD[@]}" "${VPS_USER}@${VPS_HOST}" bash -s <<EOF
 set -euo pipefail
 cd ${REMOTE_DIR}
 python3 -m venv .venv

@@ -40,7 +40,7 @@ def load_market_bundle(symbol: str = "NIFTY", expiry: str | None = None, mode: s
         return _demo_bundle()
 
     try:
-        instrument_key = resolve_instrument_key(symbol)
+        instrument_key = resolve_instrument_key(symbol, token)
         resolved_expiry = expiry or nearest_expiry(token, instrument_key)
         rows = fetch_option_chain(token, instrument_key, resolved_expiry)
         instrument, chain = normalize_option_chain_rows(symbol, resolved_expiry, rows)

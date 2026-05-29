@@ -26,15 +26,22 @@ import {
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { contractRows, dataSource, DemoContractSummary, instrumentsBySymbol, marketCharts, optionChainsBySymbol } from './data/excelMarket';
 import {
+  getUpstoxCoverageCounts,
+  upstoxAnalyticsFeeds,
+  upstoxDashboardCoverage,
+  upstoxMissingScreenSuggestions
+} from './data/upstoxAnalyticsMap';
+import {
   fetchFnOCopilotBootstrap,
-  fetchFnOCopilotChatReply,
-  isFnOCopilotEdgeEnabled
+  initAgentSession,
+  isFnOCopilotEdgeEnabled,
+  sendAgentChat
 } from './fnoCopilotApi';
 import { assistantReply, buildWorkflowSteps, createInitialMessages, draftFromChat } from './lib/aiPlanner';
 import { aggregateGreeks, computeChainAnalytics, getAtmStrike, getQuote, mid, round, rupee } from './lib/calculations';
 import { parseLiveMarketBootstrap, type FnOLiveMarketState } from './lib/edgeMarketAdapter';
 import { generateTopTrades } from './lib/strategyEngine';
-import { CandidateTrade, ChainAnalytics, ChatMessage, Instrument, MarketOverview, OptionChainColumnGroup, OptionQuote, UserMode } from './types';
+import { CandidateTrade, ChainAnalytics, ChatMessage, Instrument, MarketOverview, OptionChainColumnGroup, OptionQuote, StrategyDraft, UserMode } from './types';
 import './styles.css';
 
 type Screen = 'dashboard' | 'contract' | 'analyse-trade' | 'create-trades' | 'algo-builder' | 'screener' | 'paper-trades';
@@ -44,6 +51,7 @@ type DetailTab = 'overview' | 'option-chain' | 'combined-oi' | 'technicals' | 'b
 type DirectionKey = 'up' | 'down' | 'rangebound' | 'volatile';
 type RiskProfile = 'Defensive' | 'Neutral' | 'Aggressive';
 type ContractSummary = DemoContractSummary;
+type LiveMarketCache = Record<string, FnOLiveMarketState>;
 type AgentHistoryItem = {
   id: string;
   mode: UserMode;
@@ -101,6 +109,9 @@ type AlgoStrategyConfig = {
   exitConditions: SignalCondition[];
   legs: AlgoLegConfig[];
   adjustmentTiming: 'Next Minute Start' | 'Immediate' | 'Delay By';
+  marginLimit: string;
+  maxLossLimit: string;
+  liquidityFilter: boolean;
   transactionStopLossType: '%' | '₹' | 'Pts';
   transactionStopLoss: string;
   transactionTakeProfitType: '%' | '₹' | 'Pts';
@@ -142,8 +153,8 @@ const scoreKeys: Array<keyof CandidateTrade['scoreBreakdown']> = [
 
 const defaultContract = contractRows.find((contract) => contract.symbol === 'NIFTY') ?? contractRows[0];
 const indicatorTypes = ['simpleMovingAverage', 'exponentialMovingAverage', 'rsi', 'superTrend', 'bollingerBands', 'macd', 'vwap', 'adx', 'openInterest', 'ivRank', 'ivPercentile', 'expectedMove', 'oiWall', 'pcr', 'fairValueDeviation'];
-const signalFields = ['Current Close', 'Current Open', 'Current High', 'Current Low', 'Current Open Interest', 'Current Volume', 'Bid Ask Spread %', 'IV Rank', 'Expected Move', 'OI Wall', 'Time Of Day', 'Day Of Week', 'Date', 'Days To Expire', 'Future Last Traded Price', 'Equity Last Traded Price', 'sma', 'rsi', 'vwap', 'adx'];
-const signalOperators = ['Equal To', 'Is Above', 'Is Below', 'Crosses Above', 'Crosses Below', 'Equal Or Above', 'Equal Or Below'];
+const signalFields = ['Current Close', 'Current Open', 'Current High', 'Current Low', 'Volume', 'Open Interest', 'VWAP', 'SMA', 'EMA', 'WMA', 'RSI', 'MACD', 'Bollinger Bands', 'Supertrend', 'ATR', 'Time of Day', 'Day of Week', 'Number'];
+const signalOperators = ['Crosses Above', 'Crosses Below', 'Greater Than', 'Less Than', 'Equal To', 'Higher Than Previous', 'Lower Than Previous'];
 const strikeOffsets = ['ITM 5', 'ITM 4', 'ITM 3', 'ITM 2', 'ITM 1', 'ATM', 'OTM 1', 'OTM 2', 'OTM 3', 'OTM 4', 'OTM 5'];
 const expiryChoices: AlgoLegConfig['expiry'][] = ['Current Week', 'Next Week', 'Current Month', 'Next Month'];
 const selectionBasisChoices = ['Spot Based', 'Future Based', 'Strike Price', 'Premium near', 'Premium greater', 'Premium lesser', 'Indicator Based', 'Delta near', 'Delta greater', 'Delta lesser', 'Outside Expected Move'];
@@ -220,7 +231,10 @@ function createDefaultAlgoConfig(contract: ContractSummary): AlgoStrategyConfig 
       }
     ],
     adjustmentTiming: 'Next Minute Start',
-    transactionStopLossType: '%',
+    marginLimit: '50000',
+    maxLossLimit: '2000',
+    liquidityFilter: true,
+    transactionStopLossType: '₹',
     transactionStopLoss: '35',
     transactionTakeProfitType: '%',
     transactionTakeProfit: '60',
@@ -291,6 +305,55 @@ function createMarketContext(contract: ContractSummary) {
   return buildMarketContext(contract, instrument, chain);
 }
 
+function liveContractSummary(base: ContractSummary, live: FnOLiveMarketState): ContractSummary {
+  const analytics = live.overview?.chain;
+  const spot = live.instrument.spot || base.spot;
+  const previousClose = live.instrument.previousClose || spot;
+  const changePct = previousClose ? round(((spot - previousClose) / previousClose) * 100, 2) : base.changePct;
+  const totalCallOi = live.chain.filter((quote) => quote.type === 'CE').reduce((sum, quote) => sum + quote.oi, 0);
+  const totalPutOi = live.chain.filter((quote) => quote.type === 'PE').reduce((sum, quote) => sum + quote.oi, 0);
+  const totalOi = totalCallOi + totalPutOi;
+  const totalOiChange = live.chain.reduce((sum, quote) => sum + quote.oiChange, 0);
+  const expiryDate = live.expiry || live.instrument.expiry || base.expiryDate;
+  const regime = live.overview?.regime;
+
+  return {
+    ...base,
+    id: `${base.symbol}-${expiryDate || base.expiryDate}`,
+    name: live.instrument.name || base.name,
+    expiry: expiryDate || base.expiry,
+    expiryDate: expiryDate || base.expiryDate,
+    spot,
+    changePct,
+    pcr: analytics?.pcrOi ?? (totalCallOi ? round(totalPutOi / totalCallOi, 2) : base.pcr),
+    volumePcr: analytics?.pcrVolume ?? base.volumePcr,
+    atmIv: analytics?.atmIv ?? base.atmIv,
+    lotSize: live.instrument.lotSize || base.lotSize,
+    liquidity: analytics?.liquidityScore ?? base.liquidity,
+    maxPain: analytics?.maxPain ?? base.maxPain,
+    trend: regime === 'bullish' ? 'Up' : regime === 'bearish' ? 'Down' : regime === 'volatile' ? 'Volatile' : 'Range',
+    buildUp: 'Live OI snapshot',
+    totalOi: totalOi || base.totalOi,
+    oiChangePct: totalOi ? round((totalOiChange / totalOi) * 100, 2) : base.oiChangePct,
+    putOiChangePct: totalPutOi ? round((live.chain.filter((quote) => quote.type === 'PE').reduce((sum, quote) => sum + quote.oiChange, 0) / totalPutOi) * 100, 2) : base.putOiChangePct,
+    callOiChangePct: totalCallOi ? round((live.chain.filter((quote) => quote.type === 'CE').reduce((sum, quote) => sum + quote.oiChange, 0) / totalCallOi) * 100, 2) : base.callOiChangePct,
+    source: 'Upstox Analytics via VPS'
+  };
+}
+
+function mergeLiveContracts(baseContracts: ContractSummary[], liveCache: LiveMarketCache) {
+  return baseContracts.map((contract) => {
+    const live = liveCache[contract.symbol];
+    return live ? liveContractSummary(contract, live) : contract;
+  });
+}
+
+function requestableExpiry(contract: ContractSummary) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(contract.expiryDate)) return undefined;
+  const expiryTime = new Date(`${contract.expiryDate}T23:59:59+05:30`).getTime();
+  return expiryTime >= Date.now() ? contract.expiryDate : undefined;
+}
+
 function trendToRegime(trend: ContractSummary['trend']) {
   if (trend === 'Up') return 'bullish' as const;
   if (trend === 'Down') return 'bearish' as const;
@@ -301,6 +364,150 @@ function trendToRegime(trend: ContractSummary['trend']) {
 function trendScore(contract: ContractSummary) {
   const direction = contract.trend === 'Up' ? 18 : contract.trend === 'Down' ? -18 : contract.trend === 'Volatile' ? 8 : 0;
   return Math.max(5, Math.min(95, round(50 + direction + contract.oiChangePct * 0.7 + (contract.pcr - 0.8) * 12, 1)));
+}
+
+function PageGuide({
+  screen,
+  activeContract,
+  activeTab,
+  onNavigate
+}: {
+  screen: Screen;
+  activeContract: ContractSummary | null;
+  activeTab: DetailTab;
+  onNavigate: (targetScreen: Screen, tab?: DetailTab) => void;
+}) {
+  let locationText = '';
+  let screenTitle = '';
+  let actions: string[] = [];
+  let destinations: Array<{ label: string; onClick: () => void }> = [];
+
+  const contractSymbol = activeContract?.symbol || 'NIFTY';
+  const tabLabel = detailTabs.find(t => t.id === activeTab)?.label || 'Overview';
+
+  switch (screen) {
+    case 'dashboard':
+      locationText = 'Markets > F&O Dashboard';
+      screenTitle = 'Scan the market, then select a contract';
+      actions = [
+        'Pick symbol',
+        'Read PCR / IV / OI',
+        'Choose view'
+      ];
+      destinations = [
+        { label: 'Option Screener', onClick: () => onNavigate('screener') },
+        { label: 'Create Custom Trades', onClick: () => onNavigate('create-trades') },
+        { label: 'Create Algo Strategies', onClick: () => onNavigate('algo-builder') }
+      ];
+      break;
+
+    case 'contract':
+      locationText = `Markets > ${contractSymbol} > ${tabLabel}`;
+      screenTitle = 'Read the selected contract before choosing legs';
+      actions = [
+        'Check trend',
+        'Compare chain',
+        'Open quick trades'
+      ];
+      destinations = [
+        { label: 'Back to Dashboard', onClick: () => onNavigate('dashboard') },
+        { label: 'Option Screener', onClick: () => onNavigate('screener') },
+        { label: 'Create Custom Trades', onClick: () => onNavigate('create-trades') }
+      ];
+      break;
+
+    case 'analyse-trade':
+      locationText = `Trades > Payoff Analyser > ${contractSymbol}`;
+      screenTitle = 'Validate payoff, risk and Greeks';
+      actions = [
+        'Max loss',
+        'Breakevens',
+        'Paper trade'
+      ];
+      destinations = [
+        { label: 'Back to Option Chain', onClick: () => onNavigate('contract', 'option-chain') },
+        { label: 'View All Suggested Trades', onClick: () => onNavigate('create-trades') },
+        { label: 'Option Screener', onClick: () => onNavigate('screener') }
+      ];
+      break;
+
+    case 'create-trades':
+      locationText = 'Trades > Create Trades';
+      screenTitle = 'Convert a market view into a defined-risk trade';
+      actions = [
+        'Select view',
+        'Pick risk profile',
+        'Analyse payoff'
+      ];
+      destinations = [
+        { label: 'Option Screener', onClick: () => onNavigate('screener') },
+        { label: 'Create Algo Strategy', onClick: () => onNavigate('algo-builder') },
+        { label: 'F&O Dashboard', onClick: () => onNavigate('dashboard') }
+      ];
+      break;
+
+    case 'algo-builder':
+      locationText = 'Algo Strategies > Create Strategy';
+      screenTitle = 'Turn a repeatable idea into rules';
+      actions = [
+        'Instrument',
+        'Signals',
+        'Legs + risk',
+        'Backtest'
+      ];
+      destinations = [
+        { label: 'Option Screener', onClick: () => onNavigate('screener') },
+        { label: 'F&O Dashboard', onClick: () => onNavigate('dashboard') },
+        { label: 'Create Custom Trades', onClick: () => onNavigate('create-trades') }
+      ];
+      break;
+
+    case 'screener':
+      locationText = 'Markets > Option Screener';
+      screenTitle = 'Filter the option universe into actionable rows';
+      actions = [
+        'Liquidity',
+        'Moneyness',
+        'IV / OI signal'
+      ];
+      destinations = [
+        { label: 'F&O Dashboard', onClick: () => onNavigate('dashboard') },
+        { label: 'Create Custom Trades', onClick: () => onNavigate('create-trades') },
+        { label: 'Create Algo Strategy', onClick: () => onNavigate('algo-builder') }
+      ];
+      break;
+
+    default:
+      break;
+  }
+
+  return (
+    <div className="page-context-bar" aria-label="Workspace context">
+      <div className="context-primary">
+        <div className="context-location-trail">
+          {locationText.split(' > ').map((crumb, idx, arr) => (
+            <React.Fragment key={crumb}>
+              <span className={idx === arr.length - 1 ? 'crumb-active' : 'crumb'}>{crumb}</span>
+              {idx < arr.length - 1 && <ChevronRight size={12} className="crumb-separator" />}
+            </React.Fragment>
+          ))}
+        </div>
+        <strong>{screenTitle}</strong>
+      </div>
+      <div className="context-action-chips">
+        {actions.map((act) => (
+          <span key={act}>{act}</span>
+        ))}
+      </div>
+      <div className="context-nav-links">
+        {destinations.map((dest) => (
+          <button key={dest.label} onClick={dest.onClick}>
+            {dest.label} <ChevronRight size={14} />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function FnOCopilotApp() {
@@ -317,14 +524,27 @@ function FnOCopilotApp() {
   const [chatHistory, setChatHistory] = React.useState<AgentHistoryItem[]>(starterChatHistory);
   const [input, setInput] = React.useState('');
   const [algoConfig, setAlgoConfig] = React.useState<AlgoStrategyConfig>(() => createDefaultAlgoConfig(defaultContract));
-  const [, setDataBackendStatus] = React.useState<DataBackendStatus>(
+  const [dataBackendStatus, setDataBackendStatus] = React.useState<DataBackendStatus>(
     isFnOCopilotEdgeEnabled() ? 'edge-online' : 'local'
   );
   const [dataMode, setDataMode] = React.useState<'demo' | 'upstox_live'>('demo');
   const [marketStatus, setMarketStatus] = React.useState<string | undefined>();
-  const [liveMarket, setLiveMarket] = React.useState<FnOLiveMarketState | null>(null);
+  const [liveMarketCache, setLiveMarketCache] = React.useState<LiveMarketCache>({});
+  const [liveLoadingSymbol, setLiveLoadingSymbol] = React.useState<string | undefined>();
+  const [liveError, setLiveError] = React.useState<string | undefined>();
+  const [artifactPayloadByMode, setArtifactPayloadByMode] = React.useState<Partial<Record<UserMode, Record<string, unknown>>>>({});
+  const [sessionIdsByMode, setSessionIdsByMode] = React.useState<Partial<Record<UserMode, string>>>({});
+  const [isAiTyping, setIsAiTyping] = React.useState(false);
+  const [showDebugPanel] = React.useState(() => {
+    if (typeof window === 'undefined') return false;
+    if ((import.meta as ImportMeta & { env?: Record<string, unknown> }).env?.DEV) return true;
+    return new URLSearchParams(window.location.search).has('fno_debug');
+  });
 
-  const activeContract = selectedContract ?? defaultContract;
+  const liveContracts = React.useMemo(() => mergeLiveContracts(contractRows, liveMarketCache), [liveMarketCache]);
+  const selectedContractBase = selectedContract ?? defaultContract;
+  const activeContract = liveContracts.find((contract) => contract.symbol === selectedContractBase.symbol) ?? selectedContractBase;
+  const liveMarket = liveMarketCache[activeContract.symbol] ?? null;
   const marketContext = React.useMemo(() => {
     if (liveMarket?.mode === 'upstox_live' && liveMarket.symbol === activeContract.symbol) {
       return buildMarketContext(activeContract, liveMarket.instrument, liveMarket.chain, liveMarket.overview);
@@ -335,8 +555,35 @@ function FnOCopilotApp() {
   const activeTrades = tradeMatrix[direction];
   const selectedTrade = activeTrades.find((trade) => trade.id === selectedTradeId) ?? activeTrades[1] ?? activeTrades[0] ?? baseTrades[0];
   const allTrades = React.useMemo(() => Object.values(tradeMatrix).flat(), [tradeMatrix]);
-  const draft = React.useMemo(() => draftFromChat(mode, messages, allTrades, overview), [mode, messages, allTrades, overview]);
+  const liveArtifactPayload = artifactPayloadByMode[mode] ?? {};
+  const activeSessionId = sessionIdsByMode[mode];
+  const baseDraft = React.useMemo(() => draftFromChat(mode, messages, allTrades, overview), [mode, messages, allTrades, overview]);
+  const draft = { ...baseDraft, ...(liveArtifactPayload as Partial<StrategyDraft>) };
   const workflowSteps = buildWorkflowSteps(mode, draft.status === 'ready');
+
+  const createSessionForMode = React.useCallback(async (targetMode: UserMode) => {
+    const sessionData = await initAgentSession({
+      mode: targetMode,
+      symbol: activeContract.symbol,
+      screen_context: screen
+    });
+    setSessionIdsByMode((current) => ({ ...current, [targetMode]: sessionData.session_id }));
+    setArtifactPayloadByMode((current) => ({
+      ...current,
+      [targetMode]: (sessionData.artifact_payload as Record<string, unknown>) ?? {}
+    }));
+    return sessionData.session_id;
+  }, [activeContract.symbol, screen]);
+
+  const patchArtifactForMode = React.useCallback((targetMode: UserMode, patch: Record<string, unknown>) => {
+    setArtifactPayloadByMode((current) => ({
+      ...current,
+      [targetMode]: {
+        ...(current[targetMode] ?? {}),
+        ...patch
+      }
+    }));
+  }, []);
 
   React.useEffect(() => {
     if (!activeTrades.some((trade) => trade.id === selectedTradeId)) {
@@ -347,32 +594,69 @@ function FnOCopilotApp() {
   React.useEffect(() => {
     if (!isFnOCopilotEdgeEnabled()) {
       setDataBackendStatus('local');
+      setLiveError('Live Upstox path is not enabled in this frontend environment. Showing workbook fallback.');
       return;
     }
 
     let cancelled = false;
-    setDataBackendStatus('edge-online');
-
-    fetchFnOCopilotBootstrap()
-      .then((data) => {
-        const live = parseLiveMarketBootstrap(data as Record<string, unknown>);
+    const load = async () => {
+      setDataBackendStatus('edge-online');
+      setLiveLoadingSymbol(activeContract.symbol);
+      try {
+        const data = await fetchFnOCopilotBootstrap({
+          instrument: activeContract.symbol,
+          expiry: requestableExpiry(activeContract)
+        });
+        const live = parseLiveMarketBootstrap(data as Record<string, unknown>, activeContract.symbol);
         if (!cancelled && live) {
-          setLiveMarket(live);
+          setLiveMarketCache((current) => ({ ...current, [live.symbol]: live }));
           setDataMode('upstox_live');
           setMarketStatus(live.marketStatus);
+          setLiveError(undefined);
         } else if (!cancelled) {
           setDataMode('demo');
+          setLiveError(`Live data unavailable for ${activeContract.symbol}`);
         }
         if (!cancelled) setDataBackendStatus('edge-online');
+      } catch (error) {
+        if (!cancelled) {
+          setDataBackendStatus('edge-error');
+          setLiveError(error instanceof Error ? error.message : `Live data unavailable for ${activeContract.symbol}`);
+        }
+      } finally {
+        if (!cancelled) setLiveLoadingSymbol(undefined);
+      }
+    };
+
+    load();
+    const intervalId = window.setInterval(load, 30000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [activeContract.symbol, activeContract.expiryDate]);
+
+  React.useEffect(() => {
+    if (!isFnOCopilotEdgeEnabled()) return;
+    if (sessionIdsByMode[mode]) return;
+
+    let cancelled = false;
+    createSessionForMode(mode)
+      .then(() => {
+        if (!cancelled) setDataBackendStatus('edge-online');
       })
-      .catch(() => {
-        if (!cancelled) setDataBackendStatus('edge-error');
+      .catch((error) => {
+        if (!cancelled) {
+          console.error('Failed to initialize FnO AI session:', error);
+          setDataBackendStatus('edge-error');
+        }
       });
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [mode, sessionIdsByMode, createSessionForMode]);
 
   const openContract = (contract: ContractSummary, nextTab: DetailTab = 'overview') => {
     setSelectedContract(contract);
@@ -383,7 +667,7 @@ function FnOCopilotApp() {
 
   const goFindTrades = () => {
     if (!selectedContract) {
-      openContract(contractRows[0], 'quick-trades');
+      openContract(liveContracts[0] ?? contractRows[0], 'quick-trades');
     } else {
       setScreen('contract');
       setTab('quick-trades');
@@ -422,6 +706,14 @@ function FnOCopilotApp() {
     setScreen('analyse-trade');
   };
 
+  const handlePageGuideNavigate = (targetScreen: Screen, nextTab?: DetailTab) => {
+    setWorkspaceMode('standard');
+    setScreen(targetScreen);
+    if (nextTab) {
+      setTab(nextTab);
+    }
+  };
+
   const sendMessage = async () => {
     const text = input.trim();
     if (!text) return;
@@ -431,25 +723,53 @@ function FnOCopilotApp() {
       text,
       createdAt: new Date().toISOString()
     };
-    const nextDraft = draftFromChat(mode, [...messages, userMessage], allTrades, overview);
-    let assistantText = assistantReply(nextDraft);
+    
+    // Optimistic UI update
+    setMessages((current) => [...current, userMessage]);
+    setInput('');
+    setIsAiTyping(true);
 
-    if (mode === 'ask-ai' && isFnOCopilotEdgeEnabled()) {
+    let assistantText = "I am processing your request...";
+    const nextBaseDraft = draftFromChat(mode, [...messages, userMessage], allTrades, overview);
+
+    if (isFnOCopilotEdgeEnabled()) {
       try {
-        const edgeReply = await fetchFnOCopilotChatReply({
-          mode,
-          message: text,
-          instrument: activeContract.symbol,
-          expiry: activeContract.expiry
-        });
-        if (edgeReply.assistant_message) {
-          assistantText = edgeReply.assistant_message;
+        let resolvedSessionId = activeSessionId;
+        if (!resolvedSessionId) {
+          resolvedSessionId = await createSessionForMode(mode);
         }
+        if (!resolvedSessionId) {
+          throw new Error('No active chat session for this mode.');
+        }
+
+        const edgeReply = await sendAgentChat({
+          session_id: resolvedSessionId,
+          message: text,
+          mode,
+        });
+        
+        if (edgeReply.assistant_reply) {
+          assistantText = edgeReply.assistant_reply;
+        }
+        
+        if (edgeReply.artifact_payload) {
+          setArtifactPayloadByMode((current) => ({
+            ...current,
+            [mode]: edgeReply.artifact_payload as Record<string, unknown>
+          }));
+        }
+        
         setDataBackendStatus('edge-online');
-      } catch {
+      } catch (e) {
+        console.error("Agent chat failed, falling back to local state.", e);
+        assistantText = assistantReply(nextBaseDraft);
         setDataBackendStatus('edge-error');
       }
+    } else {
+      assistantText = assistantReply(nextBaseDraft);
     }
+    
+    setIsAiTyping(false);
 
     const assistantMessage: ChatMessage = {
       id: `assistant-${Date.now()}`,
@@ -470,8 +790,10 @@ function FnOCopilotApp() {
       ...current
     ].slice(0, 8));
     setSubmittedModes((current) => ({ ...current, [mode]: true }));
-    setMessages((current) => [...current, userMessage, assistantMessage]);
-    setInput('');
+    setMessages((current) => {
+      // Find the user message we added optimistically, and append assistant message
+      return [...current, assistantMessage];
+    });
   };
 
   return (
@@ -500,6 +822,14 @@ function FnOCopilotApp() {
         )}
 
         <main className={`main-surface ${workspaceMode === 'agent' ? 'agent-main-surface' : ''}`}>
+          {workspaceMode === 'standard' && (
+            <PageGuide
+              screen={screen}
+              activeContract={activeContract}
+              activeTab={tab}
+              onNavigate={handlePageGuideNavigate}
+            />
+          )}
           {workspaceMode === 'agent' ? (
             <AgentModeWorkspace
               mode={mode}
@@ -514,15 +844,27 @@ function FnOCopilotApp() {
               showArtifact={mode !== 'ask-ai' && Boolean(submittedModes[mode])}
               onNewChat={() => {
                 setMessages(createInitialMessages());
-                setSubmittedModes({});
+                setSubmittedModes((current) => ({ ...current, [mode]: false }));
+                setArtifactPayloadByMode((current) => ({ ...current, [mode]: {} }));
+                setSessionIdsByMode((current) => {
+                  const next = { ...current };
+                  delete next[mode];
+                  return next;
+                });
                 setInput('');
+                if (isFnOCopilotEdgeEnabled()) {
+                  createSessionForMode(mode).catch((error) => {
+                    console.error('Failed to create new chat session:', error);
+                    setDataBackendStatus('edge-error');
+                  });
+                }
               }}
               onOpenData={() => {
                 setWorkspaceMode('standard');
                 setScreen(selectedContract ? 'contract' : 'dashboard');
               }}
               onOpenTrade={(tradeId) => openAnalyseTrade(tradeId)}
-              onOpenAlgo={applyAiAlgoDraft}
+              onPatchArtifact={(patch) => patchArtifactForMode(mode, patch)}
               onOpenScreener={openScreener}
             />
           ) : screen === 'algo-builder' ? (
@@ -531,22 +873,38 @@ function FnOCopilotApp() {
               setConfig={setAlgoConfig}
               aiDraft={draft}
               selectedContract={activeContract}
+              contracts={liveContracts}
               onApplyAiDraft={applyAiAlgoDraft}
             />
           ) : screen === 'create-trades' ? (
             <CreateTradesWorkspace
               activeContract={activeContract}
+              contracts={liveContracts}
               topTrades={baseTrades.slice(0, 5)}
               tradeMatrix={tradeMatrix}
               onOpenContract={openContract}
               onAnalyseTrade={openAnalyseTrade}
             />
           ) : screen === 'screener' ? (
-            <OptionScreener onOpenContract={openContract} onAnalyseTrade={openAnalyseTrade} />
+            <OptionScreener
+              contracts={liveContracts}
+              liveMarketCache={liveMarketCache}
+              onOpenContract={openContract}
+              onAnalyseTrade={openAnalyseTrade}
+            />
           ) : screen === 'analyse-trade' ? (
             <TradeAnalysisPage trade={selectedTrade} instrument={instrument} contract={activeContract} onBack={() => setScreen(selectedContract ? 'contract' : 'dashboard')} />
           ) : screen === 'dashboard' || !selectedContract ? (
-            <OptionsDashboard onSelectContract={openContract} />
+            <OptionsDashboard
+              onSelectContract={openContract}
+              dataMode={dataMode}
+              marketStatus={marketStatus}
+              liveMarket={liveMarket}
+              contracts={liveContracts}
+              liveMarketCache={liveMarketCache}
+              liveLoadingSymbol={liveLoadingSymbol}
+              liveError={liveError}
+            />
           ) : (
             <ContractDetail
               contract={selectedContract}
@@ -589,8 +947,63 @@ function FnOCopilotApp() {
             workflowSteps={workflowSteps}
           />
         )}
+        {showDebugPanel && (
+          <FnODebugPanel
+            mode={mode}
+            sessionIdsByMode={sessionIdsByMode}
+            dataBackendStatus={dataBackendStatus}
+            isAiTyping={isAiTyping}
+            submittedModes={submittedModes}
+            artifactPayloadByMode={artifactPayloadByMode}
+            activeArtifactStatus={draft.status}
+          />
+        )}
       </div>
     </div>
+  );
+}
+
+function FnODebugPanel({
+  mode,
+  sessionIdsByMode,
+  dataBackendStatus,
+  isAiTyping,
+  submittedModes,
+  artifactPayloadByMode,
+  activeArtifactStatus
+}: {
+  mode: UserMode;
+  sessionIdsByMode: Partial<Record<UserMode, string>>;
+  dataBackendStatus: DataBackendStatus;
+  isAiTyping: boolean;
+  submittedModes: Partial<Record<UserMode, boolean>>;
+  artifactPayloadByMode: Partial<Record<UserMode, Record<string, unknown>>>;
+  activeArtifactStatus: string;
+}) {
+  const formatSession = (value?: string) => (value ? `${value.slice(0, 8)}...` : '—');
+  const modeRows: UserMode[] = ['create-trade', 'create-strategy', 'screener', 'ask-ai'];
+
+  return (
+    <aside className="fno-debug-panel" aria-label="FnO debug panel">
+      <p className="fno-debug-title">FnO Debug</p>
+      <p>active_mode: <strong>{mode}</strong></p>
+      <p>backend: <strong>{dataBackendStatus}</strong></p>
+      <p>ai_typing: <strong>{isAiTyping ? 'yes' : 'no'}</strong></p>
+      <p>artifact_status: <strong>{activeArtifactStatus}</strong></p>
+      <div className="fno-debug-table">
+        {modeRows.map((item) => {
+          const payloadSize = Object.keys(artifactPayloadByMode[item] ?? {}).length;
+          return (
+            <div key={item} className={`fno-debug-row ${item === mode ? 'active' : ''}`}>
+              <span>{item}</span>
+              <span>{formatSession(sessionIdsByMode[item])}</span>
+              <span>{submittedModes[item] ? 'sent' : 'idle'}</span>
+              <span>{payloadSize}</span>
+            </div>
+          );
+        })}
+      </div>
+    </aside>
   );
 }
 
@@ -617,7 +1030,7 @@ function ProductNav({
       </button>
       <div className="product-nav-actions">
         <span className={`data-mode-pill ${dataMode === 'upstox_live' ? 'live' : 'demo'}`}>
-          {dataMode === 'upstox_live' ? 'Live · Upstox Analytics' : 'Demo data'}
+          {dataMode === 'upstox_live' ? 'Live · Upstox Analytics' : 'Workbook fallback'}
           {marketStatus ? ` · ${marketStatus}` : ''}
         </span>
         <div className="workspace-switch" aria-label="Workspace mode">
@@ -666,7 +1079,7 @@ function AgentModeWorkspace({
   onNewChat,
   onOpenData,
   onOpenTrade,
-  onOpenAlgo,
+  onPatchArtifact,
   onOpenScreener
 }: {
   mode: UserMode;
@@ -682,7 +1095,7 @@ function AgentModeWorkspace({
   onNewChat: () => void;
   onOpenData: () => void;
   onOpenTrade: (tradeId?: string) => void;
-  onOpenAlgo: () => void;
+  onPatchArtifact: (patch: Record<string, unknown>) => void;
   onOpenScreener: () => void;
 }) {
   const selectedTrade = draft.selectedTrade;
@@ -799,10 +1212,7 @@ function AgentModeWorkspace({
             {mode === 'create-strategy' && (
               <div className="agent-artifact-stack">
                 <AgentRulesVisual draft={draft} />
-                <InfoBlock title="Filters" items={draft.filters} />
-                <InfoBlock title="Entry" items={draft.entryRules} />
-                <InfoBlock title="Exit and risk" items={[...draft.exitRules.slice(0, 2), ...draft.riskRules.slice(0, 2)]} />
-                <button className="wide-primary" onClick={onOpenAlgo}><BrainCircuit size={15} /> Open Prefilled Algo Builder</button>
+                <AgentAlgoSections draft={draft} onPatch={onPatchArtifact} />
               </div>
             )}
 
@@ -873,6 +1283,72 @@ function AgentRulesVisual({ draft }: { draft: ReturnType<typeof draftFromChat> }
           </span>
         ))}
       </div>
+    </div>
+  );
+}
+
+function AgentAlgoSections({
+  draft,
+  onPatch
+}: {
+  draft: ReturnType<typeof draftFromChat>;
+  onPatch: (patch: Record<string, unknown>) => void;
+}) {
+  const [stage, setStage] = React.useState<1 | 2 | 3 | 4>(1);
+  const payload = draft as unknown as Record<string, unknown>;
+  const readString = (key: string, fallback = '') => typeof payload[key] === 'string' ? String(payload[key]) : fallback;
+  const readBool = (key: string, fallback = false) => typeof payload[key] === 'boolean' ? Boolean(payload[key]) : fallback;
+  const readLines = (key: string, fallback: string[]) =>
+    Array.isArray(payload[key]) ? (payload[key] as unknown[]).map((item) => String(item)).join('\n') : fallback.join('\n');
+  const toLines = (value: string) => value.split('\n').map((item) => item.trim()).filter(Boolean);
+
+  return (
+    <div className="agent-algo-sections">
+      <div className="agent-algo-stage-row">
+        <button className={stage === 1 ? 'active' : ''} onClick={() => setStage(1)}>1. Setup</button>
+        <button className={stage === 2 ? 'active' : ''} onClick={() => setStage(2)}>2. Signals</button>
+        <button className={stage === 3 ? 'active' : ''} onClick={() => setStage(3)}>3. Legs and Risk</button>
+        <button className={stage === 4 ? 'active' : ''} onClick={() => setStage(4)}>4. Validate</button>
+      </div>
+
+      {stage === 1 && (
+        <div className="agent-algo-editor">
+          <label><span>Run Name</span><input value={readString('runName', draft.title)} onChange={(event) => onPatch({ runName: event.target.value })} /></label>
+          <label><span>Symbol</span><input value={readString('symbol', '')} onChange={(event) => onPatch({ symbol: event.target.value })} /></label>
+          <label><span>Instrument Segment</span><input value={readString('instrumentSegment', '')} onChange={(event) => onPatch({ instrumentSegment: event.target.value })} /></label>
+          <label><span>Trade Type</span><input value={readString('tradeType', '')} onChange={(event) => onPatch({ tradeType: event.target.value })} /></label>
+          <label><span>Total Margin Limit</span><input value={readString('marginLimit', '')} onChange={(event) => onPatch({ marginLimit: event.target.value })} /></label>
+        </div>
+      )}
+
+      {stage === 2 && (
+        <div className="agent-algo-editor">
+          <label><span>Indicators (one per line)</span><textarea rows={4} value={readLines('indicators', [])} onChange={(event) => onPatch({ indicators: toLines(event.target.value) })} /></label>
+          <label><span>Entry Rules (one per line)</span><textarea rows={4} value={readLines('entryRules', draft.entryRules)} onChange={(event) => onPatch({ entryRules: toLines(event.target.value) })} /></label>
+          <label><span>Exit Rules (one per line)</span><textarea rows={4} value={readLines('exitRules', draft.exitRules)} onChange={(event) => onPatch({ exitRules: toLines(event.target.value) })} /></label>
+        </div>
+      )}
+
+      {stage === 3 && (
+        <div className="agent-algo-editor">
+          <label><span>Legs (one leg per line)</span><textarea rows={5} value={readLines('legs', [])} onChange={(event) => onPatch({ legs: toLines(event.target.value) })} /></label>
+          <label><span>Max Loss per Trade</span><input value={readString('maxLossLimit', '')} onChange={(event) => onPatch({ maxLossLimit: event.target.value })} /></label>
+          <label><span>Daily Stop Loss</span><input value={readString('dailyStopLoss', '')} onChange={(event) => onPatch({ dailyStopLoss: event.target.value })} /></label>
+          <label><span>Daily Take Profit</span><input value={readString('dailyTakeProfit', '')} onChange={(event) => onPatch({ dailyTakeProfit: event.target.value })} /></label>
+          <label className="agent-algo-check"><input type="checkbox" checked={readBool('liquidityFilter', false)} onChange={(event) => onPatch({ liquidityFilter: event.target.checked })} /> Enforce liquidity filter</label>
+        </div>
+      )}
+
+      {stage === 4 && (
+        <div className="agent-algo-editor">
+          <InfoBlock title="Validation status" items={[
+            draft.status === 'ready' ? 'Ready to validate' : 'Needs more inputs before validate',
+            ...(draft.missingInputs.length ? draft.missingInputs : ['No missing inputs'])
+          ]} />
+          <label><span>Validation Notes</span><textarea rows={4} value={readString('validationNotes', '')} onChange={(event) => onPatch({ validationNotes: event.target.value })} /></label>
+          <p className="agent-algo-note">Edits stay in Agent mode and update this artifact directly.</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -1001,33 +1477,175 @@ function FloatingAIAssistant({
   );
 }
 
-function OptionsDashboard({ onSelectContract }: { onSelectContract: (contract: ContractSummary) => void }) {
+function readUpstoxInfoNumber(info: Record<string, unknown> | undefined, block: string, field: string) {
+  const result = info?.[block] as { ok?: boolean; data?: Record<string, unknown> } | undefined;
+  if (!result?.ok) return undefined;
+  const value = Number(result.data?.[field]);
+  return Number.isFinite(value) ? value : undefined;
+}
+
+function getLiveMarketInformationRows(info: Record<string, unknown> | undefined) {
+  const totalPuts = readUpstoxInfoNumber(info, 'oi', 'total_puts');
+  const totalCalls = readUpstoxInfoNumber(info, 'oi', 'total_calls');
+  const putChange = readUpstoxInfoNumber(info, 'changeOi', 'total_put_change_oi');
+  const callChange = readUpstoxInfoNumber(info, 'changeOi', 'total_call_change_oi');
+  const rows = [
+    { label: 'Official PCR', value: readUpstoxInfoNumber(info, 'pcr', 'pcr')?.toFixed(2) ?? 'Pending' },
+    { label: 'Max pain', value: formatMaybeRupee(readUpstoxInfoNumber(info, 'maxPain', 'max_pain')) },
+    { label: 'OI totals', value: totalPuts !== undefined && totalCalls !== undefined ? `P ${compactNumber(totalPuts)} / C ${compactNumber(totalCalls)}` : 'Pending' },
+    { label: 'OI change', value: putChange !== undefined && callChange !== undefined ? `P ${compactNumber(putChange)} / C ${compactNumber(callChange)}` : 'Pending' }
+  ];
+  return rows;
+}
+
+function formatMaybeRupee(value: number | undefined) {
+  if (!Number.isFinite(value)) return 'Pending';
+  return `₹${Number(value).toLocaleString('en-IN')}`;
+}
+
+function compactNumber(value: number) {
+  return new Intl.NumberFormat('en-IN', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
+}
+
+function BeginnerFlowStrip() {
+  const steps = [
+    { title: '1. Pick', body: 'Choose the index or FnO stock you actually want to understand.' },
+    { title: '2. Read', body: 'Check trend, PCR, IV, max pain, liquidity and news risk.' },
+    { title: '3. Compare', body: 'Use Top Trades or Quick Trades to see capped-risk choices.' },
+    { title: '4. Analyse', body: 'Open payoff, max loss, breakeven and Greeks before paper trading.' }
+  ];
+
+  return (
+    <section className="beginner-flow-strip" aria-label="Beginner workflow">
+      <div>
+        <p className="eyebrow">New trader route</p>
+        <h3>Do not start from strikes. Start from the decision.</h3>
+      </div>
+      <div className="beginner-step-row">
+        {steps.map((step) => (
+          <span key={step.title}>
+            <strong>{step.title}</strong>
+            <small>{step.body}</small>
+          </span>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ConceptStrip({ dataMode }: { dataMode: 'demo' | 'upstox_live' }) {
+  const concepts = [
+    { label: 'PCR', value: 'Put-call ratio', body: 'Above 1 usually means more put OI; below 1 usually means call-side pressure.' },
+    { label: 'IV', value: 'Implied volatility', body: 'Higher IV means expensive options and larger expected moves.' },
+    { label: 'OI', value: 'Open interest', body: 'Shows where traders have built positions. OI change tells what is moving today.' },
+    { label: 'MWPL', value: 'Position limit', body: 'High MWPL can make stock FnO riskier because fresh positions may be restricted.' }
+  ];
+
+  return (
+    <section className="concept-strip">
+      <div className="panel-header">
+        <div>
+          <p className="eyebrow">Plain English layer</p>
+          <h3>What the dashboard is trying to tell you</h3>
+        </div>
+        <span className="badge">{dataMode === 'upstox_live' ? 'Live context' : 'Workbook context'}</span>
+      </div>
+      <div className="concept-grid">
+        {concepts.map((concept) => (
+          <article key={concept.label}>
+            <strong>{concept.label}</strong>
+            <span>{concept.value}</span>
+            <small>{concept.body}</small>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ContractDecisionGuide({
+  contract,
+  analytics,
+  onQuickTrades,
+  onAnalyseTrade
+}: {
+  contract: ContractSummary;
+  analytics: ChainAnalytics;
+  onQuickTrades: () => void;
+  onAnalyseTrade: () => void;
+}) {
+  const pcrLabel = analytics.pcrOi >= 1.1 ? 'put-heavy' : analytics.pcrOi <= 0.85 ? 'call-heavy' : 'balanced';
+  const ivLabel = analytics.atmIv >= 25 ? 'expensive options' : analytics.atmIv <= 13 ? 'cheaper options' : 'normal IV';
+  const riskNote = contract.mwpl >= 80
+    ? 'MWPL is high, so keep position size small and avoid crowded stock-option trades.'
+    : 'Liquidity and position-limit risk look acceptable for educational analysis.';
+
+  return (
+    <section className="decision-guide-card">
+      <div>
+        <p className="eyebrow">Beginner read</p>
+        <h3>{contract.symbol}: what to decide before choosing legs</h3>
+        <p>{contract.trend} trend, {pcrLabel} PCR and {ivLabel}. {riskNote}</p>
+      </div>
+      <div className="decision-meter-grid">
+        <span><b>PCR</b><em>{analytics.pcrOi}</em><small>{pcrLabel}</small></span>
+        <span><b>IV</b><em>{analytics.atmIv}%</em><small>{ivLabel}</small></span>
+        <span><b>Liquidity</b><em>{analytics.liquidityScore}/100</em><small>tradeability</small></span>
+      </div>
+      <div className="decision-guide-actions">
+        <button onClick={onQuickTrades}><Target size={14} /> Compare Quick Trades</button>
+        <button onClick={onAnalyseTrade}><ShieldCheck size={14} /> Analyse Top Trade</button>
+      </div>
+    </section>
+  );
+}
+
+function OptionsDashboard({
+  onSelectContract,
+  dataMode,
+  marketStatus,
+  liveMarket,
+  contracts,
+  liveMarketCache,
+  liveLoadingSymbol,
+  liveError
+}: {
+  onSelectContract: (contract: ContractSummary) => void;
+  dataMode: 'demo' | 'upstox_live';
+  marketStatus?: string;
+  liveMarket: FnOLiveMarketState | null;
+  contracts: ContractSummary[];
+  liveMarketCache: LiveMarketCache;
+  liveLoadingSymbol?: string;
+  liveError?: string;
+}) {
   const [query, setQuery] = React.useState('');
   const [trendFilter, setTrendFilter] = React.useState<'All' | ContractSummary['trend']>('All');
   const [contractView, setContractView] = React.useState<'top' | 'all'>('top');
   const filteredContracts = React.useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    return contractRows
+    return contracts
       .filter((contract) => trendFilter === 'All' || contract.trend === trendFilter)
       .filter((contract) => {
         if (!normalized) return true;
         return [contract.symbol, contract.name, contract.industry].some((value) => value.toLowerCase().includes(normalized));
       });
-  }, [query, trendFilter]);
-  const medianPcr = median(contractRows.map((contract) => contract.pcr));
-  const highMwpl = contractRows.filter((contract) => contract.mwpl >= 80).length;
+  }, [contracts, query, trendFilter]);
+  const medianPcr = median(contracts.map((contract) => contract.pcr));
+  const highMwpl = contracts.filter((contract) => contract.mwpl >= 80).length;
   const latestUpdated = defaultContract ? instrumentsBySymbol[defaultContract.symbol]?.snapshotTs : dataSource.generatedAt;
-  const nifty = contractRows.find((contract) => contract.symbol === 'NIFTY') ?? contractRows[0];
-  const bankNifty = contractRows.find((contract) => contract.symbol === 'BANKNIFTY') ?? contractRows[1] ?? contractRows[0];
+  const nifty = contracts.find((contract) => contract.symbol === 'NIFTY') ?? contracts[0];
+  const bankNifty = contracts.find((contract) => contract.symbol === 'BANKNIFTY') ?? contracts[1] ?? contracts[0];
   const activity = React.useMemo(() => ({
-    callsActive: buildActivityRows('CE', 'volume'),
-    callsGainers: buildActivityRows('CE', 'price'),
-    callsOi: buildActivityRows('CE', 'oi'),
-    putsActive: buildActivityRows('PE', 'volume'),
-    putsGainers: buildActivityRows('PE', 'price'),
-    putsOi: buildActivityRows('PE', 'oi')
-  }), []);
-  const insights = buildDashboardInsights(nifty, bankNifty);
+    callsActive: buildActivityRows('CE', 'volume', contracts, liveMarketCache),
+    callsGainers: buildActivityRows('CE', 'price', contracts, liveMarketCache),
+    callsOi: buildActivityRows('CE', 'oi', contracts, liveMarketCache),
+    putsActive: buildActivityRows('PE', 'volume', contracts, liveMarketCache),
+    putsGainers: buildActivityRows('PE', 'price', contracts, liveMarketCache),
+    putsOi: buildActivityRows('PE', 'oi', contracts, liveMarketCache)
+  }), [contracts, liveMarketCache]);
+  const dashboardCharts = React.useMemo(() => buildDashboardCharts(contracts), [contracts]);
+  const insights = buildDashboardInsights(nifty, bankNifty, dashboardCharts.oiChangeLeaders[0]?.symbol);
   const events = demoEvents();
   const topMovers = React.useMemo(
     () => [...filteredContracts].sort((a, b) => Math.abs(b.changePct) - Math.abs(a.changePct)).slice(0, 24),
@@ -1041,6 +1659,11 @@ function OptionsDashboard({ onSelectContract }: { onSelectContract: (contract: C
     { label: 'MWPL Watch', value: `${highMwpl} symbols`, tone: highMwpl >= 8 ? 'negative' : 'positive' },
     { label: 'Event Risk', value: `${events.length} events`, tone: events.length >= 3 ? 'negative' : 'neutral' }
   ] as const;
+  const coverageCounts = getUpstoxCoverageCounts();
+  const activeLiveSymbol = liveMarket?.mode === 'upstox_live' ? liveMarket.symbol : undefined;
+  const liveUpdatedAt = liveMarket?.instrument.snapshotTs ?? latestUpdated ?? dataSource.generatedAt;
+  const upstoxFeedRows = upstoxAnalyticsFeeds;
+  const liveMarketInfoRows = getLiveMarketInformationRows(liveMarket?.marketInformation);
 
   return (
     <div className="page-stack">
@@ -1048,13 +1671,20 @@ function OptionsDashboard({ onSelectContract }: { onSelectContract: (contract: C
         <div>
           <p className="eyebrow">Markets · Options dashboard</p>
           <h2>NSE F&O contracts</h2>
-          <p className="subcopy">Excel-backed FnO universe with contract selection, PCR, open interest, build-up, volatility, MWPL, and trade discovery entry points.</p>
+          <p className="subcopy">
+            {dataMode === 'upstox_live'
+              ? 'Upstox Analytics-powered FnO workspace with live option-chain, Greeks, OI, market-status, and trade discovery entry points.'
+              : 'Excel-backed fallback universe with the same option-chain, PCR, OI, build-up, volatility, MWPL, and trade discovery structure.'}
+          </p>
         </div>
         <div className="search-box">
           <Search size={17} />
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search any FnO stock or index..." />
         </div>
       </header>
+
+      <BeginnerFlowStrip />
+      <ConceptStrip dataMode={dataMode} />
 
       <section className="market-overview-row">
         <IndexViewCard title="Nifty 50 Level" contract={nifty} onSelect={onSelectContract} />
@@ -1068,7 +1698,7 @@ function OptionsDashboard({ onSelectContract }: { onSelectContract: (contract: C
             <span><b>Index Fut</b><em className="positive">Long +6%</em></span>
             <span><b>Index Opt</b><em>Put hedge elevated</em></span>
           </div>
-          <small>Demo delayed flow · not a hard trade trigger</small>
+          <small>{dataMode === 'upstox_live' ? 'Market Information feed · context only, not a hard trade trigger' : 'Workbook fallback flow · not a hard trade trigger'}</small>
         </div>
       </section>
 
@@ -1081,11 +1711,49 @@ function OptionsDashboard({ onSelectContract }: { onSelectContract: (contract: C
         ))}
       </section>
 
+      <section className="upstox-readiness-grid">
+        <div className="market-panel live-data-card">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">Upstox Analytics Token</p>
+              <h3>Data readiness</h3>
+            </div>
+            <span className={`data-mode-pill ${dataMode === 'upstox_live' ? 'live' : 'demo'}`}>
+              {dataMode === 'upstox_live' ? 'Live analytics' : 'Workbook fallback'}
+            </span>
+          </div>
+          <div className="readiness-grid">
+            <span><b>Market</b><em>{marketStatus ?? 'Not connected'}</em></span>
+            <span><b>Active live symbol</b><em>{activeLiveSymbol ?? 'Fallback universe'}</em></span>
+            <span><b>Last snapshot</b><em>{liveUpdatedAt?.slice(0, 16).replace('T', ' ')}</em></span>
+            <span><b>Token scope</b><em>Read-only analytics</em></span>
+          </div>
+          <small>Execution, positions, holdings and user funds still require a separate trading/OAuth flow; this dashboard should treat the Analytics Token as market intelligence only.</small>
+        </div>
+
+        <div className="market-panel coverage-summary-card">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">Coverage map</p>
+              <h3>Available data points mapped to UX</h3>
+            </div>
+          </div>
+          <div className="coverage-count-row">
+            <span className="coverage-count covered"><b>{coverageCounts.covered}</b><em>Covered now</em></span>
+            <span className="coverage-count partial"><b>{coverageCounts.partial}</b><em>Partial</em></span>
+            <span className="coverage-count planned"><b>{coverageCounts.planned}</b><em>Next wiring</em></span>
+          </div>
+          <div className="source-chip-row">
+            {upstoxDashboardCoverage.map((item) => <span key={item.title}>{item.title}</span>)}
+          </div>
+        </div>
+      </section>
+
       <section className="dashboard-metrics">
-        <Metric icon={<Activity size={18} />} label="FnO stocks" value={contractRows.length.toString()} />
+        <Metric icon={<Activity size={18} />} label="FnO stocks" value={contracts.length.toString()} />
         <Metric icon={<Gauge size={18} />} label="Median PCR OI" value={medianPcr.toString()} />
         <Metric icon={<ListFilter size={18} />} label="MWPL above 80%" value={highMwpl.toString()} />
-        <Metric icon={<ShieldCheck size={18} />} label="Mode" value="Demo · Excel" />
+        <Metric icon={<ShieldCheck size={18} />} label="Mode" value={dataMode === 'upstox_live' ? 'Upstox live' : 'Workbook fallback'} />
       </section>
 
       <section className="dashboard-grid">
@@ -1094,6 +1762,7 @@ function OptionsDashboard({ onSelectContract }: { onSelectContract: (contract: C
             <div>
               <p className="eyebrow">Most active option contracts</p>
               <h3>Pick a FnO stock or index to analyse</h3>
+              <p className="subcopy">Selecting a symbol starts a 30-second live refresh loop through Supabase and the VPS quant service.</p>
             </div>
             <div className="range-pills">
               <button className={contractView === 'top' ? 'active' : ''} onClick={() => setContractView('top')}>Top movers</button>
@@ -1172,6 +1841,77 @@ function OptionsDashboard({ onSelectContract }: { onSelectContract: (contract: C
         </div>
       </section>
 
+      <section className="market-panel">
+        <div className="panel-header">
+          <div>
+            <p className="eyebrow">Dynamic dashboard contract</p>
+            <h3>How each Upstox data source powers the product</h3>
+          </div>
+          <span className="badge">Analytics Token scope</span>
+        </div>
+        <div className="upstox-feed-grid">
+          {upstoxFeedRows.map((feed) => (
+            <article key={feed.id} className="upstox-feed-card">
+              <div>
+                <span className={`coverage-status ${feed.status}`}>{feed.status}</span>
+                <p className="eyebrow">{feed.category}</p>
+                <h4>{feed.name}</h4>
+              </div>
+              <p>{feed.dashboardUse}</p>
+              <div className="feed-meta-row">
+                <span>{feed.cadence}</span>
+                <span>{feed.mappedScreens.slice(0, 3).join(' · ')}</span>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="tab-grid">
+        <div className="market-panel">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">Market Information APIs</p>
+              <h3>New dynamic blocks to wire next</h3>
+            </div>
+            <Activity size={18} />
+          </div>
+          <div className="live-info-strip">
+            {liveMarketInfoRows.map((row) => (
+              <span key={row.label}><b>{row.label}</b><em>{row.value}</em></span>
+            ))}
+          </div>
+          <div className="market-info-ladder">
+            {upstoxDashboardCoverage.map((item) => (
+              <span key={item.title}>
+                <b>{item.title}</b>
+                <em>{item.value}</em>
+                <small>{item.screens.join(' · ')}</small>
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div className="market-panel">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">Hierarchy additions</p>
+              <h3>Missing screens recommended for MVP</h3>
+            </div>
+            <Layers3 size={18} />
+          </div>
+          <div className="screen-suggestion-list">
+            {upstoxMissingScreenSuggestions.slice(0, 4).map((screen) => (
+              <span key={screen.title}>
+                <b>{screen.title}</b>
+                <em>{screen.parent} · {screen.priority}</em>
+                <small>{screen.purpose}</small>
+              </span>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section className="dashboard-grid">
         <div className="market-panel span-2">
           <div className="panel-header">
@@ -1182,7 +1922,7 @@ function OptionsDashboard({ onSelectContract }: { onSelectContract: (contract: C
             <span className="badge">{dataSource.workbook}</span>
           </div>
           <div className="index-pulse-grid">
-            {marketCharts.indexCards.map((contract) => (
+            {dashboardCharts.indexCards.map((contract) => (
               <button key={contract.symbol} className="index-pulse" onClick={() => onSelectContract(contract as ContractSummary)}>
                 <span>{contract.symbol}</span>
                 <strong>₹{contract.spot.toLocaleString('en-IN')}</strong>
@@ -1195,7 +1935,7 @@ function OptionsDashboard({ onSelectContract }: { onSelectContract: (contract: C
 
         <ChartPanel title="PCR leaders" eyebrow="Options sentiment" badge="OI + Volume">
           <ResponsiveContainer width="100%" height={260}>
-            <ComposedChart data={marketCharts.pcrLeaders}>
+            <ComposedChart data={dashboardCharts.pcrLeaders}>
               <CartesianGrid stroke="#dfe6df" />
               <XAxis dataKey="symbol" interval={0} tick={{ fontSize: 11 }} />
               <YAxis />
@@ -1209,8 +1949,8 @@ function OptionsDashboard({ onSelectContract }: { onSelectContract: (contract: C
         <ChartPanel title="Build-up mix" eyebrow="Futures and options" badge="Contracts">
           <ResponsiveContainer width="100%" height={260}>
             <PieChart>
-              <Pie data={marketCharts.buildupMix} dataKey="contracts" nameKey="bucket" cx="50%" cy="50%" outerRadius={86} label>
-                {marketCharts.buildupMix.map((_, index) => <Cell key={index} fill={chartPalette[index % chartPalette.length]} />)}
+              <Pie data={dashboardCharts.buildupMix} dataKey="contracts" nameKey="bucket" cx="50%" cy="50%" outerRadius={86} label>
+                {dashboardCharts.buildupMix.map((_, index) => <Cell key={index} fill={chartPalette[index % chartPalette.length]} />)}
               </Pie>
               <Tooltip />
             </PieChart>
@@ -1219,7 +1959,7 @@ function OptionsDashboard({ onSelectContract }: { onSelectContract: (contract: C
 
         <ChartPanel title="MWPL risk watch" eyebrow="Position limits" badge="Top 10">
           <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={marketCharts.mwplLeaders} layout="vertical" margin={{ left: 16, right: 16 }}>
+            <BarChart data={dashboardCharts.mwplLeaders} layout="vertical" margin={{ left: 16, right: 16 }}>
               <CartesianGrid stroke="#dfe6df" />
               <XAxis type="number" />
               <YAxis dataKey="symbol" type="category" width={82} tick={{ fontSize: 11 }} />
@@ -1231,7 +1971,7 @@ function OptionsDashboard({ onSelectContract }: { onSelectContract: (contract: C
 
         <ChartPanel title="OI change leaders" eyebrow="Participation" badge="Day change">
           <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={marketCharts.oiChangeLeaders}>
+            <BarChart data={dashboardCharts.oiChangeLeaders}>
               <CartesianGrid stroke="#dfe6df" />
               <XAxis dataKey="symbol" interval={0} tick={{ fontSize: 11 }} />
               <YAxis />
@@ -1253,11 +1993,12 @@ function OptionsDashboard({ onSelectContract }: { onSelectContract: (contract: C
             <ListFilter size={18} />
           </div>
           <div className="filter-list">
-            <span>FnO stock universe from workbook: {contractRows.length} symbols</span>
+            <span>FnO stock universe from workbook: {contracts.length} symbols</span>
             <span>OI, PCR, MWPL, rollover and volatility from F&O Stocks</span>
             <span>Option chain, IV, Greeks and build-up from F&O Data</span>
-            <span>Bid/ask spread is synthetic until Upstox quote fields are connected</span>
-            <span>Last sample update {latestUpdated?.slice(0, 16).replace('T', ' ')}</span>
+            <span>{dataMode === 'upstox_live' ? 'Bid/ask, IV and Greeks hydrate through Upstox option-chain rows' : 'Bid/ask spread is synthetic until Upstox quote fields are connected'}</span>
+            <span>{liveLoadingSymbol ? `Refreshing ${liveLoadingSymbol} via VPS` : `Last sample update ${latestUpdated?.slice(0, 16).replace('T', ' ')}`}</span>
+            {liveError ? <span>Live fallback note: {liveError}</span> : null}
           </div>
         </div>
 
@@ -1384,12 +2125,14 @@ function ActivityWidget({ title, subtitle, rows, onSelect }: { title: string; su
 
 function CreateTradesWorkspace({
   activeContract,
+  contracts,
   topTrades,
   tradeMatrix,
   onOpenContract,
   onAnalyseTrade
 }: {
   activeContract: ContractSummary;
+  contracts: ContractSummary[];
   topTrades: CandidateTrade[];
   tradeMatrix: Record<DirectionKey, CandidateTrade[]>;
   onOpenContract: (contract: ContractSummary, nextTab?: DetailTab) => void;
@@ -1409,8 +2152,8 @@ function CreateTradesWorkspace({
         </div>
         <div className="search-box">
           <Search size={17} />
-          <select value={activeContract.symbol} onChange={(event) => onOpenContract(contractRows.find((contract) => contract.symbol === event.target.value) ?? activeContract, 'overview')}>
-            {contractRows.slice(0, 120).map((contract) => <option key={contract.id}>{contract.symbol}</option>)}
+          <select value={activeContract.symbol} onChange={(event) => onOpenContract(contracts.find((contract) => contract.symbol === event.target.value) ?? activeContract, 'overview')}>
+            {contracts.slice(0, 120).map((contract) => <option key={contract.id}>{contract.symbol}</option>)}
           </select>
         </div>
       </header>
@@ -1431,6 +2174,19 @@ function CreateTradesWorkspace({
               : 'Current regime supports manual interpretation. Choose theory and profile, then inspect payoff.'}
         </p>
         <button className="wide-primary" onClick={() => onAnalyseTrade(topTrades[0]?.id)}>Start recommended flow</button>
+      </section>
+
+      <section className="newbie-assist-card">
+        <div>
+          <p className="eyebrow">New trader guardrail</p>
+          <h3>Translate a view into a capped-risk trade</h3>
+          <p>Say the view first: up, down, rangebound or volatile. Then choose defensive, neutral or aggressive. The product should always show max loss before paper trading.</p>
+        </div>
+        <div className="assist-chip-row">
+          <span>Prefer spreads over naked selling</span>
+          <span>Check liquidity before Greeks</span>
+          <span>Analyse payoff before entry</span>
+        </div>
       </section>
 
       <section className="trade-entry-grid">
@@ -1500,7 +2256,17 @@ function CreateTradesWorkspace({
   );
 }
 
-function OptionScreener({ onOpenContract, onAnalyseTrade }: { onOpenContract: (contract: ContractSummary, nextTab?: DetailTab) => void; onAnalyseTrade: (tradeId?: string) => void }) {
+function OptionScreener({
+  contracts,
+  liveMarketCache,
+  onOpenContract,
+  onAnalyseTrade
+}: {
+  contracts: ContractSummary[];
+  liveMarketCache: LiveMarketCache;
+  onOpenContract: (contract: ContractSummary, nextTab?: DetailTab) => void;
+  onAnalyseTrade: (tradeId?: string) => void;
+}) {
   const defaults = {
     universe: 'All FnO',
     expiry: 'Current Expiry',
@@ -1513,9 +2279,10 @@ function OptionScreener({ onOpenContract, onAnalyseTrade }: { onOpenContract: (c
   const [filters, setFilters] = React.useState(defaults);
   const [showAdvanced, setShowAdvanced] = React.useState(false);
   const [viewMode, setViewMode] = React.useState<'table' | 'cards'>('table');
-  const results = React.useMemo(() => buildScreenerResults(filters), [filters]);
+  const results = React.useMemo(() => buildScreenerResults(filters, contracts, liveMarketCache), [contracts, filters, liveMarketCache]);
   const querySummary = Object.entries(filters).filter(([, value]) => value && !String(value).startsWith('Any')).map(([key, value]) => `${labelize(key)} = ${value}`).join(' · ');
   const activeFilters = Object.entries(filters).filter(([key, value]) => value !== defaults[key as keyof typeof defaults]);
+  const [instrumentType, setInstrumentType] = React.useState('Options');
 
   const update = (key: keyof typeof filters, value: string) => setFilters((current) => ({ ...current, [key]: value }));
   const clearFilter = (key: keyof typeof filters) => setFilters((current) => ({ ...current, [key]: defaults[key] }));
@@ -1531,9 +2298,22 @@ function OptionScreener({ onOpenContract, onAnalyseTrade }: { onOpenContract: (c
         <button className="wide-primary"><Sparkles size={15} /> Ask AI to fill filters</button>
       </header>
 
+      <section className="newbie-assist-card compact-assist">
+        <div>
+          <p className="eyebrow">How to screen as a beginner</p>
+          <h3>Start with tradeability, then add edge</h3>
+          <p>Use liquidity, expiry and moneyness first. After that, add IV, OI change, build-up and Greeks so the result stays readable.</p>
+        </div>
+        <div className="assist-chip-row">
+          <span>1. Liquid</span>
+          <span>2. Near ATM</span>
+          <span>3. Clear OI/IV signal</span>
+        </div>
+      </section>
+
       <section className="screener-panel">
         <div className="screener-toolbar">
-          <SegmentedControl value="Options" options={['Options', 'Futures']} onChange={() => undefined} />
+          <SegmentedControl value={instrumentType} options={['Options', 'Futures']} onChange={(value) => setInstrumentType(value)} />
           <SegmentedControl value={viewMode === 'table' ? 'Table' : 'Cards'} options={['Table', 'Cards']} onChange={(value) => setViewMode(value === 'Cards' ? 'cards' : 'table')} />
           <div className="screener-toolbar-actions">
             <button className={showAdvanced ? 'active' : ''} onClick={() => setShowAdvanced((current) => !current)}>
@@ -1568,7 +2348,7 @@ function OptionScreener({ onOpenContract, onAnalyseTrade }: { onOpenContract: (c
       <section className="market-panel">
         <div className="panel-header">
           <div><p className="eyebrow">Results</p><h3>{results.length} matching contracts</h3></div>
-          <span className="badge">Demo deterministic</span>
+          <span className="badge">{Object.keys(liveMarketCache).length ? 'Live cache + fallback' : 'Workbook deterministic'}</span>
         </div>
         {results.length === 0 ? (
           <div className="empty-state">
@@ -1628,7 +2408,7 @@ function TradeAnalysisPage({ trade, instrument, contract, onBack }: { trade: Can
         <div className="contract-title">
           <p className="eyebrow">Analyse Trade</p>
           <h2>{contract.symbol} · {trade.strategy}</h2>
-          <span>{contract.name} · {contract.expiry} · educational demo analysis</span>
+          <span>{contract.name} · {contract.expiry} · educational paper-trade analysis</span>
         </div>
         <div className="contract-actions">
           <details className="action-overflow">
@@ -1702,6 +2482,13 @@ function ContractDetail({
         <span><b>Max pain</b><strong>{analytics.maxPain}</strong></span>
         <span><b>Liquidity</b><strong>{analytics.liquidityScore}/100</strong></span>
       </section>
+
+      <ContractDecisionGuide
+        contract={contract}
+        analytics={analytics}
+        onQuickTrades={() => setTab('quick-trades')}
+        onAnalyseTrade={() => onAnalyseTrade(topTrades[0]?.id)}
+      />
 
       <nav className="detail-tabs grouped" aria-label="Contract details">
         <div className="detail-tab-group">
@@ -1842,21 +2629,41 @@ function OptionChainTab({ instrument, chain, focusStrike }: { instrument: Instru
   const [showAdvanced, setShowAdvanced] = React.useState(false);
   const strikes = uniqueStrikes(chain);
   const atm = getAtmStrike(chain, instrument.spot);
-  const rows = strikes.flatMap((strike) => [getQuote(chain, strike, 'CE'), getQuote(chain, strike, 'PE')].filter((quote): quote is OptionQuote => !!quote));
+
   const toggleGroup = (group: OptionChainColumnGroup) => {
     setGroups((current) => current.includes(group) ? current.filter((item) => item !== group) : [...current, group]);
   };
+
   const setPreset = (preset: 'scalping' | 'positional' | 'volatility') => {
     if (preset === 'scalping') setGroups(['Price', 'OI/Volume']);
     if (preset === 'positional') setGroups(['Price', 'OI/Volume', 'Greeks', 'Model Edge']);
     if (preset === 'volatility') setGroups(['Price', 'Volatility', 'Greeks']);
   };
+
+  // Compile symmetrical column layouts
+  const callCols: string[] = [];
+  if (groups.includes('Greeks')) callCols.push('minmax(55px, 1fr)', 'minmax(55px, 1fr)');
+  if (groups.includes('Model Edge')) callCols.push('minmax(50px, 1fr)', 'minmax(90px, 1.2fr)');
+  if (groups.includes('Volatility')) callCols.push('minmax(50px, 1fr)');
+  if (groups.includes('Futures')) callCols.push('minmax(60px, 1fr)', 'minmax(50px, 1fr)');
+  if (groups.includes('OI/Volume')) callCols.push('minmax(90px, 1.3fr)', 'minmax(70px, 1fr)', 'minmax(80px, 1.1fr)');
+  if (groups.includes('Price')) callCols.push('minmax(65px, 1fr)', 'minmax(75px, 1.1fr)');
+
+  const putCols = [...callCols].reverse();
+  const gridStyle = {
+    display: 'grid',
+    gridTemplateColumns: `${callCols.join(' ')} 90px ${putCols.join(' ')}`,
+    gap: '6px',
+    alignItems: 'center',
+    textAlign: 'center' as const
+  };
+
   return (
-    <section className="market-panel">
+    <section className="market-panel option-chain-panel">
       <div className="panel-header">
         <div>
           <p className="eyebrow">Option Chain</p>
-          <h3>Grouped chain table with decision fields</h3>
+          <h3>Symmetrical chain view with highlighted strikes</h3>
         </div>
         <div className="range-pills"><button className="active">Live</button><button>15m</button><button>1h</button></div>
       </div>
@@ -1874,59 +2681,154 @@ function OptionChainTab({ instrument, chain, focusStrike }: { instrument: Instru
           <button key={group} className={groups.includes(group) ? 'active' : ''} onClick={() => toggleGroup(group)}>{group}</button>
         ))}
       </div>
-      <div className="option-chain-table">
+      
+      <div className="option-chain-table professional-table">
         {focusStrike ? <div className="chain-focus-chip">Focused strike {focusStrike}</div> : null}
-        <div className="option-chain-head">
-          <span className="sticky-col symbol">Symbol</span><span className="sticky-col type">Type</span><span className="sticky-col strike">Strike</span>
-          {groups.includes('Price') && <><span>Price</span><span>Spot</span><span>Day %</span><span>Open</span><span>High</span><span>Low</span></>}
-          {groups.includes('OI/Volume') && <><span>OI</span><span>OI %</span><span>OI Chg</span><span>Contracts</span><span>Vol %</span></>}
-          {groups.includes('Futures') && <><span>Basis</span><span>CoC</span></>}
-          {groups.includes('Volatility') && <><span>IV</span><span>Prev IV</span><span>IV %</span></>}
-          {groups.includes('Greeks') && <><span>Delta</span><span>Vega</span><span>Gamma</span><span>Theta</span><span>Rho</span></>}
-          {groups.includes('Model Edge') && <><span>Build Up</span><span>Spread</span><span>Fair Edge</span><span>POP</span></>}
+        
+        {/* Symmetric Header Labels */}
+        <div className="chain-main-header" style={gridStyle}>
+          {callCols.length > 0 ? (
+            <div className="header-label calls-label" style={{ gridColumn: `span ${callCols.length}` }}>CALLS</div>
+          ) : null}
+          <div className="header-label strike-label" style={{ gridColumn: 'span 1' }}>STRIKE</div>
+          {putCols.length > 0 ? (
+            <div className="header-label puts-label" style={{ gridColumn: `span ${putCols.length}` }}>PUTS</div>
+          ) : null}
         </div>
-        {rows.map((quote) => {
-          const derived = optionQuoteRow(instrument, quote);
+
+        {/* Column headings */}
+        <div className="option-chain-head" style={gridStyle}>
+          {/* Call Columns */}
+          {groups.includes('Greeks') && <><span>Delta</span><span>Theta</span></>}
+          {groups.includes('Model Edge') && <><span>POP%</span><span>Build Up</span></>}
+          {groups.includes('Volatility') && <><span>IV</span></>}
+          {groups.includes('Futures') && <><span>Basis</span><span>CoC</span></>}
+          {groups.includes('OI/Volume') && <><span>OI</span><span>OI Chg%</span><span>Volume</span></>}
+          {groups.includes('Price') && <><span>Chg%</span><span>LTP</span></>}
+          
+          {/* Center Column */}
+          <span className="sticky-col strike">Strike</span>
+          
+          {/* Put Columns */}
+          {groups.includes('Price') && <><span>LTP</span><span>Chg%</span></>}
+          {groups.includes('OI/Volume') && <><span>Volume</span><span>OI Chg%</span><span>OI</span></>}
+          {groups.includes('Futures') && <><span>CoC</span><span>Basis</span></>}
+          {groups.includes('Volatility') && <><span>IV</span></>}
+          {groups.includes('Model Edge') && <><span>Build Up</span><span>POP%</span></>}
+          {groups.includes('Greeks') && <><span>Theta</span><span>Delta</span></>}
+        </div>
+
+        {/* Option Rows */}
+        {strikes.map((strike) => {
+          const ce = getQuote(chain, strike, 'CE');
+          const pe = getQuote(chain, strike, 'PE');
+          const ceDev = ce ? optionQuoteRow(instrument, ce) : null;
+          const peDev = pe ? optionQuoteRow(instrument, pe) : null;
+          
+          const isAtm = strike === atm;
+          const isFocused = strike === focusStrike;
+          
+          const isCallItm = strike < instrument.spot;
+          const isPutItm = strike > instrument.spot;
+
           return (
-            <div key={`${quote.strike}-${quote.type}`} className={`option-chain-row ${quote.strike === atm ? 'atm' : ''} ${focusStrike === quote.strike ? 'focus' : ''}`}>
-              <strong className="sticky-col symbol">{instrument.symbol}</strong><span className="sticky-col type">{quote.type}</span><span className="sticky-col strike">{quote.strike}</span>
-              {groups.includes('Price') && (
+            <div 
+              key={strike} 
+              className={`option-chain-row ${isAtm ? 'atm' : ''} ${isFocused ? 'focus' : ''}`}
+              style={gridStyle}
+            >
+              {/* Call Columns */}
+              {groups.includes('Greeks') && (
                 <>
-                  <span>₹{derived.price}</span>
-                  <span>₹{round(instrument.spot, 1)}</span>
-                  <span className={derived.dayChangePct >= 0 ? 'positive' : 'negative'}>{derived.dayChangePct}%</span>
-                  <span>₹{derived.open}</span>
-                  <span>₹{derived.high}</span>
-                  <span>₹{derived.low}</span>
+                  <span className={isCallItm ? 'itm-shaded' : ''}>{ce ? round(ce.delta, 3) : '-'}</span>
+                  <span className={isCallItm ? 'itm-shaded' : ''}>{ce ? round(ce.theta, 3) : '-'}</span>
+                </>
+              )}
+              {groups.includes('Model Edge') && (
+                <>
+                  <span className={isCallItm ? 'itm-shaded' : ''}>{ceDev ? `${ceDev.pop}%` : '-'}</span>
+                  <span className={`buildup-badge ${ceDev?.buildUp.replace(/\s+/g, '-').toLowerCase()} ${isCallItm ? 'itm-shaded' : ''}`}>
+                    {ceDev ? ceDev.buildUp : '-'}
+                  </span>
+                </>
+              )}
+              {groups.includes('Volatility') && <span className={isCallItm ? 'itm-shaded' : ''}>{ce ? `${round(ce.iv * 100, 1)}%` : '-'}</span>}
+              {groups.includes('Futures') && (
+                <>
+                  <span className={isCallItm ? 'itm-shaded' : ''}>{ceDev ? ceDev.basis : '-'}</span>
+                  <span className={isCallItm ? 'itm-shaded' : ''}>{ceDev ? `${ceDev.coc}%` : '-'}</span>
                 </>
               )}
               {groups.includes('OI/Volume') && (
                 <>
-                  <span className="oi-cell">
-                    {quote.oi.toLocaleString('en-IN')}
-                    <i><em style={{ width: `${Math.min(100, Math.max(6, quote.oi / 9000))}%` }} /></i>
+                  <span className={`oi-cell ${isCallItm ? 'itm-shaded' : ''}`}>
+                    {ce ? ce.oi.toLocaleString('en-IN') : '-'}
+                    {ce && <i><em style={{ width: `${Math.min(100, Math.max(6, ce.oi / 9000))}%` }} /></i>}
                   </span>
-                  <span className={derived.oiChangePct >= 0 ? 'positive' : 'negative'}>{derived.oiChangePct}%</span>
-                  <span>{quote.oiChange.toLocaleString('en-IN')}</span>
-                  <span>{quote.volume.toLocaleString('en-IN')}</span>
-                  <span>{derived.volumeChangePct}%</span>
+                  <span className={`${ceDev && ceDev.oiChangePct >= 0 ? 'positive' : 'negative'} ${isCallItm ? 'itm-shaded' : ''}`}>
+                    {ceDev ? `${ceDev.oiChangePct}%` : '-'}
+                  </span>
+                  <span className={isCallItm ? 'itm-shaded' : ''}>{ce ? ce.volume.toLocaleString('en-IN') : '-'}</span>
                 </>
               )}
-              {groups.includes('Futures') && <><span>{derived.basis}</span><span>{derived.coc}%</span></>}
-              {groups.includes('Volatility') && <><span>{round(quote.iv * 100, 1)}%</span><span>{derived.prevIv}%</span><span className={derived.ivChangePct >= 0 ? 'positive' : 'negative'}>{derived.ivChangePct}%</span></>}
-              {groups.includes('Greeks') && <><span>{round(quote.delta, 3)}</span><span>{round(quote.vega, 3)}</span><span>{round(quote.gamma, 3)}</span><span>{round(quote.theta, 3)}</span><span>{round(quote.rho, 3)}</span></>}
+              {groups.includes('Price') && (
+                <>
+                  <span className={`${ceDev && ceDev.dayChangePct >= 0 ? 'positive' : 'negative'} ${isCallItm ? 'itm-shaded' : ''}`}>
+                    {ceDev ? `${ceDev.dayChangePct}%` : '-'}
+                  </span>
+                  <span className={`ltp-cell ${isCallItm ? 'itm-shaded' : ''}`}>₹{ce ? ce.ltp : '-'}</span>
+                </>
+              )}
+
+              {/* Center Strike Column */}
+              <strong className={`sticky-col strike ${isAtm ? 'atm-strike' : ''}`}>{strike}</strong>
+
+              {/* Put Columns */}
+              {groups.includes('Price') && (
+                <>
+                  <span className={`ltp-cell ${isPutItm ? 'itm-shaded' : ''}`}>₹{pe ? pe.ltp : '-'}</span>
+                  <span className={`${peDev && peDev.dayChangePct >= 0 ? 'positive' : 'negative'} ${isPutItm ? 'itm-shaded' : ''}`}>
+                    {peDev ? `${peDev.dayChangePct}%` : '-'}
+                  </span>
+                </>
+              )}
+              {groups.includes('OI/Volume') && (
+                <>
+                  <span className={isPutItm ? 'itm-shaded' : ''}>{pe ? pe.volume.toLocaleString('en-IN') : '-'}</span>
+                  <span className={`${peDev && peDev.oiChangePct >= 0 ? 'positive' : 'negative'} ${isPutItm ? 'itm-shaded' : ''}`}>
+                    {peDev ? `${peDev.oiChangePct}%` : '-'}
+                  </span>
+                  <span className={`oi-cell ${isPutItm ? 'itm-shaded' : ''}`}>
+                    {pe ? pe.oi.toLocaleString('en-IN') : '-'}
+                    {pe && <i><em style={{ width: `${Math.min(100, Math.max(6, pe.oi / 9000))}%` }} /></i>}
+                  </span>
+                </>
+              )}
+              {groups.includes('Futures') && (
+                <>
+                  <span className={isPutItm ? 'itm-shaded' : ''}>{peDev ? `${peDev.coc}%` : '-'}</span>
+                  <span className={isPutItm ? 'itm-shaded' : ''}>{peDev ? peDev.basis : '-'}</span>
+                </>
+              )}
+              {groups.includes('Volatility') && <span className={isPutItm ? 'itm-shaded' : ''}>{pe ? `${round(pe.iv * 100, 1)}%` : '-'}</span>}
               {groups.includes('Model Edge') && (
                 <>
-                  <span>{derived.buildUp}</span>
-                  <span className={`spread-badge ${derived.spreadPct > 3 ? 'risk' : 'safe'}`}>{derived.spreadPct}%</span>
-                  <span className={derived.fairEdge >= 0 ? 'positive' : 'negative'}>{derived.fairEdge}%</span>
-                  <span>{derived.pop}%</span>
+                  <span className={`buildup-badge ${peDev?.buildUp.replace(/\s+/g, '-').toLowerCase()} ${isPutItm ? 'itm-shaded' : ''}`}>
+                    {peDev ? peDev.buildUp : '-'}
+                  </span>
+                  <span className={isPutItm ? 'itm-shaded' : ''}>{peDev ? `${peDev.pop}%` : '-'}</span>
+                </>
+              )}
+              {groups.includes('Greeks') && (
+                <>
+                  <span className={isPutItm ? 'itm-shaded' : ''}>{pe ? round(pe.theta, 3) : '-'}</span>
+                  <span className={isPutItm ? 'itm-shaded' : ''}>{pe ? round(pe.delta, 3) : '-'}</span>
                 </>
               )}
             </div>
           );
         })}
-        {rows.length === 0 ? <div className="empty-state"><strong>No option chain rows.</strong><span>Change selected expiry or refresh quote source.</span></div> : null}
+        {strikes.length === 0 ? <div className="empty-state"><strong>No option chain rows.</strong><span>Change selected expiry or refresh quote source.</span></div> : null}
       </div>
     </section>
   );
@@ -2266,12 +3168,14 @@ function CreateAlgoWorkspace({
   setConfig,
   aiDraft,
   selectedContract,
+  contracts,
   onApplyAiDraft
 }: {
   config: AlgoStrategyConfig;
   setConfig: React.Dispatch<React.SetStateAction<AlgoStrategyConfig>>;
   aiDraft: ReturnType<typeof draftFromChat>;
   selectedContract: ContractSummary;
+  contracts: ContractSummary[];
   onApplyAiDraft: () => void;
 }) {
   const [stage, setStage] = React.useState<1 | 2 | 3 | 4>(1);
@@ -2325,6 +3229,19 @@ function CreateAlgoWorkspace({
           <button><PlayCircle size={15} /> Validate strategy</button>
         </div>
       </header>
+      <section className="newbie-assist-card compact-assist">
+        <div>
+          <p className="eyebrow">Algo strategy route</p>
+          <h3>Make the strategy repeatable before making it complex</h3>
+          <p>For the MVP, a good first algo has one instrument, one primary signal, one exit rule and defined-risk option legs. AI can draft the form, but validation and backtest are mandatory.</p>
+        </div>
+        <div className="assist-chip-row">
+          <span>Instrument</span>
+          <span>Indicator</span>
+          <span>Entry + exit</span>
+          <span>Legs + risk</span>
+        </div>
+      </section>
       <section className="algo-template-row">
         <button onClick={() => update('runName', `${selectedContract.symbol} Range Template`)}>Range template</button>
         <button onClick={() => update('runName', `${selectedContract.symbol} Breakout Template`)}>Breakout template</button>
@@ -2357,11 +3274,17 @@ function CreateAlgoWorkspace({
               </Field>
               <Field label="Symbol">
                 <select value={config.symbol} onChange={(event) => update('symbol', event.target.value)}>
-                  {contractRows.slice(0, 80).map((contract) => <option key={contract.symbol}>{contract.symbol}</option>)}
+                  {contracts.slice(0, 80).map((contract) => <option key={contract.symbol}>{contract.symbol}</option>)}
+                </select>
+              </Field>
+              <Field label="Order Type">
+                <select value={config.advanced ? 'Limit' : 'Market'} onChange={() => {}}>
+                  <option>Market</option>
+                  <option>Limit</option>
                 </select>
               </Field>
               <Field label="Current Context"><input value={`${selectedContract.name} · ${selectedContract.expiry}`} readOnly /></Field>
-              <label className="check-row"><input type="checkbox" checked={config.advanced} onChange={(event) => update('advanced', event.target.checked)} /> Advanced</label>
+              <label className="check-row"><input type="checkbox" checked={config.advanced} onChange={(event) => update('advanced', event.target.checked)} /> Advanced Settings</label>
             </div>
           </AlgoSection>}
 
@@ -2382,7 +3305,7 @@ function CreateAlgoWorkspace({
                   </Field>
                   <Field label="Interval">
                     <select value={indicator.interval} onChange={(event) => setConfig((current) => ({ ...current, indicators: current.indicators.map((item, i) => i === index ? { ...item, interval: event.target.value } : item) }))}>
-                      <option>1 Minute</option><option>3 Minutes</option><option>5 Minutes</option><option>15 Minutes</option><option>1 Day</option>
+                      <option>1 Minute</option><option>3 Minutes</option><option>5 Minutes</option><option>10 Minutes</option><option>15 Minutes</option><option>30 Minutes</option><option>1 Hour</option><option>1 Day</option>
                     </select>
                   </Field>
                   <Field label="Period"><input type="number" value={indicator.period} onChange={(event) => setConfig((current) => ({ ...current, indicators: current.indicators.map((item, i) => i === index ? { ...item, period: Number(event.target.value) } : item) }))} /></Field>
@@ -2437,7 +3360,10 @@ function CreateAlgoWorkspace({
               <Field label="Trade Type"><SegmentedControl value={config.tradeType} options={['Intraday', 'Positional']} onChange={(value) => update('tradeType', value as AlgoStrategyConfig['tradeType'])} /></Field>
               <Field label="Trade During"><div className="time-pair"><input type="time" value={config.startTime} onChange={(event) => update('startTime', event.target.value)} /><input type="time" value={config.endTime} onChange={(event) => update('endTime', event.target.value)} /></div></Field>
               <Field label="Max Transactions Per Day"><input type="number" value={config.maxTransactionsPerDay} onChange={(event) => update('maxTransactionsPerDay', Number(event.target.value))} /></Field>
-              <div className="run-credit-box"><span>Required Credits</span><strong>{Math.max(1, config.legs.length)}</strong><button>Save Strategy</button></div>
+              <Field label="Total Available Margin"><input type="number" value={config.marginLimit} onChange={(event) => update('marginLimit', event.target.value)} /></Field>
+              <Field label="Max Loss Limit (per trade)"><input type="number" value={config.maxLossLimit} onChange={(event) => update('maxLossLimit', event.target.value)} /></Field>
+              <label className="check-row"><input type="checkbox" checked={config.liquidityFilter} onChange={(event) => update('liquidityFilter', event.target.checked)} /> Enforce A-Grade Liquidity Filter</label>
+              <div className="run-credit-box" style={{ gridColumn: '1 / -1' }}><span>Required Credits</span><strong>{Math.max(1, config.legs.length)}</strong><button>Save Strategy</button></div>
             </div>
           </AlgoSection>}
 
@@ -2490,7 +3416,7 @@ function ConditionEditor({ title, conditions, onAdd, onUpdate }: { title: string
         <div key={condition.id} className="condition-row">
           <select value={condition.left} onChange={(event) => onUpdate(index, { left: event.target.value })}>{signalFields.map((item) => <option key={item}>{item}</option>)}</select>
           <select value={condition.operator} onChange={(event) => onUpdate(index, { operator: event.target.value })}>{signalOperators.map((item) => <option key={item}>{item}</option>)}</select>
-          <input value={condition.right} onChange={(event) => onUpdate(index, { right: event.target.value })} />
+          <select value={condition.right} onChange={(event) => onUpdate(index, { right: event.target.value })}>{signalFields.map((item) => <option key={item}>{item}</option>)}</select>
         </div>
       ))}
     </div>
@@ -2714,14 +3640,37 @@ function buildUpLabel(quote: OptionQuote) {
   return 'Long Unwinding';
 }
 
-function buildActivityRows(type: 'CE' | 'PE', sortBy: 'volume' | 'price' | 'oi') {
-  const rows = Object.entries(optionChainsBySymbol).flatMap(([symbol, chain]) => {
-    const contract = contractRows.find((item) => item.symbol === symbol);
+function optionChainEntries(contracts: ContractSummary[] = contractRows, liveCache: LiveMarketCache = {}) {
+  const contractBySymbol = new Map(contracts.map((contract) => [contract.symbol, contract]));
+  const entries = new Map<string, { contract: ContractSummary; instrument: Instrument; chain: OptionQuote[] }>();
+
+  Object.entries(optionChainsBySymbol).forEach(([symbol, chain]) => {
+    const contract = contractBySymbol.get(symbol) ?? contractRows.find((item) => item.symbol === symbol);
+    const instrument = instrumentsBySymbol[symbol] ?? instrumentsBySymbol[defaultContract.symbol];
+    if (contract && instrument) entries.set(symbol, { contract, instrument, chain });
+  });
+
+  Object.entries(liveCache).forEach(([symbol, live]) => {
+    const base = contractBySymbol.get(symbol) ?? contractRows.find((item) => item.symbol === symbol);
+    const contract = base ? liveContractSummary(base, live) : undefined;
+    if (contract) entries.set(symbol, { contract, instrument: live.instrument, chain: live.chain });
+  });
+
+  return [...entries.entries()];
+}
+
+function buildActivityRows(
+  type: 'CE' | 'PE',
+  sortBy: 'volume' | 'price' | 'oi',
+  contracts: ContractSummary[] = contractRows,
+  liveCache: LiveMarketCache = {}
+) {
+  const rows = optionChainEntries(contracts, liveCache).flatMap(([symbol, { chain, contract, instrument }]) => {
     if (!contract) return [];
     return chain
       .filter((quote) => quote.type === type)
       .map((quote) => {
-        const derived = optionQuoteRow(instrumentsBySymbol[symbol] ?? instrumentsBySymbol[defaultContract.symbol], quote);
+        const derived = optionQuoteRow(instrument, quote);
         return {
           contract,
           symbol,
@@ -2740,12 +3689,43 @@ function buildActivityRows(type: 'CE' | 'PE', sortBy: 'volume' | 'price' | 'oi')
   return rows.sort((a, b) => score(b) - score(a)).slice(0, 8);
 }
 
-function buildDashboardInsights(nifty: ContractSummary, bankNifty: ContractSummary) {
+function buildDashboardCharts(contracts: ContractSummary[]) {
+  const indexSymbols = new Set(['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'NIFTYNEXT50']);
+  const byBuildUp = contracts.reduce<Record<string, number>>((acc, contract) => {
+    acc[contract.buildUp] = (acc[contract.buildUp] ?? 0) + 1;
+    return acc;
+  }, {});
+  return {
+    indexCards: contracts.filter((contract) => indexSymbols.has(contract.symbol)).slice(0, 5),
+    pcrLeaders: [...contracts]
+      .sort((a, b) => b.pcr - a.pcr)
+      .slice(0, 10)
+      .map((contract) => ({ symbol: contract.symbol, name: contract.name, pcrOi: contract.pcr, pcrVolume: contract.volumePcr })),
+    mwplLeaders: [...contracts]
+      .filter((contract) => contract.mwpl > 0)
+      .sort((a, b) => b.mwpl - a.mwpl)
+      .slice(0, 10)
+      .map((contract) => ({ symbol: contract.symbol, name: contract.name, mwpl: contract.mwpl, oiChangePct: contract.oiChangePct })),
+    oiChangeLeaders: [...contracts]
+      .sort((a, b) => Math.abs(b.oiChangePct) - Math.abs(a.oiChangePct))
+      .slice(0, 10)
+      .map((contract) => ({
+        symbol: contract.symbol,
+        name: contract.name,
+        oiChangePct: contract.oiChangePct,
+        putOiChangePct: contract.putOiChangePct,
+        callOiChangePct: contract.callOiChangePct
+      })),
+    buildupMix: Object.entries(byBuildUp).map(([bucket, count]) => ({ bucket, contracts: count }))
+  };
+}
+
+function buildDashboardInsights(nifty: ContractSummary, bankNifty: ContractSummary, oiLeader?: string) {
   return [
     `${nifty.symbol} is ${nifty.trend.toLowerCase()} with PCR ${nifty.pcr}; use Quick Trades to compare range and volatility structures.`,
     `${bankNifty.symbol} shows ${bankNifty.buildUp.toLowerCase()} and ${bankNifty.oiChangePct}% OI change; confirm with Combined OI before short premium.`,
-    `${marketCharts.oiChangeLeaders[0]?.symbol ?? 'FINNIFTY'} leads OI change, so screeners should include build-up and liquidity filters.`,
-    `Demo data is deterministic from ${dataSource.workbook}; Upstox live mode will reuse the same calculators.`
+    `${oiLeader ?? 'FINNIFTY'} leads OI change, so screeners should include build-up and liquidity filters.`,
+    `Live symbols refresh through the VPS; unfetched symbols keep the ${dataSource.workbook} fallback until selected.`
   ];
 }
 
@@ -2758,19 +3738,22 @@ function demoEvents() {
   ];
 }
 
-function buildScreenerResults(filters: Record<string, string>) {
+function buildScreenerResults(
+  filters: Record<string, string>,
+  contracts: ContractSummary[] = contractRows,
+  liveCache: LiveMarketCache = {}
+) {
   const wantsCalls = filters.instrument === 'Calls';
   const wantsPuts = filters.instrument === 'Puts';
   const minLiquidity = filters.liquidity === 'A only' ? 86 : 72;
-  const rows = Object.entries(optionChainsBySymbol).flatMap(([symbol, chain]) => {
-    const contract = contractRows.find((item) => item.symbol === symbol);
+  const rows = optionChainEntries(contracts, liveCache).flatMap(([symbol, { chain, contract, instrument }]) => {
     if (!contract || contract.liquidity < minLiquidity) return [];
     if (filters.universe === 'Index Options' && !['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY'].includes(symbol)) return [];
     if (filters.universe === 'Banking' && contract.industry !== 'Banks' && symbol !== 'BANKNIFTY') return [];
     return chain
       .filter((quote) => (wantsCalls ? quote.type === 'CE' : wantsPuts ? quote.type === 'PE' : true))
       .map((quote) => {
-        const row = optionQuoteRow(instrumentsBySymbol[symbol] ?? instrumentsBySymbol[defaultContract.symbol], quote);
+        const row = optionQuoteRow(instrument, quote);
         return {
           contract,
           symbol,

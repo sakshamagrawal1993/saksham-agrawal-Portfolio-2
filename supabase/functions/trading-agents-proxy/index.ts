@@ -997,6 +997,21 @@ serve(async (req) => {
       });
       if (insErr) throw insErr;
 
+      if (agent_role === 'Portfolio Manager' || log_type === 'decision') {
+        const decision = parsePortfolioDecision(trimmed);
+        if (decision?.decision) {
+          await supabase.from('trading_sessions').update({
+            status: 'completed',
+            final_decision: decision.decision,
+            confidence_bucket: decision.confidence || null,
+            evaluation_horizon: decision.evaluation_horizon || '24h',
+            executive_summary: decision.thesis || null,
+            investment_thesis: decision.thesis || null,
+            updated_at: new Date().toISOString(),
+          }).eq('id', sid);
+        }
+      }
+
       return jsonResponse({ success: true });
     }
 
@@ -1286,6 +1301,7 @@ serve(async (req) => {
       
       const twelveDataKey = Deno.env.get('TWELVEDATA_API_KEY');
       const rapidApiKey = Deno.env.get('RAPIDAPI_KEY');
+      const finnhubKey = Deno.env.get('FINNHUB_API_KEY');
       
       // Attempt 1: TwelveData
       if (twelveDataKey) {
@@ -1341,7 +1357,59 @@ serve(async (req) => {
         }
       }
 
-      // Attempt 3: Yahoo Finance public endpoints (no key)
+      // Attempt 3: Finnhub REST. This mirrors the batch quote flow for US
+      // symbols and gives the selected-stock quote route the same resilience.
+      if (finnhubKey && !ticker.endsWith('.NS') && !ticker.endsWith('.BO')) {
+        try {
+          const normalizedTicker = normalizeTickerForProviders(ticker);
+          const finnhubRes = await fetch(
+            `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(normalizedTicker)}&token=${finnhubKey}`,
+          );
+          const finnhubData = await finnhubRes.json();
+          if (finnhubData?.c && finnhubData.c > 0) {
+            const previousClose = finnhubData.pc || null;
+            return jsonResponse({
+              ticker,
+              price: finnhubData.c,
+              currency: 'USD',
+              previousClose,
+              change: previousClose ? finnhubData.c - previousClose : null,
+              changePercent: previousClose ? ((finnhubData.c - previousClose) / previousClose) * 100 : null,
+            });
+          }
+        } catch (e) {
+          console.error('Finnhub quote fallback failed:', e);
+        }
+      }
+
+      // Attempt 4: TwelveData price endpoint. The quote endpoint can be less
+      // reliable for individual symbols, while the price endpoint is what the
+      // batch quote flow already uses successfully.
+      if (twelveDataKey) {
+        try {
+          const normalizedTicker = normalizeTickerForProviders(ticker);
+          const isIndian = normalizedTicker.endsWith('.NS') || normalizedTicker.endsWith('.BO');
+          const tdSymbol = isIndian
+            ? `${normalizedTicker.replace('.NS', '').replace('.BO', '')}:NSE`
+            : normalizedTicker;
+          const tdRes = await fetch(
+            `https://api.twelvedata.com/price?symbol=${encodeURIComponent(tdSymbol)}&apikey=${twelveDataKey}`,
+          );
+          const tdData = await tdRes.json();
+
+          if (tdData?.price) {
+            return jsonResponse({
+              ticker,
+              price: parseFloat(tdData.price),
+              currency: isIndian ? 'INR' : 'USD',
+            });
+          }
+        } catch (e) {
+          console.error('TwelveData price fallback failed:', e);
+        }
+      }
+
+      // Attempt 5: Yahoo Finance public endpoints (no key)
       try {
         const isIndian = ticker.endsWith('.NS') || ticker.endsWith('.BO');
         if (isIndian) {
