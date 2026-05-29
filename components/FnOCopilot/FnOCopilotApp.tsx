@@ -152,10 +152,10 @@ const scoreKeys: Array<keyof CandidateTrade['scoreBreakdown']> = [
 ];
 
 const defaultContract = contractRows.find((contract) => contract.symbol === 'NIFTY') ?? contractRows[0];
-const indicatorTypes = ['simpleMovingAverage', 'exponentialMovingAverage', 'rsi', 'superTrend', 'bollingerBands', 'macd', 'vwap', 'adx', 'openInterest', 'ivRank', 'ivPercentile', 'expectedMove', 'oiWall', 'pcr', 'fairValueDeviation'];
+const indicatorTypes = ['bearishEngulfing', 'bearishHammer', 'bearishInvertedHammer', 'bearishMarubozu', 'bearishSpinningTop', 'bullishEngulfing', 'bullishHammer', 'bullishInvertedHammer', 'bullishMarubozu', 'bullishSpinningTop', 'darkCloudCover', 'doji', 'dragonFlyDoji', 'eveningStar', 'graveStoneDoji', 'heikinashiBearish', 'heikinashiBearishIndecision', 'heikinashiBullish', 'heikinashiBullishIndecision', 'heikinashiVeryBearish', 'heikinashiVeryBullish', 'longLeggedDoji', 'morningStar', 'piercingLine', 'renkoBearishBrick', 'renkoBullishBrick', 'threeBlackCrows', 'threeWhiteSoldiers', 'augmentedDickeyFuller', 'densityCurve', 'ratio', 'ratioStandardDeviation', 'zScore', 'anchoredVolumeWeightedAveragePrice', 'centralPivotRange', 'currentCandle', 'gapStrategy', 'lastNCandles', 'openingRangeBreakout', 'pivotPoints', 'previousCandle', 'priceCandle', 'signalCandle', 'todayCandle', 'volumeWeightedAveragePrice', 'yesterdayCandle', 'aroon', 'averageDirectionalIndex', 'averageTrueRange', 'awesomeOscillator', 'bollingerBand', 'commodityChannelIndex', 'exponentialMovingAverage', 'ichimokuCloud', 'longBuildup', 'longUnwidening', 'movingAverageConvergenceDivergence', 'rateOfChange', 'relativeStrengthIndex', 'shortBuildup', 'shortCovering', 'simpleMovingAverage', 'stochasticOscillator', 'stochasticRSI', 'superTrend', 'weightedMovingAverage', 'wilderSmoothingAverage', 'williamsR', 'williamsAlligator', 'indiaVIXPercentile'];
 const signalFields = ['Current Close', 'Current Open', 'Current High', 'Current Low', 'Volume', 'Open Interest', 'VWAP', 'SMA', 'EMA', 'WMA', 'RSI', 'MACD', 'Bollinger Bands', 'Supertrend', 'ATR', 'Time of Day', 'Day of Week', 'Number'];
 const signalOperators = ['Crosses Above', 'Crosses Below', 'Greater Than', 'Less Than', 'Equal To', 'Higher Than Previous', 'Lower Than Previous'];
-const strikeOffsets = ['ITM 5', 'ITM 4', 'ITM 3', 'ITM 2', 'ITM 1', 'ATM', 'OTM 1', 'OTM 2', 'OTM 3', 'OTM 4', 'OTM 5'];
+const strikeOffsets = ['-30', '-29', '-28', '-27', '-26', '-25', '-24', '-23', '-22', '-21', '-20', '-19', '-18', '-17', '-16', '-15', '-14', '-13', '-12', '-11', '-10', '-9', '-8', '-7', '-6', '-5', '-4', '-3', '-2', '-1', '0 (ATM)', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30'];
 const expiryChoices: AlgoLegConfig['expiry'][] = ['Current Week', 'Next Week', 'Current Month', 'Next Month'];
 const selectionBasisChoices = ['Spot Based', 'Future Based', 'Strike Price', 'Premium near', 'Premium greater', 'Premium lesser', 'Indicator Based', 'Delta near', 'Delta greater', 'Delta lesser', 'Outside Expected Move'];
 const optionChainGroups: OptionChainColumnGroup[] = ['Price', 'OI/Volume', 'Volatility', 'Greeks', 'Futures', 'Model Edge'];
@@ -842,6 +842,7 @@ function FnOCopilotApp() {
               sendMessage={sendMessage}
               workflowSteps={workflowSteps}
               showArtifact={mode !== 'ask-ai' && Boolean(submittedModes[mode])}
+              contracts={liveContracts}
               onNewChat={() => {
                 setMessages(createInitialMessages());
                 setSubmittedModes((current) => ({ ...current, [mode]: false }));
@@ -1092,6 +1093,7 @@ function AgentModeWorkspace({
   sendMessage: () => void;
   workflowSteps: ReturnType<typeof buildWorkflowSteps>;
   showArtifact: boolean;
+  contracts: ContractSummary[];
   onNewChat: () => void;
   onOpenData: () => void;
   onOpenTrade: (tradeId?: string) => void;
@@ -1100,6 +1102,7 @@ function AgentModeWorkspace({
 }) {
   const selectedTrade = draft.selectedTrade;
   const visibleMessages = messages.filter((message) => message.id !== 'welcome' || messages.some((item) => item.role === 'user'));
+  const hasChatActive = visibleMessages.length > 0 || input.trim().length > 0;
   const modeButtons: Array<{ id: UserMode; label: string; icon: React.ReactNode }> = [
     { id: 'ask-ai', label: 'Ask AI', icon: <Bot size={16} /> },
     { id: 'create-strategy', label: 'Create Algo', icon: <BrainCircuit size={16} /> },
@@ -1141,7 +1144,7 @@ function AgentModeWorkspace({
         </div>
       </aside>
 
-      <section className={`agent-stage ${showArtifact ? 'with-artifact' : ''}`}>
+      <section className={`agent-stage ${showArtifact ? 'with-artifact' : ''} ${hasChatActive ? 'chat-active' : ''}`}>
         <div className="agent-center">
           {visibleMessages.length > 0 ? (
             <div className="agent-thread">
@@ -1212,7 +1215,7 @@ function AgentModeWorkspace({
             {mode === 'create-strategy' && (
               <div className="agent-artifact-stack">
                 <AgentRulesVisual draft={draft} />
-                <AgentAlgoSections draft={draft} onPatch={onPatchArtifact} />
+                <AgentAlgoSections draft={draft} contracts={contracts} onPatch={onPatchArtifact} />
               </div>
             )}
 
@@ -1289,9 +1292,11 @@ function AgentRulesVisual({ draft }: { draft: ReturnType<typeof draftFromChat> }
 
 function AgentAlgoSections({
   draft,
+  contracts,
   onPatch
 }: {
   draft: ReturnType<typeof draftFromChat>;
+  contracts: ContractSummary[];
   onPatch: (patch: Record<string, unknown>) => void;
 }) {
   const [stage, setStage] = React.useState<1 | 2 | 3 | 4>(1);
@@ -1314,28 +1319,102 @@ function AgentAlgoSections({
       {stage === 1 && (
         <div className="agent-algo-editor">
           <label><span>Run Name</span><input value={readString('runName', draft.title)} onChange={(event) => onPatch({ runName: event.target.value })} /></label>
-          <label><span>Symbol</span><input value={readString('symbol', '')} onChange={(event) => onPatch({ symbol: event.target.value })} /></label>
-          <label><span>Instrument Segment</span><input value={readString('instrumentSegment', '')} onChange={(event) => onPatch({ instrumentSegment: event.target.value })} /></label>
-          <label><span>Trade Type</span><input value={readString('tradeType', '')} onChange={(event) => onPatch({ tradeType: event.target.value })} /></label>
+          <label><span>Symbol</span>
+            <select value={readString('symbol', '')} onChange={(event) => onPatch({ symbol: event.target.value })}>
+              <option value="">Select</option>
+              {contracts.map(c => <option key={c.symbol} value={c.symbol}>{c.symbol}</option>)}
+            </select>
+          </label>
+          <label><span>Instrument Segment</span>
+            <select value={readString('instrumentSegment', '')} onChange={(event) => onPatch({ instrumentSegment: event.target.value })}>
+              <option value="">Select</option>
+              <option value="Equity & Index">Equity & Index</option>
+              <option value="Future & Options">Future & Options</option>
+            </select>
+          </label>
+          <label><span>Trade Type</span>
+            <select value={readString('tradeType', '')} onChange={(event) => onPatch({ tradeType: event.target.value })}>
+              <option value="">Select</option>
+              <option value="Intraday">Intraday</option>
+              <option value="Positional">Positional</option>
+            </select>
+          </label>
           <label><span>Total Margin Limit</span><input value={readString('marginLimit', '')} onChange={(event) => onPatch({ marginLimit: event.target.value })} /></label>
         </div>
       )}
 
       {stage === 2 && (
         <div className="agent-algo-editor">
-          <label><span>Indicators (one per line)</span><textarea rows={4} value={readLines('indicators', [])} onChange={(event) => onPatch({ indicators: toLines(event.target.value) })} /></label>
-          <label><span>Entry Rules (one per line)</span><textarea rows={4} value={readLines('entryRules', draft.entryRules)} onChange={(event) => onPatch({ entryRules: toLines(event.target.value) })} /></label>
-          <label><span>Exit Rules (one per line)</span><textarea rows={4} value={readLines('exitRules', draft.exitRules)} onChange={(event) => onPatch({ exitRules: toLines(event.target.value) })} /></label>
+          <label><span>Entry Rules (overall)</span><textarea rows={2} value={readLines('entryRules', draft.entryRules)} onChange={(event) => onPatch({ entryRules: toLines(event.target.value) })} /></label>
+          <label><span>Exit Rules (overall)</span><textarea rows={2} value={readLines('exitRules', draft.exitRules)} onChange={(event) => onPatch({ exitRules: toLines(event.target.value) })} /></label>
+          
+          <h4 style={{marginTop: 12, fontSize: 13, textTransform: 'uppercase', color: 'var(--muted)'}}>Configured Indicators</h4>
+          {Array.isArray(payload.indicators) ? payload.indicators.map((ind: any, i) => {
+            if (typeof ind === 'string') return <div key={i} className="agent-market-card">{ind}</div>;
+            return (
+              <div key={i} className="agent-market-card" style={{padding: 12}}>
+                <strong>{ind.type} <span style={{fontSize: 12, fontWeight: 'normal'}}>({ind.name})</span></strong>
+                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8}}>
+                  <label><span>Chart</span><select value={ind.chartType || ''} onChange={(e) => {
+                    const next = [...payload.indicators as any[]]; next[i] = { ...next[i], chartType: e.target.value }; onPatch({ indicators: next });
+                  }}><option value="Candle">Candle</option><option value="Heikin Ashi">Heikin Ashi</option></select></label>
+                  <label><span>Interval</span><select value={ind.candleInterval || ''} onChange={(e) => {
+                    const next = [...payload.indicators as any[]]; next[i] = { ...next[i], candleInterval: e.target.value }; onPatch({ indicators: next });
+                  }}><option value="1 minute">1 min</option><option value="5 minutes">5 mins</option><option value="15 minutes">15 mins</option><option value="1 hour">1 hour</option></select></label>
+                </div>
+                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8}}>
+                  <label><span>Period</span><input type="number" value={ind.period || ''} onChange={(e) => {
+                    const next = [...payload.indicators as any[]]; next[i] = { ...next[i], period: parseInt(e.target.value, 10) }; onPatch({ indicators: next });
+                  }} /></label>
+                  <label><span>Field</span><input value={ind.field || ''} readOnly/></label>
+                </div>
+              </div>
+            );
+          }) : <div style={{fontSize: 12, color: 'var(--muted)'}}>No indicators configured.</div>}
         </div>
       )}
 
       {stage === 3 && (
         <div className="agent-algo-editor">
-          <label><span>Legs (one leg per line)</span><textarea rows={5} value={readLines('legs', [])} onChange={(event) => onPatch({ legs: toLines(event.target.value) })} /></label>
-          <label><span>Max Loss per Trade</span><input value={readString('maxLossLimit', '')} onChange={(event) => onPatch({ maxLossLimit: event.target.value })} /></label>
-          <label><span>Daily Stop Loss</span><input value={readString('dailyStopLoss', '')} onChange={(event) => onPatch({ dailyStopLoss: event.target.value })} /></label>
-          <label><span>Daily Take Profit</span><input value={readString('dailyTakeProfit', '')} onChange={(event) => onPatch({ dailyTakeProfit: event.target.value })} /></label>
-          <label className="agent-algo-check"><input type="checkbox" checked={readBool('liquidityFilter', false)} onChange={(event) => onPatch({ liquidityFilter: event.target.checked })} /> Enforce liquidity filter</label>
+          <h4 style={{fontSize: 13, textTransform: 'uppercase', color: 'var(--muted)'}}>Legs</h4>
+          {Array.isArray(payload.legs) && payload.legs.length > 0 ? payload.legs.map((leg: any, i) => (
+             <div key={i} className="agent-market-card" style={{padding: 12}}>
+               <strong style={{color: leg.action === 'Buy' ? 'var(--green)' : 'var(--red)'}}>{leg.action} {leg.optionType || leg.instrument} <span style={{fontSize: 12, fontWeight: 'normal'}}>({leg.strikeOffset})</span></strong>
+               <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8}}>
+                 <label><span>Segment</span><input value={leg.segment || ''} readOnly/></label>
+                 <label><span>Expiry</span><input value={leg.expiry || ''} readOnly/></label>
+               </div>
+               <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8}}>
+                 <label><span>Entry</span><input value={leg.entryCondition || ''} readOnly/></label>
+                 <label><span>Exit</span><input value={leg.exitCondition || ''} readOnly/></label>
+               </div>
+               <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8}}>
+                 <label><span>Stop Loss</span><input value={leg.stopLoss ? `${leg.stopLoss.value} ${leg.stopLoss.type}` : ''} readOnly/></label>
+                 <label><span>Take Profit</span><input value={leg.takeProfit ? `${leg.takeProfit.value} ${leg.takeProfit.type}` : ''} readOnly/></label>
+               </div>
+             </div>
+          )) : (
+            <label><span>Legs (fallback strings)</span><textarea rows={3} value={readLines('legs', [])} onChange={(event) => onPatch({ legs: toLines(event.target.value) })} /></label>
+          )}
+
+          <h4 style={{marginTop: 12, fontSize: 13, textTransform: 'uppercase', color: 'var(--muted)'}}>Global Targets</h4>
+          {payload.globalTargets ? (
+            <div className="agent-market-card" style={{padding: 12}}>
+              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8}}>
+                <label><span>Daily SL</span><input value={(payload.globalTargets as any).dailyStopLoss || ''} onChange={(e) => onPatch({ globalTargets: { ...(payload.globalTargets as any), dailyStopLoss: e.target.value } })} /></label>
+                <label><span>Daily TP</span><input value={(payload.globalTargets as any).dailyTakeProfit || ''} onChange={(e) => onPatch({ globalTargets: { ...(payload.globalTargets as any), dailyTakeProfit: e.target.value } })} /></label>
+              </div>
+              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8}}>
+                <label><span>Trade Type</span><input value={(payload.globalTargets as any).tradeType || ''} onChange={(e) => onPatch({ globalTargets: { ...(payload.globalTargets as any), tradeType: e.target.value } })} /></label>
+                <label><span>Max Trades</span><input value={(payload.globalTargets as any).maxTransactionsPerDay || ''} onChange={(e) => onPatch({ globalTargets: { ...(payload.globalTargets as any), maxTransactionsPerDay: e.target.value } })} /></label>
+              </div>
+            </div>
+          ) : (
+            <>
+              <label><span>Max Loss per Trade</span><input value={readString('maxLossLimit', '')} onChange={(event) => onPatch({ maxLossLimit: event.target.value })} /></label>
+              <label><span>Daily Stop Loss</span><input value={readString('dailyStopLoss', '')} onChange={(event) => onPatch({ dailyStopLoss: event.target.value })} /></label>
+            </>
+          )}
         </div>
       )}
 
@@ -3331,7 +3410,7 @@ function CreateAlgoWorkspace({
               <div className="algo-leg-head"><span>Segment</span><span>Instrument</span><span>Expiry</span><span>Strike</span><span>Type</span><span>Lot</span><span>Action</span><span>SL</span><span>TP</span></div>
               {config.legs.map((leg, index) => (
                 <div key={leg.id} className="algo-leg-row">
-                  <select value={leg.segment} onChange={(event) => updateLeg(index, { segment: event.target.value as AlgoLegConfig['segment'] })}><option>Open</option><option>Close</option></select>
+                  <select value={leg.segment} onChange={(event) => updateLeg(index, { segment: event.target.value as AlgoLegConfig['segment'] })}><option>Equity & Index</option><option>Future & Options</option></select>
                   <select value={leg.instrumentType} onChange={(event) => updateLeg(index, { instrumentType: event.target.value as AlgoLegConfig['instrumentType'] })}><option>Future</option><option>Option</option></select>
                   <select value={leg.expiry} onChange={(event) => updateLeg(index, { expiry: event.target.value as AlgoLegConfig['expiry'] })}>{expiryChoices.map((item) => <option key={item}>{item}</option>)}</select>
                   <div className="split-field"><select value={leg.selectionBasis} onChange={(event) => updateLeg(index, { selectionBasis: event.target.value })}>{selectionBasisChoices.map((item) => <option key={item}>{item}</option>)}</select><select value={leg.strikeOffset} onChange={(event) => updateLeg(index, { strikeOffset: event.target.value })}>{strikeOffsets.map((item) => <option key={item}>{item}</option>)}</select></div>

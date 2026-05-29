@@ -693,6 +693,9 @@
   grid-template-columns: minmax(0, 1fr) minmax(360px, 480px);
   align-items: center;
 }
+.fno-copilot-app .agent-stage.chat-active {
+  align-items: end;
+}
 .fno-copilot-app .agent-center {
   width: min(100%, 920px);
   display: grid;
