@@ -1154,6 +1154,14 @@ function AgentModeWorkspace({
                   <p>{message.text}</p>
                 </div>
               ))}
+              {aiTyping && (
+                <div className="agent-thread-message assistant">
+                  <span>FnO Agent</span>
+                  <div className="typing-indicator">
+                    <span></span><span></span><span></span>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="agent-welcome">
@@ -1178,13 +1186,15 @@ function AgentModeWorkspace({
             </div>
           </div>
 
-          <div className="agent-quick-pills">
-            {modeButtons.map((item) => (
-              <button key={item.id} className={mode === item.id ? 'active' : ''} onClick={() => setMode(item.id)}>
-                {item.icon}{item.label}
-              </button>
-            ))}
-          </div>
+          {visibleMessages.length === 0 && (
+            <div className="agent-quick-pills">
+              {modeButtons.map((item) => (
+                <button key={item.id} className={mode === item.id ? 'active' : ''} onClick={() => setMode(item.id)}>
+                  {item.icon}{item.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {showArtifact && (

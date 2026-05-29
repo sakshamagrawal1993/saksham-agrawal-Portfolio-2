@@ -812,6 +812,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  margin-left: auto;
 }
 .fno-copilot-app .agent-prompt-tools span {
   margin-left: auto;
@@ -830,6 +831,40 @@
 .fno-copilot-app .agent-prompt-tools button:hover {
   background: var(--panel-2);
   border-color: var(--line);
+}
+.fno-copilot-app .agent-prompt-tools button:active {
+  background: var(--line);
+}
+
+.fno-copilot-app .typing-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+}
+
+.fno-copilot-app .typing-indicator span {
+  width: 6px;
+  height: 6px;
+  background: var(--muted);
+  border-radius: 50%;
+  animation: typingBounce 1.4s infinite ease-in-out both;
+}
+
+.fno-copilot-app .typing-indicator span:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.fno-copilot-app .typing-indicator span:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+@keyframes typingBounce {
+  0%, 80%, 100% { 
+    transform: scale(0);
+  } 40% { 
+    transform: scale(1);
+  }
 }
 .fno-copilot-app .agent-quick-pills {
   display: flex;
