@@ -24,7 +24,7 @@ import {
   Zap
 } from 'lucide-react';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { contractRows, dataSource, DemoContractSummary, instrumentsBySymbol, marketCharts, optionChainsBySymbol } from './data/excelMarket';
+import { contractRows, dataSource, DemoContractSummary, instrumentsBySymbol, optionChainsBySymbol } from './data/excelMarket';
 import {
   getUpstoxCoverageCounts,
   upstoxAnalyticsFeeds,
@@ -1215,7 +1215,7 @@ function AgentModeWorkspace({
             {mode === 'create-strategy' && (
               <div className="agent-artifact-stack">
                 <AgentRulesVisual draft={draft} />
-                <AgentAlgoSections draft={draft} contracts={contracts} onPatch={onPatchArtifact} />
+                <AgentAlgoSections draft={draft} contracts={contractRows} onPatch={onPatchArtifact} />
               </div>
             )}
 
@@ -1302,7 +1302,7 @@ function AgentAlgoSections({
   const [stage, setStage] = React.useState<1 | 2 | 3 | 4>(1);
   const payload = draft as unknown as Record<string, unknown>;
   const readString = (key: string, fallback = '') => typeof payload[key] === 'string' ? String(payload[key]) : fallback;
-  const readBool = (key: string, fallback = false) => typeof payload[key] === 'boolean' ? Boolean(payload[key]) : fallback;
+
   const readLines = (key: string, fallback: string[]) =>
     Array.isArray(payload[key]) ? (payload[key] as unknown[]).map((item) => String(item)).join('\n') : fallback.join('\n');
   const toLines = (value: string) => value.split('\n').map((item) => item.trim()).filter(Boolean);
