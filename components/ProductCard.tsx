@@ -17,17 +17,23 @@ interface ProjectCardProps {
 }
 
 const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) => {
+  const ribbonText = project.ribbonLabel || (project.status === 'completed' ? 'Completed' : 'In Development');
+  const ribbonWidthClassName = ribbonText.length > 14
+    ? 'w-[270px]'
+    : ribbonText.length > 9
+      ? 'w-[238px]'
+      : 'w-[214px]';
   const statusLabel = project.status === 'completed'
     ? {
-      text: 'Completed',
-      widthClassName: 'w-[214px]',
+      text: ribbonText,
+      widthClassName: ribbonWidthClassName,
       faceGradient: 'linear-gradient(100deg, #18884E 0%, #2FA866 58%, #70D893 100%)',
       foldGradient: 'linear-gradient(145deg, #115D36 0%, #1E7C49 62%, #0D3D26 100%)',
     }
     : project.status === 'under-development'
       ? {
-        text: 'In Development',
-        widthClassName: 'w-[238px]',
+        text: ribbonText,
+        widthClassName: ribbonWidthClassName,
         faceGradient: 'linear-gradient(100deg, #C76616 0%, #E88A2E 58%, #FFB05E 100%)',
         foldGradient: 'linear-gradient(145deg, #7F3F0D 0%, #A95B1D 62%, #5C2D09 100%)',
       }

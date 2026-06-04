@@ -95,7 +95,8 @@ export const PROJECTS: Project[] = [
     gallery: [],
     techStack: ['React', 'Supabase', 'n8n', 'Recharts', 'Decision Science'],
     demoUrl: '/ai-gate',
-    status: 'under-development'
+    status: 'under-development',
+    ribbonLabel: 'In Development'
   },
   {
     id: 'trading-agents',
@@ -109,7 +110,8 @@ export const PROJECTS: Project[] = [
     gallery: [],
     techStack: ['n8n', 'Supabase', 'React', 'OpenAI'],
     demoUrl: '/trading-agents',
-    status: 'completed'
+    status: 'completed',
+    ribbonLabel: 'Demo'
   },
   {
     id: 'fno-copilot',
@@ -124,7 +126,8 @@ export const PROJECTS: Project[] = [
     techStack: ['React', 'Supabase', 'n8n', 'VPS Quant Service'],
     repoUrl: 'https://github.com/sakshamagrawal1993/saksham-agrawal-Portfolio-2',
     demoUrl: '/fno-copilot',
-    status: 'under-development'
+    status: 'under-development',
+    ribbonLabel: 'In Development'
   },
   {
     id: 'insightslm',
@@ -138,7 +141,8 @@ export const PROJECTS: Project[] = [
     gallery: [],
     techStack: ['React', 'Supabase', 'N8N', 'RAG'],
     demoUrl: '/insightslm',
-    status: 'completed'
+    status: 'completed',
+    ribbonLabel: 'Demo'
   },
   {
     id: 'ticketflow',
@@ -152,7 +156,8 @@ export const PROJECTS: Project[] = [
     gallery: [],
     techStack: ['React', 'TypeScript', 'Tailwind CSS', 'Analytics'],
     demoUrl: '/ticketflow',
-    status: 'completed'
+    status: 'completed',
+    ribbonLabel: 'Demo'
   },
   {
     id: 'runner',
@@ -166,7 +171,8 @@ export const PROJECTS: Project[] = [
     gallery: [],
     techStack: ['React Three Fiber', 'Three.js', 'Zustand', 'WebGL'],
     demoUrl: '/runner',
-    status: 'completed'
+    status: 'completed',
+    ribbonLabel: 'Demo'
   },
 
   // Jivi AI Projects
@@ -186,7 +192,8 @@ export const PROJECTS: Project[] = [
     techStack: ['LLMs', 'Safety Guardrails', 'Multilingual Support', 'PLG'],
     demoUrl: '/mind-coach',
     slideDeckUrl: '',
-    status: 'completed'
+    status: 'completed',
+    ribbonLabel: 'Case Study + Demo'
   },
   {
     id: 'digital-twin',
@@ -204,7 +211,8 @@ export const PROJECTS: Project[] = [
     techStack: ['Agentic RAG', 'Knowledge Graphs', 'EHR Integration', 'Healthcare Data'],
     demoUrl: '/health-twin',
     slideDeckUrl: '',
-    status: 'completed'
+    status: 'completed',
+    ribbonLabel: 'Case Study + Demo'
   },
   {
     id: 'dr-jivi',
@@ -219,7 +227,8 @@ export const PROJECTS: Project[] = [
     gallery: [],
     techStack: ['Multi-Agent Architecture', 'Clinical Validation', 'LLM Evaluations'],
     slideDeckUrl: '',
-    status: 'completed'
+    status: 'completed',
+    ribbonLabel: 'Case Study + Demo'
   },
   {
     id: 'jivi-orchestrator',
@@ -234,7 +243,8 @@ export const PROJECTS: Project[] = [
     gallery: [],
     techStack: ['Agent Orchestration', 'Stateful Memory Management', 'Platform Strategy'],
     slideDeckUrl: '',
-    status: 'completed'
+    status: 'completed',
+    ribbonLabel: 'Case Study'
   },
 
   // Bharatpe Projects
@@ -254,7 +264,8 @@ export const PROJECTS: Project[] = [
     techStack: ['Banking Integration', 'Credit Risk', 'Go-To-Market', 'Stakeholder Mgmt'],
     demoUrl: '/unity-card',
     slideDeckUrl: '',
-    status: 'completed'
+    status: 'completed',
+    ribbonLabel: 'Case Study'
   },
   {
     id: 'postpe-cc',
@@ -269,7 +280,8 @@ export const PROJECTS: Project[] = [
     gallery: [],
     techStack: ['Lending Lifecycle', 'Regulatory Compliance', 'Risk Modeling'],
     slideDeckUrl: '',
-    status: 'completed'
+    status: 'completed',
+    ribbonLabel: 'Case Study'
   },
   {
     id: 'postpe-pl',
@@ -284,7 +296,8 @@ export const PROJECTS: Project[] = [
     gallery: [],
     techStack: ['Lending', 'E-Nach', 'Regulatory Compliance'],
     slideDeckUrl: '',
-    status: 'completed'
+    status: 'completed',
+    ribbonLabel: 'Case Study'
   },
   {
     id: 'postpe-emi',
@@ -299,7 +312,8 @@ export const PROJECTS: Project[] = [
     gallery: [],
     techStack: ['Payments', 'Lending Lifecycle', 'Consumer Finance'],
     slideDeckUrl: '',
-    status: 'completed'
+    status: 'completed',
+    ribbonLabel: 'Case Study'
   },
 
   // Other Projects

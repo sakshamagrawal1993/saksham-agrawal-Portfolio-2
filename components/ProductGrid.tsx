@@ -31,7 +31,10 @@ const ProductGrid: React.FC<ProductGridProps> = ({ onProductClick, featuredOnly 
 
   const jiviProjects = useMemo(() => PROJECTS.filter(p => p.company === 'Jivi AI'), []);
   const bharatpeProjects = useMemo(() => PROJECTS.filter(p => p.company === 'BharatPe'), []);
-  const mvpProjects = useMemo(() => PROJECTS.filter(p => p.demoUrl && p.demoUrl !== '#'), []);
+  const mvpProjects = useMemo(() => {
+    const professionalDemoIds = new Set(['mind-coach', 'digital-twin', 'p3']);
+    return PROJECTS.filter(p => p.demoUrl && p.demoUrl !== '#' && !professionalDemoIds.has(p.id));
+  }, []);
 
   return (
     <section id="work" className="py-16 md:py-16 px-6 md:px-12 bg-[#F5F2EB]">

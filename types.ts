@@ -21,6 +21,7 @@ export interface Project {
   demoUrl?: string;
   slideDeckUrl?: string;
   status?: 'completed' | 'under-development';
+  ribbonLabel?: string;
 }
 
 export interface JournalArticle {
