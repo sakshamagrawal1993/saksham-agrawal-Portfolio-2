@@ -94,7 +94,8 @@ const ProductDetail: React.FC<ProjectDetailProps> = ({ project, onBack }) => {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-24">
+          <div className="flex flex-col gap-12 lg:gap-24">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-24">
 
             {/* Left: Images */}
             <div className="lg:col-span-7 flex flex-col gap-8">
@@ -141,19 +142,6 @@ const ProductDetail: React.FC<ProjectDetailProps> = ({ project, onBack }) => {
                 <p className="text-[#5D5A53] leading-relaxed font-light text-lg mb-4">
                   {project.longDescription || project.description}
                 </p>
-
-                {project.slideDeckUrl && (
-                  <div className="mt-8">
-                    <h3 className="text-sm font-bold uppercase tracking-widest text-[#2C2A26] mb-4">Case Study</h3>
-                    <div className="w-full aspect-video bg-[#EBE7DE] rounded-xl overflow-hidden border border-[#D6D1C7] shadow-sm">
-                      <iframe
-                        src={`${project.slideDeckUrl}#view=FitH&navpanes=0`}
-                        className="w-full h-full border-0"
-                        title={`${project.name} Case Study`}
-                      />
-                    </div>
-                  </div>
-                )}
               </div>
 
               <div className="mb-8">
@@ -172,6 +160,20 @@ const ProductDetail: React.FC<ProjectDetailProps> = ({ project, onBack }) => {
                 </div>
               </div>
             </div>
+          </div>
+
+          {project.slideDeckUrl && (
+              <section>
+                <h2 className="text-sm font-bold uppercase tracking-widest text-[#2C2A26] mb-4">Case Study</h2>
+                <div className="w-full h-[72vh] min-h-[480px] md:min-h-[560px] max-h-[960px] bg-[#EBE7DE] rounded-xl overflow-hidden border border-[#D6D1C7] shadow-sm">
+                  <iframe
+                    src={`${project.slideDeckUrl}#view=FitH&navpanes=0`}
+                    className="w-full h-full border-0"
+                    title={`${project.name} Case Study`}
+                  />
+                </div>
+              </section>
+            )}
 
           </div>
         )}
