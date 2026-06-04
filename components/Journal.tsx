@@ -27,7 +27,7 @@ const Journal: React.FC = () => {
   }, []);
 
   return (
-    <section id="journal" className="bg-[#F5F2EB] py-16 md:py-16 px-6 md:px-12">
+    <section id="journal" className="bg-[#EBE7DE] py-16 md:py-16 px-6 md:px-12">
       <div className="max-w-[1800px] mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-20 pb-8 border-b border-[#D6D1C7]">
           <div>
@@ -50,10 +50,14 @@ const Journal: React.FC = () => {
               key={article.id}
               glowColor="orange"
               customSize={true}
-              className="w-full h-full cursor-pointer group !p-0"
+              className="w-full h-full cursor-pointer group !block !gap-0 !p-0 overflow-hidden bg-[#F5F2EB]/70"
+              style={{
+                '--backdrop': 'rgb(245 242 235 / 0.7)',
+                '--backup-border': 'rgb(214 209 199 / 0.8)',
+              } as React.CSSProperties}
               onClick={() => navigate(`/journal/${article.slug}`)}
             >
-              <div className="flex flex-col h-full bg-[#EBE7DE]/30 rounded-2xl overflow-hidden">
+              <div className="flex h-full min-h-full flex-col bg-[#F5F2EB]/70 rounded-2xl overflow-hidden">
                 <div className="w-full aspect-[4/3] overflow-hidden bg-[#EBE7DE]">
                   {article.cover_image_url ? (
                     <img

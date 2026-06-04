@@ -8,7 +8,7 @@
 import { Project, JournalArticle } from './types';
 
 // Placeholder PDF Base64. In production, replace this with a link to the actual file like "/Saksham_Agrawal_Resume.pdf"
-export const RESUME_DATA_URI = "https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/Resume/Saksham_Agrawal_Resume_10_04.pdf";
+export const RESUME_DATA_URI = "https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/Resume/Saksham_Agrawal_Resume_06_2026.pdf";
 
 export const EXPERIENCE = [
   {
@@ -82,6 +82,7 @@ export const EXPERIENCE = [
 ];
 
 export const PROJECTS: Project[] = [
+  // Showcase MVP / Existing Projects
   {
     id: 'ai-gate',
     name: 'AI Gating Lab',
@@ -147,7 +148,7 @@ export const PROJECTS: Project[] = [
     longDescription: 'Ticketflow enables operators to log complaints, track status changes, and analyze support metrics in real-time. Features include a secure login, detailed ticket dashboard, remark logging, and interactive analytics visualization involved in support operations.',
     role: 'Full Stack Developer',
     category: 'SaaS / Enterprise',
-    imageUrl: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&q=80&w=1000', // Placeholder or use a specific one
+    imageUrl: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&q=80&w=1000',
     gallery: [],
     techStack: ['React', 'TypeScript', 'Tailwind CSS', 'Analytics'],
     demoUrl: '/ticketflow',
@@ -167,22 +168,8 @@ export const PROJECTS: Project[] = [
     demoUrl: '/runner',
     status: 'completed'
   },
-  {
-    id: 'digital-twin',
-    name: 'Health Twin Platform',
-    tagline: 'Connected care via Knowledge Graphs.',
-    description: 'A centralized platform connecting biomarkers to give users a holistic view of their health.',
-    longDescription: 'At Jivi.ai, I identified a gap where users struggled with fragmented medical history. I standardized parameters across biomarkers to allow integration with EHRs. I implemented the Health Assistant using Agentic RAG and Knowledge Graphs, providing accurate insights to users and doctors.',
-    role: 'Senior Product Manager @ Jivi AI',
-    category: 'Healthcare AI',
-    imageUrl: 'https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&q=80&w=1000',
-    gallery: [
-      'https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&q=80&w=1000'
-    ],
-    techStack: ['Agentic RAG', 'Knowledge Graphs', 'EHR Integration', 'Healthcare Data'],
-    demoUrl: '/health-twin',
-    status: 'completed'
-  },
+
+  // Jivi AI Projects
   {
     id: 'mind-coach',
     name: 'Jivi Mind Coach',
@@ -190,6 +177,7 @@ export const PROJECTS: Project[] = [
     description: 'Mental health platform with real-time conversational capabilities in 100+ languages.',
     longDescription: 'Launched Jivi Mind Coach, scaling it to ~800 therapies/day. I conceptualized an emergency monitoring system that catches crises with an F1 score of 0.99. I also implemented LLM evaluations across 11 rubrics to ensure clinical safety.',
     role: 'Product Lead @ Jivi AI',
+    company: 'Jivi AI',
     category: 'Healthcare AI',
     imageUrl: 'https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?auto=format&fit=crop&q=80&w=1000',
     gallery: [
@@ -197,40 +185,124 @@ export const PROJECTS: Project[] = [
     ],
     techStack: ['LLMs', 'Safety Guardrails', 'Multilingual Support', 'PLG'],
     demoUrl: '/mind-coach',
+    slideDeckUrl: '',
     status: 'completed'
   },
   {
+    id: 'digital-twin',
+    name: 'Jivi Health Twin',
+    tagline: 'Connected care via Knowledge Graphs.',
+    description: 'A centralized platform connecting biomarkers to give users a holistic view of their health.',
+    longDescription: 'At Jivi.ai, I identified a gap where users struggled with fragmented medical history. I standardized parameters across biomarkers to allow integration with EHRs. I implemented the Health Assistant using Agentic RAG and Knowledge Graphs, providing accurate insights to users and doctors.',
+    role: 'Senior Product Manager @ Jivi AI',
+    company: 'Jivi AI',
+    category: 'Healthcare AI',
+    imageUrl: 'https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&q=80&w=1000',
+    gallery: [
+      'https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&q=80&w=1000'
+    ],
+    techStack: ['Agentic RAG', 'Knowledge Graphs', 'EHR Integration', 'Healthcare Data'],
+    demoUrl: '/health-twin',
+    slideDeckUrl: '',
+    status: 'completed'
+  },
+  {
+    id: 'dr-jivi',
+    name: 'Dr. Jivi',
+    tagline: 'Multi-agent diagnostic triaging.',
+    description: 'A multi-agent triaging workflow achieving top-3 diagnostic accuracy of 94.77%.',
+    longDescription: 'Led multi-agent triaging workflow for Dr. Jivi, achieving top-3 diagnostic accuracy of 94.77% in USMLE/NEJM benchmarking.',
+    role: 'Director, Product Management @ Jivi AI',
+    company: 'Jivi AI',
+    category: 'Healthcare AI',
+    imageUrl: 'https://images.unsplash.com/photo-1576091160550-2173ff9e5e3c?auto=format&fit=crop&q=80&w=1000',
+    gallery: [],
+    techStack: ['Multi-Agent Architecture', 'Clinical Validation', 'LLM Evaluations'],
+    slideDeckUrl: '',
+    status: 'completed'
+  },
+  {
+    id: 'jivi-orchestrator',
+    name: 'Jivi AI Agent Orchestrator Platform',
+    tagline: 'Multimodal agent composition for non-tech teams.',
+    description: 'A platform empowering non-tech teams to compose AI agents, reducing TTM by ~50%.',
+    longDescription: 'Built multimodal agent-orchestration platform empowering non-tech teams to compose AI agents, reducing TTM by ~50%. Architected a stateful memory management system integrating episodic session context and long-term user profiles for deep personalization.',
+    role: 'Director, Product Management @ Jivi AI',
+    company: 'Jivi AI',
+    category: 'Healthcare AI',
+    imageUrl: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&q=80&w=1000',
+    gallery: [],
+    techStack: ['Agent Orchestration', 'Stateful Memory Management', 'Platform Strategy'],
+    slideDeckUrl: '',
+    status: 'completed'
+  },
+
+  // Bharatpe Projects
+  {
     id: 'p3',
-    name: 'BharatPe Unity Card',
+    name: 'Bharatpe Unity Bank Credit Card',
     tagline: 'Co-branded credit card launch.',
     description: 'Led the 0-1 launch of BharatPe and Unity Bank’s first co-branded credit card.',
     longDescription: 'Co-led a cross-functional team to launch this product. We scaled to ~1000 cards monthly with an average transaction value of Rs. 20,000/card. I owned the product proposition and customer experience from concept to scale.',
     role: 'Senior Product Manager @ BharatPe',
+    company: 'BharatPe',
     category: 'Fintech',
     imageUrl: 'https://images.unsplash.com/photo-1614212959648-8a2b535d496e?auto=format&fit=crop&q=80&w=1000',
     gallery: [
       'https://images.unsplash.com/photo-1614212959648-8a2b535d496e?auto=format&fit=crop&q=80&w=1000'
     ],
-
     techStack: ['Banking Integration', 'Credit Risk', 'Go-To-Market', 'Stakeholder Mgmt'],
     demoUrl: '/unity-card',
-
+    slideDeckUrl: '',
+    status: 'completed'
   },
   {
-    id: 'p4',
-    name: 'Postpe & Personal Loans',
+    id: 'postpe-cc',
+    name: 'Postpe Credit Cards and Credit Line',
     tagline: 'Scaling consumer lending.',
-    description: 'Managed 3rd largest BNPL card player with 1.2M cards and launched Personal Loans.',
-    longDescription: 'Managed Postpe cards (AUM ~Rs 680 Cr). I pioneered the industry-first "EMI on QR" feature. For Personal Loans, I spearheaded the product from concept to launch with real-time disbursals, scaling to Rs 2.5 Cr/day.',
+    description: 'Managed 3rd largest BNPL card player with 1.2M cards.',
+    longDescription: 'Managed Postpe cards (1.2M+ active cards) and CCMS platform integrations. Spearheaded a team of 2 APMs to disburse INR 420 Cr/month with an AUM of ~INR 680 Cr. Increased transaction success rate from 72% to 84%, generating an additional INR 30 Cr/month in disbursals.',
     role: 'Senior Product Manager @ BharatPe',
+    company: 'BharatPe',
     category: 'Fintech',
     imageUrl: 'https://images.unsplash.com/photo-1556742502-ec7c0e9f34b1?auto=format&fit=crop&q=80&w=1000&h=563',
-    gallery: [
-      'https://images.unsplash.com/photo-1556742502-ec7c0e9f34b1?auto=format&fit=crop&q=80&w=1000&h=563'
-    ],
-    techStack: ['Lending Lifecycle', 'Regulatory Compliance', 'E-Nach', 'Risk Modeling'],
-    demoUrl: '#'
+    gallery: [],
+    techStack: ['Lending Lifecycle', 'Regulatory Compliance', 'Risk Modeling'],
+    slideDeckUrl: '',
+    status: 'completed'
   },
+  {
+    id: 'postpe-pl',
+    name: 'Postpe Personal Loans',
+    tagline: 'Real-time personal loan disbursal.',
+    description: 'Spearheaded Personal Loan product from concept to launch with E-Nach validation.',
+    longDescription: "Spearheaded Personal Loan product from concept to launch with E-Nach validation and real-time disbursals, scaling portfolio to INR 2.5 Cr/day. Defined and executed the comprehensive strategic roadmap for strict compliance with RBI's Digital Lending Guidelines.",
+    role: 'Senior Product Manager @ BharatPe',
+    company: 'BharatPe',
+    category: 'Fintech',
+    imageUrl: 'https://images.unsplash.com/photo-1579621970588-a35d0e7ab9b6?auto=format&fit=crop&q=80&w=1000',
+    gallery: [],
+    techStack: ['Lending', 'E-Nach', 'Regulatory Compliance'],
+    slideDeckUrl: '',
+    status: 'completed'
+  },
+  {
+    id: 'postpe-emi',
+    name: 'Postpe "EMI on QR"',
+    tagline: 'Industry-first EMI solution.',
+    description: 'Pioneered industry-first "EMI on QR" feature.',
+    longDescription: 'Pioneered industry-first "EMI on QR" feature, unlocking a new INR 1 Cr/day portfolio in consumer durable loans.',
+    role: 'Senior Product Manager @ BharatPe',
+    company: 'BharatPe',
+    category: 'Fintech',
+    imageUrl: 'https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?auto=format&fit=crop&q=80&w=1000',
+    gallery: [],
+    techStack: ['Payments', 'Lending Lifecycle', 'Consumer Finance'],
+    slideDeckUrl: '',
+    status: 'completed'
+  },
+
+  // Other Projects
   {
     id: 'p5',
     name: 'Mi Pay & Device Financing',
@@ -243,8 +315,7 @@ export const PROJECTS: Project[] = [
     gallery: [
       'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?auto=format&fit=crop&q=80&w=1000'
     ],
-    techStack: ['Payments', 'Supply Chain Finance', 'Strategy', 'P&L'],
-    demoUrl: '#'
+    techStack: ['Payments', 'Supply Chain Finance', 'Strategy', 'P&L']
   },
   {
     id: 'p6',
@@ -259,7 +330,6 @@ export const PROJECTS: Project[] = [
       'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&q=80&w=1000'
     ],
     techStack: ['Python', 'React Native', 'TensorFlow', 'Finance API'],
-    demoUrl: '#',
     status: 'under-development'
   },
   {
@@ -275,7 +345,6 @@ export const PROJECTS: Project[] = [
       'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?auto=format&fit=crop&q=80&w=1000'
     ],
     techStack: ['Solidity', 'Ethereum', 'Node.js', 'Web3.js'],
-    demoUrl: '#',
     status: 'under-development'
   },
   {
@@ -291,7 +360,6 @@ export const PROJECTS: Project[] = [
       'https://images.unsplash.com/photo-1611162617474-5b21e879e113?auto=format&fit=crop&q=80&w=1000'
     ],
     techStack: ['OpenAI API', 'React', 'Node.js', 'Analytics'],
-    demoUrl: '#',
     status: 'under-development'
   }
 ];

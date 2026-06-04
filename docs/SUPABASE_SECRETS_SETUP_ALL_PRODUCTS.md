@@ -110,6 +110,7 @@ Expected names should include:
   - `TRADING_AGENTS_RUN_WEBHOOK_URL`
   - `TRADING_AGENTS_RECON_WEBHOOK_URL`
   - `TRADING_AGENTS_N8N_WEBHOOK_SECRET`
+  - `TRADING_AGENTS_ADMIN_TOKEN` (Edge `evaluate`; must match n8n credential **Trading Agents Eval Admin**)
 - Mind Coach:
   - `MC_N8N_CHAT_WEBHOOK_URL`
   - `MC_N8N_DISCOVERY_WEBHOOK_URL`

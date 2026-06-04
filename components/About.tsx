@@ -5,7 +5,31 @@
 
 
 import React from 'react';
+import { Cpu, Rocket, ShieldCheck, TrendingUp } from 'lucide-react';
 import { RESUME_DATA_URI } from '../constants';
+
+const capabilities = [
+  {
+    title: 'AI Product Systems',
+    icon: Cpu,
+    evidence: 'At Jivi, built multi-agent, multi-modal workflows in healthcare with clinical-grade performance. Proficient in agent harnesses, including observability, evals, and guardrail systems.',
+  },
+  {
+    title: 'Growth & Scale',
+    icon: TrendingUp,
+    evidence: 'Scaled Jivi to 3.7M+ users and BharatPe Consumer Lending to 1.2M+ active cards, INR 420 Cr/month disbursals, and ~INR 680 Cr AUM through funnels, reliability, and PLG.',
+  },
+  {
+    title: '0-1 Product Development',
+    icon: Rocket,
+    evidence: 'Built 0-1 products by identifying customer needs, shaping the value proposition, and taking BharatPe Credit Cards, Personal Loans, EMI on QR, Xiaomi Device Financing, and Jivi monetization to market.',
+  },
+  {
+    title: 'Regulated Product Leadership',
+    icon: ShieldCheck,
+    evidence: 'Led products in regulated fintech and healthcare environments, including RBI Digital Lending, HIPAA readiness, AI safety evals, and bank/NBFC integrations, balancing speed with governance.',
+  },
+];
 
 const About: React.FC = () => {
   return (
@@ -63,6 +87,40 @@ const About: React.FC = () => {
                 <li>AI Evals & Observability</li>
               </ul>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-[#F5F2EB] px-6 py-16 md:px-12 md:py-20">
+        <div className="mx-auto max-w-[1800px]">
+          <div className="mb-12 flex flex-col items-start justify-between gap-8 border-b border-[#D6D1C7] pb-8 md:flex-row md:items-end">
+            <div>
+              <h3 className="text-4xl font-serif text-[#2C2A26] md:text-6xl">
+                What I ship
+              </h3>
+            </div>
+            <p className="max-w-2xl text-lg font-light leading-relaxed text-[#5D5A53] md:text-xl">
+              I build regulated AI, fintech, and growth products from zero to one, then scale them with data, systems, and commercial ownership.
+            </p>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+            {capabilities.map(({ title, icon: Icon, evidence }) => (
+              <article
+                key={title}
+                className="min-h-[280px] rounded-lg border border-[#D6D1C7] bg-[#EBE7DE] p-7 transition-all duration-300 hover:-translate-y-1 hover:border-[#A8A29E] hover:bg-[#F0ECE3]"
+              >
+                <div className="mb-12 flex h-12 w-12 items-center justify-center rounded-lg border border-[#D6D1C7] bg-[#F5F2EB] text-[#8B7644]">
+                  <Icon className="h-6 w-6" strokeWidth={1.8} />
+                </div>
+                <h4 className="mb-5 text-2xl font-serif font-medium text-[#2C2A26]">
+                  {title}
+                </h4>
+                <p className="text-base font-light leading-7 text-[#5D5A53]">
+                  {evidence}
+                </p>
+              </article>
+            ))}
           </div>
         </div>
       </div>

@@ -32,6 +32,7 @@ const GlowCard: React.FC<GlowCardProps> = ({
     width,
     height,
     customSize = false,
+    style,
     ...props
 }) => {
     const cardRef = useRef<HTMLDivElement>(null);
@@ -164,7 +165,7 @@ const GlowCard: React.FC<GlowCardProps> = ({
             <div
                 ref={cardRef}
                 data-glow
-                style={getInlineStyles()}
+                style={{ ...getInlineStyles(), ...style }}
                 {...props}
                 className={`
           ${getSizeClasses()}

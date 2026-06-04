@@ -107,7 +107,7 @@ const BlogPost: React.FC = () => {
 
                     <div className="bg-white/50 p-8 rounded-sm">
                         {/* Reusing the CommentSection you already built, but passing the UUID logic */}
-                        <CommentSection articleId={post.id} />
+                        <CommentSection articleId={post.id} redirectPath={`/journal/${slug}`} />
                     </div>
                 </article>
             </div>

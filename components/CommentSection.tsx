@@ -4,9 +4,10 @@ import { supabase } from '../lib/supabaseClient';
 
 interface CommentSectionProps {
     articleId: string;
+    redirectPath?: string;
 }
 
-const CommentSection: React.FC<CommentSectionProps> = ({ articleId }) => {
+const CommentSection: React.FC<CommentSectionProps> = ({ articleId, redirectPath }) => {
     const [comments, setComments] = useState<Comment[]>([]);
     const [newComment, setNewComment] = useState('');
     const [userId, setUserId] = useState<string | null>(null);
@@ -145,7 +146,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ articleId }) => {
                 </form>
             ) : (
                 <div className="bg-[#EBE7DE] p-8 text-center text-[#5D5A53]">
-                    Please <a href="/login" className="underline decoration-1 underline-offset-4 text-[#2C2A26]">sign in</a> to leave a comment.
+                    Please <a href={redirectPath ? `/login?redirect=${encodeURIComponent(redirectPath)}` : '/login'} className="underline decoration-1 underline-offset-4 text-[#2C2A26]">sign in</a> to leave a comment.
                 </div>
             )}
         </div>

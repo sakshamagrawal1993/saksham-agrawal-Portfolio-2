@@ -843,6 +843,7 @@ function FnOCopilotApp() {
               workflowSteps={workflowSteps}
               showArtifact={mode !== 'ask-ai' && Boolean(submittedModes[mode])}
               contracts={liveContracts}
+              isAiTyping={isAiTyping}
               onNewChat={() => {
                 setMessages(createInitialMessages());
                 setSubmittedModes((current) => ({ ...current, [mode]: false }));
@@ -1081,7 +1082,8 @@ function AgentModeWorkspace({
   onOpenData,
   onOpenTrade,
   onPatchArtifact,
-  onOpenScreener
+  onOpenScreener,
+  isAiTyping
 }: {
   mode: UserMode;
   setMode: (mode: UserMode) => void;
@@ -1094,6 +1096,7 @@ function AgentModeWorkspace({
   workflowSteps: ReturnType<typeof buildWorkflowSteps>;
   showArtifact: boolean;
   contracts: ContractSummary[];
+  isAiTyping: boolean;
   onNewChat: () => void;
   onOpenData: () => void;
   onOpenTrade: (tradeId?: string) => void;
@@ -1154,7 +1157,7 @@ function AgentModeWorkspace({
                   <p>{message.text}</p>
                 </div>
               ))}
-              {aiTyping && (
+              {isAiTyping && (
                 <div className="agent-thread-message assistant">
                   <span>FnO Agent</span>
                   <div className="typing-indicator">

@@ -12,12 +12,14 @@ export interface Project {
   description: string;
   longDescription?: string;
   role: string;
+  company?: 'Jivi AI' | 'BharatPe';
   category: string;
   imageUrl: string;
   gallery?: string[];
   techStack: string[];
   repoUrl?: string;
   demoUrl?: string;
+  slideDeckUrl?: string;
   status?: 'completed' | 'under-development';
 }
 

@@ -18,6 +18,7 @@ import Assistant from './components/Assistant';
 import Footer from './components/Footer';
 import ProductDetail from './components/ProductDetail';
 import { PROJECTS } from './constants';
+import { useProjectMetadata } from './hooks/useProjectMetadata';
 
 // Lazy Load Route Components
 const BlogFeed = lazy(() => import('./components/blog/BlogFeed'));
@@ -69,15 +70,23 @@ function HomePage() {
 function ProjectPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const metadataMap = useProjectMetadata();
   const project = PROJECTS.find((p) => p.id === id);
 
   if (!project) {
     return <Navigate to="/" replace />;
   }
 
+  const meta = id ? metadataMap[id] : null;
+  const mergedProject = {
+    ...project,
+    imageUrl: meta?.image_url || project.imageUrl,
+    slideDeckUrl: meta?.slide_deck_url || project.slideDeckUrl,
+  };
+
   return (
     <ProductDetail
-      project={project}
+      project={mergedProject}
       onBack={() => {
         navigate('/#work');
       }}
@@ -283,7 +292,7 @@ function App() {
             {/* Dashboard Routes */}
             <Route path="/login" element={
               <Suspense fallback={<LoadingFallback />}>
-                <Login />
+                <Login redirectPath="/dashboard" />
               </Suspense>
             } />
             <Route path="/dashboard" element={

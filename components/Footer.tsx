@@ -13,7 +13,7 @@ interface FooterProps {
 
 const Footer: React.FC<FooterProps> = ({ onLinkClick }) => {
   return (
-    <footer id="contact" className="bg-[#EBE7DE] pt-24 pb-12 px-6 text-[#5D5A53]">
+    <footer id="contact" className="bg-[#D6D1C7] pt-24 pb-12 px-6 text-[#5D5A53]">
       <div className="max-w-[1800px] mx-auto grid grid-cols-1 md:grid-cols-12 gap-12">
 
         <div className="md:col-span-4">
@@ -46,8 +46,8 @@ const Footer: React.FC<FooterProps> = ({ onLinkClick }) => {
 
       </div>
 
-      <div className="max-w-[1800px] mx-auto mt-20 pt-8 border-t border-[#D6D1C7] flex flex-col md:flex-row justify-between items-center text-xs uppercase tracking-widest opacity-60">
-        <p>&copy; 2024 Saksham Agrawal</p>
+      <div className="max-w-[1800px] mx-auto mt-20 pt-8 border-t border-[#A8A29E]/40 flex flex-col md:flex-row justify-between items-center text-xs uppercase tracking-widest opacity-60">
+        <p>&copy; 2026 Saksham Agrawal</p>
         <p>Product & Strategy</p>
       </div>
     </footer>
