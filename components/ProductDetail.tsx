@@ -17,6 +17,8 @@ interface ProjectDetailProps {
 
 const ProductDetail: React.FC<ProjectDetailProps> = ({ project, onBack }) => {
   const navigate = useNavigate();
+  const conceptDemoUrl = project.conceptDemoUrl?.trim();
+
   const openLiveDemo = () => {
     if (!project.demoUrl) return;
     if (project.demoUrl.startsWith('/')) {
@@ -161,6 +163,29 @@ const ProductDetail: React.FC<ProjectDetailProps> = ({ project, onBack }) => {
               </div>
             </div>
           </div>
+
+          {conceptDemoUrl && (
+            <section>
+              <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-4">
+                <div>
+                  <span className="block text-xs font-bold uppercase tracking-widest text-[#A8A29E] mb-2">Concept Demo</span>
+                  <h2 className="text-2xl md:text-3xl font-serif text-[#2C2A26]">Health Twin walkthrough</h2>
+                </div>
+                <p className="max-w-xl text-sm md:text-base text-[#5D5A53] font-light leading-relaxed">
+                  A short product concept demo showing how Health Twin context can power more personalized health guidance.
+                </p>
+              </div>
+              <div className="w-full aspect-video bg-[#EBE7DE] rounded-xl overflow-hidden border border-[#D6D1C7] shadow-sm">
+                <iframe
+                  src={conceptDemoUrl}
+                  className="w-full h-full border-0"
+                  title={`${project.name} Concept Demo`}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                />
+              </div>
+            </section>
+          )}
 
           {project.slideDeckUrl && (
               <section>

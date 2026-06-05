@@ -210,6 +210,7 @@ export const PROJECTS: Project[] = [
     ],
     techStack: ['Agentic RAG', 'Knowledge Graphs', 'EHR Integration', 'Healthcare Data'],
     demoUrl: '/health-twin',
+    conceptDemoUrl: 'https://www.youtube-nocookie.com/embed/5NH8JYPBPVk?rel=0',
     slideDeckUrl: '',
     status: 'completed',
     ribbonLabel: 'Case Study + Demo'
