@@ -48,7 +48,7 @@ const About: React.FC = () => {
               I am Saksham, a Product Leader with 7+ years of experience directing product strategy, scaling operations, and driving P&L impact across high-growth Fintech and cutting-edge AI sectors.
             </p>
             <p className="text-lg md:text-xl text-[#5D5A53] font-light leading-relaxed mb-8">
-              With an MBA in Strategy & Finance and a deep technical understanding of AI, I bridge the gap between complex engineering challenges and tangible business value. From architecting Agentic AI healthcare solutions to managing a high-volume consumer lending portfolio, my philosophy remains the same: <strong>Solve real problems with clarity and precision.</strong>
+              With deep empathy for customers and a comprehensive understanding across business, technology, and AI, I bridge the gap between complex engineering challenges and tangible business value while delivering a compelling customer value proposition. From architecting Agentic AI healthcare solutions to managing a high-volume consumer lending portfolio, my philosophy remains the same: <strong>Solve real problems with clarity and precision.</strong>
             </p>
 
             <div className="mb-12">
