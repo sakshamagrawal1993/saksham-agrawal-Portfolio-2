@@ -19,7 +19,6 @@ export interface Project {
   techStack: string[];
   repoUrl?: string;
   demoUrl?: string;
-  conceptDemoUrl?: string;
   slideDeckUrl?: string;
   status?: 'completed' | 'under-development';
   ribbonLabel?: string;

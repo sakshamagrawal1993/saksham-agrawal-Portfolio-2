@@ -4,8 +4,6 @@ import { supabase } from '../../lib/supabaseClient';
 import { useHealthTwinStore, HealthTwin } from '../../store/healthTwin';
 import { Plus, Loader2, LogOut, Star } from 'lucide-react';
 
-const HEALTH_TWIN_SHORTS_EMBED_URL = 'https://www.youtube-nocookie.com/embed/IcV-6lwGv74?rel=0';
-
 export const TwinLanding: React.FC = () => {
     const navigate = useNavigate();
     const { twins, setTwins, setActiveTwin, clearChat } = useHealthTwinStore();
@@ -189,34 +187,6 @@ export const TwinLanding: React.FC = () => {
                         Your central intelligence for generating, analyzing, and optimizing digital biomarkers.
                     </p>
                 </div>
-
-                <section className="mb-16 rounded-2xl border border-[#D6D1C7] bg-white/55 p-5 md:p-8 shadow-sm">
-                    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(240px,360px)] gap-8 lg:gap-12 items-center">
-                        <div>
-                            <span className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[#A8A29E] mb-4">
-                                Concept Demo
-                            </span>
-                            <h2 className="text-3xl md:text-4xl font-serif tracking-tight text-[#2C2A26] mb-4">
-                                Smart Health experience
-                            </h2>
-                            <p className="max-w-2xl text-base md:text-lg text-[#5D5A53] font-light leading-relaxed">
-                                A quick walkthrough of the mobile Health Twin experience: biomarker dashboards, personalized insights, and coach-led next actions.
-                            </p>
-                        </div>
-
-                        <div className="mx-auto w-full max-w-[300px] overflow-hidden rounded-2xl border border-[#EBE7DE] bg-[#EBE7DE] shadow-md">
-                            <div className="aspect-[9/16]">
-                                <iframe
-                                    src={HEALTH_TWIN_SHORTS_EMBED_URL}
-                                    className="h-full w-full border-0"
-                                    title="Health Twin Smart Health Concept Demo"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                                    allowFullScreen
-                                />
-                            </div>
-                        </div>
-                    </div>
-                </section>
 
                 {/* Tabs */}
                 <div className="flex items-center justify-between border-b border-[#EBE7DE] mb-12">

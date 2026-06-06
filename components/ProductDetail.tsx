@@ -15,9 +15,11 @@ interface ProjectDetailProps {
   onBack: () => void;
 }
 
+const HEALTH_TWIN_WALKTHROUGH_EMBED_URL = 'https://www.youtube-nocookie.com/embed/5NH8JYPBPVk?rel=0';
+const HEALTH_TWIN_SHORTS_EMBED_URL = 'https://www.youtube-nocookie.com/embed/IcV-6lwGv74?rel=0';
+
 const ProductDetail: React.FC<ProjectDetailProps> = ({ project, onBack }) => {
   const navigate = useNavigate();
-  const conceptDemoUrl = project.conceptDemoUrl?.trim();
 
   const openLiveDemo = () => {
     if (!project.demoUrl) return;
@@ -164,25 +166,56 @@ const ProductDetail: React.FC<ProjectDetailProps> = ({ project, onBack }) => {
             </div>
           </div>
 
-          {conceptDemoUrl && (
-            <section>
-              <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-4">
-                <div>
-                  <span className="block text-xs font-bold uppercase tracking-widest text-[#A8A29E] mb-2">Concept Demo</span>
-                  <h2 className="text-2xl md:text-3xl font-serif text-[#2C2A26]">Health Twin walkthrough</h2>
-                </div>
-                <p className="max-w-xl text-sm md:text-base text-[#5D5A53] font-light leading-relaxed">
-                  A short product concept demo showing how Health Twin context can power more personalized health guidance.
+          {project.id === 'digital-twin' && (
+            <section className="rounded-xl border border-[#D6D1C7] bg-white/55 p-5 md:p-8 shadow-sm">
+              <div className="mb-8 max-w-3xl">
+                <span className="block text-xs font-bold uppercase tracking-widest text-[#A8A29E] mb-3">
+                  Walkthrough
+                </span>
+                <h2 className="text-3xl md:text-4xl font-serif tracking-tight text-[#2C2A26] mb-3">
+                  Health Twin product demos
+                </h2>
+                <p className="text-base md:text-lg text-[#5D5A53] font-light leading-relaxed">
+                  The concept flow and mobile Smart Health experience shown side by side, before entering the live demo environment.
                 </p>
               </div>
-              <div className="w-full aspect-video bg-[#EBE7DE] rounded-xl overflow-hidden border border-[#D6D1C7] shadow-sm">
-                <iframe
-                  src={conceptDemoUrl}
-                  className="w-full h-full border-0"
-                  title={`${project.name} Concept Demo`}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  allowFullScreen
-                />
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start">
+                <div className="overflow-hidden rounded-xl border border-[#EBE7DE] bg-[#EBE7DE] shadow-md">
+                  <div className="aspect-video">
+                    <iframe
+                      src={HEALTH_TWIN_WALKTHROUGH_EMBED_URL}
+                      className="h-full w-full border-0"
+                      title="Health Twin Concept Walkthrough"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      allowFullScreen
+                    />
+                  </div>
+                  <div className="p-4 bg-white">
+                    <h3 className="font-serif text-lg text-[#2C2A26]">Concept walkthrough</h3>
+                    <p className="mt-1 text-sm text-[#5D5A53]">How Health Twin context powers personalized health guidance.</p>
+                  </div>
+                </div>
+
+                <div className="overflow-hidden rounded-xl border border-[#EBE7DE] bg-[#EBE7DE] shadow-md">
+                  <div className="flex justify-center bg-[#F5F2EB] py-4">
+                    <div className="w-full max-w-[240px] overflow-hidden rounded-xl border border-[#EBE7DE] bg-[#EBE7DE]">
+                      <div className="aspect-[9/16]">
+                        <iframe
+                          src={HEALTH_TWIN_SHORTS_EMBED_URL}
+                          className="h-full w-full border-0"
+                          title="Health Twin Smart Health Concept Demo"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                          allowFullScreen
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-4 bg-white">
+                    <h3 className="font-serif text-lg text-[#2C2A26]">Smart Health interface</h3>
+                    <p className="mt-1 text-sm text-[#5D5A53]">Biomarker dashboards, insights, and coach-led next actions.</p>
+                  </div>
+                </div>
               </div>
             </section>
           )}
