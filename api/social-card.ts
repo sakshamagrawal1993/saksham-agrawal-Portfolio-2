@@ -85,10 +85,10 @@ function getDefaultHTML(baseUrl: string) {
     <html lang="en">
     <head>
         <meta charset="UTF-8">
-        <title>Saksham Agrawal - Portfolio</title>
-        <meta property="og:title" content="Saksham Agrawal - Product Leader">
+        <title>Product Portfolio - Saksham Agrawal</title>
+        <meta property="og:title" content="Product Portfolio - Saksham Agrawal">
         <meta property="og:description" content="Senior Product Manager building AI and Fintech solutions.">
-        <meta property="og:image" content="${baseUrl}/og-image.png">
+        <meta property="og:image" content="${baseUrl}/assets/og-image.png">
     </head>
     <body>
         <p>Redirecting...</p>
