@@ -1,0 +1,61 @@
+{
+  "history": [
+    {
+      "role": "user",
+      "content": "I have a swollen left eyelid that started 3 days ago. It was generalized and red, but now it is localized to a single swollen lump on the upper left eyelid."
+    },
+    {
+      "role": "assistant",
+      "content": "Could you tell me more about that?"
+    },
+    {
+      "role": "user",
+      "content": "It is tender to touch and has a constant, low-severity burning pain. It gets worse when I touch it, but hot baths seem to help."
+    },
+    {
+      "role": "assistant",
+      "content": "Could you tell me more about that?"
+    },
+    {
+      "role": "user",
+      "content": "I noticed some white pus coming from the lump starting 2 days ago. I do not have any redness in my eye itself, no vision changes, no fever, or chills."
+    },
+    {
+      "role": "assistant",
+      "content": "Could you tell me more about that?"
+    },
+    {
+      "role": "user",
+      "content": "I am a 39 year old female. I do not have a history of diabetes, skin conditions, or immune issues. I have not used any new makeup products, and there has been no trauma to the eye."
+    },
+    {
+      "role": "assistant",
+      "content": "Could you tell me more about that?"
+    },
+    {
+      "role": "user",
+      "content": "No other symptoms. Just the painful, pus-filled lump on my upper left eyelid."
+    },
+    {
+      "role": "assistant",
+      "content": "Could you tell me more about that?"
+    },
+    {
+      "role": "user",
+      "content": "That is all the information I have."
+    },
+    {
+      "role": "assistant",
+      "content": "Could you tell me more about that?"
+    },
+    {
+      "role": "user",
+      "content": "I am ready for the diagnosis."
+    },
+    {
+      "role": "assistant",
+      "content": "Could you tell me more about that?"
+    }
+  ],
+  "intermediate_diagnoses": []
+}
