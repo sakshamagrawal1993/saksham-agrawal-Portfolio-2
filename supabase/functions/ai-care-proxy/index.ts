@@ -51,8 +51,19 @@ serve(async (req) => {
 
       if (sessionError) throw sessionError;
 
+      // Fetch user profile name to address the user correctly in chat
+      const { data: profile } = await supabaseClient
+        .from('jivi_profiles')
+        .select('name')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      const rawName = profile?.name || user.email?.split('@')[0] || '';
+      const userName = rawName.split(' ')[0] || rawName;
+      
       // Ask first question
-      const initialQuestion = "Hello " + (user.email?.split('@')[0] || '') + ", what symptoms or concerns would you like to discuss today?";
+      const initialQuestion = `Hello ${userName}, what symptoms or concerns would you like to discuss today?`;
       
       await supabaseClient.from('jivi_chat_messages').insert({
         session_id: session.id,
