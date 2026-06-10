@@ -125,26 +125,25 @@ export const AICareChat: React.FC = () => {
         : [];
 
     return (
-        <div className="h-screen bg-[#FDFBF7] font-sans text-gray-900 flex flex-col overflow-hidden">
+        <div className="h-screen bg-[#F5F2EB] font-sans text-[#2C2A26] flex flex-col overflow-hidden">
             {/* Header */}
-            <header className="border-b border-gray-100 bg-white sticky top-0 z-10 flex flex-col">
-                <div className="px-4 py-4 flex items-center border-b border-gray-100">
-                    <button onClick={() => navigate('/portfolio')} className="mr-3 p-1">
-                        <ChevronLeft className="w-6 h-6" />
+            <header className="sticky top-0 z-50 bg-[#F5F2EB]/90 backdrop-blur-md border-b flex items-center justify-between px-6 py-4 border-[#EBE7DE]">
+                <div className="flex items-center gap-2">
+                    <button onClick={() => navigate('/portfolio')} className="mr-2 p-1">
+                        <ChevronLeft className="w-5 h-5 text-[#A8A29E] hover:text-[#2C2A26] transition-colors" />
                     </button>
-                    <h1 className="text-xl font-semibold">AI Care</h1>
-                </div>
-                <div className="px-4 py-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <button onClick={() => navigate('/portfolio')} className="p-1">
-                            <ChevronLeft className="w-5 h-5 text-gray-500" />
-                        </button>
-                        <div className="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center text-white cursor-pointer hover:bg-orange-600">
-                            <Plus className="w-5 h-5" />
-                        </div>
+                    <div className="bg-[#2C2A26] rounded-sm text-[#F5F2EB] font-serif w-8 h-8 flex items-center justify-center font-bold">
+                        J
                     </div>
-                    <button className="w-8 h-8 rounded-full border border-orange-200 flex items-center justify-center text-orange-500 bg-orange-50">
-                        <Volume2 className="w-4 h-4" />
+                    <span className="font-serif text-lg font-bold tracking-tight text-[#2C2A26]">Dr. Jivi</span>
+                </div>
+
+                <div className="flex items-center gap-6">
+                    <button
+                        onClick={() => navigate('/portfolio')}
+                        className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#A8A29E] hover:text-[#2C2A26] transition-colors hidden sm:block"
+                    >
+                        BACK TO PORTFOLIO
                     </button>
                 </div>
             </header>
@@ -166,8 +165,8 @@ export const AICareChat: React.FC = () => {
                     <div key={msg.id || idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[85%] px-5 py-4 rounded-2xl text-[15px] leading-relaxed shadow-sm ${
                             msg.role === 'user' 
-                                ? 'bg-orange-500 text-white rounded-br-sm' 
-                                : 'bg-white border border-gray-100 text-gray-800 rounded-tl-sm'
+                                ? 'bg-[#A84A00] text-white rounded-br-sm' 
+                                : 'bg-white border border-[#EBE7DE] text-[#2C2A26] rounded-tl-sm'
                         }`}>
                             {msg.content}
                         </div>
@@ -176,9 +175,9 @@ export const AICareChat: React.FC = () => {
                 
                 {loading && (
                     <div className="flex justify-start">
-                        <div className="max-w-[85%] px-5 py-4 rounded-2xl bg-white border border-gray-100 rounded-tl-sm shadow-sm flex items-center gap-2">
-                            <Loader2 className="w-4 h-4 animate-spin text-orange-500" />
-                            <span className="text-gray-400 text-sm">Dr. Jivi is typing...</span>
+                        <div className="max-w-[85%] px-5 py-4 rounded-2xl bg-white border border-[#EBE7DE] text-[#2C2A26] rounded-tl-sm shadow-sm flex items-center gap-2">
+                            <Loader2 className="w-4 h-4 animate-spin text-[#A84A00]" />
+                            <span className="text-[#A8A29E] text-sm">Dr. Jivi is typing...</span>
                         </div>
                     </div>
                 )}
@@ -186,7 +185,7 @@ export const AICareChat: React.FC = () => {
             </div>
 
             {/* Bottom Input Area */}
-            <div className="p-4 bg-[#FDFBF7] border-t border-gray-100 shrink-0">
+            <div className="p-4 bg-[#F5F2EB] border-t border-[#EBE7DE] shrink-0">
                 {!emergencyAlert && currentOptions && currentOptions.length > 0 && (
                     <div className="flex flex-wrap gap-2 mb-4">
                         {currentOptions.map((opt, i) => (
@@ -194,7 +193,7 @@ export const AICareChat: React.FC = () => {
                                 key={i}
                                 onClick={() => sendMessage(opt)}
                                 disabled={loading}
-                                className="bg-white border border-gray-200 text-gray-700 text-sm px-4 py-3 rounded-2xl hover:border-orange-300 hover:text-orange-600 transition-colors text-left shadow-sm flex-1 min-w-[200px]"
+                                className="bg-white border border-[#EBE7DE] text-[#2C2A26] text-sm px-4 py-3 rounded-2xl hover:border-[#A84A00] transition-colors text-left shadow-sm flex-1 min-w-[200px]"
                             >
                                 {opt}
                             </button>
@@ -210,12 +209,12 @@ export const AICareChat: React.FC = () => {
                         onKeyDown={e => e.key === 'Enter' && sendMessage(inputValue)}
                         disabled={loading || !!emergencyAlert}
                         placeholder="Describe your issue"
-                        className="w-full bg-white border border-gray-200 rounded-full pl-6 pr-14 py-4 focus:outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400 shadow-sm"
+                        className="w-full bg-white border border-[#EBE7DE] rounded-full pl-6 pr-14 py-4 focus:outline-none focus:border-[#A84A00] focus:ring-1 focus:ring-[#A84A00] shadow-sm text-[#2C2A26]"
                     />
                     <button 
                         onClick={() => sendMessage(inputValue)}
                         disabled={loading || !!emergencyAlert || !inputValue.trim()}
-                        className="absolute right-2 top-2 bottom-2 aspect-square rounded-full bg-orange-500 text-white flex items-center justify-center hover:bg-orange-600 disabled:opacity-50 transition-colors"
+                        className="absolute right-2 top-2 bottom-2 aspect-square rounded-full bg-[#A84A00] text-white flex items-center justify-center hover:bg-[#8A3D00] disabled:opacity-50 transition-colors"
                     >
                         <Mic className="w-5 h-5" />
                     </button>
