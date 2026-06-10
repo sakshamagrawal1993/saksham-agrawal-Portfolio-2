@@ -15,6 +15,20 @@ interface ChatRequestPayload {
   user_id: string;
 }
 
+interface MessageItem {
+  role: string;
+  content: string;
+}
+
+interface DatabaseMessage {
+  id: string;
+  session_id: string;
+  role: string;
+  content: string;
+  options?: string[];
+  created_at: string;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -134,8 +148,8 @@ serve(async (req) => {
         .eq('session_id', sessionId)
         .order('created_at', { ascending: true });
 
-      const messageHistory = messages?.map((m: any) => ({ role: m.role, content: m.content })) || [];
-      const userMessageCount = messageHistory.filter(m => m.role === 'user').length;
+      const messageHistory: MessageItem[] = messages?.map((m: DatabaseMessage) => ({ role: m.role, content: m.content })) || [];
+      const userMessageCount = messageHistory.filter((m: MessageItem) => m.role === 'user').length;
 
       // 3. Diagnosis Check (Only if > 5 questions asked)
       if (userMessageCount > 5) {
@@ -154,7 +168,9 @@ serve(async (req) => {
             if (systemMsg && systemMsg.content) {
                 intermediate = JSON.parse(systemMsg.content).intermediate_diagnoses || [];
             }
-        } catch(e) {}
+        } catch (_e) {
+            // Ignore parsing error
+        }
 
         const diagRes = await fetch(N8N_DIAGNOSIS_WEBHOOK, {
           method: 'POST',
@@ -171,10 +187,14 @@ serve(async (req) => {
         if (typeof diagData.output === 'string') {
            try {
               diagData = JSON.parse(diagData.output);
-           } catch(e) {
+           } catch (_e) {
               const match = diagData.output.match(/```json\n([\s\S]*?)\n```/);
               if (match) {
-                 try { diagData = JSON.parse(match[1]); } catch(e2) {}
+                 try { 
+                    diagData = JSON.parse(match[1]); 
+                 } catch (_e2) {
+                    // Ignore parsing error
+                 }
               }
            }
         } else if (diagData.output && typeof diagData.output === 'object') {
@@ -252,7 +272,8 @@ serve(async (req) => {
 
   } catch (error) {
     console.error(error)
-    return new Response(JSON.stringify({ error: error.message }), {
+    const errMessage = error instanceof Error ? error.message : String(error);
+    return new Response(JSON.stringify({ error: errMessage }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
     })
