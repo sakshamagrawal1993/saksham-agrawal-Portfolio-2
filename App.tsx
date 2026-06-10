@@ -46,6 +46,11 @@ const UnityCardDashboard = lazy(() => import('./components/UnityCard/UnityCardDa
 const TradingAgentsApp = lazy(() => import('./components/TradingAgents/TradingAgentsApp'));
 const FnOCopilotApp = lazy(() => import('./components/FnOCopilot/FnOCopilotApp'));
 
+const AICareLanding = lazy(() => import('./components/AICare/AICareLanding').then(m => ({ default: m.AICareLanding })));
+const AICareProfile = lazy(() => import('./components/AICare/AICareProfile').then(m => ({ default: m.AICareProfile })));
+const AICareChat = lazy(() => import('./components/AICare/AICareChat').then(m => ({ default: m.AICareChat })));
+const AICareObservations = lazy(() => import('./components/AICare/AICareObservations').then(m => ({ default: m.AICareObservations })));
+
 const LoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-[#F5F2EB] font-serif italic text-[#2C2A26]/50">
     Loading...
@@ -277,6 +282,28 @@ function App() {
               </Suspense>
             } />
 
+            {/* AI Care Routes */}
+            <Route path="/ai-care" element={
+              <Suspense fallback={<LoadingFallback />}>
+                <AICareLanding />
+              </Suspense>
+            } />
+            <Route path="/ai-care/profile" element={
+              <Suspense fallback={<LoadingFallback />}>
+                <AICareProfile />
+              </Suspense>
+            } />
+            <Route path="/ai-care/chat" element={
+              <Suspense fallback={<LoadingFallback />}>
+                <AICareChat />
+              </Suspense>
+            } />
+            <Route path="/ai-care/observations" element={
+              <Suspense fallback={<LoadingFallback />}>
+                <AICareObservations />
+              </Suspense>
+            } />
+
             {/* Unified Journal/Blog Routes */}
             <Route path="/journal" element={
               <Suspense fallback={<LoadingFallback />}>
@@ -315,8 +342,8 @@ function App() {
           </Routes>
         </main>
 
-        {!['/ticketflow', '/insightslm', '/login', '/medical-benchmark', '/trading-agents', '/ai-gate', '/fno-copilot'].includes(location.pathname) && !location.pathname.startsWith('/health-twin') && !location.pathname.startsWith('/mind-coach') && !location.pathname.startsWith('/unity-card') && <Footer onLinkClick={handleNavClick} />}
-        {!['/runner', '/medical-benchmark', '/trading-agents', '/ai-gate', '/fno-copilot'].includes(location.pathname) && !location.pathname.startsWith('/health-twin') && !location.pathname.startsWith('/mind-coach') && !location.pathname.startsWith('/unity-card') && <Assistant />}
+        {!['/ticketflow', '/insightslm', '/login', '/medical-benchmark', '/trading-agents', '/ai-gate', '/fno-copilot'].includes(location.pathname) && !location.pathname.startsWith('/health-twin') && !location.pathname.startsWith('/mind-coach') && !location.pathname.startsWith('/unity-card') && !location.pathname.startsWith('/ai-care') && <Footer onLinkClick={handleNavClick} />}
+        {!['/runner', '/medical-benchmark', '/trading-agents', '/ai-gate', '/fno-copilot'].includes(location.pathname) && !location.pathname.startsWith('/health-twin') && !location.pathname.startsWith('/mind-coach') && !location.pathname.startsWith('/unity-card') && !location.pathname.startsWith('/ai-care') && <Assistant />}
       </div>
     </AuthProvider>
   );

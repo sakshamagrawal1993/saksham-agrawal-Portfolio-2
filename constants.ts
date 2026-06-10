@@ -226,6 +226,7 @@ export const PROJECTS: Project[] = [
     imageUrl: 'https://images.unsplash.com/photo-1576091160550-2173ff9e5e3c?auto=format&fit=crop&q=80&w=1000',
     gallery: [],
     techStack: ['Multi-Agent Architecture', 'Clinical Validation', 'LLM Evaluations'],
+    demoUrl: '/ai-care',
     slideDeckUrl: '',
     status: 'completed',
     ribbonLabel: 'Case Study + Demo'

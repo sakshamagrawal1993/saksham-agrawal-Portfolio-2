@@ -6,11 +6,13 @@ export type Instrument = {
   symbol: string;
   name: string;
   lotSize: number;
-  minimumLot: number;
-  tickSize: number;
-  freezeQuantity: number;
+  // Optional: present on live/edge-adapted instruments; demo/mock data omits them
+  // (edgeMarketAdapter supplies safe defaults when reading raw market data).
+  minimumLot?: number;
+  tickSize?: number;
+  freezeQuantity?: number;
   expiry: string;
-  isWeekly: boolean;
+  isWeekly?: boolean;
   spot: number;
   previousClose: number;
   snapshotTs: string;
@@ -20,15 +22,16 @@ export type OptionQuote = {
   strike: number;
   type: OptionType;
   bid: number;
-  bidQuantity: number;
+  // Optional depth fields: present on live/edge-adapted quotes; demo/mock data omits them.
+  bidQuantity?: number;
   ask: number;
-  askQuantity: number;
+  askQuantity?: number;
   ltp: number;
   volume: number;
   oi: number;
   oiChange: number;
-  totalBuyQuantity: number;
-  totalSellQuantity: number;
+  totalBuyQuantity?: number;
+  totalSellQuantity?: number;
   iv: number;
   delta: number;
   gamma: number;

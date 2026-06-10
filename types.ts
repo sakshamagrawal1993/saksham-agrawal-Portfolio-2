@@ -67,3 +67,55 @@ export interface Product {
   category: string;
   imageUrl: string;
 }
+
+// Jivi AI Care Types
+export interface JiviProfile {
+  id: string;
+  user_id: string;
+  name: string;
+  gender: string;
+  age: number;
+  comorbidities: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface JiviChatSession {
+  id: string;
+  user_id: string;
+  status: 'active' | 'completed' | 'emergency_stopped';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface JiviChatMessage {
+  id: string;
+  session_id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  options?: string[];
+  created_at: string;
+}
+
+export interface JiviAlert {
+  id: string;
+  session_id: string;
+  is_emergency: boolean;
+  message: string;
+  created_at: string;
+}
+
+export interface JiviDiagnosis {
+  id: string;
+  session_id: string;
+  diagnosis_data: {
+    diagnoses: Array<{
+      name: string;
+      likelihood: string;
+      severity: string;
+      description: string;
+    }>;
+  };
+  confidence_score: number;
+  created_at: string;
+}
