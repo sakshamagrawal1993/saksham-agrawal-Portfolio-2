@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { LeaderboardService } from '../../services/leaderboardService';
 
 interface GameState {
     status: 'idle' | 'playing' | 'gameover';
@@ -8,6 +9,7 @@ interface GameState {
     highScore: number;
     speed: number;
     distance: number;
+    roundId: string | null;
 
     // Player State
     playerLane: number; // -1, 0, 1
@@ -37,11 +39,19 @@ export const useRunnerStore = create<GameState>()(
             highScore: 0,
             speed: 10, // Base speed
             distance: 0,
+            roundId: null,
             playerLane: 0,
             isJumping: false,
             yPosition: 0.5,
 
-            startGame: () => set({ status: 'playing', score: 0, lives: 3, distance: 0, speed: 10, playerLane: 0, isJumping: false, yPosition: 0.5 }),
+            startGame: () => {
+                set({ status: 'playing', score: 0, lives: 3, distance: 0, speed: 10, playerLane: 0, isJumping: false, yPosition: 0.5, roundId: null });
+                // Open a server-tracked round in the background; the id is required
+                // to submit a score and lets the server validate elapsed play time.
+                LeaderboardService.startRound()
+                    .then((id) => { if (id) set({ roundId: id }); })
+                    .catch((err) => console.warn('Could not start scored round:', err));
+            },
 
             setPlayerLane: (lane) => set({ playerLane: lane }),
             setIsJumping: (jumping) => set({ isJumping: jumping }),

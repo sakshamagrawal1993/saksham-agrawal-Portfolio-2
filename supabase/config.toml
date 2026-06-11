@@ -420,3 +420,7 @@ entrypoint = "./functions/fno-copilot-chat/index.ts"
 [functions.fno-copilot-session-init]
 verify_jwt = false
 entrypoint = "./functions/fno-copilot-session-init/index.ts"
+
+[functions.submit-score]
+verify_jwt = false
+entrypoint = "./functions/submit-score/index.ts"

@@ -58,16 +58,41 @@ export const LeaderboardService = {
     },
 
     /**
-     * Submit a new score
+     * Begin a server-tracked game round. Returns a round_id that must be passed
+     * back to submitScore. The server uses the round's start time to validate
+     * that the submitted score is plausible for the elapsed play time, which
+     * blocks forged scores inserted directly via the API.
      */
-    submitScore: async (name: string, score: number) => {
-        const { error } = await supabaseGame
-            .from('game_leaderboard')
-            .insert([{ player_name: name, score }]);
-
+    startRound: async (): Promise<string | null> => {
+        const { data, error } = await supabaseGame.functions.invoke('submit-score', {
+            body: { action: 'start' },
+        });
         if (error) {
-            console.error('Error submitting score:', error);
-            throw error;
+            console.error('Error starting round:', error);
+            return null;
+        }
+        return (data as { round_id?: string })?.round_id ?? null;
+    },
+
+    /**
+     * Submit a new score through the validated Edge Function. Direct inserts
+     * into game_leaderboard are no longer permitted for anonymous clients.
+     */
+    submitScore: async (name: string, score: number, roundId: string | null) => {
+        if (!roundId) {
+            throw new Error('No active game round. Please play a full game before submitting.');
+        }
+        const { data, error } = await supabaseGame.functions.invoke('submit-score', {
+            body: { action: 'submit', round_id: roundId, player_name: name, score },
+        });
+        if (error) {
+            // supabase-js wraps non-2xx responses; surface the server message if present.
+            const serverMsg = (error as { context?: { body?: string } })?.context?.body;
+            console.error('Error submitting score:', error, serverMsg);
+            throw new Error(serverMsg || error.message || 'Failed to submit score');
+        }
+        if (data && (data as { ok?: boolean }).ok === false) {
+            throw new Error((data as { error?: string }).error || 'Failed to submit score');
         }
     }
 };

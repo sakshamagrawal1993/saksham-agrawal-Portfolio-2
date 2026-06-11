@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LeaderboardEntry, LeaderboardService } from '../../services/leaderboardService';
+import { useRunnerStore } from './store';
 
 interface LeaderboardProps {
     currentScore: number;
@@ -12,6 +13,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ currentScore, onRestart }) =>
     const [isTopScore, setIsTopScore] = useState(false);
     const [name, setName] = useState('');
     const [submitted, setSubmitted] = useState(false);
+    const roundId = useRunnerStore((s) => s.roundId);
 
     useEffect(() => {
         const checkScore = async () => {
@@ -42,8 +44,9 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ currentScore, onRestart }) =>
 
         setLoading(true);
         try {
-            // Ensure score is an integer
-            await LeaderboardService.submitScore(name, Math.floor(currentScore));
+            // Ensure score is an integer; round id ties the submission to a
+            // server-tracked play session for validation.
+            await LeaderboardService.submitScore(name, Math.floor(currentScore), roundId);
             setSubmitted(true);
             setIsTopScore(false); // Hide input
             refreshScores(); // Show table
