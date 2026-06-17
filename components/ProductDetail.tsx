@@ -17,6 +17,7 @@ interface ProjectDetailProps {
 
 const HEALTH_TWIN_WALKTHROUGH_EMBED_URL = 'https://www.youtube-nocookie.com/embed/5NH8JYPBPVk?rel=0';
 const HEALTH_TWIN_SHORTS_EMBED_URL = 'https://www.youtube-nocookie.com/embed/IcV-6lwGv74?rel=0';
+const DR_JIVI_WALKTHROUGH_EMBED_URL = 'https://www.youtube-nocookie.com/embed/gqfU1VsBQe8?rel=0';
 
 const ProductDetail: React.FC<ProjectDetailProps> = ({ project, onBack }) => {
   const navigate = useNavigate();
@@ -214,6 +215,40 @@ const ProductDetail: React.FC<ProjectDetailProps> = ({ project, onBack }) => {
                   <div className="p-4 bg-white">
                     <h3 className="font-serif text-lg text-[#2C2A26]">Smart Health interface</h3>
                     <p className="mt-1 text-sm text-[#5D5A53]">Biomarker dashboards, insights, and coach-led next actions.</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {project.id === 'dr-jivi' && (
+            <section className="rounded-xl border border-[#D6D1C7] bg-white/55 p-5 md:p-8 shadow-sm mt-8">
+              <div className="mb-8 max-w-3xl">
+                <span className="block text-xs font-bold uppercase tracking-widest text-[#A8A29E] mb-3">
+                  Walkthrough
+                </span>
+                <h2 className="text-3xl md:text-4xl font-serif tracking-tight text-[#2C2A26] mb-3">
+                  Dr. Jivi product demo
+                </h2>
+                <p className="text-base md:text-lg text-[#5D5A53] font-light leading-relaxed">
+                  A multi-agent triaging workflow demonstrating conversational diagnostic capabilities.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-6 lg:gap-8 items-start">
+                <div className="overflow-hidden rounded-xl border border-[#EBE7DE] bg-[#EBE7DE] shadow-md">
+                  <div className="aspect-video">
+                    <iframe
+                      src={DR_JIVI_WALKTHROUGH_EMBED_URL}
+                      className="h-full w-full border-0"
+                      title="Dr. Jivi Concept Walkthrough"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      allowFullScreen
+                    />
+                  </div>
+                  <div className="p-4 bg-white">
+                    <h3 className="font-serif text-lg text-[#2C2A26]">Concept walkthrough</h3>
+                    <p className="mt-1 text-sm text-[#5D5A53]">How Dr. Jivi leverages an intelligent multi-agent system.</p>
                   </div>
                 </div>
               </div>
