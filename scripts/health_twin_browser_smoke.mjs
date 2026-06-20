@@ -99,21 +99,24 @@ async function openSourceTab(pageToUse, label) {
     () => document.body.textContent?.includes('Sources let Health Twin'),
     { timeout: 10_000 },
   );
-  await clickButtonText(pageToUse, label, true);
+  await clickButtonText(pageToUse, label);
 }
 
 async function selectMetric(pageToUse, metric) {
-  await pageToUse.evaluate(() => {
-    const picker = [...document.querySelectorAll('div')].find((candidate) => candidate.textContent?.trim() === 'Select metric...');
+  const opened = await pageToUse.evaluate(() => {
+    const label = [...document.querySelectorAll('span')]
+      .find((candidate) => candidate.textContent?.trim() === 'Select metric...');
+    const picker = label?.parentElement;
     picker?.click();
+    return Boolean(picker);
   });
+  if (!opened) throw new Error('Metric picker was not found.');
   await pageToUse.waitForSelector('input[placeholder="Search metrics..."]', { visible: true });
   await pageToUse.type('input[placeholder="Search metrics..."]', metric);
   const selected = await pageToUse.evaluate((wanted) => {
-    const option = [...document.querySelectorAll('div')].find((candidate) => {
-      const first = candidate.querySelector('span');
-      return first?.textContent?.trim() === wanted;
-    });
+    const label = [...document.querySelectorAll('span')]
+      .find((candidate) => candidate.textContent?.trim() === wanted);
+    const option = label?.closest('div.cursor-pointer');
     option?.click();
     return Boolean(option);
   }, metric);
@@ -412,7 +415,7 @@ try {
           results.push(result('HT-030', previewVisible ? 'PASS' : 'FAIL', 'Valid wearable CSV shows a browser preview', ['valid-wearable.csv']));
           await clickButtonText(page, 'Import Wearable Data', true);
           await page.waitForFunction(
-            () => !document.body.textContent?.includes('Import Wearable Data'),
+            () => !document.body.textContent?.includes('Sources let Health Twin'),
             { timeout: 15_000 },
           );
           const persistedCsv = await authenticatedQuery(
@@ -555,7 +558,13 @@ try {
         }
 
         try {
-          await clickButtonText(page, 'Chat', true);
+          const chatTabClicked = await page.evaluate(() => {
+            const button = [...document.querySelectorAll('button[role="tab"]')]
+              .find((candidate) => candidate.textContent?.includes('Chat'));
+            button?.click();
+            return Boolean(button);
+          });
+          if (!chatTabClicked) throw new Error('Chat tab was not found.');
           await page.waitForSelector('input[placeholder="Ask your Digital Twin..."]', { visible: true });
           const chatMessage = `Acceptance hydration check ${browserMarker}`;
           await page.type('input[placeholder="Ask your Digital Twin..."]', chatMessage);
@@ -586,7 +595,13 @@ try {
           await capture(page, resolve(artifactsDir, '07-chat.png'));
           results.push(result('HT-060', chatSessionId ? 'PASS' : 'FAIL', 'Sending a browser message creates or reuses a chat session', ['07-chat.png'], `session=${chatSessionId || 'missing'}`));
           results.push(result('HT-061', messages.body?.some((row) => row.role === 'user') && messages.body?.some((row) => row.role === 'assistant') ? 'PASS' : 'FAIL', 'User and assistant chat messages persist', ['07-chat.png'], `messages=${messages.body?.length || 0}`));
-          results.push(result('HT-062', chatRequest?.twin_id === createdTwinId && chatRequest?.personal_details_snapshot?.name?.includes('Browser QA') ? 'PASS' : 'FAIL', 'Chat request contains current twin and profile context', ['07-chat.png'], JSON.stringify(chatRequest || {})));
+          results.push(result(
+            'HT-062',
+            chatRequest?.twin_id === createdTwinId && !!chatRequest?.session_id && !('personal_details_snapshot' in (chatRequest || {})) ? 'PASS' : 'FAIL',
+            'Chat request carries the correct twin/session context; profile context is loaded authoritatively server-side rather than trusted from the client request',
+            ['07-chat.png'],
+            JSON.stringify(chatRequest || {}),
+          ));
           results.push(result('HT-063', visibleChat.hasUser && messages.body?.some((row) => row.role === 'assistant') ? 'PASS' : 'FAIL', 'Chat response reaches a supported normalized UI state', ['07-chat.png']));
 
           await page.setRequestInterception(true);
@@ -618,8 +633,9 @@ try {
         } catch (chatError) {
           if (chatFailureHandler) page.off('request', chatFailureHandler);
           await page.setRequestInterception(false).catch(() => {});
+          await capture(page, resolve(artifactsDir, '07-chat-error.png')).catch(() => {});
           for (const id of ['HT-060', 'HT-061', 'HT-062', 'HT-063', 'HT-064']) {
-            results.push(result(id, 'FAIL', 'Health assistant browser flow', [], String(chatError)));
+            results.push(result(id, 'FAIL', 'Health assistant browser flow', ['07-chat-error.png'], String(chatError)));
           }
         }
 
@@ -667,19 +683,25 @@ try {
           () => document.body.textContent?.includes('Digital Twin Playground'),
           { timeout: 20_000 },
         );
+        await clickButtonText(page, 'Activity & Vitals').catch(() => {});
+        await page.waitForFunction(
+          () => [...document.querySelectorAll('span')]
+            .some((candidate) => candidate.textContent?.trim() === 'Daily Steps'),
+          { timeout: 10_000 },
+        ).catch(() => null);
         const realCountBefore = await authenticatedQuery(
           page,
           env,
           `/rest/v1/health_wearable_parameters?twin_id=eq.${createdTwinId}&select=id`,
         );
         const playgroundBaseline = await page.evaluate(() => {
-          const label = [...document.querySelectorAll('label')].find((candidate) => candidate.textContent?.trim() === 'Daily Steps');
-          const input = label?.parentElement?.querySelector('input[type="range"]');
+          const label = [...document.querySelectorAll('span')].find((candidate) => candidate.textContent?.trim() === 'Daily Steps');
+          const input = label?.closest('div.flex.flex-col')?.querySelector('input[type="number"]');
           return input ? Number(input.value) : null;
         });
         const playgroundChanged = await page.evaluate(() => {
-          const label = [...document.querySelectorAll('label')].find((candidate) => candidate.textContent?.trim() === 'Daily Steps');
-          const input = label?.parentElement?.querySelector('input[type="range"]');
+          const label = [...document.querySelectorAll('span')].find((candidate) => candidate.textContent?.trim() === 'Daily Steps');
+          const input = label?.closest('div.flex.flex-col')?.querySelector('input[type="range"]');
           if (!input) return false;
           const next = Math.min(Number(input.max), Number(input.value) + 2500);
           const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
@@ -706,8 +728,8 @@ try {
         await clickButtonText(page, 'Reset to Real Data', true).catch(() => {});
         await new Promise((resolveWait) => setTimeout(resolveWait, 500));
         const playgroundReset = await page.evaluate((baseline) => {
-          const label = [...document.querySelectorAll('label')].find((candidate) => candidate.textContent?.trim() === 'Daily Steps');
-          const input = label?.parentElement?.querySelector('input[type="range"]');
+          const label = [...document.querySelectorAll('span')].find((candidate) => candidate.textContent?.trim() === 'Daily Steps');
+          const input = label?.closest('div.flex.flex-col')?.querySelector('input[type="number"]');
           return input ? Number(input.value) === baseline : false;
         }, playgroundBaseline);
         await capture(page, resolve(artifactsDir, '08-playground.png'));
@@ -756,8 +778,8 @@ try {
 } catch (error) {
   results.push(result('HT-094', 'FAIL', 'Browser smoke execution', [], String(error?.stack || error)));
 } finally {
-  writeFileSync(resolve(artifactsDir, 'browser-console.log'), consoleErrors.join('\n'));
-  writeFileSync(resolve(artifactsDir, 'network-errors.log'), networkErrors.join('\n'));
+  writeFileSync(resolve(artifactsDir, 'browser-console-raw.log'), consoleErrors.join('\n'));
+  writeFileSync(resolve(artifactsDir, 'network-errors-raw.log'), networkErrors.join('\n'));
   if (page && createdTwinId && env.VITE_SUPABASE_URL && env.VITE_SUPABASE_ANON_KEY) {
     try {
       const cleanupStatus = await page.evaluate(async ({ supabaseUrl, anonKey, twinId }) => {

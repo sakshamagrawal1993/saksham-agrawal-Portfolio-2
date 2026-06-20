@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useHealthTwinStore } from '../../../store/healthTwin';
 import { defaultPlaygroundParams, usePlaygroundStore } from '../../../store/playgroundStore';
+import { loadHealthTwinData } from '../../../lib/healthTwin/loadTwinData';
 import { Loader2, ArrowLeft, RefreshCw, Zap } from 'lucide-react';
 import { PlaygroundInputPanel } from './PlaygroundInputPanel';
 import { PlaygroundScorePanel } from './PlaygroundScorePanel';
@@ -13,15 +14,7 @@ export const PlaygroundLayout: React.FC = () => {
     const navigate = useNavigate();
 
     // Main Store (Source of truth for baseline)
-    const {
-        activeTwinId,
-        parameterDefinitions,
-        parameterRanges,
-        personalDetails,
-        scores: baselineScores,
-        labParameters,
-        wearableParameters
-    } = useHealthTwinStore();
+    const { parameterDefinitions, parameterRanges } = useHealthTwinStore();
 
     // Playground Store (Simulation state)
     const {
@@ -36,31 +29,55 @@ export const PlaygroundLayout: React.FC = () => {
 
     const isInitialized = React.useRef(false);
 
-    // 1. Initial Sync: Load baseline data from the main store into the playground store
+    // 1. Initial Sync: Load baseline data from the main store into the playground store.
+    // A direct URL visit or page reload won't have the main store populated yet, so
+    // fetch the twin's real data directly instead of bouncing to the dashboard.
     useEffect(() => {
-        if (!id || activeTwinId !== id) {
-            navigate(`/health-twin/${id || ''}`);
+        if (!id) {
+            navigate('/health-twin');
             return;
         }
 
         if (isInitialized.current) return;
 
-        const syncBaseline = () => {
+        const cancelledRef = { cancelled: false };
+
+        const syncBaseline = async () => {
+            if (useHealthTwinStore.getState().activeTwinId !== id) {
+                const result = await loadHealthTwinData(id, cancelledRef);
+                if (cancelledRef.cancelled) return;
+                if (result === 'unauthenticated') {
+                    navigate('/login?redirect=/health-twin');
+                    return;
+                }
+                if (result === 'not_found') {
+                    navigate('/health-twin');
+                    return;
+                }
+            }
+
+            const state = useHealthTwinStore.getState();
             const baseline = mapRealDataToPlaygroundBaseline({
                 defaults: defaultPlaygroundParams,
-                labParameters,
-                wearableParameters,
-                parameterDefinitions,
-                personalDetails,
+                labParameters: state.labParameters,
+                wearableParameters: state.wearableParameters,
+                parameterDefinitions: state.parameterDefinitions,
+                personalDetails: state.personalDetails,
             });
 
-            initializeBaseline(baseline, baselineScores);
+            initializeBaseline(baseline, state.scores);
             isInitialized.current = true;
-            setLoading(false);
+            if (!cancelledRef.cancelled) setLoading(false);
         };
 
-        syncBaseline();
-    }, [id, activeTwinId, navigate, labParameters, wearableParameters, parameterDefinitions, personalDetails, baselineScores, initializeBaseline]);
+        syncBaseline().catch((err) => {
+            console.error('Failed to initialize playground from real data:', err);
+        });
+
+        return () => {
+            cancelledRef.cancelled = true;
+        };
+    }, [id, navigate, initializeBaseline]);
 
     // 2. Continuous Recalculation: Trigger scores on parameter change
     useEffect(() => {

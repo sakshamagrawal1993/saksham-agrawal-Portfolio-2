@@ -22,7 +22,8 @@
     "mind-coach:publish": "node scripts/mind_coach_publish.mjs",
     "test:mind-coach:contract": "node scripts/mind_coach_contract_test.mjs",
     "test:mind-coach:browser": "node scripts/mind_coach_browser_smoke.mjs",
-    "test:mind-coach:qa": "npm run test:mind-coach:contract && npm run test:mind-coach:browser"
+    "test:mind-coach:qa": "npm run test:mind-coach:contract && npm run test:mind-coach:browser",
+    "test:demo-smoke": "node scripts/demo_smoke_runner.mjs"
   },
   "dependencies": {
     "@google/genai": "^1.43.0",

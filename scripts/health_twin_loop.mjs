@@ -13,7 +13,18 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
 const config = readJson(resolve(root, '.loop/config.json'));
-const maximumIterations = Number(argValue('--max-iterations', String(config.maximumIterations || 3)));
+const HARD_MAXIMUM_ITERATIONS = 3;
+const requestedIterations = Number(argValue('--max-iterations', String(config.maximumIterations || HARD_MAXIMUM_ITERATIONS)));
+const maximumIterations = Math.min(requestedIterations, HARD_MAXIMUM_ITERATIONS);
+const runId = argValue('--run-id', new Date().toISOString().replace(/[:.]/g, '-'));
+const runRootRelative = `.loop/runs/${runId}`;
+const runRoot = resolve(root, runRootRelative);
+const publicationAllowed = config.publishCommandsAllowed && !args.includes('--no-publish');
+const implementerTimeoutMs = Number(
+  process.env.HEALTH_TWIN_CLAUDE_TIMEOUT_MS
+  || config.claudeTimeoutMs
+  || 90 * 60 * 1000,
+);
 const statePath = resolve(root, '.loop/STATE.json');
 const codexBin = process.env.CODEX_BIN
   || (existsSync('/Applications/Codex.app/Contents/Resources/codex')
@@ -46,6 +57,16 @@ function updateState(patch) {
   const next = { ...current, ...patch, updatedAt: new Date().toISOString() };
   writeJson(statePath, next);
   return next;
+}
+
+function addStateFailure(status, message) {
+  const current = existsSync(statePath)
+    ? readJson(statePath)
+    : readJson(resolve(root, '.loop/STATE.example.json'));
+  updateState({
+    status,
+    failedCriteria: [...new Set([...(current.failedCriteria || []), message])],
+  });
 }
 
 function run(label, command, commandArgs, logPath, options = {}) {
@@ -88,20 +109,67 @@ function safeReadJson(path, fallback) {
   }
 }
 
-function iterationContext(iterationDir) {
+function isNonEmptyFile(path) {
+  return existsSync(path) && readFileSync(path, 'utf8').trim().length > 0;
+}
+
+function validJsonArtifact(path, validator) {
+  if (!isNonEmptyFile(path)) return false;
+  try {
+    return validator(readJson(path));
+  } catch {
+    return false;
+  }
+}
+
+function validEvidenceReport(path, expectedTotal = null) {
+  return validJsonArtifact(path, (report) => (
+    report
+    && Array.isArray(report.results)
+    && report.results.length > 0
+    && (!expectedTotal || report.results.length === expectedTotal)
+    && report.summary
+    && Number(report.summary.total) === report.results.length
+  ));
+}
+
+function validReview(path) {
+  return validJsonArtifact(path, (review) => (
+    typeof review.blocking === 'boolean'
+    && typeof review.summary === 'string'
+    && Array.isArray(review.findings)
+  ));
+}
+
+function validCompletion(path) {
+  return validJsonArtifact(path, (completion) => (
+    typeof completion.complete === 'boolean'
+    && ['COMPLETE', 'ITERATE', 'STOP_INCOMPLETE'].includes(completion.decision)
+    && typeof completion.summary === 'string'
+    && Array.isArray(completion.failedCriteria)
+    && Array.isArray(completion.blockedCriteria)
+    && Array.isArray(completion.nextActions)
+  ));
+}
+
+function iterationContext(iteration) {
   const priorDirectories = [];
-  for (let number = 1; number < Number(iterationDir.match(/iteration-(\d+)/)?.[1] || 1); number += 1) {
-    priorDirectories.push(resolve(root, `.loop/runs/iteration-${number}`));
+  for (let number = 1; number < iteration; number += 1) {
+    priorDirectories.push(resolve(runRoot, `iteration-${number}`));
   }
   return priorDirectories.filter(existsSync);
 }
 
-if (!Number.isInteger(maximumIterations) || maximumIterations < 1 || maximumIterations > 10) {
-  throw new Error('--max-iterations must be an integer between 1 and 10');
+if (!Number.isInteger(requestedIterations) || requestedIterations < 1) {
+  throw new Error('--max-iterations must be a positive integer');
 }
 
+mkdirSync(runRoot, { recursive: true });
 updateState({
+  runId,
+  runRoot: runRootRelative,
   maximumIterations,
+  hardMaximumIterations: HARD_MAXIMUM_ITERATIONS,
   status: 'STARTING',
   completion: false,
   failedCriteria: [],
@@ -110,10 +178,10 @@ updateState({
 let finalDecision = 'STOP_INCOMPLETE';
 
 for (let iteration = 1; iteration <= maximumIterations; iteration += 1) {
-  const relativeIterationDir = `.loop/runs/iteration-${iteration}`;
+  const relativeIterationDir = `${runRootRelative}/iteration-${iteration}`;
   const iterationDir = resolve(root, relativeIterationDir);
   mkdirSync(iterationDir, { recursive: true });
-  const previous = iterationContext(relativeIterationDir);
+  const previous = iterationContext(iteration);
 
   updateState({
     iteration,
@@ -144,8 +212,13 @@ for (let iteration = 1; iteration <= maximumIterations; iteration += 1) {
     ],
     resolve(iterationDir, 'planner.log'),
   );
-  if (!planner.ok || !existsSync(planPath)) {
-    updateState({ status: 'PLANNER_FAILED' });
+  if (!planner.ok || !isNonEmptyFile(planPath)) {
+    writeJson(resolve(iterationDir, 'failure.json'), {
+      stage: 'PLANNING',
+      exitCode: planner.status,
+      reason: 'Planner failed or did not produce a non-empty plan.',
+    });
+    addStateFailure('PLANNER_FAILED', 'Planner failed or did not produce a non-empty plan.');
     continue;
   }
 
@@ -175,12 +248,22 @@ for (let iteration = 1; iteration <= maximumIterations; iteration += 1) {
       implementPrompt,
     ],
     resolve(iterationDir, 'implementer.log'),
+    { timeoutMs: implementerTimeoutMs },
   );
-  if (!existsSync(implementationPath)) {
+  if (!isNonEmptyFile(implementationPath)) {
     writeFileSync(
       implementationPath,
       `# Implementation process result\n\nClaude exit code: ${implementer.status}\n\nSee implementer.log.\n`,
     );
+  }
+  if (!implementer.ok) {
+    writeJson(resolve(iterationDir, 'failure.json'), {
+      stage: 'IMPLEMENTING',
+      exitCode: implementer.status,
+      reason: 'Claude implementer failed.',
+    });
+    addStateFailure('IMPLEMENTER_FAILED', 'Claude implementer failed.');
+    continue;
   }
 
   updateState({ status: 'REVIEWING' });
@@ -199,10 +282,10 @@ for (let iteration = 1; iteration <= maximumIterations; iteration += 1) {
     ],
     resolve(iterationDir, 'reviewer.log'),
   );
-  if (!reviewer.ok && !existsSync(reviewPath)) {
+  if (!reviewer.ok || !validReview(reviewPath)) {
     writeJson(reviewPath, {
       blocking: true,
-      summary: 'The independent review command failed. See reviewer.log.',
+      summary: 'The independent review command failed or returned invalid structured output. See reviewer.log.',
       findings: [],
     });
   }
@@ -223,6 +306,7 @@ for (let iteration = 1; iteration <= maximumIterations; iteration += 1) {
     resolve(iterationDir, 'contract-qa.log'),
     { timeoutMs: 10 * 60 * 1000 },
   );
+  const contractArtifactValid = validEvidenceReport(contractPath, 52);
   const browserPath = resolve(iterationDir, 'browser-qa.json');
   const browserArtifacts = resolve(iterationDir, 'browser');
   const browser = run(
@@ -237,10 +321,19 @@ for (let iteration = 1; iteration <= maximumIterations; iteration += 1) {
     resolve(iterationDir, 'browser-qa.log'),
     { timeoutMs: 20 * 60 * 1000 },
   );
+  const browserArtifactValid = validEvidenceReport(browserPath);
   writeJson(resolve(iterationDir, 'command-results.json'), {
     build: { ok: build.ok, exitCode: build.status },
-    contract: { ok: contract.ok, exitCode: contract.status },
-    browser: { ok: browser.ok, exitCode: browser.status },
+    contract: {
+      ok: contract.ok && contractArtifactValid,
+      exitCode: contract.status,
+      artifactValid: contractArtifactValid,
+    },
+    browser: {
+      ok: browser.ok && browserArtifactValid,
+      exitCode: browser.status,
+      artifactValid: browserArtifactValid,
+    },
   });
 
   updateState({ status: 'CHECKING_COMPLETION' });
@@ -273,14 +366,18 @@ for (let iteration = 1; iteration <= maximumIterations; iteration += 1) {
     ],
     resolve(iterationDir, 'completion.log'),
   );
-  const completion = safeReadJson(completionPath, {
-    complete: false,
-    decision: 'ITERATE',
-    summary: checker.ok ? 'Completion output was not valid JSON.' : 'Completion checker failed.',
-    failedCriteria: [],
-    blockedCriteria: [],
-    nextActions: ['Inspect completion.log and rerun the loop.'],
-  });
+  const completionOutputValid = checker.ok && validCompletion(completionPath);
+  const completion = completionOutputValid
+    ? readJson(completionPath)
+    : {
+      complete: false,
+      decision: iteration === maximumIterations ? 'STOP_INCOMPLETE' : 'ITERATE',
+      summary: 'Completion checker failed or returned invalid structured output.',
+      failedCriteria: [],
+      blockedCriteria: ['No valid independent completion decision was produced.'],
+      nextActions: ['Inspect completion.log and rerun within the three-iteration cap.'],
+    };
+  if (!completionOutputValid) writeJson(completionPath, completion);
 
   updateState({
     status: completion.complete ? 'COMPLETE' : completion.decision,
@@ -304,7 +401,7 @@ for (let iteration = 1; iteration <= maximumIterations; iteration += 1) {
 
 if (finalDecision !== 'COMPLETE') {
   updateState({ status: 'STOP_INCOMPLETE', completion: false });
-} else if (config.publishCommandsAllowed) {
+} else if (publicationAllowed) {
   updateState({ status: 'PUBLISHING', completion: true });
   const publicationDir = resolve(root, '.loop/runs/publication');
   mkdirSync(publicationDir, { recursive: true });
@@ -323,5 +420,9 @@ if (finalDecision !== 'COMPLETE') {
 }
 
 console.log(`\nHealth Twin loop finished: ${finalDecision}`);
+console.log(`Run artifacts: ${runRootRelative}`);
+if (config.publishCommandsAllowed && !publicationAllowed) {
+  console.log('Publication was disabled for this run.');
+}
 console.log('No commit, git push, pull request, or merge was performed.');
 process.exit(['COMPLETE', 'PUBLISHED'].includes(finalDecision) ? 0 : 2);

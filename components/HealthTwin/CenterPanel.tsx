@@ -149,24 +149,24 @@ export const CenterPanel: React.FC = () => {
                 body: {
                     twin_id: activeTwinId,
                     session_id: sessionIdToUse,
-                    message_text: messageText,
-                    personal_details_snapshot: personalDetails
+                    message_text: messageText
                 }
             });
 
             if (error) throw error;
 
-            if (data?.assistant_reply) {
-                addChatMessage({
-                    id: crypto.randomUUID(),
-                    role: 'assistant',
-                    content: data.assistant_reply,
-                    timestamp: new Date(),
-                    widgets: data.widgets
-                });
-            } else {
+            if (!data?.assistant_reply) {
                 console.error("Agent responded but missing assistant_reply payload", data);
+                throw new Error('Agent responded but missing assistant_reply payload');
             }
+
+            addChatMessage({
+                id: crypto.randomUUID(),
+                role: 'assistant',
+                content: data.assistant_reply,
+                timestamp: new Date(),
+                widgets: data.widgets
+            });
 
         } catch (error) {
             console.error("Error communicating with chat agent:", error);

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '../../lib/supabaseClient';
 import { useHealthTwinStore } from '../../store/healthTwin';
+import { loadHealthTwinData } from '../../lib/healthTwin/loadTwinData';
 import { LeftPanel } from './LeftPanel';
 import { CenterPanel } from './CenterPanel';
 import { RightPanel } from './RightPanel';
@@ -10,27 +10,12 @@ import { Loader2, Zap } from 'lucide-react';
 export const HealthTwinDashboard: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const {
-        twins,
-        activeTwinId,
-        setTwins,
-        setActiveTwin,
-        setPersonalDetails,
-        setSummary,
-        setLabParameters,
-        setWearableParameters,
-        setScores,
-        setRecommendations,
-        setSources,
-        setDailyAggregates,
-        setWellnessPrograms,
-        setIsLoadingWellness
-    } = useHealthTwinStore();
+    const { twins, activeTwinId } = useHealthTwinStore();
 
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        let cancelled = false;
+        const cancelledRef = { cancelled: false };
         const initDashboard = async () => {
             setLoading(true);
             if (!id) {
@@ -38,127 +23,36 @@ export const HealthTwinDashboard: React.FC = () => {
                 return;
             }
 
-            // Check if user is logged in
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
+            const store = useHealthTwinStore.getState();
+            if (store.activeTwinId && store.activeTwinId !== id) {
+                // Switching twins: clear the previous twin's profile, data,
+                // and chat session so it never leaks onto the new twin's view.
+                store.resetForTwinChange();
+            }
+
+            const result = await loadHealthTwinData(id, cancelledRef);
+            if (cancelledRef.cancelled) return;
+
+            if (result === 'unauthenticated') {
                 navigate('/login?redirect=/health-twin');
                 return;
             }
-
-            // Verify the twin exists and belongs to the user
-            const { data, error } = await supabase
-                .from('health_twins')
-                .select('*')
-                .eq('id', id)
-                .single();
-
-            if (error || !data) {
-                console.error("Failed to load twin profile:", error);
+            if (result === 'not_found') {
                 navigate('/health-twin');
                 return;
             }
 
-            if (cancelled) return;
-
-            // Load the user's complete selector list on direct dashboard entry.
-            const { data: ownedTwins } = await supabase
-                .from('health_twins')
-                .select('*')
-                .eq('user_id', session.user.id)
-                .order('created_at', { ascending: false });
-            setTwins(ownedTwins?.length ? ownedTwins : [data]);
-
-            setActiveTwin(data.id);
-
-            // Fetch the rest of the 8-table data concurrently
-            try {
-                const [
-                    personalData,
-                    summaryData,
-                    labData,
-                    wearableData,
-                    scoresData,
-                    recData,
-                    sourcesData,
-                    definitionsData,
-                    rangesData,
-                    aggregatesData,
-                    wellnessData
-                ] = await Promise.all([
-                    supabase.from('health_personal_details').select('*').eq('twin_id', data.id).maybeSingle(),
-                    supabase.from('health_summary').select('*').eq('twin_id', data.id).maybeSingle(),
-                    supabase.from('health_lab_parameters').select('*').eq('twin_id', data.id).order('recorded_at', { ascending: false }),
-                    supabase.from('health_wearable_parameters').select('*').eq('twin_id', data.id).order('recorded_at', { ascending: false }),
-                    supabase.from('health_scores').select('*').eq('twin_id', data.id),
-                    supabase.from('health_recommendations').select('*').eq('twin_id', data.id).order('created_at', { ascending: false }),
-                    supabase.from('health_sources').select('*').eq('twin_id', data.id).order('created_at', { ascending: false }),
-                    supabase.from('health_parameter_definitions').select('*'),
-                    supabase.from('health_parameter_ranges').select('*'),
-                    supabase.from('health_daily_aggregates').select('*').eq('twin_id', data.id).order('date', { ascending: false }),
-                    supabase.from('health_wellness_programs').select('*').eq('twin_id', data.id)
-                        .gt('expires_at', new Date().toISOString())
-                        .order('created_at', { ascending: false })
-                ]);
-
-                setPersonalDetails(personalData.data || null);
-                setSummary(summaryData.data || null);
-                setLabParameters(labData.data || []);
-                setWearableParameters(wearableData.data || []);
-                setScores(scoresData.data || []);
-                setRecommendations(recData.data || []);
-                setSources(sourcesData.data || []);
-                setDailyAggregates(aggregatesData.data || []);
-
-                // Store definitions and ranges
-                useHealthTwinStore.getState().setParameterDefinitions(definitionsData.data || []);
-                useHealthTwinStore.getState().setParameterRanges(rangesData.data || []);
-
-                // Set cached wellness programs
-                setWellnessPrograms(wellnessData.data || []);
-
-                // If no cached programs, trigger generation
-                if (!wellnessData.data || wellnessData.data.length === 0) {
-                    setIsLoadingWellness(true);
-                    void (async () => {
-                      try {
-                        const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL;
-                        const res = await fetch(`${supabaseUrl}/functions/v1/generate-wellness`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${session?.access_token}`,
-                            },
-                            body: JSON.stringify({ twin_id: data.id }),
-                        });
-                        if (res.ok) {
-                            const result = await res.json();
-                            if (!cancelled) setWellnessPrograms(result.programs || []);
-                        }
-                      } catch (genErr) {
-                        console.error('Failed to auto-generate wellness programs:', genErr);
-                      } finally {
-                        setIsLoadingWellness(false);
-                      }
-                    })();
-                }
-
-                // Calculate fresh 0-100 scores
-                useHealthTwinStore.getState().calculateLiveScores();
-            } catch (err) {
-                console.error("Error loading twin sub-data:", err);
-            }
-
-            if (!cancelled) setLoading(false);
+            setLoading(false);
         };
 
         initDashboard().catch((err) => {
             console.error("Failed to initialize Health Twin dashboard:", err);
-            if (!cancelled) setLoading(false);
+            if (!cancelledRef.cancelled) setLoading(false);
         });
         return () => {
-            cancelled = true;
+            cancelledRef.cancelled = true;
         };
-    }, [id, navigate, setActiveTwin, setTwins, setPersonalDetails, setSummary, setLabParameters, setWearableParameters, setScores, setRecommendations, setSources, setDailyAggregates, setWellnessPrograms, setIsLoadingWellness]);
+    }, [id, navigate]);
 
     if (loading) {
         return (

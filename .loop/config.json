@@ -2,6 +2,7 @@
   "product": "health-twin",
   "maximumIterations": 3,
   "claudeBudgetUsdPerIteration": 20,
+  "claudeTimeoutMs": 5400000,
   "baseBranch": "main",
   "qaCommand": "npm run test:health-twin:qa",
   "buildCommand": "npm run build",

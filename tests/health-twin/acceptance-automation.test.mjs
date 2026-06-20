@@ -39,3 +39,20 @@ test('acceptance merger does not promote source contracts into live evidence', (
   assert.match(source, /row\.evidenceType === 'source-contract'/);
   assert.match(source, /requires browser, API, RLS, storage, build, or live Edge evidence/);
 });
+
+test('Health Twin loop enforces a three-iteration hard stop and validates QA artifacts', () => {
+  const source = read('scripts/health_twin_loop.mjs');
+  assert.match(source, /HARD_MAXIMUM_ITERATIONS = 3/);
+  assert.match(source, /Math\.min\(requestedIterations, HARD_MAXIMUM_ITERATIONS\)/);
+  assert.match(source, /validEvidenceReport\(contractPath, 52\)/);
+  assert.match(source, /artifactValid: contractArtifactValid/);
+  assert.match(source, /--no-publish/);
+  assert.match(source, /claudeTimeoutMs/);
+});
+
+test('Health Twin contract runner cannot pass as an empty no-op', () => {
+  const source = read('scripts/health_twin_contract_test.mjs');
+  assert.ok(source.trim().length > 1000);
+  assert.match(source, /acceptanceIds\.map\(evaluate\)/);
+  assert.match(source, /report\.summary\.failed > 0/);
+});

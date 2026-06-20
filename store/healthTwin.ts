@@ -225,11 +225,14 @@ interface HealthTwinState {
   // Wellness Programs
   wellnessPrograms: WellnessProgram[];
   isLoadingWellness: boolean;
+  wellnessError: string | null;
   setWellnessPrograms: (programs: WellnessProgram[]) => void;
   setIsLoadingWellness: (loading: boolean) => void;
+  setWellnessError: (error: string | null) => void;
 
   // Actions
   calculateLiveScores: () => void;
+  resetForTwinChange: () => void;
 }
 
 // 8. Daily Aggregates
@@ -331,15 +334,17 @@ export const useHealthTwinStore = create<HealthTwinState>((set, get) => ({
   chatHistory: [],
   setChatHistory: (chatHistory) => set({ chatHistory }),
   addChatMessage: (msg) => set((state) => ({ chatHistory: [...state.chatHistory, msg] })),
-  clearChat: () => set({ chatHistory: [] }),
+  clearChat: () => set({ chatHistory: [], activeChatSessionId: null }),
 
   twinMemories: [],
   setTwinMemories: (twinMemories) => set({ twinMemories }),
 
   wellnessPrograms: [],
   isLoadingWellness: false,
+  wellnessError: null,
   setWellnessPrograms: (wellnessPrograms) => set({ wellnessPrograms }),
   setIsLoadingWellness: (isLoadingWellness) => set({ isLoadingWellness }),
+  setWellnessError: (wellnessError) => set({ wellnessError }),
 
   calculateLiveScores: () => {
     const { labParameters, wearableParameters, parameterDefinitions, parameterRanges, personalDetails } = get();
@@ -354,5 +359,25 @@ export const useHealthTwinStore = create<HealthTwinState>((set, get) => ({
     );
 
     set({ scores: computedScores });
-  }
+  },
+
+  // Clears all per-twin state before loading a different twin so the
+  // previous twin's profile, chat session, and data never linger on screen
+  // while the new twin's data is being fetched.
+  resetForTwinChange: () => set({
+    personalDetails: null,
+    summary: null,
+    scores: [],
+    recommendations: [],
+    sources: [],
+    labParameters: [],
+    wearableParameters: [],
+    dailyAggregates: [],
+    wellnessPrograms: [],
+    isLoadingWellness: false,
+    wellnessError: null,
+    chatHistory: [],
+    activeChatSessionId: null,
+    twinMemories: [],
+  })
 }));

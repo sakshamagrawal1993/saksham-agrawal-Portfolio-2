@@ -159,33 +159,28 @@ const ProgramSkeleton: React.FC = () => (
 
 // ─── Main Component ───────────────────────────────────────────
 export const WellnessPrograms: React.FC = () => {
-    const { wellnessPrograms, isLoadingWellness, setWellnessPrograms, setIsLoadingWellness, activeTwinId } = useHealthTwinStore();
+    const { wellnessPrograms, isLoadingWellness, wellnessError, setWellnessPrograms, setIsLoadingWellness, setWellnessError, activeTwinId } = useHealthTwinStore();
 
     const handleRefresh = useCallback(async () => {
         if (!activeTwinId || isLoadingWellness) return;
         setIsLoadingWellness(true);
+        setWellnessError(null);
 
         try {
-            const { data: { session } } = await supabase.auth.getSession();
-            const res = await fetch(`${(import.meta as any).env.VITE_SUPABASE_URL}/functions/v1/generate-wellness`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${session?.access_token}`,
-                },
-                body: JSON.stringify({ twin_id: activeTwinId, force_refresh: true }),
+            const { data, error } = await supabase.functions.invoke('generate-wellness', {
+                body: { twin_id: activeTwinId, force_refresh: true },
             });
 
-            if (res.ok) {
-                const data = await res.json();
-                setWellnessPrograms(data.programs || []);
-            }
+            if (error) throw error;
+            // Preserve the existing programs if the function responded without a usable payload.
+            if (data?.programs) setWellnessPrograms(data.programs);
         } catch (err) {
             console.error('Failed to generate wellness programs:', err);
+            setWellnessError('Could not refresh wellness programs. Please try again.');
         } finally {
             setIsLoadingWellness(false);
         }
-    }, [activeTwinId, isLoadingWellness, setWellnessPrograms, setIsLoadingWellness]);
+    }, [activeTwinId, isLoadingWellness, setWellnessPrograms, setIsLoadingWellness, setWellnessError]);
 
     return (
         <div>
@@ -202,6 +197,18 @@ export const WellnessPrograms: React.FC = () => {
                     {isLoadingWellness ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
                 </button>
             </div>
+
+            {wellnessError && (
+                <div className="mb-3 flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-red-50 border border-red-100">
+                    <p className="text-xs text-red-600">{wellnessError}</p>
+                    <button
+                        onClick={handleRefresh}
+                        className="text-xs font-medium text-red-700 hover:text-red-800 underline flex-shrink-0"
+                    >
+                        Retry
+                    </button>
+                </div>
+            )}
 
             <div className="space-y-3">
                 {isLoadingWellness && wellnessPrograms.length === 0 ? (
