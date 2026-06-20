@@ -24,7 +24,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({ onProductClick, featuredOnly 
 
   const featuredProjects = useMemo(() => {
     if (featuredOnly) {
-      const featuredIds = ['digital-twin', 'trading-agents', 'mind-coach', 'insightslm'];
+      const featuredIds = ['digital-twin', 'trading-agents', 'mind-coach', 'dr-jivi'];
       return featuredIds.map(id => PROJECTS.find(p => p.id === id)).filter((p): p is Project => !!p);
     }
     return [];
