@@ -83,10 +83,11 @@ function ProjectPage() {
   }
 
   const meta = id ? metadataMap[id] : null;
+  const slideDeckUrl = (meta?.slide_deck_url || project.slideDeckUrl || '').trim();
   const mergedProject = {
     ...project,
     imageUrl: meta?.image_url || project.imageUrl,
-    slideDeckUrl: meta?.slide_deck_url || project.slideDeckUrl,
+    slideDeckUrl: slideDeckUrl || undefined,
   };
 
   return (

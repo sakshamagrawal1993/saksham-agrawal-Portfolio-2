@@ -14,10 +14,11 @@ const ProductGrid: React.FC<ProductGridProps> = ({ onProductClick, featuredOnly 
 
   const getMergedProject = (project: Project): Project => {
     const meta = metadataMap[project.id];
+    const slideDeckUrl = (meta?.slide_deck_url || project.slideDeckUrl || '').trim();
     return {
       ...project,
       imageUrl: meta?.image_url || project.imageUrl,
-      slideDeckUrl: meta?.slide_deck_url || project.slideDeckUrl,
+      slideDeckUrl: slideDeckUrl || undefined,
     };
   };
 

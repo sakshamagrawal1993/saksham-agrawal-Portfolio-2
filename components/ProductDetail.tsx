@@ -15,12 +15,71 @@ interface ProjectDetailProps {
   onBack: () => void;
 }
 
+const CASE_STUDY_SECTION_ID = 'case-study';
 const HEALTH_TWIN_WALKTHROUGH_EMBED_URL = 'https://www.youtube-nocookie.com/embed/5NH8JYPBPVk?rel=0';
 const HEALTH_TWIN_SHORTS_EMBED_URL = 'https://www.youtube-nocookie.com/embed/IcV-6lwGv74?rel=0';
 const DR_JIVI_WALKTHROUGH_EMBED_URL = 'https://www.youtube-nocookie.com/embed/gqfU1VsBQe8?rel=0';
 
+const scrollToCaseStudy = () => {
+  const section = document.getElementById(CASE_STUDY_SECTION_ID);
+  if (!section) return;
+  const headerOffset = 88;
+  const top = section.getBoundingClientRect().top + window.scrollY - headerOffset;
+  window.scrollTo({ top, behavior: 'smooth' });
+};
+
+interface CaseStudySectionProps {
+  project: Project;
+  className?: string;
+}
+
+const CaseStudySection: React.FC<CaseStudySectionProps> = ({ project, className = '' }) => {
+  if (!project.slideDeckUrl) return null;
+
+  return (
+    <section
+      id={CASE_STUDY_SECTION_ID}
+      className={`scroll-mt-24 ${className}`}
+    >
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h2 className="text-sm font-bold uppercase tracking-widest text-[#2C2A26]">Case Study</h2>
+        <a
+          href={project.slideDeckUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center justify-center rounded-full border border-[#2C2A26] px-4 py-2 text-xs font-medium uppercase tracking-widest text-[#2C2A26] transition-colors hover:bg-[#2C2A26] hover:text-[#F5F2EB]"
+        >
+          Open Case Study
+        </a>
+      </div>
+
+      <div className="w-full h-[50vh] min-h-[280px] md:h-[72vh] md:min-h-[480px] lg:min-h-[560px] max-h-[960px] bg-[#EBE7DE] rounded-xl overflow-hidden border border-[#D6D1C7] shadow-sm">
+        <iframe
+          src={`${project.slideDeckUrl}#view=FitH&navpanes=0`}
+          className="hidden h-full w-full border-0 md:block"
+          title={`${project.name} Case Study`}
+        />
+        <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center md:hidden">
+          <p className="max-w-sm text-sm leading-relaxed text-[#5D5A53]">
+            The embedded deck can be unreliable on mobile. Open the full case study in a new tab for the best reading experience.
+          </p>
+          <a
+            href={project.slideDeckUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center rounded-full bg-[#2C2A26] px-6 py-3 text-xs font-medium uppercase tracking-widest text-[#F5F2EB] transition-colors hover:bg-[#433E38]"
+          >
+            Open Case Study
+          </a>
+        </div>
+      </div>
+    </section>
+  );
+};
+
 const ProductDetail: React.FC<ProjectDetailProps> = ({ project, onBack }) => {
   const navigate = useNavigate();
+  const hasCaseStudy = Boolean(project.slideDeckUrl);
 
   const openLiveDemo = () => {
     if (!project.demoUrl) return;
@@ -60,6 +119,15 @@ const ProductDetail: React.FC<ProjectDetailProps> = ({ project, onBack }) => {
                   <span className="block text-xs font-medium text-[#A8A29E] uppercase tracking-widest mb-1">{project.category}</span>
                   <h1 className="text-3xl md:text-4xl font-serif text-[#2C2A26] leading-tight mb-2">{project.name}</h1>
                   <p className="text-lg font-light text-[#2C2A26] mb-4">{project.tagline}</p>
+                  {hasCaseStudy && (
+                    <button
+                      type="button"
+                      onClick={scrollToCaseStudy}
+                      className="mb-4 inline-flex items-center justify-center rounded-full border border-[#2C2A26] px-4 py-2 text-xs font-medium uppercase tracking-widest text-[#2C2A26] transition-colors hover:bg-[#2C2A26] hover:text-[#F5F2EB] lg:hidden"
+                    >
+                      View Case Study
+                    </button>
+                  )}
                   <h3 className="text-xs font-bold uppercase tracking-widest text-[#2C2A26] mb-2">About the Project</h3>
                   <p className="text-[#5D5A53] leading-relaxed font-light text-base">
                     {project.longDescription || project.description}
@@ -85,18 +153,7 @@ const ProductDetail: React.FC<ProjectDetailProps> = ({ project, onBack }) => {
               </div>
             </div>
 
-            {project.slideDeckUrl && (
-              <section>
-                <h2 className="text-xs font-bold uppercase tracking-widest text-[#2C2A26] mb-3">Case Study</h2>
-                <div className="w-full h-[72vh] min-h-[480px] md:min-h-[560px] max-h-[960px] bg-[#EBE7DE] rounded-xl overflow-hidden border border-[#D6D1C7] shadow-sm">
-                  <iframe
-                    src={`${project.slideDeckUrl}#view=FitH&navpanes=0`}
-                    className="w-full h-full border-0"
-                    title={`${project.name} Case Study`}
-                  />
-                </div>
-              </section>
-            )}
+            <CaseStudySection project={project} />
           </div>
         ) : (
           <div className="flex flex-col gap-12 lg:gap-24">
@@ -131,13 +188,22 @@ const ProductDetail: React.FC<ProjectDetailProps> = ({ project, onBack }) => {
               <h1 className="text-4xl md:text-5xl font-serif text-[#2C2A26] mb-4">{project.name}</h1>
               <p className="text-xl font-light text-[#2C2A26] mb-8">{project.tagline}</p>
 
-              <div className="flex gap-4 mb-8">
+              <div className="flex flex-col gap-3 sm:flex-row mb-8">
                 {project.demoUrl && (
                   <button
                     onClick={openLiveDemo}
                     className="flex-1 py-4 bg-[#2C2A26] text-[#F5F2EB] text-center uppercase tracking-widest text-sm font-medium hover:bg-[#433E38] transition-colors"
                   >
                     Live Demo
+                  </button>
+                )}
+                {hasCaseStudy && (
+                  <button
+                    type="button"
+                    onClick={scrollToCaseStudy}
+                    className="flex-1 py-4 border border-[#2C2A26] text-[#2C2A26] text-center uppercase tracking-widest text-sm font-medium hover:bg-[#2C2A26] hover:text-[#F5F2EB] transition-colors lg:hidden"
+                  >
+                    View Case Study
                   </button>
                 )}
               </div>
@@ -222,51 +288,31 @@ const ProductDetail: React.FC<ProjectDetailProps> = ({ project, onBack }) => {
           )}
 
           {project.id === 'dr-jivi' && (
-            <section className="rounded-xl border border-[#D6D1C7] bg-white/55 p-5 md:p-8 shadow-sm mt-8">
-              <div className="mb-8 max-w-3xl">
-                <span className="block text-xs font-bold uppercase tracking-widest text-[#A8A29E] mb-3">
-                  Walkthrough
-                </span>
-                <h2 className="text-3xl md:text-4xl font-serif tracking-tight text-[#2C2A26] mb-3">
+            <section className="flex flex-col gap-5 md:gap-8">
+              <div className="max-w-3xl">
+                <h2 className="text-2xl md:text-4xl font-serif tracking-tight text-[#2C2A26] mb-2 md:mb-3">
                   Dr. Jivi product demo
                 </h2>
-                <p className="text-base md:text-lg text-[#5D5A53] font-light leading-relaxed">
+                <p className="text-sm md:text-lg text-[#5D5A53] font-light leading-relaxed">
                   A multi-agent triaging workflow demonstrating conversational diagnostic capabilities.
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 gap-6 lg:gap-8 items-start">
-                <div className="overflow-hidden rounded-xl border border-[#EBE7DE] bg-[#EBE7DE] shadow-md">
-                  <div className="aspect-video">
-                    <iframe
-                      src={DR_JIVI_WALKTHROUGH_EMBED_URL}
-                      className="h-full w-full border-0"
-                      title="Dr. Jivi Concept Walkthrough"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                      allowFullScreen
-                    />
-                  </div>
-                  <div className="p-4 bg-white">
-                    <h3 className="font-serif text-lg text-[#2C2A26]">Concept walkthrough</h3>
-                    <p className="mt-1 text-sm text-[#5D5A53]">How Dr. Jivi leverages an intelligent multi-agent system.</p>
-                  </div>
+              <div className="-mx-6 md:-mx-12 w-[calc(100%+3rem)] md:w-[calc(100%+6rem)]">
+                <div className="aspect-[16/10] max-h-[220px] sm:max-h-none sm:aspect-video">
+                  <iframe
+                    src={DR_JIVI_WALKTHROUGH_EMBED_URL}
+                    className="h-full w-full border-0"
+                    title="Dr. Jivi Concept Walkthrough"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
+                  />
                 </div>
               </div>
             </section>
           )}
 
-          {project.slideDeckUrl && (
-              <section>
-                <h2 className="text-sm font-bold uppercase tracking-widest text-[#2C2A26] mb-4">Case Study</h2>
-                <div className="w-full h-[72vh] min-h-[480px] md:min-h-[560px] max-h-[960px] bg-[#EBE7DE] rounded-xl overflow-hidden border border-[#D6D1C7] shadow-sm">
-                  <iframe
-                    src={`${project.slideDeckUrl}#view=FitH&navpanes=0`}
-                    className="w-full h-full border-0"
-                    title={`${project.name} Case Study`}
-                  />
-                </div>
-              </section>
-            )}
+          <CaseStudySection project={project} />
 
           </div>
         )}
