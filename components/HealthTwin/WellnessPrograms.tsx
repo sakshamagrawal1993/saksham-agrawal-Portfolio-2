@@ -173,7 +173,7 @@ export const WellnessPrograms: React.FC = () => {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${session?.access_token}`,
                 },
-                body: JSON.stringify({ twin_id: activeTwinId }),
+                body: JSON.stringify({ twin_id: activeTwinId, force_refresh: true }),
             });
 
             if (res.ok) {

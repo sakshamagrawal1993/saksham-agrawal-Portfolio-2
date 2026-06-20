@@ -1,4 +1,4 @@
-import {
+import type {
   HealthParameter,
   HealthParameterDefinition,
   HealthParameterRange,
@@ -9,7 +9,7 @@ import {
 // Mathematical representation of health score mapped 0-100
 // P_score = max(0, 100 - (\max(0, distance_from_optimal) / allowed_variance) * 50)
 // This is a simplified boundary logic mapped to Optimal, Normal, and Critical thresholds.
-function calculateParameterScore(
+export function calculateParameterScore(
   val: number | string | boolean,
   rangeDef: HealthParameterRange | undefined
 ): number | null {

@@ -1,0 +1,28 @@
+{
+  "product": "health-twin",
+  "maximumIterations": 3,
+  "claudeBudgetUsdPerIteration": 20,
+  "baseBranch": "main",
+  "qaCommand": "npm run test:health-twin:qa",
+  "buildCommand": "npm run build",
+  "publishCommandsAllowed": true,
+  "productionUrl": "https://saksham-experiments.com",
+  "n8nRepository": "/Users/sakshamagrawal/Documents/Projects/n8n-workflows",
+  "n8nWorkflowIds": [
+    "QmbwB8UJcN8PNbrd",
+    "9GaGrmxlOtPD3PDm"
+  ],
+  "supabaseProjectRef": "ralhkmpbslsdkwnqzqen",
+  "supabaseFunctions": [
+    "chat-completion",
+    "process-lab-report",
+    "generate-wellness",
+    "generate-wellness-playground",
+    "playground-wellness"
+  ],
+  "forbiddenPublicationCommands": [
+    "git push",
+    "gh pr create",
+    "gh pr merge"
+  ]
+}

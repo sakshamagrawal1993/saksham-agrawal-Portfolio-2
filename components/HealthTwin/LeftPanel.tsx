@@ -2,6 +2,7 @@ import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import { Plus, FileText, Activity, Watch, UploadCloud, User, X, Check, Loader2, Pencil, ChevronDown } from 'lucide-react';
 import { useHealthTwinStore } from '../../store/healthTwin';
 import { supabase } from '../../lib/supabaseClient';
+import { normalizeLabParameterRows } from '../../lib/healthTwin/labExtraction';
 
 type SourceTab = 'upload' | 'wearable' | 'parameter' | 'profile';
 
@@ -145,9 +146,11 @@ export const LeftPanel: React.FC = () => {
                 const { data: { session } } = await supabase.auth.getSession();
                 userName = (session?.user?.email?.split('@')[0] || session?.user?.id || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '_');
             }
-            const fileName = `${userName}/${activeTwinId}/${fileToUpload.name}`;
+            const uploadId = crypto.randomUUID();
+            const safeName = fileToUpload.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+            const fileName = `${userName}/${activeTwinId}/${uploadId}/${safeName}`;
 
-            const { error: uploadError } = await supabase.storage.from('health_documents').upload(fileName, fileToUpload, { upsert: true });
+            const { error: uploadError } = await supabase.storage.from('health_documents').upload(fileName, fileToUpload, { upsert: false });
             if (uploadError) throw uploadError;
 
             const { data: signedUrlData, error: signedUrlError } = await supabase.storage
@@ -173,7 +176,15 @@ export const LeftPanel: React.FC = () => {
 
             // Call Supabase Edge Function to securely route the payload and auth header to n8n
             try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session?.access_token) {
+                    throw new Error('Your session has expired. Please sign in again.');
+                }
+
                 const { data: result, error: invokeError } = await supabase.functions.invoke('process-lab-report', {
+                    headers: {
+                        Authorization: `Bearer ${session.access_token}`,
+                    },
                     body: {
                         file_url: signedUrlData.signedUrl,
                         storage_path: fileName,
@@ -185,112 +196,48 @@ export const LeftPanel: React.FC = () => {
                 if (invokeError) throw invokeError;
                 if (!result) throw new Error("No data returned from edge function");
 
-                // Navigate n8n's varied response wrappers (e.g. `[{ body: { output: { parameters: [] } } }]`)
-                let parameters = result.parameters;
-
                 console.log("[Health Twin] Raw n8n Response Result:", result);
+                const paramRows = normalizeLabParameterRows(result, {
+                    twinId: activeTwinId,
+                    sourceId: sourceData.id,
+                });
+                console.log("[Health Twin] Attempting to insert", paramRows.length, "rows into Supabase...");
 
-                if (!parameters) {
-                    let parsedResult = result;
-                    try {
-                        if (typeof result === 'string') {
-                            console.log("[Health Twin] Attempting to parse string result to JSON.");
-                            parsedResult = JSON.parse(result);
-                        }
-                    } catch (e) {
-                        console.error("[Health Twin] Failed to parse result string to JSON:", e);
-                    }
+                const { data: insertedParams, error: paramError } = await supabase
+                    .from('health_lab_parameters')
+                    .insert(paramRows)
+                    .select();
 
-                    const payload = Array.isArray(parsedResult) ? parsedResult[0] : parsedResult;
-                    console.log("[Health Twin] Payload Base:", payload);
+                if (paramError) throw paramError;
 
-                    // Dig through n8n wrapping permutations
-                    let inner = payload;
-                    if (inner?.body) {
-                        console.log("[Health Twin] Found 'body' wrapper.");
-                        inner = inner.body;
-                    }
-                    if (inner?.output) {
-                        console.log("[Health Twin] Found 'output' wrapper (first).");
-                        inner = inner.output;
-                    }
-                    if (inner?.output) { // Sometimes double-wrapped in 'output'
-                        console.log("[Health Twin] Found 'output' wrapper (second).");
-                        inner = inner.output;
-                    }
-
-                    if (inner?.parameters) {
-                        console.log("[Health Twin] Found 'parameters' array inside inner object.");
-                        parameters = inner.parameters;
-                    }
-                    else if (Array.isArray(inner)) { // Fallback if it's just the array
-                        console.log("[Health Twin] Inner object is directly an array.");
-                        parameters = inner;
-                    }
-
-                    console.log("[Health Twin] Unwrapped Parameters Array:", parameters);
-                }
-
-                // Save extracted parameters to health_lab_parameters
-                if (parameters && Array.isArray(parameters) && parameters.length > 0) {
-                    console.log("[Health Twin] Attempting to insert", parameters.length, "rows into Supabase...");
-
-                    const parseDateSafely = (dateString: string) => {
-                        if (!dateString) return new Date().toISOString();
-
-                        let cleanStr = dateString.trim();
-
-                        // 1. Detect European/Indian format DD-MM-YYYY or DD/MM/YYYY
-                        const dmyRegex = /^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/;
-                        const dmyMatch = cleanStr.match(dmyRegex);
-                        if (dmyMatch) {
-                            // Rebuild as YYYY-MM-DD
-                            const day = dmyMatch[1].padStart(2, '0');
-                            const month = dmyMatch[2].padStart(2, '0');
-                            const year = dmyMatch[3];
-                            cleanStr = `${year}-${month}-${day}`;
-                        }
-
-                        // 2. If it's just YYYY-MM-DD (including rebuilt ones), rigidly append midnight UTC 
-                        // so JS doesn't crash on incomplete strings lacking timezone data.
-                        if (/^\d{4}-\d{2}-\d{2}$/.test(cleanStr)) {
-                            cleanStr = `${cleanStr}T00:00:00.000Z`;
-                        }
-
-                        const parsed = Date.parse(cleanStr);
-                        return isNaN(parsed) ? new Date().toISOString() : new Date(parsed).toISOString();
-                    };
-
-                    const paramRows = parameters.map((p: any) => ({
-                        twin_id: activeTwinId,
-                        source_id: sourceData.id,
-                        parameter_name: p.parameter_name,
-                        parameter_value: Number(p.parameter_value) || 0,
-                        unit: p.unit || '',
-                        recorded_at: parseDateSafely(p.recorded_at),
-                    }));
-
-                    const { data: insertedParams, error: paramError } = await supabase
-                        .from('health_lab_parameters')
-                        .insert(paramRows)
-                        .select();
-
-                    if (paramError) throw paramError;
-
-                    // Merge new parameters into store
-                    if (insertedParams) {
-                        setLabParameters([...insertedParams, ...labParameters]);
-                    }
+                // Merge new parameters into store
+                if (insertedParams) {
+                    setLabParameters([...insertedParams, ...labParameters]);
                 }
 
                 // Mark source as completed
                 await supabase.from('health_sources').update({ status: 'completed' }).eq('id', sourceData.id);
                 setSources([{ ...sourceData, status: 'completed' }, ...sources.filter(s => s.id !== sourceData.id)]);
-            } catch (webhookErr) {
-                console.error('Webhook/parameter processing error:', webhookErr);
+            } catch (webhookErr: any) {
+                let processingError = webhookErr instanceof Error ? webhookErr.message : String(webhookErr);
+                const response = webhookErr?.context;
+                if (response && typeof response.clone === 'function') {
+                    try {
+                        const body = await response.clone().json();
+                        processingError = body?.error || body?.message || JSON.stringify(body);
+                    } catch {
+                        try {
+                            const bodyText = await response.clone().text();
+                            if (bodyText) processingError = bodyText;
+                        } catch {
+                            // Preserve the original error when the response body is unavailable.
+                        }
+                    }
+                }
+                console.error('Webhook/parameter processing error:', processingError);
                 // Mark source as failed
-                await supabase.from('health_sources').update({ status: 'failed', processing_error: String(webhookErr) }).eq('id', sourceData.id);
-                setSources([{ ...sourceData, status: 'failed' }, ...sources.filter(s => s.id !== sourceData.id)]);
+                await supabase.from('health_sources').update({ status: 'failed', processing_error: processingError }).eq('id', sourceData.id);
+                setSources([{ ...sourceData, status: 'failed', processing_error: processingError }, ...sources.filter(s => s.id !== sourceData.id)]);
             }
 
             setFileToUpload(null);
@@ -367,6 +314,8 @@ export const LeftPanel: React.FC = () => {
                 setLabParameters([...data, ...labParameters]);
             }
 
+            calculateLiveScores();
+
             setParamForm({
                 name: '', value: '', unit: '', recorded_at: '', ended_at: '',
                 is_present: false, bp_sys: '', bp_dia: '',
@@ -383,16 +332,34 @@ export const LeftPanel: React.FC = () => {
     };
 
     // ---------- CSV PARSER ----------
+    const REQUIRED_CSV_COLUMNS = [
+        { label: 'parameter_name or name', aliases: ['parameter_name', 'name'] },
+        { label: 'parameter_value or value', aliases: ['parameter_value', 'value'] },
+        { label: 'recorded_at or timestamp', aliases: ['recorded_at', 'timestamp'] },
+    ];
+
     const parseCsv = (text: string): Record<string, string>[] => {
         const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
         if (lines.length < 2) throw new Error('CSV must have a header row and at least one data row.');
         const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-        return lines.slice(1).map(line => {
+        const missingCols = REQUIRED_CSV_COLUMNS
+            .filter(({ aliases }) => !aliases.some(alias => headers.includes(alias)))
+            .map(({ label }) => label);
+        if (missingCols.length > 0) {
+            throw new Error(`CSV is missing required columns: ${missingCols.join(', ')}. Download the sample template for the correct format.`);
+        }
+        const rows = lines.slice(1).map((line, lineIdx) => {
             const values = line.match(/("[^"]*"|[^,]+)/g)?.map(v => v.trim().replace(/^"|"$/g, '')) || [];
             const row: Record<string, string> = {};
             headers.forEach((h, i) => { row[h] = values[i] || ''; });
+            const nameVal = row.parameter_name || row.name || '';
+            if (!nameVal.trim()) throw new Error(`Row ${lineIdx + 2}: parameter_name is blank.`);
+            const rawVal = row.parameter_value || row.value || '';
+            if (rawVal !== '' && isNaN(Number(rawVal))) throw new Error(`Row ${lineIdx + 2}: parameter_value "${rawVal}" is not a valid number.`);
+            if (!(row.recorded_at || row.timestamp)) throw new Error(`Row ${lineIdx + 2}: recorded_at or timestamp is blank.`);
             return row;
         });
+        return rows;
     };
 
     const handleCsvFileSelect = (file: File) => {

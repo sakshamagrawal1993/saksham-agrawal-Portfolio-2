@@ -27,3 +27,13 @@ dist-ssr
 .env
 .env.local
 .vercel
+
+# Health Twin autonomous loop runtime artifacts
+.loop/STATE.json
+.loop/runs/
+.loop/logs/
+
+# Mind Coach autonomous loop runtime artifacts
+.loop-mind-coach/STATE.json
+.loop-mind-coach/runs/
+.loop-mind-coach/logs/

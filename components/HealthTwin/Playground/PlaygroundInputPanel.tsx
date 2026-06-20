@@ -316,7 +316,7 @@ export const PlaygroundInputPanel: React.FC = () => {
                     ) : (
                         <>
                             <Zap className="w-4 h-4 fill-white text-white" />
-                            <span>Save & Recalculate</span>
+                            <span>Recalculate Scores</span>
                         </>
                     )}
                 </button>

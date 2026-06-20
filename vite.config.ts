@@ -10,9 +10,14 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     base: '/',
     resolve: {
+      dedupe: ['react', 'react-dom'],
       alias: {
         "@": path.resolve(__dirname, "./"),
       },
+    },
+    optimizeDeps: {
+      entries: ['index.html'],
+      include: ['react', 'react-dom', 'react-router-dom', 'zustand'],
     },
     define: {
       // This ensures process.env.GEMINI_API_KEY in your code is replaced by the actual value during build

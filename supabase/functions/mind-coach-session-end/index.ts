@@ -150,10 +150,23 @@ serve(async (req) => {
         ? body.profile
         : profileRes.data;
 
-    if (!session || messages.length === 0) {
+    if (!session) {
       return new Response(
-        JSON.stringify({ error: 'Session not found or empty' }),
+        JSON.stringify({ error: 'Session not found' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
+      );
+    }
+    if (messages.length === 0) {
+      return new Response(
+        JSON.stringify({
+          case_notes: null,
+          session_summary: 'Session ended without messages.',
+          extracted_tasks: [],
+          extracted_memories: [],
+          agent_meta: null,
+          suggested_pathway: null,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }
 

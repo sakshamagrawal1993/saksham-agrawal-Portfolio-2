@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { corsHeaders } from "../_shared/cors.ts";
+import { requireAuth, isAuthError } from "../_shared/healthTwinAuth.ts";
 
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
 
@@ -9,6 +10,15 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    // Validate JWT — playground functions do not write real data but still require authenticated callers
+    const authResult = await requireAuth(req);
+    if (isAuthError(authResult)) {
+      return new Response(JSON.stringify({ error: authResult.message }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: authResult.status,
+      });
+    }
+
     const { playground_state, computed_scores } = await req.json();
 
     if (!playground_state || !computed_scores) {

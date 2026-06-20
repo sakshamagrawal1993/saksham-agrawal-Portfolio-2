@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import { corsHeaders } from '../_shared/cors.ts';
+import { requireAuth, isAuthError, verifyTwinOwner, verifySessionOwner } from '../_shared/healthTwinAuth.ts';
+import { normalizeHealthTwinChatResponse } from '../_shared/healthTwinChatResponse.ts';
 
 serve(async (req) => {
   // Handle CORS preflight request
@@ -9,18 +10,45 @@ serve(async (req) => {
   }
 
   try {
+    // Validate JWT
+    const authResult = await requireAuth(req);
+    if (isAuthError(authResult)) {
+      return new Response(
+        JSON.stringify({ error: authResult.message }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: authResult.status }
+      );
+    }
+    const { user, adminClient: supabaseAdmin } = authResult;
+
     const payload = await req.json();
-    const { 
-      twin_id, 
-      session_id, 
-      message_text, 
-      personal_details_snapshot 
+    const {
+      twin_id,
+      session_id,
+      message_text,
     } = payload;
 
     if (!twin_id || !session_id || !message_text) {
       return new Response(
         JSON.stringify({ error: 'Missing required parameters: twin_id, session_id, message_text' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
+
+    // Verify twin ownership
+    const ownsTwin = await verifyTwinOwner(supabaseAdmin, twin_id, user.id);
+    if (!ownsTwin) {
+      return new Response(
+        JSON.stringify({ error: 'Forbidden: twin not found or not owned by caller' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
+      );
+    }
+
+    // Verify session ownership (if existing session, must belong to same twin)
+    const ownsSession = await verifySessionOwner(supabaseAdmin, session_id, twin_id);
+    if (!ownsSession) {
+      return new Response(
+        JSON.stringify({ error: 'Forbidden: session belongs to a different twin' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
       );
     }
 
@@ -56,28 +84,48 @@ serve(async (req) => {
       );
     }
 
-    // Initialize Supabase Admin client (bypasses RLS with service role key)
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const { data: personalDetails, error: personalDetailsError } = await supabaseAdmin
+      .from('health_personal_details')
+      .select('*')
+      .eq('twin_id', twin_id)
+      .maybeSingle();
+    if (personalDetailsError) {
+      console.error('Failed to load authoritative profile context:', personalDetailsError.message);
+      return new Response(
+        JSON.stringify({ error: 'Failed to load health context' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      );
+    }
 
     // 1. Upsert chat session (create if new, update timestamp if existing)
-    await supabaseAdmin.from('health_chat_sessions').upsert(
+    const { error: sessionErr } = await supabaseAdmin.from('health_chat_sessions').upsert(
       { id: session_id, twin_id: twin_id, active: true },
       { onConflict: 'id' }
     );
+    if (sessionErr) {
+      console.error('Failed to upsert session:', sessionErr.message);
+      return new Response(
+        JSON.stringify({ error: 'Failed to initialize chat session' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      );
+    }
 
     // 2. Save the user's message and capture the generated ID
     const userMessageId = crypto.randomUUID();
-    await supabaseAdmin.from('health_chat_messages').insert([{
+    const { error: userMsgErr } = await supabaseAdmin.from('health_chat_messages').insert([{
       id: userMessageId,
       session_id: session_id,
       role: 'user',
       content: message_text
     }]);
+    if (userMsgErr) {
+      console.error('Failed to save user message:', userMsgErr.message);
+      return new Response(
+        JSON.stringify({ error: 'Failed to persist user message' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      );
+    }
 
-    // 3. Forward the payload securely to n8n's Agent Webhook
     // 3. Forward the payload securely to n8n's Agent Webhook
     //    Include the user_message_id so n8n can link memories to this message
     //    Use a 5-minute timeout since the Agent may need multiple tool calls
@@ -97,7 +145,7 @@ serve(async (req) => {
           session_id,
           message_text,
           user_message_id: userMessageId,
-          personal_details_snapshot
+          personal_details_snapshot: personalDetails || null,
         }),
         signal: controller.signal,
       });
@@ -122,44 +170,35 @@ serve(async (req) => {
       );
     }
 
-    // n8n sometimes wraps the response in an array — unwrap it
-    let parsedResult = await n8nResponse.json();
-    const result = Array.isArray(parsedResult) ? parsedResult[0] : parsedResult;
-    const rawReply = result.assistant_reply || result.output || '';
+    const parsedResult = await n8nResponse.json();
+    const { assistant_reply: assistantReply, widgets } = normalizeHealthTwinChatResponse(parsedResult);
 
-    // The n8n Structured Output Parser double-encodes strings as JSON
-    let assistantReply = rawReply;
-    if (typeof rawReply === 'string') {
-      const trimmed = rawReply.trim();
-      if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
-        try {
-          assistantReply = JSON.parse(trimmed);
-        } catch (_) {
-          assistantReply = trimmed
-            .slice(1, -1)
-            .replace(/\\n/g, '\n')
-            .replace(/\\t/g, '\t')
-            .replace(/\\"/g, '"')
-            .replace(/\\\\/g, '\\');
-        }
-      }
+    if (typeof assistantReply !== 'string' || !assistantReply.trim()) {
+      console.error('n8n returned an empty or invalid assistant reply');
+      return new Response(
+        JSON.stringify({ error: 'Agent pipeline returned an invalid response' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 502 }
+      );
     }
 
-    // 4. Save the assistant's reply to the same session
-    if (assistantReply) {
-      supabaseAdmin.from('health_chat_messages').insert([{
-        session_id: session_id,
-        role: 'assistant',
-        content: assistantReply
-      }]).then(({ error }) => {
-        if (error) console.error('Failed to log assistant reply:', error.message);
-      });
+    // 4. Save the assistant's reply to the same session (awaited to ensure persistence)
+    const { error: assistantMsgErr } = await supabaseAdmin.from('health_chat_messages').insert([{
+      session_id: session_id,
+      role: 'assistant',
+      content: assistantReply,
+    }]);
+    if (assistantMsgErr) {
+      console.error('Failed to persist assistant reply:', assistantMsgErr.message);
+      return new Response(
+        JSON.stringify({ error: 'Failed to persist assistant message' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      );
     }
 
     // 5. Return the CLEANED response to the frontend
     const cleanResponse = {
       assistant_reply: assistantReply,
-      widgets: result.widgets || [],
+      widgets,
       session_id: session_id,
       twin_id: twin_id
     };

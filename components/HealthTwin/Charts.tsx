@@ -76,10 +76,15 @@ const ChartCard: React.FC<{ children: React.ReactNode; className?: string; param
 };
 
 // ======== EDIT DATA MODAL ========
-export const EditDataModal: React.FC<{ params: HealthParameter[]; onClose: () => void }> = ({ params, onClose }) => {
+export const EditDataModal: React.FC<{ params: HealthParameter[]; onClose: () => void; isLabTable?: boolean }> = ({ params, onClose, isLabTable }) => {
     const [rows, setRows] = useState<HealthParameter[]>([...params]);
     const [saving, setSaving] = useState(false);
-    const { wearableParameters, setWearableParameters, parameterDefinitions } = useHealthTwinStore();
+    const [saveError, setSaveError] = useState('');
+    const { wearableParameters, setWearableParameters, labParameters, setLabParameters, parameterDefinitions, calculateLiveScores } = useHealthTwinStore();
+
+    // Determine table: explicit prop or fall back to checking whether any row has a category
+    const useLabTable = isLabTable ?? rows.every(r => !r.category);
+    const tableName = useLabTable ? 'health_lab_parameters' : 'health_wearable_parameters';
 
     const updateRow = (idx: number, field: string, value: string) => {
         setRows(prev => prev.map((r, i) => i === idx ? { ...r, [field]: field === 'parameter_value' ? Number(value) : value } : r));
@@ -87,33 +92,54 @@ export const EditDataModal: React.FC<{ params: HealthParameter[]; onClose: () =>
 
     const deleteRow = async (idx: number) => {
         const row = rows[idx];
-        const { error } = await supabase.from('health_wearable_parameters').delete().eq('id', row.id);
-        if (!error) {
-            setRows(prev => prev.filter((_, i) => i !== idx));
+        const { error } = await supabase.from(tableName).delete().eq('id', row.id);
+        if (error) {
+            console.error('Delete error:', error);
+            return;
+        }
+        setRows(prev => prev.filter((_, i) => i !== idx));
+        if (useLabTable) {
+            setLabParameters(labParameters.filter(p => p.id !== row.id));
+        } else {
             setWearableParameters(wearableParameters.filter(p => p.id !== row.id));
         }
+        calculateLiveScores();
     };
 
     const handleSave = async () => {
         setSaving(true);
+        setSaveError('');
         try {
             for (const row of rows) {
-                await supabase.from('health_wearable_parameters').update({
+                const updatePayload: Record<string, unknown> = {
                     parameter_name: row.parameter_name,
                     parameter_value: row.parameter_value,
-                    parameter_text: row.parameter_text || null,
                     unit: row.unit,
-                }).eq('id', row.id);
+                };
+                if (!useLabTable) {
+                    updatePayload.parameter_text = row.parameter_text || null;
+                }
+                const { error } = await supabase.from(tableName).update(updatePayload).eq('id', row.id);
+                if (error) throw error;
             }
-            // Update zustand store
-            const updatedStore = wearableParameters.map(p => {
-                const edited = rows.find(r => r.id === p.id);
-                return edited || p;
-            });
-            setWearableParameters(updatedStore);
+            if (useLabTable) {
+                const updatedStore = labParameters.map(p => {
+                    const edited = rows.find(r => r.id === p.id);
+                    return edited || p;
+                });
+                setLabParameters(updatedStore);
+            } else {
+                const updatedStore = wearableParameters.map(p => {
+                    const edited = rows.find(r => r.id === p.id);
+                    return edited || p;
+                });
+                setWearableParameters(updatedStore);
+            }
+            calculateLiveScores();
             onClose();
-        } catch (err) {
+        } catch (err: any) {
             console.error('Save error:', err);
+            setSaveError(err?.message || 'Failed to save changes.');
         } finally {
             setSaving(false);
         }
@@ -172,11 +198,14 @@ export const EditDataModal: React.FC<{ params: HealthParameter[]; onClose: () =>
                     </table>
                     {rows.length === 0 && <p className="text-center text-[#A8A29E] py-8">All data deleted.</p>}
                 </div>
-                <div className="p-4 border-t border-[#EBE7DE] flex justify-end gap-3 flex-shrink-0">
-                    <button onClick={onClose} className="px-4 py-2 text-sm font-bold text-[#5D5A53] hover:bg-[#F5F2EB] rounded-xl">Cancel</button>
-                    <button onClick={handleSave} disabled={saving} className="px-4 py-2 text-sm font-bold bg-[#A84A00] text-white hover:bg-[#8A3D00] disabled:opacity-50 rounded-xl flex items-center gap-2">
-                        <Save size={14} /> {saving ? 'Saving...' : 'Save Changes'}
-                    </button>
+                <div className="p-4 border-t border-[#EBE7DE] flex flex-col gap-2 flex-shrink-0">
+                    {saveError && <p className="text-xs text-red-600 text-right">{saveError}</p>}
+                    <div className="flex justify-end gap-3">
+                        <button onClick={onClose} className="px-4 py-2 text-sm font-bold text-[#5D5A53] hover:bg-[#F5F2EB] rounded-xl">Cancel</button>
+                        <button onClick={handleSave} disabled={saving} className="px-4 py-2 text-sm font-bold bg-[#A84A00] text-white hover:bg-[#8A3D00] disabled:opacity-50 rounded-xl flex items-center gap-2">
+                            <Save size={14} /> {saving ? 'Saving...' : 'Save Changes'}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

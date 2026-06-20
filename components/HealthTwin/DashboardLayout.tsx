@@ -30,7 +30,9 @@ export const HealthTwinDashboard: React.FC = () => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        let cancelled = false;
         const initDashboard = async () => {
+            setLoading(true);
             if (!id) {
                 navigate('/health-twin');
                 return;
@@ -56,10 +58,15 @@ export const HealthTwinDashboard: React.FC = () => {
                 return;
             }
 
-            // Make sure the twin is in our state list
-            if (!twins.find(t => t.id === data.id)) {
-                setTwins([data, ...twins]);
-            }
+            if (cancelled) return;
+
+            // Load the user's complete selector list on direct dashboard entry.
+            const { data: ownedTwins } = await supabase
+                .from('health_twins')
+                .select('*')
+                .eq('user_id', session.user.id)
+                .order('created_at', { ascending: false });
+            setTwins(ownedTwins?.length ? ownedTwins : [data]);
 
             setActiveTwin(data.id);
 
@@ -112,8 +119,8 @@ export const HealthTwinDashboard: React.FC = () => {
                 // If no cached programs, trigger generation
                 if (!wellnessData.data || wellnessData.data.length === 0) {
                     setIsLoadingWellness(true);
-                    try {
-                        const { data: { session } } = await supabase.auth.getSession();
+                    void (async () => {
+                      try {
                         const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL;
                         const res = await fetch(`${supabaseUrl}/functions/v1/generate-wellness`, {
                             method: 'POST',
@@ -125,13 +132,14 @@ export const HealthTwinDashboard: React.FC = () => {
                         });
                         if (res.ok) {
                             const result = await res.json();
-                            setWellnessPrograms(result.programs || []);
+                            if (!cancelled) setWellnessPrograms(result.programs || []);
                         }
-                    } catch (genErr) {
+                      } catch (genErr) {
                         console.error('Failed to auto-generate wellness programs:', genErr);
-                    } finally {
+                      } finally {
                         setIsLoadingWellness(false);
-                    }
+                      }
+                    })();
                 }
 
                 // Calculate fresh 0-100 scores
@@ -140,11 +148,17 @@ export const HealthTwinDashboard: React.FC = () => {
                 console.error("Error loading twin sub-data:", err);
             }
 
-            setLoading(false);
+            if (!cancelled) setLoading(false);
         };
 
-        initDashboard();
-    }, [id, navigate, setActiveTwin, twins, setTwins, setPersonalDetails, setSummary, setLabParameters, setWearableParameters, setScores, setRecommendations, setSources, setDailyAggregates, setWellnessPrograms, setIsLoadingWellness]);
+        initDashboard().catch((err) => {
+            console.error("Failed to initialize Health Twin dashboard:", err);
+            if (!cancelled) setLoading(false);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [id, navigate, setActiveTwin, setTwins, setPersonalDetails, setSummary, setLabParameters, setWearableParameters, setScores, setRecommendations, setSources, setDailyAggregates, setWellnessPrograms, setIsLoadingWellness]);
 
     if (loading) {
         return (

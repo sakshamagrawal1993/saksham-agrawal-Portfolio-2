@@ -109,6 +109,7 @@ export const CenterPanel: React.FC = () => {
     const [isChatLoading, setIsChatLoading] = useState(false);
     const [activeCategory, setActiveCategory] = useState('all');
     const [editParams, setEditParams] = useState<HealthParameter[] | null>(null);
+    const [editIsLab, setEditIsLab] = useState(false);
 
     const handleSendMessage = async () => {
         if (!chatInput.trim() || isChatLoading || !activeTwinId) return;
@@ -136,7 +137,15 @@ export const CenterPanel: React.FC = () => {
                 setActiveChatSessionId(sessionIdToUse);
             }
 
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session?.access_token) {
+                throw new Error('Your session has expired. Please sign in again.');
+            }
+
             const { data, error } = await supabase.functions.invoke('chat-completion', {
+                headers: {
+                    Authorization: `Bearer ${session.access_token}`,
+                },
                 body: {
                     twin_id: activeTwinId,
                     session_id: sessionIdToUse,
@@ -172,8 +181,9 @@ export const CenterPanel: React.FC = () => {
         }
     };
 
-    const handleEditClick = (params: HealthParameter[]) => {
+    const handleEditClick = (params: HealthParameter[], isLab: boolean = false) => {
         setEditParams(params);
+        setEditIsLab(isLab);
     };
 
     return (
@@ -261,7 +271,7 @@ export const CenterPanel: React.FC = () => {
                                                     <span className="w-2 h-6 rounded-full bg-[#A84A00]" />
                                                     <h2 className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#5D5A53]">{chartInfo.label}</h2>
                                                 </div>
-                                                <Component data={isLab ? labParameters : wearableParameters} onEditClick={handleEditClick} />
+                                                <Component data={isLab ? labParameters : wearableParameters} onEditClick={(params: HealthParameter[]) => handleEditClick(params, isLab)} />
                                             </div>
                                         );
                                     })}
@@ -272,7 +282,8 @@ export const CenterPanel: React.FC = () => {
                                     if (!match) return null;
                                     const Comp = match.Component;
                                     const dataToPass = activeCategory === 'lab' ? labParameters : wearableParameters;
-                                    return <Comp data={dataToPass} onEditClick={handleEditClick} />;
+                                    const isLabCat = activeCategory === 'lab';
+                                    return <Comp data={dataToPass} onEditClick={(params: HealthParameter[]) => handleEditClick(params, isLabCat)} />;
                                 })()
                             ) : null}
                         </div>
@@ -343,7 +354,7 @@ export const CenterPanel: React.FC = () => {
             </div>
 
             {/* Edit Modal */}
-            {editParams && <EditDataModal params={editParams} onClose={() => setEditParams(null)} />}
+            {editParams && <EditDataModal params={editParams} onClose={() => setEditParams(null)} isLabTable={editIsLab} />}
         </div>
     );
 };

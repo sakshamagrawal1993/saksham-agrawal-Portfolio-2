@@ -1,7 +1,7 @@
 import React from 'react';
 import { usePlaygroundStore } from '../../../store/playgroundStore';
 import { ProgramCard } from '../WellnessPrograms';
-import { Zap, CheckCircle2, Sparkles, Loader2, RefreshCw } from 'lucide-react';
+import { Zap, Sparkles, Loader2, RefreshCw } from 'lucide-react';
 
 export const PlaygroundWellnessPanel: React.FC = () => {
     const { changedParams, wellnessPrograms, simulationSummary, isGeneratingWellness, generateWellnessPlan } = usePlaygroundStore();
@@ -40,7 +40,7 @@ export const PlaygroundWellnessPanel: React.FC = () => {
                         </div>
                         <h3 className="text-sm font-semibold text-[#2C2A26]">No Simulations Detected</h3>
                         <p className="text-xs text-[#5D5A53] mt-2 leading-relaxed">
-                            Adjust parameters on the left and click "Save & Recalculate" to generate simulated wellness plans.
+                            Adjust parameters on the left and click "Recalculate Scores" to generate simulated wellness plans.
                         </p>
                     </div>
                 ) : (
@@ -70,16 +70,6 @@ export const PlaygroundWellnessPanel: React.FC = () => {
                             ))}
                         </div>
 
-                        {/* Action CTA */}
-                        {wellnessPrograms.length > 0 && (
-                            <button className="w-full mt-4 bg-white border border-[#EBE7DE] p-4 rounded-xl shadow-sm hover:shadow-md transition-all flex items-center justify-between group">
-                                <div className="flex flex-col items-start text-left">
-                                    <span className="text-[10px] font-bold text-[#A84A00] uppercase">Scenario Management</span>
-                                    <span className="text-xs font-semibold text-[#2C2A26] mt-0.5">Save this Simulation Profile</span>
-                                </div>
-                                <CheckCircle2 className="w-5 h-5 text-[#A8A29E] group-hover:text-[#A84A00] transition-colors" />
-                            </button>
-                        )}
                     </>
                 )}
             </div>

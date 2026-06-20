@@ -393,6 +393,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
   }, [activeSession, isEngagementDiscovery, messages, messageCountForObjective]);
 
   const canEndSession = useMemo(() => {
+    if (messages.length === 0) return false;
     if (sessionCrisisFlag) return true;
     if (isSessionClose) return true;
     if (isEngagementDiscovery) {
@@ -403,6 +404,7 @@ export const TherapistChat: React.FC<TherapistChatProps> = ({ onBack, onViewProp
     }
     return sessionObjectiveProgressRaw >= SESSION_GOAL_MET_PROGRESS_THRESHOLD;
   }, [
+    messages.length,
     sessionCrisisFlag,
     isSessionClose,
     isEngagementDiscovery,

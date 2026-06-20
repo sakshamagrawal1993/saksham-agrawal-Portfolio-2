@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { requireAuth, isAuthError, verifyTwinOwner } from "../_shared/healthTwinAuth.ts";
 
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -12,7 +13,17 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { twin_id, playground_state } = await req.json();
+    // Validate JWT
+    const authResult = await requireAuth(req);
+    if (isAuthError(authResult)) {
+      return new Response(JSON.stringify({ error: authResult.message }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: authResult.status,
+      });
+    }
+    const { user, adminClient } = authResult;
+
+    const { twin_id, playground_state, force_refresh } = await req.json();
     if (!twin_id) {
       return new Response(JSON.stringify({ error: "twin_id is required" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -20,16 +31,27 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    // Verify twin ownership
+    const ownsTwin = await verifyTwinOwner(adminClient, twin_id, user.id);
+    if (!ownsTwin) {
+      return new Response(JSON.stringify({ error: "Forbidden: twin not found or not owned by caller" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 403,
+      });
+    }
 
-    // ─── 1. Check Cache (Skip if playground simulation) ────────
-    if (!playground_state) {
-      const { data: cached } = await supabase
+    const supabase = adminClient;
+
+    // ─── 1. Check Cache (Skip if playground simulation or force refresh) ────────
+    if (!playground_state && !force_refresh) {
+      const { data: cached, error: cacheErr } = await supabase
         .from("health_wellness_programs")
         .select("*")
         .eq("twin_id", twin_id)
         .gt("expires_at", new Date().toISOString())
         .order("created_at", { ascending: false });
+
+      if (cacheErr) console.error("Cache query error:", cacheErr.message);
 
       if (cached && cached.length > 0) {
         return new Response(JSON.stringify({ programs: cached, source: "cache" }), {
@@ -44,12 +66,12 @@ Deno.serve(async (req: Request) => {
       supabase.from("health_daily_aggregates").select("date,parameter_name,aggregate_value,unit").eq("twin_id", twin_id)
         .gte("date", new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0])
         .order("date", { ascending: false }),
-      supabase.from("health_lab_parameters").select("parameter_name,value,unit,recorded_at").eq("twin_id", twin_id)
+      supabase.from("health_lab_parameters").select("parameter_name,parameter_value,unit,recorded_at").eq("twin_id", twin_id)
         .order("recorded_at", { ascending: false }),
       supabase.from("health_personal_details").select("name,age,gender,height_cm,weight_kg,blood_type,co_morbidities,location").eq("twin_id", twin_id).single(),
-      supabase.from("health_wearable_parameters").select("parameter_name,value,unit,recorded_at").eq("twin_id", twin_id).eq("category", "exercise")
+      supabase.from("health_wearable_parameters").select("parameter_name,parameter_value,unit,recorded_at").eq("twin_id", twin_id).eq("category", "exercise")
         .order("recorded_at", { ascending: false }).limit(10),
-      supabase.from("health_wearable_parameters").select("parameter_name,value,unit,recorded_at").eq("twin_id", twin_id).eq("category", "sleep")
+      supabase.from("health_wearable_parameters").select("parameter_name,parameter_value,unit,recorded_at").eq("twin_id", twin_id).eq("category", "sleep")
         .order("recorded_at", { ascending: false }).limit(7),
       supabase.from("health_twin_memories").select("memory_text").eq("twin_id", twin_id)
         .order("created_at", { ascending: false }).limit(10),
@@ -69,9 +91,9 @@ Deno.serve(async (req: Request) => {
       personal: personalRes.data || null,
       scores: scoresRes.data || [],
       weekly_aggregates: aggregatesByParam,
-      latest_labs: (labsRes.data || []).map((r: any) => ({ name: r.parameter_name, value: r.value, unit: r.unit, date: r.recorded_at?.split("T")[0] })),
-      recent_exercise: (exerciseRes.data || []).map((r: any) => ({ name: r.parameter_name, value: r.value, unit: r.unit })),
-      recent_sleep: (sleepRes.data || []).map((r: any) => ({ name: r.parameter_name, value: r.value, unit: r.unit })),
+      latest_labs: (labsRes.data || []).map((r: any) => ({ name: r.parameter_name, value: r.parameter_value, unit: r.unit, date: r.recorded_at?.split("T")[0] })),
+      recent_exercise: (exerciseRes.data || []).map((r: any) => ({ name: r.parameter_name, value: r.parameter_value, unit: r.unit })),
+      recent_sleep: (sleepRes.data || []).map((r: any) => ({ name: r.parameter_name, value: r.parameter_value, unit: r.unit })),
       memories: (memoriesRes.data || []).map((m: any) => m.memory_text),
       simulation_context: playground_state || null,
     };

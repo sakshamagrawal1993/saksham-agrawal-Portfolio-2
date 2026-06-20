@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["approved", "acceptanceIds", "maxIterations", "n8nWorkflowIds", "edgeFunctions"],
+  "properties": {
+    "approved": { "type": "boolean" },
+    "acceptanceIds": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "maxIterations": { "type": "integer", "minimum": 1, "maximum": 10 },
+    "n8nWorkflowIds": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "edgeFunctions": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "summary": { "type": "string" }
+  }
+}

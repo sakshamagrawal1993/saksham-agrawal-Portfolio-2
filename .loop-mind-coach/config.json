@@ -1,0 +1,40 @@
+{
+  "product": "mind-coach",
+  "maximumIterations": 3,
+  "claudeBudgetUsdPerIteration": 20,
+  "cursorBudgetUsdPerIteration": 25,
+  "baseBranch": "main",
+  "qaCommand": "npm run test:mind-coach:qa",
+  "buildCommand": "npm run build",
+  "publishCommandsAllowed": true,
+  "productionUrl": "https://saksham-experiments.com/project/mind-coach",
+  "n8nRepository": "/Users/sakshamagrawal/Documents/Projects/n8n-workflows",
+  "n8nWorkflowIds": [
+    "EBo9At6eCh0S7vkM",
+    "1xntJU9IDNQ3tWle",
+    "FHwf1PMIrkN6T9j5",
+    "WNCcZQDy6fcVL5RS",
+    "xE1TPYaF0MAZHO2W",
+    "6BCoakPPIfGOcZo2"
+  ],
+  "n8nWorkflowFiles": [
+    "definitions/mind-coach-therapist-chat-and-discovery-v6-robust__EBo9At6eCh0S7vkM.json",
+    "definitions/mind-coach-session-end-orchestrator-v6-execute-workflow__1xntJU9IDNQ3tWle.json",
+    "definitions/mind-coach-session-end-memory-agent-v2-execute-trigger__FHwf1PMIrkN6T9j5.json",
+    "definitions/mind-coach-session-end-summary-agent-v2-execute-trigger__WNCcZQDy6fcVL5RS.json",
+    "definitions/mind-coach-session-end-readiness-agent-v2-execute-trigger__xE1TPYaF0MAZHO2W.json",
+    "definitions/mental-health-guardrail__6BCoakPPIfGOcZo2.json"
+  ],
+  "supabaseProjectRef": "ralhkmpbslsdkwnqzqen",
+  "supabaseFunctions": [
+    "mind-coach-chat",
+    "mind-coach-session-end",
+    "mind-coach-session-start",
+    "mind-coach-journey"
+  ],
+  "forbiddenPublicationCommands": [
+    "git push",
+    "gh pr create",
+    "gh pr merge"
+  ]
+}

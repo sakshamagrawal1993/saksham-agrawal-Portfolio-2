@@ -6,7 +6,23 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "health-twin:loop": "node scripts/health_twin_loop.mjs",
+    "health-twin:loop:once": "node scripts/health_twin_loop.mjs --max-iterations 1",
+    "health-twin:publish": "node scripts/health_twin_publish.mjs",
+    "test:health-twin:unit": "node --experimental-strip-types --test tests/health-twin/*.test.mjs",
+    "test:health-twin:contract": "node scripts/health_twin_contract_test.mjs",
+    "test:health-twin:edge-contract": "node scripts/health_twin_edge_contract_test.mjs",
+    "test:health-twin:browser": "node scripts/health_twin_browser_smoke.mjs",
+    "test:health-twin:qa": "npm run test:health-twin:unit && npm run test:health-twin:contract && npm run test:health-twin:browser",
+    "mind-coach:goal-plan": "node scripts/mind_coach_loop.mjs --goal-plan-only",
+    "mind-coach:approve-goal-plan": "node scripts/mind_coach_loop.mjs --approve-goal-plan",
+    "mind-coach:loop": "node scripts/mind_coach_loop.mjs",
+    "mind-coach:loop:once": "node scripts/mind_coach_loop.mjs --max-iterations 1",
+    "mind-coach:publish": "node scripts/mind_coach_publish.mjs",
+    "test:mind-coach:contract": "node scripts/mind_coach_contract_test.mjs",
+    "test:mind-coach:browser": "node scripts/mind_coach_browser_smoke.mjs",
+    "test:mind-coach:qa": "npm run test:mind-coach:contract && npm run test:mind-coach:browser"
   },
   "dependencies": {
     "@google/genai": "^1.43.0",
@@ -60,6 +76,7 @@
     "zustand": "^5.0.9"
   },
   "devDependencies": {
+    "@cursor/sdk": "^1.0.19",
     "@tailwindcss/typography": "^0.5.19",
     "@types/node": "^25.3.2",
     "@types/react": "^18.2.66",

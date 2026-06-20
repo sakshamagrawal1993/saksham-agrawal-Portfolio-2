@@ -1,0 +1,11 @@
+{
+  "product": "mind-coach",
+  "status": "NEEDS_GOAL_PLAN",
+  "goalPlanApproved": false,
+  "iteration": 0,
+  "maximumIterations": 3,
+  "completion": false,
+  "failedCriteria": [],
+  "lastArtifactDirectory": null,
+  "updatedAt": null
+}

@@ -221,10 +221,12 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
     resetToBaseline: () => {
         const { baselineParameters, baselineScores } = get();
         if (baselineParameters) {
-            set({ 
-                parameters: { ...baselineParameters }, 
+            set({
+                parameters: { ...baselineParameters },
                 scores: [...baselineScores],
-                changedParams: new Set()
+                changedParams: new Set(),
+                wellnessPrograms: [],
+                simulationSummary: '',
             });
         }
     },
@@ -266,7 +268,15 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
         set({ isGeneratingWellness: true });
         try {
             console.log('Invoking generate-wellness-playground with:', { parameters, scores });
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session?.access_token) {
+                throw new Error('Your session has expired. Please sign in again.');
+            }
+
             const { data, error } = await supabase.functions.invoke('generate-wellness-playground', {
+                headers: {
+                    Authorization: `Bearer ${session.access_token}`,
+                },
                 body: { 
                     playground_state: parameters,
                     computed_scores: scores
