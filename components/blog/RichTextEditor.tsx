@@ -1,5 +1,5 @@
-import React, { useCallback } from 'react';
-import { useEditor, EditorContent } from '@tiptap/react';
+import React, { useCallback, useRef } from 'react';
+import { useEditor, EditorContent, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Image from '@tiptap/extension-image';
 import Link from '@tiptap/extension-link';
@@ -10,14 +10,21 @@ import { TextStyle } from '@tiptap/extension-text-style';
 import FontFamily from '@tiptap/extension-font-family';
 import Color from '@tiptap/extension-color';
 import Highlight from '@tiptap/extension-highlight';
+import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table';
 import { Extension } from '@tiptap/core';
 import {
     Bold, Italic, Underline as UnderlineIcon, Strikethrough,
     List, ListOrdered, Quote, Image as ImageIcon,
     AlignLeft, AlignCenter, AlignRight, AlignJustify,
-    Highlighter
+    Highlighter, Table as TableIcon
 } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
+import {
+    containsMarkdownTable,
+    isMarkdownTableRow,
+    isMarkdownTableSeparator,
+    markdownTableRowsToHtml,
+} from '../../lib/markdownToHtml';
 
 // --- Custom Font Size Extension ---
 const FontSize = Extension.create({
@@ -80,7 +87,16 @@ interface RichTextEditorProps {
     editable?: boolean;
 }
 
+function extractMarkdownTableRows(text: string): string[] {
+    return text
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line && isMarkdownTableRow(line) && !isMarkdownTableSeparator(line));
+}
+
 const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, editable = true }) => {
+    const editorRef = useRef<Editor | null>(null);
+
     const uploadImage = async (file: File): Promise<string | null> => {
         try {
             const fileExt = file.name.split('.').pop();
@@ -131,6 +147,10 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, edit
             Color,
             Highlight.configure({ multicolor: true }),
             FontSize,
+            Table.configure({ resizable: true }),
+            TableRow,
+            TableHeader,
+            TableCell,
         ],
         content,
         editable,
@@ -140,6 +160,21 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, edit
         editorProps: {
             attributes: {
                 class: 'prose prose-lg max-w-none focus:outline-none min-h-[300px] p-4',
+            },
+            handlePaste: (_view, event) => {
+                const text = event.clipboardData?.getData('text/plain') ?? '';
+                if (!containsMarkdownTable(text)) return false;
+
+                const rows = extractMarkdownTableRows(text);
+                if (rows.length < 2) return false;
+
+                event.preventDefault();
+                editorRef.current
+                    ?.chain()
+                    .focus()
+                    .insertContent(markdownTableRowsToHtml(rows))
+                    .run();
+                return true;
             },
             handleDrop: (view, event, _slice, moved) => {
                 if (!moved && event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0]) {
@@ -161,6 +196,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, edit
             }
         },
     });
+
+    editorRef.current = editor;
 
     React.useEffect(() => {
         if (editor && content) {
@@ -297,6 +334,13 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, edit
                         <ToolbarButton onClick={() => editor.chain().focus().toggleBlockquote().run()} isActive={editor.isActive('blockquote')} title="Blockquote">
                             <Quote className="w-4 h-4" />
                         </ToolbarButton>
+                        <ToolbarButton
+                            onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
+                            isActive={editor.isActive('table')}
+                            title="Insert Table"
+                        >
+                            <TableIcon className="w-4 h-4" />
+                        </ToolbarButton>
                         <ToolbarButton onClick={addImage} title="Add Image">
                             <ImageIcon className="w-4 h-4" />
                         </ToolbarButton>
@@ -320,6 +364,21 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, edit
                     float: left;
                     height: 0;
                     pointer-events: none;
+                }
+                .ProseMirror table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin: 1rem 0;
+                }
+                .ProseMirror th,
+                .ProseMirror td {
+                    border: 1px solid #D4C5A9;
+                    padding: 0.5rem 0.75rem;
+                    vertical-align: top;
+                }
+                .ProseMirror th {
+                    background: #EBE7DE;
+                    font-weight: 600;
                 }
             `}</style>
         </div >
