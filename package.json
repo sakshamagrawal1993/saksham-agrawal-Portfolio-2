@@ -55,6 +55,7 @@
     "@tiptap/extension-text-align": "^3.14.0",
     "@tiptap/extension-text-style": "^3.14.0",
     "@tiptap/extension-underline": "^3.14.0",
+    "@tiptap/html": "^3.27.1",
     "@tiptap/react": "^3.14.0",
     "@tiptap/starter-kit": "^3.14.0",
     "@types/three": "^0.181.0",

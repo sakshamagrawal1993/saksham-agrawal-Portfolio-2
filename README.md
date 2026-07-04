@@ -15,6 +15,8 @@ View your app in AI Studio: https://ai.studio/apps/drive/15LFBlWxz1E0Eu0HI2WDvHV
 
 1. Install dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+2. Set `GEMINI_API_KEY` as a server-side environment variable. Do not expose it as a `VITE_` variable or inject it into the Vite client bundle.
 3. Run the app:
    `npm run dev`
+
+For the Ask AI feature in production, the browser calls `/api/ask-ai`, and that server endpoint reads `GEMINI_API_KEY`. On Vercel, add `GEMINI_API_KEY` in Project Settings -> Environment Variables.

@@ -42,7 +42,7 @@ const CaseStudySection: React.FC<CaseStudySectionProps> = ({ project, className 
       className={`scroll-mt-24 ${className}`}
     >
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-sm font-bold uppercase tracking-widest text-[#2C2A26]">Case Study</h2>
+        <h2 className="text-base font-bold uppercase tracking-widest text-[#2C2A26]">Case Study</h2>
         <a
           href={project.slideDeckUrl}
           target="_blank"
@@ -234,22 +234,14 @@ const ProductDetail: React.FC<ProjectDetailProps> = ({ project, onBack }) => {
           </div>
 
           {project.id === 'digital-twin' && (
-            <section className="rounded-xl border border-[#D6D1C7] bg-white/55 p-5 md:p-8 shadow-sm">
-              <div className="mb-8 max-w-3xl">
-                <span className="block text-xs font-bold uppercase tracking-widest text-[#A8A29E] mb-3">
-                  Walkthrough
-                </span>
-                <h2 className="text-3xl md:text-4xl font-serif tracking-tight text-[#2C2A26] mb-3">
-                  Health Twin product demos
-                </h2>
-                <p className="text-base md:text-lg text-[#5D5A53] font-light leading-relaxed">
-                  The concept flow and mobile Smart Health experience shown side by side, before entering the live demo environment.
-                </p>
-              </div>
+            <section className="flex flex-col gap-5 md:gap-8">
+              <h2 className="text-base font-bold uppercase tracking-widest text-[#2C2A26]">
+                Health Twin Product Walkthrough
+              </h2>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start">
-                <div className="overflow-hidden rounded-xl border border-[#EBE7DE] bg-[#EBE7DE] shadow-md">
-                  <div className="aspect-video">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 items-start">
+                <div className="overflow-hidden rounded-xl border border-[#D6D1C7] bg-[#EBE7DE] shadow-sm">
+                  <div className="aspect-video overflow-hidden">
                     <iframe
                       src={HEALTH_TWIN_WALKTHROUGH_EMBED_URL}
                       className="h-full w-full border-0"
@@ -264,10 +256,10 @@ const ProductDetail: React.FC<ProjectDetailProps> = ({ project, onBack }) => {
                   </div>
                 </div>
 
-                <div className="overflow-hidden rounded-xl border border-[#EBE7DE] bg-[#EBE7DE] shadow-md">
+                <div className="overflow-hidden rounded-xl border border-[#D6D1C7] bg-[#EBE7DE] shadow-sm">
                   <div className="flex justify-center bg-[#F5F2EB] py-4">
-                    <div className="w-full max-w-[240px] overflow-hidden rounded-xl border border-[#EBE7DE] bg-[#EBE7DE]">
-                      <div className="aspect-[9/16]">
+                    <div className="w-full max-w-[240px] overflow-hidden rounded-xl border border-[#D6D1C7] bg-[#EBE7DE]">
+                      <div className="aspect-[9/16] overflow-hidden">
                         <iframe
                           src={HEALTH_TWIN_SHORTS_EMBED_URL}
                           className="h-full w-full border-0"
@@ -289,17 +281,12 @@ const ProductDetail: React.FC<ProjectDetailProps> = ({ project, onBack }) => {
 
           {project.id === 'dr-jivi' && (
             <section className="flex flex-col gap-5 md:gap-8">
-              <div className="max-w-3xl">
-                <h2 className="text-2xl md:text-4xl font-serif tracking-tight text-[#2C2A26] mb-2 md:mb-3">
-                  Dr. Jivi product demo
-                </h2>
-                <p className="text-sm md:text-lg text-[#5D5A53] font-light leading-relaxed">
-                  A multi-agent triaging workflow demonstrating conversational diagnostic capabilities.
-                </p>
-              </div>
+              <h2 className="text-base font-bold uppercase tracking-widest text-[#2C2A26]">
+                Dr. Jivi Product Walkthrough
+              </h2>
 
-              <div className="-mx-6 md:-mx-12 w-[calc(100%+3rem)] md:w-[calc(100%+6rem)]">
-                <div className="aspect-[16/10] max-h-[220px] sm:max-h-none sm:aspect-video">
+              <div className="mx-auto w-full max-w-3xl overflow-hidden rounded-xl border border-[#D6D1C7] bg-[#EBE7DE] shadow-sm">
+                <div className="aspect-[16/10] max-h-[220px] overflow-hidden sm:max-h-none sm:aspect-video">
                   <iframe
                     src={DR_JIVI_WALKTHROUGH_EMBED_URL}
                     className="h-full w-full border-0"

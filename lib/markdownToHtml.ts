@@ -149,10 +149,13 @@ export function markdownToHtml(md: string): string {
 
     if (line.trim().startsWith('> [!')) {
       flushList();
-      const calloutMatch = line.match(/^>\s*\[!(NOTE|IMPORTANT|WARNING|TIP|CAUTION)\]/i);
+      const calloutMatch = line.match(/^>\s*\[!([A-Z_]+)\]/i);
       const calloutType = calloutMatch ? calloutMatch[1].toUpperCase() : 'NOTE';
       const calloutStyles: Record<string, string> = {
         NOTE: 'border-blue-400 bg-blue-50 text-blue-900',
+        ABSTRACT: 'border-stone-400 bg-stone-50 text-stone-900',
+        SUMMARY: 'border-stone-400 bg-stone-50 text-stone-900',
+        INFO: 'border-sky-400 bg-sky-50 text-sky-900',
         IMPORTANT: 'border-amber-500 bg-amber-50 text-amber-900',
         WARNING: 'border-orange-500 bg-orange-50 text-orange-900',
         TIP: 'border-green-500 bg-green-50 text-green-900',
@@ -238,6 +241,17 @@ export function markdownToHtml(md: string): string {
       flushList();
       flushTable();
       html += `<hr class="my-10 border-[#D4C5A9]" />\n`;
+      i++;
+      continue;
+    }
+
+    const imageMatch = line.trim().match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+    if (imageMatch) {
+      flushList();
+      flushTable();
+      const alt = imageMatch[1] || '';
+      const src = imageMatch[2];
+      html += `<img src="${src}" alt="${alt}" loading="lazy" class="w-full rounded-lg my-6" />\n`;
       i++;
       continue;
     }
