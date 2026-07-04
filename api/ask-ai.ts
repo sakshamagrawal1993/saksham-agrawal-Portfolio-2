@@ -5,7 +5,7 @@ type ChatTurn = {
 
 const MAX_HISTORY_TURNS = 12;
 const MAX_MESSAGE_CHARS = 1200;
-const N8N_TIMEOUT_MS = 45000;
+const N8N_TIMEOUT_MS = 12000;
 
 const getSystemInstruction = () => {
   return `You are "Saksham AI", the interactive portfolio assistant for Saksham Agrawal.
@@ -117,9 +117,51 @@ const normalizeN8nText = (payload: unknown): string => {
   return '';
 };
 
-export default async function handler(request: Request) {
+const readJsonBody = async (request: any) => {
+  if (typeof request.json === 'function') {
+    return request.json();
+  }
+
+  if (request.body && typeof request.body === 'object') {
+    return request.body;
+  }
+
+  if (typeof request.body === 'string') {
+    return request.body ? JSON.parse(request.body) : {};
+  }
+
+  return new Promise<Record<string, unknown>>((resolve, reject) => {
+    if (typeof request.on !== 'function') {
+      resolve({});
+      return;
+    }
+
+    let raw = '';
+    request.on('data', (chunk: Buffer | string) => {
+      raw += chunk.toString();
+    });
+    request.on('end', () => {
+      try {
+        resolve(raw ? JSON.parse(raw) : {});
+      } catch (error) {
+        reject(error);
+      }
+    });
+    request.on('error', reject);
+  });
+};
+
+const jsonResponse = (response: any, payload: Record<string, unknown>, status = 200) => {
+  if (response && typeof response.status === 'function' && typeof response.json === 'function') {
+    return response.status(status).json(payload);
+  }
+
+  return Response.json(payload, { status });
+};
+
+export default async function handler(request: any, response?: any) {
   if (request.method !== 'POST') {
-    return Response.json({ error: 'Method not allowed' }, { status: 405 });
+    return jsonResponse(response, { error: 'Method not allowed' }, 405);
   }
 
   const n8nWebhookUrl = getN8nWebhookUrl();
@@ -127,13 +169,13 @@ export default async function handler(request: Request) {
   let requestedMessage = '';
 
   try {
-    const body = await request.json();
+    const body = await readJsonBody(request);
     const newMessage = String(body?.message || '').trim().slice(0, MAX_MESSAGE_CHARS);
     requestedMessage = newMessage;
     const history = Array.isArray(body?.history) ? body.history : [];
 
     if (!newMessage) {
-      return Response.json({ error: 'Missing message' }, { status: 400 });
+      return jsonResponse(response, { error: 'Missing message' }, 400);
     }
 
     const safeHistory: ChatTurn[] = history
@@ -150,7 +192,7 @@ export default async function handler(request: Request) {
 
     if (!n8nWebhookUrl || !n8nWebhookSecret) {
       console.error('Saksham AI n8n webhook URL or secret is missing');
-      return Response.json({ text: getPortfolioFallbackText(newMessage) }, { status: 200 });
+      return jsonResponse(response, { text: getPortfolioFallbackText(newMessage) }, 200);
     }
 
     const controller = new AbortController();
@@ -188,14 +230,11 @@ export default async function handler(request: Request) {
       throw new Error('Saksham AI n8n webhook returned an empty response');
     }
 
-    return Response.json({ text });
+    return jsonResponse(response, { text }, 200);
   } catch (error) {
     console.error('Ask AI API error:', error);
-    return Response.json(
-      {
-        text: requestedMessage ? getPortfolioFallbackText(requestedMessage) : fallbackText,
-      },
-      { status: 200 },
-    );
+    return jsonResponse(response, {
+      text: requestedMessage ? getPortfolioFallbackText(requestedMessage) : fallbackText,
+    }, 200);
   }
 }
