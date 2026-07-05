@@ -282,6 +282,11 @@ function App() {
                 <FnOCopilotApp />
               </Suspense>
             } />
+            <Route path="/fno-copilot/agent" element={
+              <Suspense fallback={<LoadingFallback />}>
+                <FnOCopilotApp initialWorkspaceMode="agent" />
+              </Suspense>
+            } />
 
             {/* AI Care Routes */}
             <Route path="/ai-care" element={

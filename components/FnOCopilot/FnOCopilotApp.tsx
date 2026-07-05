@@ -510,8 +510,21 @@ function PageGuide({
   );
 }
 
-function FnOCopilotApp() {
-  const [workspaceMode, setWorkspaceMode] = React.useState<WorkspaceMode>('standard');
+function FnOCopilotApp({ initialWorkspaceMode }: { initialWorkspaceMode?: WorkspaceMode } = {}) {
+  const [workspaceMode, setWorkspaceModeState] = React.useState<WorkspaceMode>(() => {
+    if (initialWorkspaceMode) return initialWorkspaceMode;
+    // Deep link support: /fno-copilot/agent opens straight into Agent mode.
+    if (typeof window !== 'undefined' && window.location.pathname.endsWith('/fno-copilot/agent')) return 'agent';
+    return 'standard';
+  });
+  // Keep the URL in sync so Agent mode is shareable/bookmarkable at its own path.
+  const setWorkspaceMode = React.useCallback((next: WorkspaceMode) => {
+    setWorkspaceModeState(next);
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/fno-copilot')) {
+      const target = next === 'agent' ? '/fno-copilot/agent' : '/fno-copilot';
+      if (window.location.pathname !== target) window.history.replaceState(null, '', target + window.location.search);
+    }
+  }, []);
   const [screen, setScreen] = React.useState<Screen>('dashboard');
   const [selectedContract, setSelectedContract] = React.useState<ContractSummary | null>(null);
   const [tab, setTab] = React.useState<DetailTab>('overview');
