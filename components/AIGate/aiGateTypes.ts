@@ -133,6 +133,27 @@ export interface AgentOutput {
   durationMs?: number | null;
 }
 
+export interface CoverageManifestItem {
+  present: boolean;
+  agentKey: string;
+  requiredFields: string[];
+  missingFields: string[];
+  sourcePath: string;
+}
+
+export type CoverageManifest = Record<
+  | 'legitimacy'
+  | 'taxonomy'
+  | 'dice'
+  | 'reliability'
+  | 'anti_patterns'
+  | 'economics_readiness'
+  | 'synthesis'
+  | 'schema_audit'
+  | 'n8n_contract',
+  CoverageManifestItem
+>;
+
 export interface GatingEvaluationResult {
   schemaVersion?: string;
   workflowExecutionId?: string | null;
@@ -150,6 +171,7 @@ export interface GatingEvaluationResult {
   buildRecommendation: string;
   governanceNotes: string[];
   agentOutputs?: AgentOutput[];
+  coverageManifest?: CoverageManifest;
   simulated?: boolean;
 }
 

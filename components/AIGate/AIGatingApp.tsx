@@ -13,6 +13,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   Sparkles,
+  Send,
   Workflow,
   XCircle,
 } from 'lucide-react';
@@ -30,13 +31,21 @@ import {
   Tooltip,
   Cell,
 } from 'recharts';
-import { DICE_SCORE_MEANINGS, IDEA_PRESETS, evaluateIdeaWithAiGate, listAiGateHistory } from './aiGateApi';
+import {
+  AI_GATE_MAX_IDEA_LENGTH,
+  AI_GATE_MIN_IDEA_LENGTH,
+  DICE_SCORE_MEANINGS,
+  IDEA_PRESETS,
+  evaluateIdeaWithAiGate,
+  listAiGateHistory,
+} from './aiGateApi';
 import type {
   AgentOutput,
   AutomationLevel,
   DiceDimension,
   DiceDimensionKey,
   FrameworkScore,
+  GatingEvaluationResult,
   GatingDecisionLabel,
   GatingEvaluationHistoryItem,
   GatingEvaluationResponse,
@@ -77,6 +86,72 @@ const ideaRows = [
   IDEA_PRESETS.slice(5, 10),
   IDEA_PRESETS.slice(10, 15),
 ];
+
+type ClarifierRole = 'agent' | 'user';
+
+interface ClarifierMessage {
+  role: ClarifierRole;
+  content: string;
+}
+
+const initialClarifierMessages: ClarifierMessage[] = [
+  {
+    role: 'agent',
+    content: 'I will shape the idea before the gate. Start with the user, input, decision, output, and what can go wrong.',
+  },
+];
+
+const concreteChecks = [
+  {
+    key: 'user',
+    label: 'User',
+    question: 'Who is the primary user or team, and when would they use this workflow?',
+    keywords: ['user', 'customer', 'agent', 'team', 'analyst', 'manager', 'clinician', 'sales', 'support', 'employee', 'staff'],
+  },
+  {
+    key: 'input',
+    label: 'Input',
+    question: 'What inputs, documents, systems, or data fields does the workflow receive?',
+    keywords: ['input', 'email', 'pdf', 'document', 'crm', 'ticket', 'database', 'field', 'form', 'notes', 'history', 'logs', 'policy'],
+  },
+  {
+    key: 'decision',
+    label: 'Decision',
+    question: 'What decision, recommendation, classification, or action should the system produce?',
+    keywords: ['decide', 'decision', 'classify', 'score', 'recommend', 'route', 'draft', 'summarize', 'flag', 'approve', 'detect', 'extract'],
+  },
+  {
+    key: 'stakes',
+    label: 'Stakes',
+    question: 'What is the cost of a wrong result, and should a human approve anything before it affects users?',
+    keywords: ['risk', 'wrong', 'error', 'human', 'review', 'approve', 'compliance', 'legal', 'medical', 'financial', 'rollback', 'audit'],
+  },
+  {
+    key: 'economics',
+    label: 'Value',
+    question: 'What volume, frequency, or business value makes this worth automating?',
+    keywords: ['volume', 'daily', 'weekly', 'scale', 'cost', 'time', 'manual', 'hours', 'savings', 'revenue', 'value', 'frequency'],
+  },
+] as const;
+
+const userClarifierAnswers = (messages: ClarifierMessage[]) =>
+  messages.filter((message) => message.role === 'user').map((message) => message.content.trim()).filter(Boolean);
+
+const buildClarifiedIdea = (idea: string, messages: ClarifierMessage[]) => {
+  const answers = userClarifierAnswers(messages);
+  if (!answers.length) return idea.trim();
+  return `${idea.trim()}\n\nClarifying context:\n${answers.map((answer, index) => `- ${index + 1}. ${answer}`).join('\n')}`.trim();
+};
+
+const getMissingConcreteChecks = (idea: string, messages: ClarifierMessage[]) => {
+  const combined = `${idea} ${userClarifierAnswers(messages).join(' ')}`.toLowerCase();
+  return concreteChecks.filter((check) => !check.keywords.some((keyword) => combined.includes(keyword)));
+};
+
+const isConcreteEnough = (idea: string, messages: ClarifierMessage[]) => {
+  const clarifiedIdea = buildClarifiedIdea(idea, messages);
+  return clarifiedIdea.length >= AI_GATE_MIN_IDEA_LENGTH && getMissingConcreteChecks(idea, messages).length <= 1;
+};
 
 const quadrantCards = [
   {
@@ -123,6 +198,19 @@ const resultSourceLabel = (source?: ResultSource) => {
   return 'Preview fallback';
 };
 
+type HistorySourceFilter = 'all' | ResultSource;
+
+const historyDecisionFilterLabel = (filter: 'all' | GatingDecisionLabel | 'rejected') =>
+  filter === 'all' ? 'all decisions' : filter === 'rejected' ? 'rejected gates' : filter;
+
+const historySourceFilterLabel = (filter: HistorySourceFilter) =>
+  filter === 'all' ? 'all sources' : resultSourceLabel(filter);
+
+const getMissingCoverageSections = (result: GatingEvaluationResult) =>
+  Object.entries(result.coverageManifest ?? {})
+    .filter(([, item]) => !item.present)
+    .map(([key, item]) => `${key}${item.missingFields.length ? `: ${item.missingFields.join(', ')}` : ''}`);
+
 const ResultBadge = ({
   label,
   value,
@@ -137,6 +225,103 @@ const ResultBadge = ({
     <div className="mt-1 text-sm font-semibold">{value}</div>
   </div>
 );
+
+const simplerBaselineByLevel: Record<AutomationLevel, string> = {
+  'Deterministic only': 'Start with the recorded taxonomy and rule boundaries before adding model judgment.',
+  'Classical ML first': 'Try a deterministic rules pass or labeled classifier before introducing generative output.',
+  'Assistive AI': 'Pilot this as a human-reviewed drafting or recommendation aid before letting it act.',
+  'Constrained autonomy': 'Prove the assistive workflow first, then constrain any autonomous step behind approvals.',
+  'Autonomous agent': 'Run a constrained-autonomy pilot first, with approval gates around irreversible actions.',
+};
+
+const getSmallestViableSolverPanel = (
+  result: GatingEvaluationResult,
+  status: string,
+  source: ResultSource
+) => {
+  const isStopped = status === 'rejected' || source === 'decider' || result.legitimacy?.isLegitimate === false;
+
+  if (isStopped) {
+    return {
+      isStopped: true,
+      items: [
+        {
+          label: 'Solver recommendation',
+          value: 'No solver recommendation for stopped assessments.',
+        },
+        {
+          label: 'Next safe step',
+          value: result.legitimacy?.improvementPrompt || result.legitimacy?.rejectionReason || 'Revise the idea brief and run the gate again.',
+        },
+      ],
+    };
+  }
+
+  const guardrails = [
+    result.reliability.humanReviewRequirement,
+    ...(result.redFlags?.filter((flag) => flag.triggered).map((flag) => flag.mitigation) ?? []),
+    ...result.governanceNotes,
+    result.reliability.strategy,
+  ].filter(Boolean);
+
+  return {
+    isStopped: false,
+    items: [
+      {
+        label: 'Recommended solver',
+        value: result.route.solver,
+      },
+      {
+        label: 'Simpler baseline to try first',
+        value: simplerBaselineByLevel[result.route.automationLevel],
+      },
+      {
+        label: 'Why not increase autonomy yet',
+        value: result.reliability.humanReviewRequirement || result.reliability.quadrantReasoning || result.route.reasoning,
+      },
+      {
+        label: 'Minimum guardrails',
+        value: guardrails.slice(0, 2).join(' ') || result.reliability.strategy,
+      },
+    ],
+  };
+};
+
+const SmallestViableSolverPanel = ({
+  result,
+  status,
+  source,
+}: {
+  result: GatingEvaluationResult;
+  status: string;
+  source: ResultSource;
+}) => {
+  const panel = getSmallestViableSolverPanel(result, status, source);
+
+  return (
+    <div className="rounded-[32px] border border-[#D8D2C6] bg-white p-6 shadow-[0_16px_50px_rgba(44,42,38,0.04)]">
+      <div className="flex items-start gap-3">
+        <div className={`rounded-2xl p-3 ${panel.isStopped ? 'bg-[#C75B5B]/10' : 'bg-[#6B8F71]/10'}`}>
+          {panel.isStopped ? <ShieldAlert className="h-5 w-5 text-[#A54B4B]" /> : <ShieldCheck className="h-5 w-5 text-[#4D7253]" />}
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.2em] text-[#2C2A26]/45">Smallest Viable Solver</div>
+          <h3 className="mt-1 text-xl font-semibold">
+            {panel.isStopped ? 'No solver until the idea passes the decider' : 'Smallest useful path before more autonomy'}
+          </h3>
+        </div>
+      </div>
+      <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {panel.items.map((item) => (
+          <div key={item.label} className="rounded-[22px] border border-[#D8D2C6] bg-[#FAF8F3] p-4">
+            <div className="text-[10px] uppercase tracking-[0.18em] text-[#2C2A26]/45">{item.label}</div>
+            <p className="mt-2 text-sm leading-6 text-[#2C2A26]">{item.value}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 const FrameworkCard = ({ framework, index }: { framework: FrameworkScore; index: number }) => (
   <div className="rounded-[24px] border border-[#D8D2C6] bg-white p-5 shadow-[0_10px_30px_rgba(44,42,38,0.04)]">
@@ -311,14 +496,22 @@ const AIGatingApp: React.FC<AIGatingAppProps> = ({ onBack }) => {
   const [activeResult, setActiveResult] = useState<GatingEvaluationResponse | null>(null);
   const [history, setHistory] = useState<GatingEvaluationHistoryItem[]>([]);
   const [historyFilter, setHistoryFilter] = useState<'all' | GatingDecisionLabel | 'rejected'>('all');
+  const [historySourceFilter, setHistorySourceFilter] = useState<HistorySourceFilter>('all');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [clarifierMessages, setClarifierMessages] = useState<ClarifierMessage[]>(initialClarifierMessages);
+  const [clarifierDraft, setClarifierDraft] = useState('');
 
   const selectedPreset = selectedPresetId ? IDEA_PRESETS.find((preset) => preset.id === selectedPresetId) ?? null : null;
   const effectiveIdea = customIdea.trim();
   const effectiveTitle = selectedPreset?.title || ideaTitle;
+  const clarifiedIdea = useMemo(() => buildClarifiedIdea(effectiveIdea, clarifierMessages), [effectiveIdea, clarifierMessages]);
+  const missingConcreteChecks = useMemo(() => getMissingConcreteChecks(effectiveIdea, clarifierMessages), [effectiveIdea, clarifierMessages]);
+  const concreteEnough = isConcreteEnough(effectiveIdea, clarifierMessages);
+  const clarifierAnswers = userClarifierAnswers(clarifierMessages);
+  const nextClarifierQuestion = missingConcreteChecks[0]?.question ?? null;
 
   const activeSource = (activeResult?.resultSource ?? (activeResult?.result.simulated ? 'fallback' : 'n8n')) as ResultSource;
   const agentOutputs = activeResult?.agentOutputs?.length
@@ -327,6 +520,7 @@ const AIGatingApp: React.FC<AIGatingAppProps> = ({ onBack }) => {
   const redFlags = activeResult?.result.redFlags ?? [];
   const triggeredRedFlags = redFlags.filter((flag) => flag.triggered);
   const diceDimensions = activeResult?.result.dice.dimensions ?? [];
+  const missingCoverageSections = activeResult ? getMissingCoverageSections(activeResult.result) : [];
 
   const refreshHistory = async () => {
     setIsHistoryLoading(true);
@@ -345,10 +539,15 @@ const AIGatingApp: React.FC<AIGatingAppProps> = ({ onBack }) => {
   }, []);
 
   const filteredHistory = useMemo(() => {
-    if (historyFilter === 'all') return history;
-    if (historyFilter === 'rejected') return history.filter((item) => item.status === 'rejected');
-    return history.filter((item) => item.decisionLabel === historyFilter);
-  }, [history, historyFilter]);
+    const byDecision = historyFilter === 'all'
+      ? history
+      : historyFilter === 'rejected'
+        ? history.filter((item) => item.status === 'rejected')
+        : history.filter((item) => item.decisionLabel === historyFilter);
+
+    if (historySourceFilter === 'all') return byDecision;
+    return byDecision.filter((item) => (item.resultSource || 'fallback') === historySourceFilter);
+  }, [history, historyFilter, historySourceFilter]);
 
   const radarData = useMemo(() => {
     if (!activeResult) return [];
@@ -374,15 +573,36 @@ const AIGatingApp: React.FC<AIGatingAppProps> = ({ onBack }) => {
       return;
     }
 
+    if (clarifiedIdea.length < AI_GATE_MIN_IDEA_LENGTH || !concreteEnough) {
+      const prompt = nextClarifierQuestion || 'Add one more concrete detail before the gate runs.';
+      setError(`Concretization Agent: ${prompt}`);
+      if (clarifierMessages[clarifierMessages.length - 1]?.content !== prompt) {
+        setClarifierMessages((current) => [...current, { role: 'agent', content: prompt }]);
+      }
+      return;
+    }
+
+    if (clarifiedIdea.length > AI_GATE_MAX_IDEA_LENGTH) {
+      setError(`The clarified brief is ${clarifiedIdea.length - AI_GATE_MAX_IDEA_LENGTH} characters too long.`);
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
 
     try {
       const result = await evaluateIdeaWithAiGate({
         title: effectiveTitle,
-        ideaText: effectiveIdea,
+        ideaText: clarifiedIdea,
         source: selectedPreset ? 'preset' : 'custom',
         presetId: selectedPreset?.id,
+        clientMetadata: {
+          concretization_agent: {
+            answer_count: clarifierAnswers.length,
+            transcript: clarifierMessages,
+            applied_brief: clarifiedIdea !== effectiveIdea,
+          },
+        },
       });
       setActiveResult(result);
       await refreshHistory();
@@ -397,6 +617,8 @@ const AIGatingApp: React.FC<AIGatingAppProps> = ({ onBack }) => {
     setSelectedPresetId(preset.id);
     setIdeaTitle(preset.title);
     setCustomIdea(preset.ideaText);
+    setClarifierMessages(initialClarifierMessages);
+    setClarifierDraft('');
     setError(null);
   };
 
@@ -404,10 +626,35 @@ const AIGatingApp: React.FC<AIGatingAppProps> = ({ onBack }) => {
     setSelectedPresetId(null);
     setIdeaTitle('Custom Idea');
     setCustomIdea(value);
+    setClarifierMessages(initialClarifierMessages);
+    setClarifierDraft('');
+  };
+
+  const handleSendClarifierMessage = () => {
+    const answer = clarifierDraft.trim();
+    if (!answer) return;
+
+    const userMessage: ClarifierMessage = { role: 'user', content: answer };
+    const nextMessages = [...clarifierMessages, userMessage];
+    const nextMissingChecks = getMissingConcreteChecks(effectiveIdea, nextMessages);
+    const agentMessage: ClarifierMessage = nextMissingChecks.length > 1
+      ? { role: 'agent', content: nextMissingChecks[0].question }
+      : {
+          role: 'agent',
+          content: 'This is concrete enough for the gate. I will include these answers as clarifying context when you run the assessment.',
+        };
+
+    setClarifierMessages([...nextMessages, agentMessage]);
+    setClarifierDraft('');
+    setError(null);
   };
 
   const handleSelectHistory = (item: GatingEvaluationHistoryItem) => {
     if (!item.result) return;
+    const publicHistoryResult = {
+      ...item.result,
+      ideaText: item.ideaText,
+    };
     setActiveResult({
       ideaId: item.ideaId,
       assessmentId: item.assessmentId,
@@ -418,7 +665,7 @@ const AIGatingApp: React.FC<AIGatingAppProps> = ({ onBack }) => {
       durationMs: item.durationMs,
       legitimacy: item.legitimacy,
       agentOutputs: item.agentOutputs,
-      result: item.result,
+      result: publicHistoryResult,
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -498,9 +745,74 @@ const AIGatingApp: React.FC<AIGatingAppProps> = ({ onBack }) => {
               id="ai-gate-idea"
               value={customIdea}
               onChange={(event) => handleIdeaChange(event.target.value)}
+              maxLength={AI_GATE_MAX_IDEA_LENGTH}
               className="h-32 w-full resize-none rounded-[24px] border border-[#D8D2C6] bg-[#FAF8F3] px-5 py-4 text-base leading-7 text-[#2C2A26] outline-none transition placeholder:text-[#2C2A26]/35 focus:border-[#2C2A26]/35 focus:bg-white"
               placeholder="Type the idea to be built..."
             />
+            <div className="mt-2 flex items-center justify-between gap-3 text-xs text-[#5D5A53]">
+              <span>{clarifiedIdea.length < AI_GATE_MIN_IDEA_LENGTH ? `${AI_GATE_MIN_IDEA_LENGTH - clarifiedIdea.length} more characters needed` : `${missingConcreteChecks.length} open context checks`}</span>
+              <span>{clarifiedIdea.length}/{AI_GATE_MAX_IDEA_LENGTH}</span>
+            </div>
+            <div className="mt-4 rounded-[24px] border border-[#D8D2C6] bg-[#FAF8F3] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="rounded-2xl bg-white p-2">
+                    <BrainCircuit className="h-4 w-4 text-[#2C2A26]" />
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-[#2C2A26]/45">Concretization Agent</div>
+                    <div className="text-sm font-semibold text-[#2C2A26]">
+                      {concreteEnough ? 'Ready for the gate' : nextClarifierQuestion || 'Add context before evaluation'}
+                    </div>
+                  </div>
+                </div>
+                <span className={`shrink-0 rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${
+                  concreteEnough
+                    ? 'border-[#6B8F71]/25 bg-[#6B8F71]/10 text-[#4D7253]'
+                    : 'border-[#D4A574]/25 bg-[#D4A574]/12 text-[#8B6231]'
+                }`}>
+                  {concreteEnough ? 'Concrete' : 'Clarify'}
+                </span>
+              </div>
+              <div className="mt-4 max-h-48 space-y-2 overflow-auto pr-1">
+                {clarifierMessages.map((message, index) => (
+                  <div
+                    key={`${message.role}-${index}`}
+                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div className={`max-w-[88%] rounded-[18px] px-4 py-3 text-sm leading-6 ${
+                      message.role === 'user'
+                        ? 'bg-[#2C2A26] text-[#F5F2EB]'
+                        : 'border border-[#D8D2C6] bg-white text-[#5D5A53]'
+                    }`}>
+                      {message.content}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 flex gap-2">
+                <input
+                  value={clarifierDraft}
+                  onChange={(event) => setClarifierDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      handleSendClarifierMessage();
+                    }
+                  }}
+                  className="min-w-0 flex-1 rounded-full border border-[#D8D2C6] bg-white px-4 py-2.5 text-sm text-[#2C2A26] outline-none transition placeholder:text-[#2C2A26]/35 focus:border-[#2C2A26]/35"
+                  placeholder="Answer the agent..."
+                />
+                <button
+                  type="button"
+                  onClick={handleSendClarifierMessage}
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#2C2A26] text-[#F5F2EB] transition hover:bg-[#3C3934]"
+                  title="Send answer"
+                >
+                  <Send className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
             <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="text-left text-xs leading-5 text-[#5D5A53]">
                 Public history may show safe or redacted submissions. Avoid personal, confidential, or sensitive information.
@@ -575,7 +887,16 @@ const AIGatingApp: React.FC<AIGatingAppProps> = ({ onBack }) => {
                       </span>
                       <span>{formatDuration(activeResult.durationMs)}</span>
                       <span>{activeResult.result.schemaVersion || activeResult.schemaVersion || 'ai-gate-result-v1'}</span>
+                      <span className="inline-flex items-center gap-1.5">
+                        {missingCoverageSections.length ? <ShieldAlert className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                        {missingCoverageSections.length ? `Missing ${missingCoverageSections.length} contract sections` : 'Contract complete'}
+                      </span>
                     </div>
+                    {missingCoverageSections.length > 0 && (
+                      <p className="mt-2 max-w-2xl text-xs leading-5 text-[#F5F2EB]/70">
+                        {missingCoverageSections.slice(0, 3).join(' | ')}
+                      </p>
+                    )}
                   </div>
                   <div className="grid w-full max-w-sm gap-3">
                     <div className={`rounded-2xl border px-4 py-3 text-sm font-semibold ${decisionStyles[activeResult.result.route.decisionLabel]}`}>
@@ -594,6 +915,12 @@ const AIGatingApp: React.FC<AIGatingAppProps> = ({ onBack }) => {
                   </div>
                 )}
               </div>
+
+              <SmallestViableSolverPanel
+                result={activeResult.result}
+                status={activeResult.status}
+                source={activeSource}
+              />
 
               {activeResult.result.legitimacy && (
                 <div className="rounded-[32px] border border-[#D8D2C6] bg-white p-6 shadow-[0_16px_50px_rgba(44,42,38,0.04)]">
@@ -902,6 +1229,25 @@ const AIGatingApp: React.FC<AIGatingAppProps> = ({ onBack }) => {
                 );
               })}
             </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {(['all', 'n8n', 'fallback', 'decider'] as const).map((filter) => {
+                const isActive = filter === historySourceFilter;
+                return (
+                  <button
+                    key={filter}
+                    type="button"
+                    onClick={() => setHistorySourceFilter(filter)}
+                    className={`rounded-full border px-3 py-2 text-xs font-semibold transition ${
+                      isActive
+                        ? 'border-[#2C2A26] bg-[#2C2A26] text-[#F5F2EB]'
+                        : 'border-[#D8D2C6] bg-[#FAF8F3] text-[#5D5A53] hover:border-[#2C2A26]/30'
+                    }`}
+                  >
+                    {historySourceFilterLabel(filter)}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {historyError && (
@@ -957,7 +1303,9 @@ const AIGatingApp: React.FC<AIGatingAppProps> = ({ onBack }) => {
               ))
             ) : (
               <div className="flex items-center justify-center rounded-[24px] border border-dashed border-[#D8D2C6] bg-[#FAF8F3] p-10 text-sm text-[#5D5A53]">
-                {history.length ? 'No public history items match this filter yet.' : 'No public gates yet. Run an assessment to create the first shared history row.'}
+                {history.length
+                  ? `No ${historySourceFilterLabel(historySourceFilter)} gates match ${historyDecisionFilterLabel(historyFilter)} yet.`
+                  : 'No public gates yet. Run an assessment to create the first shared history row.'}
               </div>
             )}
           </div>

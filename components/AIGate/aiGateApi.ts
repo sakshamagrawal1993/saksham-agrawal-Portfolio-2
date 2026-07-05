@@ -2,6 +2,7 @@ import { supabase } from '../../lib/supabaseClient';
 import type {
   AgentOutput,
   AutomationLevel,
+  CoverageManifest,
   DiceDimension,
   DiceDimensionKey,
   DiceScores,
@@ -23,6 +24,8 @@ import type {
 export const AI_GATE_FUNCTION = 'ai-gating-evaluate';
 
 const SCHEMA_VERSION = 'ai-gate-result-v2';
+export const AI_GATE_MIN_IDEA_LENGTH = 40;
+export const AI_GATE_MAX_IDEA_LENGTH = 3000;
 
 export const IDEA_PRESETS: IdeaPreset[] = [
   {
@@ -824,10 +827,94 @@ const normalizeAgentOutputs = (value: any): AgentOutput[] =>
       }))
     : [];
 
+const hasValue = (value: unknown) => {
+  if (Array.isArray(value)) return value.length > 0;
+  if (value && typeof value === 'object') return Object.keys(value as Record<string, unknown>).length > 0;
+  return value !== undefined && value !== null && String(value).trim() !== '';
+};
+
+const buildCoverageItem = (
+  result: GatingEvaluationResult,
+  agentKey: string,
+  requiredFields: string[],
+  sourcePath: string,
+  values: Record<string, unknown>
+) => {
+  const missingFields = requiredFields.filter((field) => !hasValue(values[field]));
+  const agentPresent = agentKey === 'schema_audit' || agentKey === 'n8n_contract'
+    ? true
+    : (result.agentOutputs ?? []).some((agent) => agent.key === agentKey && agent.status !== 'failed');
+
+  return {
+    present: agentPresent && missingFields.length === 0,
+    agentKey,
+    requiredFields,
+    missingFields,
+    sourcePath,
+  };
+};
+
+const buildCoverageManifest = (result: GatingEvaluationResult): CoverageManifest => ({
+  legitimacy: buildCoverageItem(result, 'legitimacy', ['legitimacy'], 'result.legitimacy', {
+    legitimacy: result.legitimacy,
+  }),
+  taxonomy: buildCoverageItem(result, 'taxonomy', ['type', 'reasoning', 'inputStructure', 'solutionSpecifiability'], 'result.taxonomy', {
+    type: result.taxonomy?.type,
+    reasoning: result.taxonomy?.reasoning,
+    inputStructure: result.taxonomy?.inputStructure,
+    solutionSpecifiability: result.taxonomy?.solutionSpecifiability,
+  }),
+  dice: buildCoverageItem(result, 'dice', ['dimensions', 'total', 'rav'], 'result.dice', {
+    dimensions: result.dice?.dimensions,
+    total: result.dice?.total,
+    rav: result.dice?.rav,
+  }),
+  reliability: buildCoverageItem(result, 'reliability', ['quadrant', 'strategy', 'humanReviewRequirement'], 'result.reliability', {
+    quadrant: result.reliability?.quadrant,
+    strategy: result.reliability?.strategy,
+    humanReviewRequirement: result.reliability?.humanReviewRequirement,
+  }),
+  anti_patterns: buildCoverageItem(result, 'anti_patterns', ['redFlags'], 'result.redFlags', {
+    redFlags: result.redFlags,
+  }),
+  economics_readiness: buildCoverageItem(result, 'economics_readiness', ['governanceNotes'], 'result.governanceNotes', {
+    governanceNotes: result.governanceNotes,
+  }),
+  synthesis: buildCoverageItem(result, 'synthesis', ['route', 'summary', 'conclusion', 'buildRecommendation'], 'result.route', {
+    route: result.route,
+    summary: result.summary,
+    conclusion: result.conclusion,
+    buildRecommendation: result.buildRecommendation,
+  }),
+  schema_audit: buildCoverageItem(result, 'schema_audit', ['schemaVersion'], 'result.schemaVersion', {
+    schemaVersion: result.schemaVersion,
+  }),
+  n8n_contract: buildCoverageItem(result, 'n8n_contract', ['workflowExecutionId'], 'result.workflowExecutionId', {
+    workflowExecutionId: result.workflowExecutionId || (result.simulated ? 'fallback-not-required' : null),
+  }),
+});
+
+const replaceSensitiveIdeaText = <T,>(value: T, sensitiveIdeaText: string, publicIdeaText: string): T => {
+  if (!sensitiveIdeaText || sensitiveIdeaText === publicIdeaText) return value;
+  if (typeof value === 'string') return value.split(sensitiveIdeaText).join(publicIdeaText) as T;
+  if (Array.isArray(value)) {
+    return value.map((item) => replaceSensitiveIdeaText(item, sensitiveIdeaText, publicIdeaText)) as T;
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, entry]) => [
+        key,
+        replaceSensitiveIdeaText(entry, sensitiveIdeaText, publicIdeaText),
+      ])
+    ) as T;
+  }
+  return value;
+};
+
 export const normalizeAiGateResult = (result: any): GatingEvaluationResult => {
   const base = result || {};
   const fallback = simulateAiGateEvaluation(String(base.title || 'Custom Idea'), String(base.ideaText || base.idea_text || 'A product workflow idea that should be evaluated for AI suitability.'));
-  return {
+  const normalized = {
     ...fallback,
     ...base,
     schemaVersion: base.schemaVersion || base.schema_version || fallback.schemaVersion,
@@ -873,6 +960,10 @@ export const normalizeAiGateResult = (result: any): GatingEvaluationResult => {
     governanceNotes: Array.isArray(base.governanceNotes) ? base.governanceNotes : fallback.governanceNotes,
     agentOutputs: normalizeAgentOutputs(base.agentOutputs || base.agent_outputs || fallback.agentOutputs),
   };
+  return {
+    ...normalized,
+    coverageManifest: base.coverageManifest || base.coverage_manifest || buildCoverageManifest(normalized),
+  };
 };
 
 export const evaluateIdeaWithAiGate = async (params: {
@@ -880,6 +971,7 @@ export const evaluateIdeaWithAiGate = async (params: {
   ideaText: string;
   source: 'preset' | 'custom';
   presetId?: string;
+  clientMetadata?: Record<string, unknown>;
 }): Promise<GatingEvaluationResponse> => {
   try {
     const { data, error } = await supabase.functions.invoke(AI_GATE_FUNCTION, {
@@ -891,6 +983,7 @@ export const evaluateIdeaWithAiGate = async (params: {
         user_session_id: getAnonymousSessionId(),
         client_metadata: {
           user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+          ...(params.clientMetadata ?? {}),
         },
       },
     });
@@ -930,13 +1023,28 @@ export const evaluateIdeaWithAiGate = async (params: {
 
 const mapHistoryRow = (row: any): GatingEvaluationHistoryItem => {
   const idea = row.idea || row.ai_gate_ideas || {};
-  const result = row.result_payload ? normalizeAiGateResult(row.result_payload) : null;
+  const resultPayload = row.result_payload || null;
+  const rawResultIdeaText = String(resultPayload?.ideaText || resultPayload?.idea_text || '');
+  const result = resultPayload ? normalizeAiGateResult(resultPayload) : null;
   const legitimacy = row.legitimacy_payload && Object.keys(row.legitimacy_payload).length
     ? row.legitimacy_payload as LegitimacyResult
     : result?.legitimacy;
   const title = idea.display_title || legitimacy?.generatedTitle || result?.title || idea.title || 'Untitled idea';
   const ideaText = idea.public_idea_text || legitimacy?.redactedIdeaText || result?.ideaText || idea.idea_text || '';
   const diceTotal = result?.dice?.total ?? null;
+  const safeResult = result
+    ? replaceSensitiveIdeaText(
+        {
+          ...result,
+          ideaText,
+        },
+        rawResultIdeaText || result.ideaText,
+        ideaText
+      )
+    : null;
+  const safeAgentOutputs = normalizeAgentOutputs(
+    replaceSensitiveIdeaText(row.agent_outputs || result?.agentOutputs, rawResultIdeaText || result?.ideaText || '', ideaText)
+  );
 
   return {
     ideaId: String(row.idea_id || idea.id || ''),
@@ -957,8 +1065,8 @@ const mapHistoryRow = (row: any): GatingEvaluationHistoryItem => {
     completedAt: row.completed_at || row.updated_at || null,
     durationMs: row.duration_ms ?? null,
     legitimacy,
-    agentOutputs: normalizeAgentOutputs(row.agent_outputs || result?.agentOutputs),
-    result,
+    agentOutputs: safeAgentOutputs,
+    result: safeResult,
   };
 };
 

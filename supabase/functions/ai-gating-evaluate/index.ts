@@ -62,6 +62,27 @@ type AgentOutput = {
   durationMs?: number | null;
 };
 
+type CoverageManifestItem = {
+  present: boolean;
+  agentKey: string;
+  requiredFields: string[];
+  missingFields: string[];
+  sourcePath: string;
+};
+
+type CoverageManifest = Record<
+  | 'legitimacy'
+  | 'taxonomy'
+  | 'dice'
+  | 'reliability'
+  | 'anti_patterns'
+  | 'economics_readiness'
+  | 'synthesis'
+  | 'schema_audit'
+  | 'n8n_contract',
+  CoverageManifestItem
+>;
+
 type FrameworkScore = {
   key: string;
   label: string;
@@ -127,6 +148,7 @@ type GatingEvaluationResult = {
   buildRecommendation: string;
   governanceNotes: string[];
   agentOutputs?: AgentOutput[];
+  coverageManifest?: CoverageManifest;
   simulated?: boolean;
 };
 
@@ -205,6 +227,8 @@ const nowIso = () => new Date().toISOString();
 const durationMs = (startedAt: string) => Math.max(0, Date.now() - new Date(startedAt).getTime());
 const clamp = (value: number, min = 1, max = 5) => Math.max(min, Math.min(max, value));
 const clampScore = (value: number) => Math.max(0, Math.min(100, Math.round(value)));
+const envFlagEnabled = (name: string) => Deno.env.get(name)?.toLowerCase() === 'true';
+const errorMessage = (error: unknown) => error instanceof Error ? error.message : String(error);
 
 const buildDiceDimensions = (
   scores: Pick<GatingEvaluationResult['dice'], 'determinism' | 'inputComplexity' | 'costOfError' | 'economics'>,
@@ -845,6 +869,78 @@ const normalizeAgentOutputs = (value: any): AgentOutput[] =>
       }))
     : [];
 
+const hasValue = (value: unknown) => {
+  if (Array.isArray(value)) return value.length > 0;
+  if (value && typeof value === 'object') return Object.keys(value as Record<string, unknown>).length > 0;
+  return value !== undefined && value !== null && String(value).trim() !== '';
+};
+
+const buildCoverageItem = (
+  result: GatingEvaluationResult,
+  agentKey: string,
+  requiredFields: string[],
+  sourcePath: string,
+  values: Record<string, unknown>
+): CoverageManifestItem => {
+  const missingFields = requiredFields.filter((field) => !hasValue(values[field]));
+  const agentPresent = agentKey === 'schema_audit' || agentKey === 'n8n_contract'
+    ? true
+    : (result.agentOutputs ?? []).some((agent) => agent.key === agentKey && agent.status !== 'failed');
+
+  return {
+    present: agentPresent && missingFields.length === 0,
+    agentKey,
+    requiredFields,
+    missingFields,
+    sourcePath,
+  };
+};
+
+const buildCoverageManifest = (result: GatingEvaluationResult, source: ResultSource): CoverageManifest => ({
+  legitimacy: buildCoverageItem(result, 'legitimacy', ['legitimacy'], 'result.legitimacy', {
+    legitimacy: result.legitimacy,
+  }),
+  taxonomy: buildCoverageItem(result, 'taxonomy', ['type', 'reasoning', 'inputStructure', 'solutionSpecifiability'], 'result.taxonomy', {
+    type: result.taxonomy?.type,
+    reasoning: result.taxonomy?.reasoning,
+    inputStructure: result.taxonomy?.inputStructure,
+    solutionSpecifiability: result.taxonomy?.solutionSpecifiability,
+  }),
+  dice: buildCoverageItem(result, 'dice', ['dimensions', 'total', 'rav'], 'result.dice', {
+    dimensions: result.dice?.dimensions,
+    total: result.dice?.total,
+    rav: result.dice?.rav,
+  }),
+  reliability: buildCoverageItem(result, 'reliability', ['quadrant', 'strategy', 'humanReviewRequirement'], 'result.reliability', {
+    quadrant: result.reliability?.quadrant,
+    strategy: result.reliability?.strategy,
+    humanReviewRequirement: result.reliability?.humanReviewRequirement,
+  }),
+  anti_patterns: buildCoverageItem(result, 'anti_patterns', ['redFlags'], 'result.redFlags', {
+    redFlags: result.redFlags,
+  }),
+  economics_readiness: buildCoverageItem(result, 'economics_readiness', ['governanceNotes'], 'result.governanceNotes', {
+    governanceNotes: result.governanceNotes,
+  }),
+  synthesis: buildCoverageItem(result, 'synthesis', ['route', 'summary', 'conclusion', 'buildRecommendation'], 'result.route', {
+    route: result.route,
+    summary: result.summary,
+    conclusion: result.conclusion,
+    buildRecommendation: result.buildRecommendation,
+  }),
+  schema_audit: buildCoverageItem(result, 'schema_audit', ['schemaVersion'], 'result.schemaVersion', {
+    schemaVersion: result.schemaVersion,
+  }),
+  n8n_contract: buildCoverageItem(result, 'n8n_contract', ['workflowExecutionId'], 'result.workflowExecutionId', {
+    workflowExecutionId: source === 'n8n' ? result.workflowExecutionId : 'fallback-not-required',
+  }),
+});
+
+const missingCoverage = (manifest: CoverageManifest) =>
+  Object.entries(manifest)
+    .filter(([, item]) => !item.present)
+    .map(([key, item]) => `${key}${item.missingFields.length ? `:${item.missingFields.join(',')}` : ''}`);
+
 const normalizeWorkflowPayload = (payload: any, fallbackLegitimacy: LegitimacyResult): WorkflowPayload | null => {
   const current = unwrap(payload);
   if (!current || typeof current !== 'object') return null;
@@ -976,6 +1072,33 @@ const tryInsertAgentSteps = async (supabase: any, assessmentId: string, agentOut
   if (error) console.warn(`Failed to persist AI gate agent steps: ${error.message}`);
 };
 
+const persistFailedAssessment = async (
+  supabase: any,
+  assessmentId: string,
+  startedAt: string,
+  message: string
+) => {
+  const failedAt = nowIso();
+  const { error } = await supabase
+    .from('ai_gate_assessments')
+    .update({
+      status: 'failed',
+      failed_at: failedAt,
+      duration_ms: durationMs(startedAt),
+      error_message: message,
+      result_source: 'n8n',
+      schema_version: SCHEMA_VERSION,
+      prompt_version: PROMPT_VERSION,
+      model_versions: { workflow: 'n8n', fallback: false },
+      updated_at: failedAt,
+    })
+    .eq('id', assessmentId);
+
+  if (error) {
+    throw new Error(`Failed to persist assessment failure: ${error.message}`);
+  }
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -1054,6 +1177,7 @@ serve(async (req) => {
 
     const n8nWebhookUrl = Deno.env.get('AI_GATE_N8N_WEBHOOK_URL');
     const n8nSecret = Deno.env.get('AI_GATE_N8N_WEBHOOK_SECRET');
+    const allowFallback = envFlagEnabled('AI_GATE_ALLOW_FALLBACK');
     let workflowPayload: WorkflowPayload | null = null;
     let resultSource: ResultSource = 'n8n';
 
@@ -1091,15 +1215,34 @@ serve(async (req) => {
         });
 
         if (!n8nResponse.ok) {
-          throw new Error(`n8n returned ${n8nResponse.status}`);
+          const errorText = await n8nResponse.text().catch(() => '');
+          throw new Error(`n8n returned ${n8nResponse.status}${errorText ? `: ${errorText.slice(0, 500)}` : ''}`);
         }
 
         workflowPayload = normalizeWorkflowPayload(await n8nResponse.json(), localLegitimacy);
+        if (!workflowPayload) {
+          throw new Error('n8n returned an unrecognized AI Gate payload');
+        }
       } catch (error) {
-        console.warn(`AI Gate n8n call failed, using fallback: ${error instanceof Error ? error.message : String(error)}`);
+        const message = errorMessage(error);
+        if (!allowFallback) {
+          console.error(`AI Gate n8n call failed: ${message}`);
+          await persistFailedAssessment(supabase, assessmentRow.id, startedAt, message);
+          return jsonResponse({
+            ideaId: ideaRow.id,
+            assessmentId: assessmentRow.id,
+            status: 'failed',
+            error: message,
+          }, 502);
+        }
+        console.warn(`AI Gate n8n call failed, using explicit fallback: ${message}`);
       }
-    } else if (n8nWebhookUrl && !n8nSecret) {
-      console.warn('AI_GATE_N8N_WEBHOOK_SECRET is missing; using fallback evaluator');
+    } else {
+      const missingConfig = [
+        !n8nWebhookUrl ? 'AI_GATE_N8N_WEBHOOK_URL' : null,
+        !n8nSecret ? 'AI_GATE_N8N_WEBHOOK_SECRET' : null,
+      ].filter(Boolean).join(', ');
+      console.warn(`${missingConfig} missing; using local fallback evaluator`);
     }
 
     if (!workflowPayload) {
@@ -1170,6 +1313,20 @@ serve(async (req) => {
     finalResult.legitimacy = workflowPayload.legitimacy;
     finalResult.agentOutputs = agentOutputs;
     finalResult.simulated = resultSource === 'fallback';
+    finalResult.coverageManifest = buildCoverageManifest(finalResult, resultSource);
+
+    const missingContractSections = missingCoverage(finalResult.coverageManifest);
+    if (resultSource === 'n8n' && finalStatus === 'completed' && missingContractSections.length) {
+      const message = `failed_contract: missing ${missingContractSections.join('; ')}`;
+      await persistFailedAssessment(supabase, assessmentRow.id, startedAt, message);
+      return jsonResponse({
+        ideaId: ideaRow.id,
+        assessmentId: assessmentRow.id,
+        status: 'failed_contract',
+        error: message,
+        coverageManifest: finalResult.coverageManifest,
+      }, 502);
+    }
 
     const { error: updateError } = await supabase
       .from('ai_gate_assessments')
