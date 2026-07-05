@@ -1320,6 +1320,48 @@ function AgentAlgoSections({
     Array.isArray(payload[key]) ? (payload[key] as unknown[]).map((item) => String(item)).join('\n') : fallback.join('\n');
   const toLines = (value: string) => value.split('\n').map((item) => item.trim()).filter(Boolean);
 
+  // Structured rule groups: n8n payload (entryConditions/exitConditions) wins,
+  // then the local planner's plan; the free-text boxes are only a fallback.
+  type StructuredRule = { connector?: string; negate?: boolean; left: string; operator: string; right: string };
+  const structuredRules = (key: 'entryConditions' | 'exitConditions'): StructuredRule[] | null => {
+    const fromPayload = payload[key];
+    if (Array.isArray(fromPayload) && fromPayload.length && typeof fromPayload[0] === 'object') return fromPayload as StructuredRule[];
+    const plan = draft.plan;
+    if (plan && plan[key]?.length) return plan[key];
+    return null;
+  };
+  const RuleRows = ({ rules }: { rules: StructuredRule[] }) => (
+    <div className="agent-rule-rows">
+      {rules.map((rule, index) => (
+        <div key={index} className="agent-market-card" style={{ padding: '8px 12px', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          {index > 0 && <strong style={{ fontSize: 11, color: 'var(--muted)' }}>{rule.connector ?? 'AND'}</strong>}
+          {rule.negate && <strong style={{ fontSize: 11, color: 'var(--red)' }}>NOT</strong>}
+          <span style={{ fontSize: 13 }}>{rule.left} <em style={{ color: 'var(--muted)' }}>{rule.operator}</em> {rule.right}</span>
+        </div>
+      ))}
+    </div>
+  );
+
+  // Legs: n8n payload legs (side/lots/stopLoss objects, or legacy action/…),
+  // then the local plan's template legs. Strategy defines the legs.
+  type AnyLeg = Record<string, any>;
+  const artifactLegs: AnyLeg[] | null = (() => {
+    const fromPayload = payload.legs;
+    if (Array.isArray(fromPayload) && fromPayload.length && typeof fromPayload[0] === 'object') return fromPayload as AnyLeg[];
+    if (draft.plan?.legs?.length) return draft.plan.legs as unknown as AnyLeg[];
+    return null;
+  })();
+  const legSide = (leg: AnyLeg) => leg.side ?? leg.action ?? 'Buy';
+  const legName = (leg: AnyLeg) => (leg.instrument === 'Future' || leg.instrumentType === 'Future') ? 'FUT' : (leg.optionType ?? leg.instrument ?? '');
+  const legLots = (leg: AnyLeg) => leg.lots ?? leg.lotsMultiplier ?? 1;
+  const legRisk = (leg: AnyLeg, kind: 'stopLoss' | 'takeProfit') => {
+    const box = leg[kind];
+    if (box && typeof box === 'object') return `${box.value} ${box.type}`;
+    const flat = leg[kind === 'stopLoss' ? 'stopLossValue' : 'takeProfitValue'];
+    return flat ? `${flat} %` : (leg.applyRisk === false ? 'hedge · none' : '');
+  };
+  const riskBox = (payload.risk && typeof payload.risk === 'object' ? payload.risk : payload.globalTargets) as AnyLeg | undefined;
+
   return (
     <div className="agent-algo-sections">
       <div className="agent-algo-stage-row">
@@ -1358,8 +1400,19 @@ function AgentAlgoSections({
 
       {stage === 2 && (
         <div className="agent-algo-editor">
-          <label><span>Entry Rules (overall)</span><textarea rows={2} value={readLines('entryRules', draft.entryRules)} onChange={(event) => onPatch({ entryRules: toLines(event.target.value) })} /></label>
-          <label><span>Exit Rules (overall)</span><textarea rows={2} value={readLines('exitRules', draft.exitRules)} onChange={(event) => onPatch({ exitRules: toLines(event.target.value) })} /></label>
+          {structuredRules('entryConditions') ? (
+            <>
+              <h4 style={{ fontSize: 13, textTransform: 'uppercase', color: 'var(--muted)' }}>Entry Rules (AND-gated)</h4>
+              <RuleRows rules={structuredRules('entryConditions')!} />
+              <h4 style={{ marginTop: 12, fontSize: 13, textTransform: 'uppercase', color: 'var(--muted)' }}>Exit Rules (OR-triggered)</h4>
+              <RuleRows rules={structuredRules('exitConditions') ?? []} />
+            </>
+          ) : (
+            <>
+              <label><span>Entry Rules (overall)</span><textarea rows={2} value={readLines('entryRules', draft.entryRules)} onChange={(event) => onPatch({ entryRules: toLines(event.target.value) })} /></label>
+              <label><span>Exit Rules (overall)</span><textarea rows={2} value={readLines('exitRules', draft.exitRules)} onChange={(event) => onPatch({ exitRules: toLines(event.target.value) })} /></label>
+            </>
+          )}
           
           <h4 style={{marginTop: 12, fontSize: 13, textTransform: 'uppercase', color: 'var(--muted)'}}>Configured Indicators</h4>
           {Array.isArray(payload.indicators) ? payload.indicators.map((ind: any, i) => {
@@ -1389,21 +1442,22 @@ function AgentAlgoSections({
 
       {stage === 3 && (
         <div className="agent-algo-editor">
-          <h4 style={{fontSize: 13, textTransform: 'uppercase', color: 'var(--muted)'}}>Legs</h4>
-          {Array.isArray(payload.legs) && payload.legs.length > 0 ? payload.legs.map((leg: any, i) => (
+          <h4 style={{fontSize: 13, textTransform: 'uppercase', color: 'var(--muted)'}}>
+            Legs{draft.plan ? ` · ${draft.plan.structureLabel}` : ''}
+          </h4>
+          {artifactLegs ? artifactLegs.map((leg, i) => (
              <div key={i} className="agent-market-card" style={{padding: 12}}>
-               <strong style={{color: leg.action === 'Buy' ? 'var(--green)' : 'var(--red)'}}>{leg.action} {leg.optionType || leg.instrument} <span style={{fontSize: 12, fontWeight: 'normal'}}>({leg.strikeOffset})</span></strong>
+               <strong style={{color: legSide(leg) === 'Buy' ? 'var(--green)' : 'var(--red)'}}>
+                 {legSide(leg)} {legName(leg)}
+                 <span style={{fontSize: 12, fontWeight: 'normal'}}> ({leg.strikeOffset}{legLots(leg) > 1 ? ` ×${legLots(leg)}` : ''}{leg.expiryOffset === 'far' ? ' · next expiry' : ''})</span>
+               </strong>
                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8}}>
-                 <label><span>Segment</span><input value={leg.segment || ''} readOnly/></label>
-                 <label><span>Expiry</span><input value={leg.expiry || ''} readOnly/></label>
+                 <label><span>Lots</span><input value={legLots(leg)} readOnly/></label>
+                 <label><span>Expiry</span><input value={leg.expiry || (leg.expiryOffset === 'far' ? 'Next expiry' : 'Current expiry')} readOnly/></label>
                </div>
                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8}}>
-                 <label><span>Entry</span><input value={leg.entryCondition || ''} readOnly/></label>
-                 <label><span>Exit</span><input value={leg.exitCondition || ''} readOnly/></label>
-               </div>
-               <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8}}>
-                 <label><span>Stop Loss</span><input value={leg.stopLoss ? `${leg.stopLoss.value} ${leg.stopLoss.type}` : ''} readOnly/></label>
-                 <label><span>Take Profit</span><input value={leg.takeProfit ? `${leg.takeProfit.value} ${leg.takeProfit.type}` : ''} readOnly/></label>
+                 <label><span>Stop Loss</span><input value={legRisk(leg, 'stopLoss')} readOnly/></label>
+                 <label><span>Take Profit</span><input value={legRisk(leg, 'takeProfit')} readOnly/></label>
                </div>
              </div>
           )) : (
@@ -1411,16 +1465,22 @@ function AgentAlgoSections({
           )}
 
           <h4 style={{marginTop: 12, fontSize: 13, textTransform: 'uppercase', color: 'var(--muted)'}}>Global Targets</h4>
-          {payload.globalTargets ? (
+          {riskBox ? (
             <div className="agent-market-card" style={{padding: 12}}>
               <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8}}>
-                <label><span>Daily SL</span><input value={(payload.globalTargets as any).dailyStopLoss || ''} onChange={(e) => onPatch({ globalTargets: { ...(payload.globalTargets as any), dailyStopLoss: e.target.value } })} /></label>
-                <label><span>Daily TP</span><input value={(payload.globalTargets as any).dailyTakeProfit || ''} onChange={(e) => onPatch({ globalTargets: { ...(payload.globalTargets as any), dailyTakeProfit: e.target.value } })} /></label>
+                <label><span>Daily SL</span><input value={riskBox.dailyStopLoss ?? ''} onChange={(e) => onPatch({ risk: { ...riskBox, dailyStopLoss: e.target.value } })} /></label>
+                <label><span>Daily TP</span><input value={riskBox.dailyTakeProfit ?? ''} onChange={(e) => onPatch({ risk: { ...riskBox, dailyTakeProfit: e.target.value } })} /></label>
               </div>
               <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8}}>
-                <label><span>Trade Type</span><input value={(payload.globalTargets as any).tradeType || ''} onChange={(e) => onPatch({ globalTargets: { ...(payload.globalTargets as any), tradeType: e.target.value } })} /></label>
-                <label><span>Max Trades</span><input value={(payload.globalTargets as any).maxTransactionsPerDay || ''} onChange={(e) => onPatch({ globalTargets: { ...(payload.globalTargets as any), maxTransactionsPerDay: e.target.value } })} /></label>
+                <label><span>Trade Type</span><input value={riskBox.tradeType ?? ''} onChange={(e) => onPatch({ risk: { ...riskBox, tradeType: e.target.value } })} /></label>
+                <label><span>Max Trades</span><input value={riskBox.maxTransactionsPerDay ?? ''} onChange={(e) => onPatch({ risk: { ...riskBox, maxTransactionsPerDay: e.target.value } })} /></label>
               </div>
+              {riskBox.transactionStopLoss && (
+                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8}}>
+                  <label><span>Txn SL</span><input value={`${riskBox.transactionStopLoss.value} ${riskBox.transactionStopLoss.type}`} readOnly/></label>
+                  <label><span>Txn TP</span><input value={riskBox.transactionTakeProfit ? `${riskBox.transactionTakeProfit.value} ${riskBox.transactionTakeProfit.type}` : ''} readOnly/></label>
+                </div>
+              )}
             </div>
           ) : (
             <>

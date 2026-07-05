@@ -1,9 +1,99 @@
-import { CandidateTrade, ChatMessage, MarketOverview, StrategyDraft, UserMode } from '../types';
+import { CandidateTrade, ChatMessage, ExtractedAlgoParams, MarketOverview, MarketView, StrategyDraft, UserMode } from '../types';
 import { summarizeTrade } from './calculations';
+import { findUnsupportedInputs } from './signalCatalog';
+import { STRUCTURE_LIBRARY, buildAlgoPlan, defaultStructureForView, describeLeg, describeRules, detectSetup, detectStructure, extractStrikeLevels, extractTrackedSymbols } from './strategyTemplates';
 
 const lower = (value: string) => value.toLowerCase();
 
 const includesAny = (text: string, terms: string[]) => terms.some((term) => text.includes(term));
+
+const INDEX_SYMBOLS = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'NIFTYNXT50', 'SENSEX', 'BANKEX'];
+
+export const isIndexSymbol = (symbol: string) => INDEX_SYMBOLS.includes(symbol.toUpperCase());
+
+const firstMatch = (text: string, patterns: RegExp[]): RegExpMatchArray | null => {
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) return match;
+  }
+  return null;
+};
+
+const parseRupees = (raw: string, scale?: string): number | null => {
+  const value = Number(raw.replace(/,/g, ''));
+  if (!Number.isFinite(value)) return null;
+  if (scale === 'k' || scale === 'thousand') return value * 1000;
+  if (scale === 'lakh' || scale === 'lac') return value * 100000;
+  // A bare number under 100 is more likely a percentage or lot count than rupees.
+  return value < 100 ? null : value;
+};
+
+const detectView = (text: string): MarketView | null =>
+  includesAny(text, ['iron condor', 'condor', 'rangebound', 'range-bound', 'range bound', 'sideways', 'non-directional', 'theta play', ' range'])
+    ? 'rangebound'
+    : includesAny(text, ['straddle', 'strangle', 'volatile', 'volatility', 'big move', 'expected to move', 'sharp move', 'either side', 'event play', 'volatility play', 'vol expansion'])
+      ? 'volatile'
+      : includesAny(text, ['bullish', 'upside', 'buy call', 'long call', 'breakout', 'breaks out', 'bull '])
+        ? 'bullish'
+        : includesAny(text, ['bearish', 'downside', 'buy put', 'long put', 'breakdown', 'breaks down', 'bear '])
+          ? 'bearish'
+          : null;
+
+export const extractAlgoParams = (text: string): ExtractedAlgoParams => {
+  const lossMatch = firstMatch(text, [
+    /(?:max(?:imum)?\s*loss|risk|lose|capital)[^\d%]{0,24}(?:₹|rs\.?|inr)?\s*([\d,]+(?:\.\d+)?)\s*(k|thousand|lakh|lac)?(?!\s*%)/,
+    /(?:₹|rs\.?|inr)\s*([\d,]+(?:\.\d+)?)\s*(k|thousand|lakh|lac)?(?!\s*%)/,
+    /([\d,]+(?:\.\d+)?)\s*(k|thousand|lakh|lac)?\s*rupees/
+  ]);
+
+  const slMatch = firstMatch(text, [
+    /(\d{1,2}(?:\.\d+)?)\s*%[^.%\d]{0,16}?(?:stop|sl\b)/,
+    /(?:stop\s*loss|stop|sl)\b[^\d%]{0,12}(\d{1,2}(?:\.\d+)?)\s*%/
+  ]);
+
+  const tpMatch = firstMatch(text, [
+    /(\d{1,3}(?:\.\d+)?)\s*%\s*(?:of\s*max\s*)?(?:profit|target|tp\b)/,
+    /(?:take\s*profit|profit|target|tp)\b[^\d%]{0,12}(\d{1,3}(?:\.\d+)?)\s*%/
+  ]);
+
+  const backtestMatch = firstMatch(text, [
+    /backtest[^\d]{0,30}(\d+)\s*(day|week|month|year)/,
+    /(\d+)\s*(day|week|month|year)s?[^.]{0,16}backtest/
+  ]);
+  const toMonths = (value: number, unit: string) =>
+    unit.startsWith('year') ? value * 12 : unit.startsWith('month') ? value : unit.startsWith('week') ? Math.max(1, Math.round(value / 4)) : Math.max(1, Math.round(value / 30));
+
+  const lotsMatch = text.match(/(\d+)\s*lots?\b/);
+  const structure = detectStructure(text);
+  const setup = detectSetup(text);
+  const { shortLevel, wingLevel } = extractStrikeLevels(text);
+  const detectedView = structure ? STRUCTURE_LIBRARY[structure].view : detectView(text);
+
+  return {
+    // Setups without an explicit direction get sensible defaults: reversal
+    // buys the bounce, momentum rides strength (both bullish), event goes
+    // long volatility. The builder makes flipping any of these a one-click edit.
+    view: detectedView ?? (setup === 'reversal' || setup === 'momentum' ? 'bullish' : setup === 'event' ? 'volatile' : null),
+    setup,
+    trackedSymbols: extractTrackedSymbols(text),
+    structure,
+    shortStrikeLevel: shortLevel,
+    wingStrikeLevel: wingLevel,
+    maxLossRupees: lossMatch ? parseRupees(lossMatch[1], lossMatch[2]) : null,
+    stopLossPct: slMatch ? Number(slMatch[1]) : null,
+    takeProfitPct: tpMatch ? Number(tpMatch[1]) : null,
+    backtestMonths: backtestMatch ? toMonths(Number(backtestMatch[1]), backtestMatch[2]) : null,
+    lots: lotsMatch ? Number(lotsMatch[1]) : null,
+    expiryPreference: /\bweekly\b/.test(text) ? 'Current Week' : /\bmonthly\b/.test(text) ? 'Current Month' : null
+  };
+};
+
+export const algoStructureNames: Record<MarketView, string> = {
+  bullish: 'Momentum Call Buy',
+  bearish: 'Momentum Put Buy',
+  rangebound: 'Iron Condor',
+  volatile: 'Long Straddle'
+};
 
 export const buildWorkflowSteps = (mode: UserMode, ready: boolean) => [
   {
@@ -26,7 +116,11 @@ export const buildWorkflowSteps = (mode: UserMode, ready: boolean) => [
   {
     label: 'Clarification',
     state: ready ? ('completed' as const) : ('waiting_input' as const),
-    detail: ready ? 'Enough inputs captured to draft an artifact.' : 'Waiting for risk, direction, expiry, or exit preference.'
+    detail: ready
+      ? 'Enough inputs captured to draft an artifact.'
+      : mode === 'create-strategy'
+        ? 'Waiting for your market view: bullish, bearish, rangebound, or volatile. Everything else uses editable defaults.'
+        : 'Waiting for risk, direction, expiry, or exit preference.'
   },
   {
     label: 'Artifact validation',
@@ -41,7 +135,7 @@ export const createInitialMessages = (): ChatMessage[] => [
     role: 'assistant',
     createdAt: new Date().toISOString(),
     text:
-      'Tell me whether you want to find a one-off options trade or create a reusable algo strategy. I will ask for missing risk, entry, exit, and filter inputs before producing a paper-trade-ready artifact.'
+      "Tell me whether you want a one-off trade or a reusable algo strategy. For an algo, just share your market view (bullish, bearish, rangebound, or volatile) plus any numbers you care about — e.g. 'rangebound NIFTY, max loss 5000, exit at 50% profit'. I default everything else and you can edit the result in the builder."
   }
 ];
 
@@ -122,37 +216,71 @@ export const draftFromChat = (
   }
 
   if (mode === 'create-strategy') {
-    const strategyMissing = [
-      !includesAny(userText, ['entry', 'signal', 'when', 'trend', 'indicator', 'rsi', 'macd']) ? 'Entry signal definition (e.g. what defines the bullish trend?)' : null,
-      !includesAny(userText, ['margin', 'capital', 'funds']) ? 'Total available margin' : null,
-      !includesAny(userText, ['loss', 'risk limit', 'max loss']) ? 'Maximum acceptable loss per trade' : null
+    const params = extractAlgoParams(userText);
+    const symbol = overview.instrument.symbol;
+    const expiryWord = (params.expiryPreference ?? (isIndexSymbol(symbol) ? 'Current Week' : 'Current Month')) === 'Current Week' ? 'Weekly' : 'Monthly';
+    const structureId = params.structure ?? (params.view ? defaultStructureForView[params.view] : null);
+    const ready = structureId !== null;
+    const slPct = params.stopLossPct ?? 35;
+    const tpPct = params.takeProfitPct ?? 60;
+    const maxLoss = params.maxLossRupees ?? 5000;
+    const appliedDefaults = [
+      params.stopLossPct == null ? `stop loss ${slPct}%` : null,
+      params.takeProfitPct == null ? `take profit ${tpPct}%` : null,
+      params.maxLossRupees == null ? `daily max loss ₹${maxLoss.toLocaleString('en-IN')}` : null,
+      params.backtestMonths == null ? 'backtest period 3 months' : null,
+      params.lots == null ? '1 lot per leg' : null
     ].filter((item): item is string => !!item);
+    const trackedSymbols = params.trackedSymbols.length ? params.trackedSymbols : [symbol];
+    const plan = structureId
+      ? buildAlgoPlan({
+          structureId,
+          userText,
+          shortLevel: params.shortStrikeLevel,
+          wingLevel: params.wingStrikeLevel,
+          support: String(overview.chain.putWall || Math.round(overview.instrument.spot * 0.994)),
+          resistance: String(overview.chain.callWall || Math.round(overview.instrument.spot * 1.006)),
+          setup: params.setup,
+          trackedSymbols
+        })
+      : undefined;
+    const legSummaries = plan ? plan.legs.map(describeLeg) : [];
     return {
-      title: strategyMissing.length ? 'Draft Algo Strategy: Need More Info' : 'Draft Algo Strategy: Risk & Signal Approved',
+      title: plan
+        ? `${params.trackedSymbols.length > 1 ? 'Multi-Symbol' : symbol} ${expiryWord} ${plan.structureLabel}`
+        : 'Draft Algo Strategy',
       mode,
-      status: [...strategyMissing].length ? 'needs-input' : 'ready',
-      missingInputs: [...strategyMissing],
+      status: ready ? 'ready' : 'needs-input',
+      missingInputs: ready
+        ? []
+        : ['Your market view (bullish, bearish, rangebound, volatile) or a structure (iron condor, iron butterfly, butterfly spread, short strangle, straddle, bull call spread...)'],
       filters: [
-        `Instrument universe: ${overview.instrument.symbol} options only in MVP`,
-        'Reject if any leg has critical stale-data or missing bid-ask flag',
-        'Require liquidity score above 70 and defined max loss'
+        params.trackedSymbols.length
+          ? `Tracked symbols (signal watchlist): ${trackedSymbols.join(', ')}`
+          : `Instrument universe: ${symbol} options only in MVP`,
+        ...(plan?.setup ? [`Setup: ${plan.setup} — entry template tuned for ${plan.setup} signals`] : []),
+        ...(plan ? [`Structure: ${plan.structureLabel} — legs: ${legSummaries.join(' · ')}`] : []),
+        'Default: liquidity score above 70, tight bid-ask spread, no critical stale-data flags',
+        ...(appliedDefaults.length ? [`Defaults you can edit in the builder: ${appliedDefaults.join(', ')}`] : [])
       ],
-      entryRules: [
-        'Enter only when market regime matches the chosen view',
-        `Use OI walls: put wall ${overview.chain.putWall}, call wall ${overview.chain.callWall}`,
-        'Confirm spread and OI thresholds before paper entry'
-      ],
-      exitRules: [
-        'Exit at 50% of max profit for credit strategies',
-        'Exit at 35% of max loss or when quality flags become critical',
-        'Force close before expiry if event risk is detected'
-      ],
+      entryRules: plan
+        ? describeRules(plan.entryConditions)
+        : ['Entry rules are generated as individual AND/OR/NOT conditions once the structure or view is known'],
+      exitRules: plan
+        ? describeRules(plan.exitConditions)
+        : [
+            `Take profit at ${tpPct}% and stop at ${slPct}% per transaction`,
+            'Time exit at 15:10 for intraday runs'
+          ],
       riskRules: [
-        'One paper position per instrument in MVP',
-        'Strict margin constraints and max loss limit applied per trade',
-        'Auto-suggest spreads over naked options to cap loss if required'
+        `Per-leg SL ${slPct}% / TP ${tpPct}% on risk-bearing legs; daily max loss ₹${maxLoss.toLocaleString('en-IN')}`,
+        `Validation: backtest ${params.backtestMonths ?? 3} month${(params.backtestMonths ?? 3) > 1 ? 's' : ''} before paper trading`,
+        'No averaging down and no live broker order placement'
       ],
-      selectedTrade
+      selectedTrade,
+      params,
+      plan,
+      unsupportedInputs: findUnsupportedInputs(userText)
     };
   }
 
@@ -186,6 +314,33 @@ export const draftFromChat = (
 };
 
 export const assistantReply = (draft: StrategyDraft) => {
+  if (draft.mode === 'create-strategy') {
+    if (draft.status === 'needs-input') {
+      const unsupportedNote = draft.unsupportedInputs?.length ? `${draft.unsupportedInputs.join(' ')} ` : '';
+      return `${unsupportedNote}What's your view on the market — do you expect it to go up, go down, stay in a range, or make a big move? You can also name a strategy directly (iron condor, straddle, bull call spread...). Add any numbers you care about (max loss, stop %, target %, lots, backtest period) and I'll handle the rest with sensible defaults you can edit.`;
+    }
+    const params = draft.params;
+    const captured = [
+      params?.trackedSymbols.length ? `watchlist ${params.trackedSymbols.join(', ')}` : null,
+      params?.setup != null ? `${params.setup} setup` : null,
+      params?.structure != null ? `structure ${draft.plan?.structureLabel ?? params.structure}` : null,
+      params?.shortStrikeLevel != null ? `short strikes at ${params.shortStrikeLevel}` : null,
+      params?.wingStrikeLevel != null ? `wings at ${params.wingStrikeLevel}` : null,
+      params?.maxLossRupees != null ? `max loss ₹${params.maxLossRupees.toLocaleString('en-IN')}` : null,
+      params?.stopLossPct != null ? `stop ${params.stopLossPct}%` : null,
+      params?.takeProfitPct != null ? `target ${params.takeProfitPct}%` : null,
+      params?.lots != null ? `${params.lots} lot${params.lots > 1 ? 's' : ''}` : null,
+      params?.backtestMonths != null ? `backtest ${params.backtestMonths} month${params.backtestMonths > 1 ? 's' : ''}` : null
+    ].filter((item): item is string => !!item);
+    const legLine = draft.plan
+      ? ` Legs: ${draft.plan.legs.map(describeLeg).join(', ')}. Entry and exit are individual rules joined with AND/OR/NOT — edit each one in the builder.`
+      : '';
+    const unsupportedLine = draft.unsupportedInputs?.length
+      ? ` One heads-up: ${draft.unsupportedInputs.join(' ')}`
+      : '';
+    return `Drafted "${draft.title}".${captured.length ? ` Captured from chat: ${captured.join(', ')}.` : ''}${legLine}${unsupportedLine} Anything you did not specify uses editable defaults — press Apply AI Draft to fill the builder.`;
+  }
+
   if (draft.status === 'needs-input') {
     return `I can draft this, but I need ${draft.missingInputs.slice(0, 3).join(', ')}. Give me those and I will turn it into a validated ${draft.mode === 'create-trade' ? 'trade' : draft.mode === 'screener' ? 'screener' : 'algo strategy'} artifact.`;
   }
@@ -204,18 +359,5 @@ export const assistantReply = (draft: StrategyDraft) => {
     return `I have a complete trade artifact: ${summarizeTrade(draft.selectedTrade)} I would paper trade it only after the liquidity and freshness checks remain green.`;
   }
 
-  if (draft.mode === 'create-strategy') {
-    if (draft.status === 'needs-input') {
-      if (draft.missingInputs.includes('Total available margin') || draft.missingInputs.includes('Maximum acceptable loss per trade')) {
-        return `Great. Before we build this, let's protect your capital. What is your **total available margin** for this strategy, and what is the **maximum loss** (in INR or %) you are willing to take per trade?`;
-      }
-      if (draft.missingInputs.includes('Entry signal definition (e.g. what defines the bullish trend?)')) {
-        return `I can help you build a strategy. Usually, traders identify this using technical indicators like the RSI being over 60 or the MACD crossing its signal line. How would you like to define it?`;
-      }
-      return `I need a bit more info: ${draft.missingInputs.join(', ')}.`;
-    }
-    return `Understood. I have designed a risk-defined strategy and added a safety filter to ensure we only trade highly liquid strikes. I am passing the configuration to the manual builder for your review.`;
-  }
-
-  return 'I have enough inputs to compile this artifact.';
+  return 'I have enough inputs to compile this into a reusable algo strategy with filters, entry rules, exit rules, risk rules, and a backtest plan.';
 };
