@@ -158,35 +158,49 @@ serve(async (req) => {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (webhookSecret) headers["x-n8n-secret"] = webhookSecret;
 
-    const n8nRes = await fetch(webhookUrl, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        session_id,
-        mode: sessionData.workflow_type,
-        workflow_type: sessionData.workflow_type,
-        chat_history: updatedMessages,
-        current_artifact: artifactData.payload,
-        body: {
+    let assistantReply = "I updated your artifact draft. Tell me what to change next.";
+    let artifactInstruction: ArtifactInstruction = {};
+    let degraded = false;
+
+    try {
+      const n8nRes = await fetch(webhookUrl, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
           session_id,
           mode: sessionData.workflow_type,
           workflow_type: sessionData.workflow_type,
           chat_history: updatedMessages,
           current_artifact: artifactData.payload,
-        },
-      })
-    });
+          body: {
+            session_id,
+            mode: sessionData.workflow_type,
+            workflow_type: sessionData.workflow_type,
+            chat_history: updatedMessages,
+            current_artifact: artifactData.payload,
+          },
+        })
+      });
 
-    if (!n8nRes.ok) {
+      if (!n8nRes.ok) {
         throw new Error(`n8n webhook failed with status ${n8nRes.status}`);
-    }
+      }
 
-    const rawN8nData = normalizeN8nBody(await n8nRes.json());
-    const n8nData = normalizeN8nBody(rawN8nData.response ?? rawN8nData);
-    const assistantReply = typeof n8nData.assistant_reply === "string"
-      ? n8nData.assistant_reply
-      : "I updated your artifact draft. Tell me what to change next.";
-    const artifactInstruction = normalizeArtifactInstruction(n8nData.artifact_instruction);
+      const rawN8nData = normalizeN8nBody(await n8nRes.json());
+      const n8nData = normalizeN8nBody(rawN8nData.response ?? rawN8nData);
+      assistantReply = typeof n8nData.assistant_reply === "string"
+        ? n8nData.assistant_reply
+        : assistantReply;
+      artifactInstruction = normalizeArtifactInstruction(n8nData.artifact_instruction);
+    } catch (n8nError) {
+      // Graceful degradation: never orphan the user's message on a workflow failure.
+      // Save a friendly reply, leave the artifact unchanged, and return 200.
+      console.error("fno-copilot-chat n8n failure:", n8nError);
+      degraded = true;
+      assistantReply =
+        "Sorry — I hit a snag while working on that and couldn't apply the change, so your strategy is unchanged. Please try again or rephrase what you'd like to adjust.";
+      artifactInstruction = {};
+    }
 
     // 4. Update DB with LLM Response
     const finalMessages = [...updatedMessages, { role: 'assistant', content: assistantReply, created_at: new Date().toISOString() }];
@@ -215,6 +229,7 @@ serve(async (req) => {
 
     return jsonResponse({
       ok: true,
+      degraded,
       assistant_reply: assistantReply,
       artifact_payload: newArtifactPayload,
       artifact_status: newStatus,
