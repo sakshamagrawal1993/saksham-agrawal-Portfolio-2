@@ -28,6 +28,15 @@ const getSupabase = () => {
   return createClient(url, serviceKey);
 };
 
+const getCallerUserId = async (supabase: ReturnType<typeof createClient>, req: Request) => {
+  const auth = req.headers.get("authorization") || "";
+  const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+  if (!token || token.startsWith("sb_publishable_")) return null;
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data.user) return null;
+  return data.user.id;
+};
+
 const requireServiceSecret = (req: Request) => {
   const apikey = req.headers.get("apikey") || "";
   const auth = req.headers.get("authorization") || "";
@@ -86,7 +95,12 @@ serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
     const workflowType = body?.workflow_type;
-    const userId = body?.user_id ?? null;
+    const callerUserId = await getCallerUserId(supabase, req);
+    const requestedUserId = typeof body?.user_id === "string" ? body.user_id : null;
+    if (callerUserId && requestedUserId && callerUserId !== requestedUserId) {
+      return jsonResponse({ ok: false, error: "User mismatch" }, 403);
+    }
+    const userId = callerUserId ?? requestedUserId;
     const symbol = typeof body?.symbol === "string" ? body.symbol : null;
     const screenContext = typeof body?.screen_context === "string" ? body.screen_context : null;
 

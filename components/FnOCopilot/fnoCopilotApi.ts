@@ -133,6 +133,31 @@ export type AgentSessionInitData = {
   artifact_status: string;
 };
 
+export type AgentSessionMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+  created_at?: string;
+};
+
+export type AgentSessionSummary = {
+  session_id: string;
+  workflow_type: FnOWorkflowType;
+  symbol?: string | null;
+  state?: string | null;
+  messages: AgentSessionMessage[];
+  missing_inputs?: string[];
+  created_at: string;
+  updated_at?: string | null;
+  artifact?: {
+    id: string;
+    type: 'answer' | 'trade' | 'algo_strategy' | 'screener';
+    title: string;
+    payload: Record<string, unknown>;
+    status: string;
+    created_at: string;
+  } | null;
+};
+
 const userModeToWorkflowType = (mode: UserMode): FnOWorkflowType => {
   switch (mode) {
     case 'ask-ai':
@@ -144,6 +169,20 @@ const userModeToWorkflowType = (mode: UserMode): FnOWorkflowType => {
     case 'create-trade':
     default:
       return 'create_trade';
+  }
+};
+
+export const workflowTypeToUserMode = (workflowType: FnOWorkflowType): UserMode => {
+  switch (workflowType) {
+    case 'ask_ai':
+      return 'ask-ai';
+    case 'create_algo_strategy':
+      return 'create-strategy';
+    case 'option_screener':
+      return 'screener';
+    case 'create_trade':
+    default:
+      return 'create-trade';
   }
 };
 
@@ -191,3 +230,80 @@ export const sendAgentChat = async (params: {
   return data as AgentChatData;
 };
 
+const normalizeMessages = (messages: unknown): AgentSessionMessage[] => {
+  if (!Array.isArray(messages)) return [];
+  return messages
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null;
+      const row = item as Record<string, unknown>;
+      const role = row.role === 'assistant' ? 'assistant' : row.role === 'user' ? 'user' : null;
+      const content = typeof row.content === 'string'
+        ? row.content
+        : typeof row.text === 'string'
+          ? row.text
+          : '';
+      if (!role || !content) return null;
+      return {
+        role,
+        content,
+        created_at: typeof row.created_at === 'string' ? row.created_at : undefined,
+      };
+    })
+    .filter(Boolean) as AgentSessionMessage[];
+};
+
+export const listAgentSessions = async (params: {
+  user_id: string;
+  limit?: number;
+}): Promise<AgentSessionSummary[]> => {
+  const limit = params.limit ?? 12;
+  const { data: sessions, error: sessionError } = await supabase
+    .from('fno_ai_sessions')
+    .select('id, workflow_type, symbol, state, messages, missing_inputs, created_at, updated_at')
+    .eq('user_id', params.user_id)
+    .order('updated_at', { ascending: false })
+    .limit(limit);
+
+  if (sessionError) throw sessionError;
+  if (!sessions?.length) return [];
+
+  const sessionIds = sessions.map((session: any) => session.id);
+  const { data: artifacts, error: artifactError } = await supabase
+    .from('fno_ai_artifacts')
+    .select('id, ai_session_id, artifact_type, title, payload, status, created_at')
+    .in('ai_session_id', sessionIds)
+    .order('created_at', { ascending: false });
+
+  if (artifactError) throw artifactError;
+
+  const latestArtifactBySession = new Map<string, any>();
+  for (const artifact of artifacts ?? []) {
+    if (!latestArtifactBySession.has(artifact.ai_session_id)) {
+      latestArtifactBySession.set(artifact.ai_session_id, artifact);
+    }
+  }
+
+  return sessions.map((session: any) => {
+    const artifact = latestArtifactBySession.get(session.id);
+    return {
+      session_id: session.id,
+      workflow_type: session.workflow_type,
+      symbol: session.symbol,
+      state: session.state,
+      messages: normalizeMessages(session.messages),
+      missing_inputs: Array.isArray(session.missing_inputs) ? session.missing_inputs : [],
+      created_at: session.created_at,
+      updated_at: session.updated_at,
+      artifact: artifact
+        ? {
+            id: artifact.id,
+            type: artifact.artifact_type,
+            title: artifact.title,
+            payload: artifact.payload ?? {},
+            status: artifact.status,
+            created_at: artifact.created_at,
+          }
+        : null,
+    };
+  });
+};

@@ -24,6 +24,7 @@ import {
   Zap
 } from 'lucide-react';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import type { User } from '@supabase/supabase-js';
 import { contractRows, dataSource, DemoContractSummary, instrumentsBySymbol, optionChainsBySymbol } from './data/excelMarket';
 import {
   getUpstoxCoverageCounts,
@@ -35,8 +36,13 @@ import {
   fetchFnOCopilotBootstrap,
   initAgentSession,
   isFnOCopilotEdgeEnabled,
-  sendAgentChat
+  listAgentSessions,
+  sendAgentChat,
+  workflowTypeToUserMode,
+  type AgentSessionSummary
 } from './fnoCopilotApi';
+import { useAuth } from '../../context/AuthContext';
+import Login from '../auth/Login';
 import { assistantReply, buildWorkflowSteps, createInitialMessages, draftFromChat } from './lib/aiPlanner';
 import { aggregateGreeks, computeChainAnalytics, getAtmStrike, getQuote, mid, round, rupee } from './lib/calculations';
 import { parseLiveMarketBootstrap, type FnOLiveMarketState } from './lib/edgeMarketAdapter';
@@ -46,6 +52,7 @@ import './styles.css';
 
 type Screen = 'dashboard' | 'contract' | 'analyse-trade' | 'create-trades' | 'algo-builder' | 'screener' | 'paper-trades';
 type WorkspaceMode = 'standard' | 'agent';
+type FnOCopilotAppProps = { initialWorkspaceMode?: WorkspaceMode };
 type DataBackendStatus = 'local' | 'edge-online' | 'edge-error';
 type DetailTab = 'overview' | 'option-chain' | 'combined-oi' | 'technicals' | 'build-up' | 'quick-trades';
 type DirectionKey = 'up' | 'down' | 'rangebound' | 'volatile';
@@ -58,6 +65,10 @@ type AgentHistoryItem = {
   title: string;
   preview: string;
   createdAt: string;
+  sessionId?: string;
+  messages?: ChatMessage[];
+  artifactPayload?: Record<string, unknown>;
+  artifactStatus?: string;
 };
 
 type IndicatorConfig = {
@@ -188,6 +199,38 @@ const starterChatHistory: AgentHistoryItem[] = [
     createdAt: 'Earlier'
   }
 ];
+
+const formatAgentTime = (value?: string | null) => {
+  if (!value) return 'Earlier';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Earlier';
+  return date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+};
+
+const titleFromSession = (session: AgentSessionSummary) => {
+  const firstUserMessage = session.messages.find((message) => message.role === 'user')?.content;
+  const artifactTitle = session.artifact?.title;
+  const title = firstUserMessage || artifactTitle || agentModeLabels[workflowTypeToUserMode(session.workflow_type)];
+  return title.length > 58 ? `${title.slice(0, 55)}...` : title;
+};
+
+const previewFromSession = (session: AgentSessionSummary) => {
+  const lastAssistantMessage = [...session.messages].reverse().find((message) => message.role === 'assistant')?.content;
+  const fallback = session.artifact?.status
+    ? `Artifact ${session.artifact.status}`
+    : 'Saved agent session';
+  return lastAssistantMessage || fallback;
+};
+
+const messagesFromSession = (session: AgentSessionSummary): ChatMessage[] => {
+  const savedMessages = session.messages.map((message, index) => ({
+    id: `${session.session_id}-${index}`,
+    role: message.role,
+    text: message.content,
+    createdAt: message.created_at ?? session.created_at,
+  }));
+  return savedMessages.length ? savedMessages : createInitialMessages();
+};
 
 function createDefaultAlgoConfig(contract: ContractSummary): AlgoStrategyConfig {
   return {
@@ -510,7 +553,40 @@ function PageGuide({
   );
 }
 
-function FnOCopilotApp({ initialWorkspaceMode }: { initialWorkspaceMode?: WorkspaceMode } = {}) {
+function FnOCopilotApp({ initialWorkspaceMode }: FnOCopilotAppProps = {}) {
+  const { user, loading: authLoading } = useAuth();
+  const requiresAgentAuth = initialWorkspaceMode === 'agent';
+
+  if (authLoading && requiresAgentAuth) {
+    return (
+      <div className="fno-app-shell fno-agent-loading">
+        <Sparkles size={24} />
+        <p>Loading FnO Co-Pilot...</p>
+      </div>
+    );
+  }
+
+  if (requiresAgentAuth && !user) {
+    return (
+      <Login
+        title="FnO Co-Pilot"
+        subtitle="Sign in to save and reopen agent chats"
+        redirectPath="/fno-copilot/agent"
+      />
+    );
+  }
+
+  return <FnOCopilotExperience initialWorkspaceMode={initialWorkspaceMode} authUser={user} authLoading={authLoading} />;
+}
+
+function FnOCopilotExperience({
+  initialWorkspaceMode,
+  authUser,
+  authLoading
+}: FnOCopilotAppProps & { authUser: User | null; authLoading: boolean } = {
+  authUser: null,
+  authLoading: false
+}) {
   const [workspaceMode, setWorkspaceModeState] = React.useState<WorkspaceMode>(() => {
     if (initialWorkspaceMode) return initialWorkspaceMode;
     // Deep link support: /fno-copilot/agent opens straight into Agent mode.
@@ -519,12 +595,18 @@ function FnOCopilotApp({ initialWorkspaceMode }: { initialWorkspaceMode?: Worksp
   });
   // Keep the URL in sync so Agent mode is shareable/bookmarkable at its own path.
   const setWorkspaceMode = React.useCallback((next: WorkspaceMode) => {
+    if (next === 'agent' && !authUser) {
+      if (typeof window !== 'undefined') {
+        window.location.assign('/fno-copilot/agent');
+      }
+      return;
+    }
     setWorkspaceModeState(next);
     if (typeof window !== 'undefined' && window.location.pathname.startsWith('/fno-copilot')) {
       const target = next === 'agent' ? '/fno-copilot/agent' : '/fno-copilot';
       if (window.location.pathname !== target) window.history.replaceState(null, '', target + window.location.search);
     }
-  }, []);
+  }, [authUser]);
   const [screen, setScreen] = React.useState<Screen>('dashboard');
   const [selectedContract, setSelectedContract] = React.useState<ContractSummary | null>(null);
   const [tab, setTab] = React.useState<DetailTab>('overview');
@@ -573,10 +655,12 @@ function FnOCopilotApp({ initialWorkspaceMode }: { initialWorkspaceMode?: Worksp
   const baseDraft = React.useMemo(() => draftFromChat(mode, messages, allTrades, overview), [mode, messages, allTrades, overview]);
   const draft = { ...baseDraft, ...(liveArtifactPayload as Partial<StrategyDraft>) };
   const workflowSteps = buildWorkflowSteps(mode, draft.status === 'ready');
+  const userId = authUser?.id;
 
   const createSessionForMode = React.useCallback(async (targetMode: UserMode) => {
     const sessionData = await initAgentSession({
       mode: targetMode,
+      user_id: userId,
       symbol: activeContract.symbol,
       screen_context: screen
     });
@@ -586,7 +670,29 @@ function FnOCopilotApp({ initialWorkspaceMode }: { initialWorkspaceMode?: Worksp
       [targetMode]: (sessionData.artifact_payload as Record<string, unknown>) ?? {}
     }));
     return sessionData.session_id;
-  }, [activeContract.symbol, screen]);
+  }, [activeContract.symbol, screen, userId]);
+
+  const refreshRecentAgentSessions = React.useCallback(async () => {
+    if (!isFnOCopilotEdgeEnabled() || !userId) {
+      setChatHistory(starterChatHistory);
+      return;
+    }
+    const sessions = await listAgentSessions({ user_id: userId, limit: 12 });
+    const history = sessions
+      .filter((session) => session.messages.length > 0 || session.artifact)
+      .map((session) => ({
+        id: session.session_id,
+        sessionId: session.session_id,
+        mode: workflowTypeToUserMode(session.workflow_type),
+        title: titleFromSession(session),
+        preview: previewFromSession(session),
+        createdAt: formatAgentTime(session.updated_at ?? session.created_at),
+        messages: messagesFromSession(session),
+        artifactPayload: session.artifact?.payload ?? {},
+        artifactStatus: session.artifact?.status,
+      }));
+    setChatHistory(history.length ? history : starterChatHistory);
+  }, [userId]);
 
   const patchArtifactForMode = React.useCallback((targetMode: UserMode, patch: Record<string, unknown>) => {
     setArtifactPayloadByMode((current) => ({
@@ -652,6 +758,7 @@ function FnOCopilotApp({ initialWorkspaceMode }: { initialWorkspaceMode?: Worksp
 
   React.useEffect(() => {
     if (!isFnOCopilotEdgeEnabled()) return;
+    if (authLoading) return;
     if (sessionIdsByMode[mode]) return;
 
     let cancelled = false;
@@ -669,7 +776,32 @@ function FnOCopilotApp({ initialWorkspaceMode }: { initialWorkspaceMode?: Worksp
     return () => {
       cancelled = true;
     };
-  }, [mode, sessionIdsByMode, createSessionForMode]);
+  }, [mode, sessionIdsByMode, createSessionForMode, authLoading]);
+
+  React.useEffect(() => {
+    if (authLoading) return;
+    refreshRecentAgentSessions().catch((error) => {
+      console.error('Failed to load FnO recent chats:', error);
+      setDataBackendStatus('edge-error');
+    });
+  }, [authLoading, refreshRecentAgentSessions]);
+
+  const openAgentHistoryItem = (item: AgentHistoryItem) => {
+    setMode(item.mode);
+    if (item.sessionId) {
+      setSessionIdsByMode((current) => ({ ...current, [item.mode]: item.sessionId! }));
+    }
+    if (item.messages?.length) {
+      setMessages(item.messages);
+    }
+    if (item.artifactPayload) {
+      setArtifactPayloadByMode((current) => ({
+        ...current,
+        [item.mode]: item.artifactPayload ?? {}
+      }));
+      setSubmittedModes((current) => ({ ...current, [item.mode]: true }));
+    }
+  };
 
   const openContract = (contract: ContractSummary, nextTab: DetailTab = 'overview') => {
     setSelectedContract(contract);
@@ -759,6 +891,7 @@ function FnOCopilotApp({ initialWorkspaceMode }: { initialWorkspaceMode?: Worksp
           session_id: resolvedSessionId,
           message: text,
           mode,
+          user_id: userId,
         });
         
         if (edgeReply.assistant_reply) {
@@ -807,6 +940,11 @@ function FnOCopilotApp({ initialWorkspaceMode }: { initialWorkspaceMode?: Worksp
       // Find the user message we added optimistically, and append assistant message
       return [...current, assistantMessage];
     });
+    if (userId) {
+      refreshRecentAgentSessions().catch((error) => {
+        console.error('Failed to refresh FnO recent chats:', error);
+      });
+    }
   };
 
   return (
@@ -847,6 +985,7 @@ function FnOCopilotApp({ initialWorkspaceMode }: { initialWorkspaceMode?: Worksp
             <AgentModeWorkspace
               mode={mode}
               setMode={setMode}
+              onOpenHistoryItem={openAgentHistoryItem}
               draft={draft}
               messages={messages}
               chatHistory={chatHistory}
@@ -1083,6 +1222,7 @@ function StandardModeNavStrip({
 function AgentModeWorkspace({
   mode,
   setMode,
+  onOpenHistoryItem,
   draft,
   messages,
   chatHistory,
@@ -1100,6 +1240,7 @@ function AgentModeWorkspace({
 }: {
   mode: UserMode;
   setMode: (mode: UserMode) => void;
+  onOpenHistoryItem: (item: AgentHistoryItem) => void;
   draft: ReturnType<typeof draftFromChat>;
   messages: ChatMessage[];
   chatHistory: AgentHistoryItem[];
@@ -1119,6 +1260,13 @@ function AgentModeWorkspace({
   const selectedTrade = draft.selectedTrade;
   const visibleMessages = messages.filter((message) => message.id !== 'welcome' || messages.some((item) => item.role === 'user'));
   const hasChatActive = visibleMessages.length > 0 || input.trim().length > 0;
+  const threadRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (threadRef.current) {
+      threadRef.current.scrollTop = threadRef.current.scrollHeight;
+    }
+  }, [messages, isAiTyping]);
   const modeButtons: Array<{ id: UserMode; label: string; icon: React.ReactNode }> = [
     { id: 'ask-ai', label: 'Ask AI', icon: <Bot size={16} /> },
     { id: 'create-strategy', label: 'Create Algo', icon: <BrainCircuit size={16} /> },
@@ -1151,7 +1299,7 @@ function AgentModeWorkspace({
           <p><Clock3 size={13} /> Recent chats</p>
           <div className="agent-history-list">
             {chatHistory.map((item) => (
-              <button key={item.id} onClick={() => setMode(item.mode)}>
+              <button key={item.id} onClick={() => onOpenHistoryItem(item)}>
                 <strong>{item.title}</strong>
                 <span>{agentModeLabels[item.mode]} · {item.createdAt}</span>
               </button>
@@ -1163,8 +1311,8 @@ function AgentModeWorkspace({
       <section className={`agent-stage ${showArtifact ? 'with-artifact' : ''} ${hasChatActive ? 'chat-active' : ''}`}>
         <div className="agent-center">
           {visibleMessages.length > 0 ? (
-            <div className="agent-thread">
-              {visibleMessages.slice(-6).map((message) => (
+            <div className="agent-thread" ref={threadRef}>
+              {visibleMessages.map((message) => (
                 <div key={message.id} className={`agent-thread-message ${message.role}`}>
                   <span>{message.role === 'assistant' ? 'FnO Agent' : 'You'}</span>
                   <p>{message.text}</p>

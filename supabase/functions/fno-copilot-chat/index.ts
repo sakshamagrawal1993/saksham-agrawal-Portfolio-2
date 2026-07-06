@@ -20,6 +20,15 @@ const getSupabase = (req: Request) => {
   return createClient(url, serviceKey);
 };
 
+const getCallerUserId = async (supabase: ReturnType<typeof createClient>, req: Request) => {
+  const auth = req.headers.get("authorization") || "";
+  const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+  if (!token || token.startsWith("sb_publishable_")) return null;
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data.user) return null;
+  return data.user.id;
+};
+
 type WorkflowType =
   | "ask_ai"
   | "create_trade"
@@ -116,20 +125,35 @@ serve(async (req) => {
   if (!supabase) return jsonResponse({ ok: false, error: "Internal Server Error: No DB" }, 500);
 
   try {
-    const { session_id, message, workflow_type } = await req.json();
+    const { session_id, message, workflow_type, user_id } = await req.json();
     if (!session_id || !message) return jsonResponse({ ok: false, error: "Missing required fields" }, 400);
     if (workflow_type && !isWorkflowType(workflow_type)) {
       return jsonResponse({ ok: false, error: "Invalid workflow_type" }, 400);
     }
 
+    const callerUserId = await getCallerUserId(supabase, req);
+    const requestedUserId = typeof user_id === "string" ? user_id : null;
+    if (callerUserId && requestedUserId && callerUserId !== requestedUserId) {
+      return jsonResponse({ ok: false, error: "User mismatch" }, 403);
+    }
+
     // 1. Fetch current session & artifact
     const { data: sessionData, error: sessionErr } = await supabase
       .from('fno_ai_sessions')
-      .select('workflow_type, messages')
+      .select('workflow_type, user_id, messages')
       .eq('id', session_id)
       .single();
       
     if (sessionErr || !sessionData) return jsonResponse({ ok: false, error: "Session not found" }, 404);
+    if (sessionData.user_id && !callerUserId) {
+      return jsonResponse({ ok: false, error: "Authentication required for this session" }, 401);
+    }
+    if (sessionData.user_id && callerUserId && sessionData.user_id !== callerUserId) {
+      return jsonResponse({ ok: false, error: "Forbidden" }, 403);
+    }
+    if (sessionData.user_id && requestedUserId && sessionData.user_id !== requestedUserId) {
+      return jsonResponse({ ok: false, error: "User mismatch" }, 403);
+    }
     if (workflow_type && sessionData.workflow_type !== workflow_type) {
       return jsonResponse({
         ok: false,
@@ -149,7 +173,7 @@ serve(async (req) => {
 
     // 2. Append new message to history
     const updatedMessages = [...(sessionData.messages || []), { role: 'user', content: message, created_at: new Date().toISOString() }];
-    await supabase.from('fno_ai_sessions').update({ messages: updatedMessages }).eq('id', session_id);
+    await supabase.from('fno_ai_sessions').update({ messages: updatedMessages, updated_at: new Date().toISOString() }).eq('id', session_id);
 
     // 3. Call n8n Orchestrator Webhook
     const webhookUrl = Deno.env.get("FNO_COPILOT_ALGO_STRATEGY_WEBHOOK_URL") || "https://n8n.saksham-experiments.com/webhook/fno-copilot-orchestrator";
@@ -168,12 +192,14 @@ serve(async (req) => {
         headers,
         body: JSON.stringify({
           session_id,
+          user_id: sessionData.user_id,
           mode: sessionData.workflow_type,
           workflow_type: sessionData.workflow_type,
           chat_history: updatedMessages,
           current_artifact: artifactData.payload,
           body: {
             session_id,
+            user_id: sessionData.user_id,
             mode: sessionData.workflow_type,
             workflow_type: sessionData.workflow_type,
             chat_history: updatedMessages,
@@ -215,7 +241,7 @@ serve(async (req) => {
 
     await supabase
       .from('fno_ai_sessions')
-      .update({ messages: finalMessages, missing_inputs: missingInputs, state: sessionState })
+      .update({ messages: finalMessages, missing_inputs: missingInputs, state: sessionState, updated_at: new Date().toISOString() })
       .eq('id', session_id);
 
     await supabase
