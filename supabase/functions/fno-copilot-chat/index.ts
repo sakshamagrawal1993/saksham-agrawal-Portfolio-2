@@ -103,6 +103,11 @@ const deepMerge = (base: unknown, updates: unknown): Record<string, unknown> => 
   return merged;
 };
 
+const objectOrUndefined = (value: unknown): Record<string, unknown> | undefined =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined;
+
 const requireServiceSecret = (req: Request) => {
   const apikey = req.headers.get("apikey") || "";
   const auth = req.headers.get("authorization") || "";
@@ -125,7 +130,7 @@ serve(async (req) => {
   if (!supabase) return jsonResponse({ ok: false, error: "Internal Server Error: No DB" }, 500);
 
   try {
-    const { session_id, message, workflow_type, user_id } = await req.json();
+    const { session_id, message, workflow_type, user_id, current_artifact } = await req.json();
     if (!session_id || !message) return jsonResponse({ ok: false, error: "Missing required fields" }, 400);
     if (workflow_type && !isWorkflowType(workflow_type)) {
       return jsonResponse({ ok: false, error: "Invalid workflow_type" }, 400);
@@ -171,6 +176,10 @@ serve(async (req) => {
 
     if (artifactErr || !artifactData) return jsonResponse({ ok: false, error: "Artifact not found" }, 404);
 
+    const artifactBasePayload = objectOrUndefined(current_artifact)
+      ? deepMerge(artifactData.payload, current_artifact)
+      : artifactData.payload as Record<string, unknown>;
+
     // 2. Append new message to history
     const updatedMessages = [...(sessionData.messages || []), { role: 'user', content: message, created_at: new Date().toISOString() }];
     await supabase.from('fno_ai_sessions').update({ messages: updatedMessages, updated_at: new Date().toISOString() }).eq('id', session_id);
@@ -196,14 +205,14 @@ serve(async (req) => {
           mode: sessionData.workflow_type,
           workflow_type: sessionData.workflow_type,
           chat_history: updatedMessages,
-          current_artifact: artifactData.payload,
+          current_artifact: artifactBasePayload,
           body: {
             session_id,
             user_id: sessionData.user_id,
             mode: sessionData.workflow_type,
             workflow_type: sessionData.workflow_type,
             chat_history: updatedMessages,
-            current_artifact: artifactData.payload,
+            current_artifact: artifactBasePayload,
           },
         })
       });
@@ -232,8 +241,8 @@ serve(async (req) => {
     const finalMessages = [...updatedMessages, { role: 'assistant', content: assistantReply, created_at: new Date().toISOString() }];
 
     const newArtifactPayload = artifactInstruction.operation === "replace"
-      ? (artifactInstruction.updated_artifact_payload ?? (artifactData.payload as Record<string, unknown>))
-      : deepMerge(artifactData.payload, artifactInstruction.updated_artifact_payload);
+      ? (artifactInstruction.updated_artifact_payload ?? artifactBasePayload)
+      : deepMerge(artifactBasePayload, artifactInstruction.updated_artifact_payload);
     const newStatus = artifactInstruction.status || artifactData.status || 'draft';
     const missingInputs = artifactInstruction.missing_inputs ?? [];
     const sessionState = newStatus === "ready" ? "completed" : "waiting_input";

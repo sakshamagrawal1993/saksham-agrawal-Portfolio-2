@@ -213,12 +213,14 @@ export const sendAgentChat = async (params: {
   message: string;
   mode?: UserMode;
   user_id?: string;
+  current_artifact?: Record<string, unknown>;
 }): Promise<AgentChatData> => {
   const body = {
     session_id: params.session_id,
     message: params.message,
     workflow_type: params.mode ? userModeToWorkflowType(params.mode) : undefined,
     user_id: params.user_id,
+    current_artifact: params.current_artifact,
   };
   const { data, error } = await supabase.functions.invoke('fno-copilot-chat', { body });
   if (error) {
