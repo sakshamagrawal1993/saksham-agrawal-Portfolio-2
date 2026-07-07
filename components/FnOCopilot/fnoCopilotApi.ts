@@ -309,3 +309,27 @@ export const listAgentSessions = async (params: {
     };
   });
 };
+
+export type FnOCopilotBacktestResult = {
+  state: string;
+  summary: {
+    totalTrades: number;
+    winRate: number;
+    maxDrawdownPct: number;
+    profitFactor: number;
+    dataVersion: string;
+    expectancy: number;
+    avgHoldingMinutes: number;
+  };
+  equityCurve?: Array<{ date: string; value: number }>;
+};
+
+export const runAlgoBacktest = async (
+  payload: Record<string, unknown>
+): Promise<FnOCopilotBacktestResult> => {
+  return invokeFnOCopilot<FnOCopilotBacktestResult>({
+    action: 'backtest',
+    strategy: payload,
+  });
+};
+
