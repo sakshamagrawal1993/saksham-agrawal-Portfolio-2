@@ -83,7 +83,7 @@ export interface JiviProfile {
 export interface JiviChatSession {
   id: string;
   user_id: string;
-  status: 'active' | 'completed' | 'emergency_stopped';
+  status: 'active' | 'completed' | 'emergency_stopped' | 'abandoned';
   created_at: string;
   updated_at: string;
 }

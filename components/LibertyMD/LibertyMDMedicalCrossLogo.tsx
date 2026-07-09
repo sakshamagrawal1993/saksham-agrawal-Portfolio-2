@@ -51,6 +51,7 @@ float snoise(vec3 v) {
 }
 
 uniform float uTime;
+uniform float uTheme;
 varying vec3 vNormal;
 varying vec3 vPosition;
 varying float vNoise;
@@ -58,14 +59,15 @@ varying float vNoise;
 void main() {
   vNormal = normalize(normalMatrix * normal);
   
-  // High density satin silk fabric folds inside the cross
-  float noise1 = snoise(vec3(position.xy * 3.8, uTime * 0.40));
-  float noise2 = snoise(vec3(position.yx * 6.5, uTime * 0.30));
-  float noise3 = snoise(vec3(position.xy * 12.0, uTime * 0.20));
-  float combinedNoise = (noise1 * 0.55 + noise2 * 0.30 + noise3 * 0.15);
+  // Highly prominent multi-octave liquid silk wave displacement
+  float noise1 = snoise(vec3(position.xy * 4.2, uTime * 0.45));
+  float noise2 = snoise(vec3(position.yx * 8.0, uTime * 0.35));
+  float noise3 = snoise(vec3(position.xy * 15.0, uTime * 0.25));
+  float combinedNoise = (noise1 * 0.58 + noise2 * 0.32 + noise3 * 0.18);
   vNoise = combinedNoise;
 
-  vec3 newPosition = position + vec3(0.0, 0.0, combinedNoise * 0.34);
+  // Prominent wave displacement height
+  vec3 newPosition = position + vec3(0.0, 0.0, combinedNoise * 0.45);
   vPosition = newPosition;
 
   gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.0);
@@ -80,31 +82,32 @@ varying vec3 vPosition;
 varying float vNoise;
 
 void main() {
-  // Emerald / Sage Green metallic silk palette (matching reference screenshot)
+  // Electric Cobalt Blue / Azure / Ice Blue Pearl Shimmer Palette matching LibertyMDFooterRibbon
+  vec3 darkBlue  = vec3(0.10, 0.32, 0.82);  // Deep Cobalt Blue
+  vec3 midBlue   = vec3(0.24, 0.58, 0.98);  // Electric Azure Blue
+  vec3 lightSilk = vec3(0.82, 0.94, 1.00);  // Ice Blue Pearl Shimmer
+
+  // Emerald green fallback palette
   vec3 darkEmerald = vec3(0.16, 0.38, 0.30);
   vec3 midSage     = vec3(0.34, 0.62, 0.49);
   vec3 lightMint   = vec3(0.62, 0.84, 0.72);
-
-  // Royal & Cerulean Blue metallic silk palette
-  vec3 darkBlue    = vec3(0.07, 0.20, 0.58);
-  vec3 midBlue     = vec3(0.14, 0.45, 0.90);
-  vec3 lightSilk   = vec3(0.50, 0.80, 0.98);
 
   vec3 darkColor  = mix(darkEmerald, darkBlue, uTheme);
   vec3 midColor   = mix(midSage, midBlue, uTheme);
   vec3 lightColor = mix(lightMint, lightSilk, uTheme);
 
-  vec3 lightDir = normalize(vec3(0.8, 1.2, 2.0));
+  // Strong directional light for crisp, prominent wave ridge definition
+  vec3 lightDir = normalize(vec3(0.9, 1.3, 1.8));
   float diff = max(dot(vNormal, lightDir), 0.0);
   
-  float mix1 = smoothstep(-0.4, 0.2, vNoise);
+  float mix1 = smoothstep(-0.45, 0.25, vNoise);
   vec3 baseColor = mix(darkColor, midColor, mix1);
-  baseColor = mix(baseColor, lightColor, smoothstep(0.15, 0.5, vNoise * diff));
+  baseColor = mix(baseColor, lightColor, smoothstep(0.12, 0.55, vNoise * diff * 1.3));
 
-  // Velvet/silk sheen lighting along ripple crests
-  float sheen = pow(max(dot(vNormal, lightDir), 0.0), 3.0);
-  vec3 sheenColor = mix(vec3(0.20, 0.45, 0.35), vec3(0.25, 0.50, 0.95), uTheme);
-  vec3 finalColor = baseColor + sheenColor * sheen * 0.85;
+  // Prominent specular liquid sheen along silk crests
+  float sheen = pow(max(dot(vNormal, lightDir), 0.0), 2.8);
+  vec3 sheenColor = mix(vec3(0.20, 0.45, 0.35), vec3(0.55, 0.82, 1.00), uTheme);
+  vec3 finalColor = baseColor + sheenColor * sheen * 1.15;
 
   gl_FragColor = vec4(finalColor, 1.0);
 }
@@ -118,8 +121,8 @@ interface LibertyMDMedicalCrossLogoProps {
 
 export default function LibertyMDMedicalCrossLogo({
   className = '',
-  size = 340,
-  colorTheme = 'emerald'
+  size = 350,
+  colorTheme = 'blue'
 }: LibertyMDMedicalCrossLogoProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -130,61 +133,76 @@ export default function LibertyMDMedicalCrossLogo({
     const width = size;
     const height = size;
 
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
-    camera.position.z = 2.4;
-
-    const renderer = new THREE.WebGLRenderer({
-      canvas,
-      alpha: true,
-      antialias: true
-    });
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-
-    const geometry = new THREE.PlaneGeometry(2.4, 2.4, 150, 150);
-    const material = new THREE.ShaderMaterial({
-      vertexShader: CROSS_VERTEX_SHADER,
-      fragmentShader: CROSS_FRAGMENT_SHADER,
-      uniforms: {
-        uTime: { value: 0 },
-        uTheme: { value: colorTheme === 'blue' ? 1.0 : 0.0 }
-      }
-    });
-
-    const mesh = new THREE.Mesh(geometry, material);
-    scene.add(mesh);
-
     let animationFrameId: number;
-    let startTime = performance.now();
+    let renderer: THREE.WebGLRenderer | null = null;
+    let geometry: THREE.PlaneGeometry | null = null;
+    let material: THREE.ShaderMaterial | null = null;
 
-    const animate = (currentTime: number) => {
-      const elapsed = (currentTime - startTime) * 0.001;
-      material.uniforms.uTime.value = elapsed;
-      renderer.render(scene, camera);
+    try {
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
+      camera.position.z = 2.4;
+
+      renderer = new THREE.WebGLRenderer({
+        canvas,
+        alpha: true,
+        antialias: true
+      });
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+      geometry = new THREE.PlaneGeometry(2.4, 2.4, 160, 160);
+      material = new THREE.ShaderMaterial({
+        vertexShader: CROSS_VERTEX_SHADER,
+        fragmentShader: CROSS_FRAGMENT_SHADER,
+        uniforms: {
+          uTime: { value: 0 },
+          uTheme: { value: colorTheme === 'blue' ? 1.0 : 0.0 }
+        }
+      });
+
+      const mesh = new THREE.Mesh(geometry, material);
+      scene.add(mesh);
+
+      let startTime = performance.now();
+
+      const animate = (currentTime: number) => {
+        if (!material || !renderer) return;
+        const elapsed = (currentTime - startTime) * 0.001;
+        material.uniforms.uTime.value = elapsed;
+        renderer.render(scene, camera);
+        animationFrameId = requestAnimationFrame(animate);
+      };
+
       animationFrameId = requestAnimationFrame(animate);
-    };
-
-    animationFrameId = requestAnimationFrame(animate);
+    } catch (err) {
+      console.warn('WebGL initialization warning:', err);
+    }
 
     return () => {
-      cancelAnimationFrame(animationFrameId);
-      geometry.dispose();
-      material.dispose();
-      renderer.dispose();
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      if (geometry) geometry.dispose();
+      if (material) material.dispose();
+      if (renderer) renderer.dispose();
     };
   }, [size, colorTheme]);
 
   return (
     <div
       className={`relative flex items-center justify-center select-none ${className}`}
-      style={{ width: `${size}px`, height: `${size}px` }}
+      style={{
+        width: '100%',
+        height: '100%',
+        maxWidth: `${size}px`,
+        maxHeight: `${size}px`,
+        aspectRatio: '1 / 1'
+      }}
       data-test-id="medical-cross-doctronic-logo"
     >
-      {/* Soft blue aura behind cross */}
-      <div className="absolute inset-4 rounded-full bg-[#2563EB]/25 blur-3xl opacity-80 animate-pulse pointer-events-none" />
+      {/* Electric Cobalt Blue ambient aura around cross */}
+      <div className="absolute inset-4 rounded-full bg-[#2563EB]/35 blur-3xl opacity-90 animate-pulse pointer-events-none" />
 
-      {/* SVG Clip Path matching the exact Organic Concave-Filleted Medical Cross Shape */}
+      {/* SVG Clip Path defining the exact Organic Concave-Filleted Swiss Medical Cross Shape */}
       <svg width="0" height="0" className="absolute">
         <defs>
           <clipPath id="doctronic-medical-cross-clip" clipPathUnits="objectBoundingBox">
@@ -193,7 +211,7 @@ export default function LibertyMDMedicalCrossLogo({
         </defs>
       </svg>
 
-      {/* Blue Satin Silk Wave Three.js Canvas Clipped to Cross Shape */}
+      {/* Prominent Blue Liquid Silk Wave Three.js Canvas Clipped to Cross Shape */}
       <div
         className="relative w-full h-full shadow-2xl transition-transform duration-500 hover:scale-105"
         style={{ clipPath: 'url(#doctronic-medical-cross-clip)' }}
@@ -204,24 +222,6 @@ export default function LibertyMDMedicalCrossLogo({
           width={size}
           height={size}
           className="w-full h-full"
-        />
-      </div>
-
-      {/* Overlapping Top-Left Circular Physician Portrait Avatar matching exact screenshot placement */}
-      <div className="absolute top-[12%] left-[17%] w-[44%] h-[44%] rounded-full border-[3px] border-white/95 shadow-2xl overflow-hidden z-20 transition-transform duration-300 hover:scale-105 bg-[#1E293B]">
-        <img
-          src="https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=85"
-          alt="Board-certified Physician"
-          className="w-full h-full object-cover object-top"
-        />
-      </div>
-
-      {/* Overlapping Bottom-Right Circular Physician Portrait Avatar matching exact screenshot placement */}
-      <div className="absolute bottom-[17%] right-[17%] w-[28%] h-[28%] rounded-full border-[3px] border-white/95 shadow-2xl overflow-hidden z-20 transition-transform duration-300 hover:scale-105 bg-[#1E293B]">
-        <img
-          src="https://images.unsplash.com/photo-1594824476967-48c8b964273f?auto=format&fit=crop&w=300&q=85"
-          alt="Board-certified Physician"
-          className="w-full h-full object-cover object-top"
         />
       </div>
     </div>

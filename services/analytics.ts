@@ -6,7 +6,8 @@ const MIXPANEL_TOKEN = import.meta.env.VITE_MIXPANEL_TOKEN || 'YOUR_MIXPANEL_TOK
 // Initialize Mixpanel safely
 if (MIXPANEL_TOKEN && MIXPANEL_TOKEN !== 'YOUR_MIXPANEL_TOKEN' && MIXPANEL_TOKEN !== 'INSERT_MIXPANEL_TOKEN_HERE') {
     mixpanel.init(MIXPANEL_TOKEN, {
-        debug: true,
+        debug: false,
+        ignore_dnt: true,
         track_pageview: true,
         persistence: 'localStorage',
         autocapture: true, // @ts-ignore

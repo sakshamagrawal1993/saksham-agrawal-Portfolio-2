@@ -10,6 +10,15 @@ interface ChatMessage {
     options?: string[];
 }
 
+const STATUS_COPY: Record<string, string> = {
+    started: 'Connecting to Dr. Jivi...',
+    checking_safety_and_generating: 'Checking safety and drafting the next question...',
+    safety_passed: 'Safety check passed...',
+    generating_question: 'Drafting the next question...',
+    running_diagnosis: 'Preparing your clinical summary...',
+    emergency_end: 'Safety alert...',
+};
+
 export const AICareChat: React.FC = () => {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -18,6 +27,8 @@ export const AICareChat: React.FC = () => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [inputValue, setInputValue] = useState('');
     const [loading, setLoading] = useState(false);
+    const [statusText, setStatusText] = useState<string | null>(null);
+    const [streamingText, setStreamingText] = useState('');
     const [initializing, setInitializing] = useState(true);
     const [emergencyAlert, setEmergencyAlert] = useState<string | null>(null);
     const [resumePrompt, setResumePrompt] = useState(false);
@@ -29,7 +40,7 @@ export const AICareChat: React.FC = () => {
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages, resumePrompt]);
+    }, [messages, resumePrompt, streamingText, statusText]);
 
     useEffect(() => {
         const initKey = `${forceNew ? 'new' : 'resume'}:${requestedSessionId || ''}`;
@@ -87,25 +98,144 @@ export const AICareChat: React.FC = () => {
         }
     };
 
+    const invokeProxyJson = async (body: Record<string, unknown>, attempts = 3) => {
+        let lastError: unknown = null;
+        for (let i = 0; i < attempts; i++) {
+            try {
+                const { data, error } = await supabase.functions.invoke('ai-care-proxy', { body });
+                if (error) {
+                    const status = (error as any)?.context?.status ?? (error as any)?.status;
+                    const msg = String((error as any)?.message || error || '');
+                    const retryable =
+                        status === 502 || status === 503 || status === 504 ||
+                        /503|502|504|Failed to send a request|FunctionsFetchError|network|fetch|Service Unavailable/i.test(msg);
+                    if (retryable && i < attempts - 1) {
+                        await new Promise((r) => setTimeout(r, 800 * (i + 1)));
+                        continue;
+                    }
+                    throw error;
+                }
+                return data;
+            } catch (error) {
+                lastError = error;
+                const status = (error as any)?.context?.status ?? (error as any)?.status;
+                const msg = String((error as any)?.message || error || '');
+                const retryable =
+                    status === 502 || status === 503 || status === 504 ||
+                    /503|502|504|Failed to send a request|FunctionsFetchError|network|fetch|Service Unavailable/i.test(msg);
+                if (!retryable || i === attempts - 1) throw error;
+                await new Promise((r) => setTimeout(r, 800 * (i + 1)));
+            }
+        }
+        throw lastError;
+    };
+
+    /** Prefer SSE so the UI can show live status / tokens while n8n works. */
+    const invokeProxyStream = async (body: Record<string, unknown>) => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) throw new Error('Not authenticated');
+
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-care-proxy`;
+        let lastError: unknown = null;
+
+        for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${session.access_token}`,
+                        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+                    },
+                    body: JSON.stringify({ ...body, stream: true }),
+                });
+
+                if (!res.ok) {
+                    const retryable = res.status === 502 || res.status === 503 || res.status === 504;
+                    if (retryable && attempt < 2) {
+                        await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
+                        continue;
+                    }
+                    throw new Error(`Proxy HTTP ${res.status}`);
+                }
+
+                if (!res.body) throw new Error('No stream body');
+
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let finalPayload: any = null;
+                let eventName = 'message';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    buffer += decoder.decode(value, { stream: true });
+
+                    const parts = buffer.split('\n');
+                    buffer = parts.pop() || '';
+
+                    for (const line of parts) {
+                        if (line.startsWith('event:')) {
+                            eventName = line.slice(6).trim();
+                            continue;
+                        }
+                        if (!line.startsWith('data:')) continue;
+                        const raw = line.slice(5).trim();
+                        if (!raw) continue;
+                        let data: any;
+                        try {
+                            data = JSON.parse(raw);
+                        } catch {
+                            continue;
+                        }
+
+                        if (eventName === 'status' && data?.state) {
+                            setStatusText(STATUS_COPY[data.state] || 'Dr. Jivi is working...');
+                        } else if (eventName === 'token' && typeof data?.text === 'string') {
+                            setStatusText(null);
+                            setStreamingText((prev) => prev + data.text);
+                        } else if (eventName === 'final') {
+                            finalPayload = data;
+                        }
+                        eventName = 'message';
+                    }
+                }
+
+                if (!finalPayload) throw new Error('Stream ended without final event');
+                return finalPayload;
+            } catch (error) {
+                lastError = error;
+                const msg = String((error as any)?.message || error || '');
+                const retryable = /503|502|504|Failed to fetch|network|Proxy HTTP 50/i.test(msg);
+                if (!retryable || attempt === 2) break;
+                await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
+            }
+        }
+
+        // Fallback to JSON path if streaming fails
+        console.warn('SSE path failed, falling back to JSON', lastError);
+        setStatusText('Finishing response...');
+        return invokeProxyJson({ ...body, stream: false });
+    };
+
     const beginFreshSession = async (userId: string) => {
         setLoading(true);
+        setStatusText('Starting a new evaluation...');
         try {
             await closeOtherActiveSessions(userId);
-            const { data, error } = await supabase.functions.invoke('ai-care-proxy', {
-                body: { action: 'start_session', user_id: userId },
-            });
-            if (error) throw error;
+            const data = await invokeProxyJson({ action: 'start_session', user_id: userId });
 
             setSessionId(data.session_id);
             setResumePrompt(false);
             await loadMessages(data.session_id);
 
-            // Drop query flags so refresh doesn't keep forcing new forever
             if (forceNew || requestedSessionId) {
                 setSearchParams({}, { replace: true });
             }
         } finally {
             setLoading(false);
+            setStatusText(null);
         }
     };
 
@@ -129,7 +259,6 @@ export const AICareChat: React.FC = () => {
 
         setSessionId(existing.id);
         await loadMessages(existing.id);
-        // Ask to continue when reopening an in-progress evaluation
         setResumePrompt(true);
     };
 
@@ -145,49 +274,57 @@ export const AICareChat: React.FC = () => {
         navigate('/ai-care/chat?new=1', { replace: true });
     };
 
+    const applyProxyResult = (data: any) => {
+        if (data?.emergency || data?.state === 'emergency_end') {
+            setEmergencyAlert(data.message || 'Please seek emergency care now.');
+            return;
+        }
+        if (data?.diagnosis_ready || data?.state === 'diagnosis_ready') {
+            navigate('/ai-care/observations');
+            return;
+        }
+        if (data?.next_question) {
+            setMessages((prev) => [...prev, {
+                id: `${Date.now()}a`,
+                role: 'assistant',
+                content: data.next_question,
+                options: Array.isArray(data.options) ? data.options : [],
+            }]);
+            return;
+        }
+        throw new Error(data?.error || 'Empty response from Dr. Jivi');
+    };
+
     const sendMessage = async (text: string) => {
-        if (!text.trim() || !sessionId || emergencyAlert || resumePrompt) return;
+        if (!text.trim() || !sessionId || emergencyAlert || resumePrompt || loading) return;
 
         const optimisticMsg: ChatMessage = { id: Date.now().toString(), role: 'user', content: text };
-        setMessages(prev => [...prev, optimisticMsg]);
+        setMessages((prev) => [...prev, optimisticMsg]);
         setInputValue('');
         setLoading(true);
+        setStreamingText('');
+        setStatusText('Sending...');
 
         try {
-            const { data, error } = await supabase.functions.invoke('ai-care-proxy', {
-                body: {
-                    action: 'send_message',
-                    session_id: sessionId,
-                    message: text,
-                    stream: false,
-                },
+            const data = await invokeProxyStream({
+                action: 'send_message',
+                session_id: sessionId,
+                message: text,
             });
-
-            if (error) throw error;
-
-            if (data?.emergency) {
-                setEmergencyAlert(data.message || 'Please seek emergency care now.');
-            } else if (data?.diagnosis_ready) {
-                navigate('/ai-care/observations');
-            } else if (data?.next_question) {
-                setMessages(prev => [...prev, {
-                    id: `${Date.now()}a`,
-                    role: 'assistant',
-                    content: data.next_question,
-                    options: Array.isArray(data.options) ? data.options : [],
-                }]);
-            } else {
-                throw new Error(data?.error || 'Empty response from Dr. Jivi');
-            }
+            setStreamingText('');
+            applyProxyResult(data);
         } catch (error) {
             console.error('Failed to send message', error);
-            alert('Failed to connect to Dr. Jivi. Please try again.');
+            setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id));
+            alert('Dr. Jivi is temporarily unavailable. Please try again in a moment.');
         } finally {
             setLoading(false);
+            setStatusText(null);
+            setStreamingText('');
         }
     };
 
-    const currentOptions = !resumePrompt && messages.length > 0 && messages[messages.length - 1].role === 'assistant'
+    const currentOptions = !resumePrompt && !loading && messages.length > 0 && messages[messages.length - 1].role === 'assistant'
         ? messages[messages.length - 1].options
         : [];
 
@@ -261,12 +398,23 @@ export const AICareChat: React.FC = () => {
                     </div>
                 ))}
 
-                {(loading || initializing) && (
+                {streamingText && (
+                    <div className="flex justify-start">
+                        <div className="max-w-[85%] px-5 py-4 rounded-2xl bg-white border border-[#EBE7DE] text-[#2C2A26] rounded-tl-sm shadow-sm text-[15px] leading-relaxed">
+                            {streamingText}
+                            <span className="inline-block w-1.5 h-4 ml-0.5 bg-[#A84A00]/70 animate-pulse align-middle" />
+                        </div>
+                    </div>
+                )}
+
+                {(loading || initializing) && !streamingText && (
                     <div className="flex justify-start">
                         <div className="max-w-[85%] px-5 py-4 rounded-2xl bg-white border border-[#EBE7DE] text-[#2C2A26] rounded-tl-sm shadow-sm flex items-center gap-2">
                             <Loader2 className="w-4 h-4 animate-spin text-[#A84A00]" />
                             <span className="text-[#A8A29E] text-sm">
-                                {initializing ? 'Starting chat...' : 'Dr. Jivi is typing...'}
+                                {initializing
+                                    ? 'Starting chat...'
+                                    : statusText || 'Dr. Jivi is typing...'}
                             </span>
                         </div>
                     </div>
@@ -282,7 +430,7 @@ export const AICareChat: React.FC = () => {
                                 key={i}
                                 onClick={() => sendMessage(opt)}
                                 disabled={loading}
-                                className="bg-white border border-[#EBE7DE] text-[#2C2A26] text-sm px-4 py-3 rounded-2xl hover:border-[#A84A00] transition-colors text-left shadow-sm flex-1 min-w-[200px]"
+                                className="bg-white border border-[#EBE7DE] text-[#2C2A26] text-sm px-4 py-3 rounded-2xl hover:border-[#A84A00] transition-colors text-left shadow-sm flex-1 min-w-[200px] disabled:opacity-50"
                             >
                                 {opt}
                             </button>
@@ -295,10 +443,10 @@ export const AICareChat: React.FC = () => {
                         type="text"
                         value={inputValue}
                         onChange={e => setInputValue(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && sendMessage(inputValue)}
+                        onKeyDown={e => e.key === 'Enter' && !loading && sendMessage(inputValue)}
                         disabled={loading || initializing || !!emergencyAlert || resumePrompt}
                         placeholder={resumePrompt ? 'Continue or start a new chat above' : 'Describe your issue'}
-                        className="w-full bg-white border border-[#EBE7DE] rounded-full pl-6 pr-14 py-4 focus:outline-none focus:border-[#A84A00] focus:ring-1 focus:ring-[#A84A00] shadow-sm text-[#2C2A26]"
+                        className="w-full bg-white border border-[#EBE7DE] rounded-full pl-6 pr-14 py-4 focus:outline-none focus:border-[#A84A00] focus:ring-1 focus:ring-[#A84A00] shadow-sm text-[#2C2A26] disabled:opacity-60"
                     />
                     <button
                         onClick={() => sendMessage(inputValue)}

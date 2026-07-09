@@ -12,6 +12,13 @@ interface ChatRequestPayload {
   message?: string;
   user_id?: string;
   stream?: boolean;
+  product?: 'ai-care' | 'libertymd';
+  anonymous?: boolean;
+  region?: 'EU' | 'US';
+  demographics?: {
+    age?: string | number;
+    sex?: string;
+  };
 }
 
 interface MessageItem {
@@ -105,16 +112,35 @@ function normalizeGuardrail(raw: any): GuardrailResult {
   };
 }
 
+/** Bound outbound n8n calls so the Edge Function always returns before the gateway 503s. */
+function withTimeout(ms: number, parent?: AbortSignal): { signal: AbortSignal; clear: () => void } {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  const onAbort = () => ctrl.abort();
+  if (parent) {
+    if (parent.aborted) ctrl.abort();
+    else parent.addEventListener('abort', onAbort, { once: true });
+  }
+  return {
+    signal: ctrl.signal,
+    clear: () => {
+      clearTimeout(timer);
+      parent?.removeEventListener('abort', onAbort);
+    },
+  };
+}
+
 async function fetchGuardrail(message: string, history: MessageItem[], signal?: AbortSignal): Promise<GuardrailResult> {
   const local = deterministicEmergency(message);
   if (local) return local;
 
+  const { signal: timed, clear } = withTimeout(8000, signal);
   try {
     const res = await fetch(N8N_GUARDRAIL_WEBHOOK, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message, history }),
-      signal,
+      signal: timed,
     });
     const raw = await res.json().catch(() => ({ is_emergency: false }));
     return normalizeGuardrail(raw);
@@ -125,24 +151,80 @@ async function fetchGuardrail(message: string, history: MessageItem[], signal?: 
     // Fail open to interview (deterministic already caught classics); log-worthy
     console.error('guardrail fetch failed', e);
     return { is_emergency: false, status: 'pass', message: 'Guardrail unavailable', source: 'error_fail_open' };
+  } finally {
+    clear();
+  }
+}
+
+function normalizeQAPayload(raw: any) {
+  const qaData = raw?.output && typeof raw.output === 'object' ? raw.output : raw;
+  const next_question = String(
+    qaData?.next_question || qaData?.question || '',
+  ).trim();
+  const options = Array.isArray(qaData?.options)
+    ? qaData.options.map(String).filter(Boolean).slice(0, 4)
+    : [];
+  return {
+    next_question,
+    options,
+    ready_for_report: !!qaData?.ready_for_report,
+    qa_source: 'n8n' as const,
+  };
+}
+
+async function fetchQAOnce(history: MessageItem[], timeoutMs: number, signal?: AbortSignal) {
+  const { signal: timed, clear } = withTimeout(timeoutMs, signal);
+  try {
+    const res = await fetch(N8N_QA_WEBHOOK, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ history }),
+      signal: timed,
+    });
+    if (!res.ok) {
+      throw new Error(`QA webhook HTTP ${res.status}`);
+    }
+    const raw = await res.json().catch(() => ({}));
+    const normalized = normalizeQAPayload(raw);
+    if (!normalized.next_question) {
+      throw new Error('QA webhook returned empty question');
+    }
+    return normalized;
+  } finally {
+    clear();
   }
 }
 
 async function fetchQA(history: MessageItem[], signal?: AbortSignal) {
-  const res = await fetch(N8N_QA_WEBHOOK, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ history }),
-    signal,
-  });
-  const qaData = await res.json().catch(() => ({
-    next_question: 'Could you tell me more about that?',
-    options: [],
-  }));
+  // Wait up to 20s for the real n8n agent question before using backup.
+  try {
+    if (!signal?.aborted) {
+      return await fetchQAOnce(history, 20_000, signal);
+    }
+  } catch (e) {
+    console.error('qa fetch failed after 20s', e);
+    if ((e as Error)?.name === 'AbortError' && signal?.aborted) {
+      // Parent aborted (emergency) — do not invent a follow-up question.
+      return {
+        next_question: '',
+        options: [],
+        ready_for_report: false,
+        qa_source: 'aborted' as const,
+      };
+    }
+  }
+
   return {
-    next_question: qaData.next_question || qaData.question || 'Could you tell me more about that?',
-    options: Array.isArray(qaData.options) ? qaData.options : [],
-    ready_for_report: !!qaData.ready_for_report,
+    next_question:
+      'Sorry — that took too long. Could you briefly restate your main symptom and how long it has lasted?',
+    options: [
+      'Fever for a few days',
+      'Cough or sore throat',
+      'Pain somewhere specific',
+      'Something else — I will type it',
+    ],
+    ready_for_report: false,
+    qa_source: 'fallback' as const,
   };
 }
 
@@ -199,57 +281,95 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseClient = createClient(
+    const payload: ChatRequestPayload = await req.json();
+    const authHeader = req.headers.get('Authorization') || '';
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const isLibertyMd = payload.product === 'libertymd';
+    const allowAnonymousLibertyMd = isLibertyMd && payload.anonymous === true;
+
+    const userScopedClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } },
+      authHeader ? { global: { headers: { Authorization: authHeader } } } : undefined,
     );
 
     const {
       data: { user },
-    } = await supabaseClient.auth.getUser();
+    } = authHeader
+      ? await userScopedClient.auth.getUser()
+      : { data: { user: null } };
 
-    if (!user) {
+    if (!user && !allowAnonymousLibertyMd) {
       return jsonResponse({ error: 'Unauthorized' }, 401);
     }
 
-    const payload: ChatRequestPayload = await req.json();
+    if (!user && allowAnonymousLibertyMd && !serviceRoleKey) {
+      return jsonResponse({ error: 'LibertyMd anonymous mode is not configured' }, 503);
+    }
+
+    const supabaseClient = user
+      ? userScopedClient
+      : createClient(supabaseUrl, serviceRoleKey, {
+          auth: { persistSession: false, autoRefreshToken: false },
+        });
+    const actorUserId = user?.id ?? null;
+
     // Opt-in streaming so supabase.functions.invoke (JSON) clients keep working
     const wantStream = payload.stream === true;
 
     if (payload.action === 'start_session') {
       const { data: session, error: sessionError } = await supabaseClient
         .from('jivi_chat_sessions')
-        .insert({ user_id: user.id })
+        .insert({ user_id: actorUserId })
         .select()
         .single();
 
       if (sessionError) throw sessionError;
 
-      const { data: profile } = await supabaseClient
-        .from('jivi_profiles')
-        .select('name')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
+      const { data: profile } = actorUserId
+        ? await supabaseClient
+            .from('jivi_profiles')
+            .select('name')
+            .eq('user_id', actorUserId)
+            .limit(1)
+            .maybeSingle()
+        : { data: null };
 
-      const rawName = profile?.name || user.email?.split('@')[0] || '';
+      const rawName = profile?.name || user?.email?.split('@')[0] || '';
       const userName = rawName.split(' ')[0] || rawName;
-      const initialQuestion = `Hello ${userName}, what symptoms or concerns would you like to discuss today?`;
+      const initialQuestion = isLibertyMd
+        ? `Hi${userName ? ` ${userName}` : ''}, I'm LibertyMd. Tell me what's going on today, including when it started and what worries you most.`
+        : `Hello ${userName}, what symptoms or concerns would you like to discuss today?`;
+      const initialOptions = isLibertyMd
+        ? [
+            'I have fever, cough, and body aches.',
+            'I have chest pain and shortness of breath.',
+            'My wrist hurts after a fall.',
+            'I have burning when I pee.',
+          ]
+        : [
+            'I am constantly thirsty and have to use the bathroom all night.',
+            'I have a sharp pain in the lower right side of my stomach.',
+            'I get breathless and my chest feels tight.',
+            'I have a bad headache that won\'t go away.',
+          ];
 
       await supabaseClient.from('jivi_chat_messages').insert({
         session_id: session.id,
         role: 'assistant',
         content: initialQuestion,
-        options: [
-          'I am constantly thirsty and have to use the bathroom all night.',
-          'I have a sharp pain in the lower right side of my stomach.',
-          'I get breathless and my chest feels tight.',
-          'I have a bad headache that won\'t go away.',
-        ],
+        options: initialOptions,
       });
 
-      return jsonResponse({ session_id: session.id, initial_question: initialQuestion });
+      return jsonResponse({
+        session_id: session.id,
+        initial_question: initialQuestion,
+        options: initialOptions,
+        product: isLibertyMd ? 'libertymd' : 'ai-care',
+        anonymous: !actorUserId,
+      });
     }
 
     if (payload.action !== 'send_message') {
@@ -260,6 +380,39 @@ serve(async (req) => {
     const userMessage = payload.message;
     if (!sessionId || !userMessage) {
       return jsonResponse({ error: 'Missing session_id or message' }, 400);
+    }
+
+    const { data: existingSession, error: existingSessionError } = await supabaseClient
+      .from('jivi_chat_sessions')
+      .select('id,user_id,status')
+      .eq('id', sessionId)
+      .maybeSingle();
+
+    if (existingSessionError) throw existingSessionError;
+    if (!existingSession) {
+      return jsonResponse({ error: 'Session not found' }, 404);
+    }
+    if (actorUserId && existingSession.user_id && existingSession.user_id !== actorUserId) {
+      return jsonResponse({ error: 'Forbidden' }, 403);
+    }
+    if (!actorUserId && existingSession.user_id) {
+      return jsonResponse({ error: 'Forbidden' }, 403);
+    }
+    if (existingSession.status === 'emergency_stopped') {
+      return jsonResponse({
+        emergency: true,
+        message: 'This evaluation was stopped for safety. Please seek emergency care if symptoms persist, or start a new evaluation.',
+        guardrail_source: 'session_status',
+      });
+    }
+    if (existingSession.status === 'completed') {
+      return jsonResponse({
+        diagnosis_ready: true,
+        message: 'This evaluation is already complete.',
+      });
+    }
+    if (existingSession.status === 'abandoned') {
+      return jsonResponse({ error: 'This evaluation was closed. Please start a new chat.' }, 409);
     }
 
     await supabaseClient.from('jivi_chat_messages').insert({
@@ -357,6 +510,23 @@ serve(async (req) => {
       const qaData = await qaPromise;
       timing.qa_ms = Date.now() - timing.t0;
 
+      if (!qaData.next_question) {
+        // Emergency abort or empty agent payload — use backup so the UI never stalls blank.
+        const backup = {
+          next_question:
+            'Sorry — that took too long. Could you briefly restate your main symptom and how long it has lasted?',
+          options: [
+            'Fever for a few days',
+            'Cough or sore throat',
+            'Pain somewhere specific',
+            'Something else — I will type it',
+          ],
+          ready_for_report: false,
+          qa_source: 'fallback' as const,
+        };
+        Object.assign(qaData, backup);
+      }
+
       const shouldRunDiagnosis =
         !!qaData.ready_for_report || userMessageCount >= 8 || /home care|summary|i'?m done|give me (the )?report/i.test(userMessage);
 
@@ -380,15 +550,24 @@ serve(async (req) => {
           /* ignore */
         }
 
-        const diagRes = await fetch(N8N_DIAGNOSIS_WEBHOOK, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            history: messageHistory,
-            intermediate_diagnoses: intermediate,
-          }),
-        });
-        const diagRaw = await diagRes.json().catch(() => ({ confidence_score: 0 }));
+        const { signal: diagSignal, clear: clearDiag } = withTimeout(8000);
+        let diagRaw: any = { confidence_score: 0 };
+        try {
+          const diagRes = await fetch(N8N_DIAGNOSIS_WEBHOOK, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              history: messageHistory,
+              intermediate_diagnoses: intermediate,
+            }),
+            signal: diagSignal,
+          });
+          diagRaw = await diagRes.json().catch(() => ({ confidence_score: 0 }));
+        } catch (e) {
+          console.error('diagnosis fetch failed', e);
+        } finally {
+          clearDiag();
+        }
         const { confScore, diagnosesList, raw, reportReady } = parseDiagnosisPayload(diagRaw);
         timing.diagnosis_ms = Date.now() - timing.t0;
 
@@ -428,6 +607,7 @@ serve(async (req) => {
         next_question: qaData.next_question,
         options: qaData.options,
         ready_for_report: qaData.ready_for_report,
+        qa_source: (qaData as any).qa_source || 'n8n',
         timing,
         parallel: true,
       };
@@ -455,6 +635,7 @@ serve(async (req) => {
         next_question: result.next_question,
         options: result.options,
         ready_for_report: result.ready_for_report,
+        qa_source: (result as any).qa_source || 'n8n',
         timing: result.timing,
         parallel: result.parallel,
       });
@@ -504,6 +685,7 @@ serve(async (req) => {
             next_question: result.next_question,
             options: result.options,
             ready_for_report: result.ready_for_report,
+            qa_source: (result as any).qa_source || 'n8n',
             timing: result.timing,
             parallel: result.parallel,
           });
