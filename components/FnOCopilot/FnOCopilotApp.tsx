@@ -2255,7 +2255,7 @@ function AgentAlgoSections({
   const [stage, setStage] = React.useState<1 | 2 | 3 | 4>(1);
   const [isRunningBacktest, setIsRunningBacktest] = React.useState(false);
   const [backtestResults, setBacktestResults] = React.useState<any>(null);
-  const payload = draft as unknown as Record<string, unknown>;
+  const payload = draft as any;
 
   const handleRunBacktest = async () => {
     setIsRunningBacktest(true);
@@ -2296,9 +2296,9 @@ function AgentAlgoSections({
 
   const readString = (key: string, fallback = '') => typeof payload[key] === 'string' ? String(payload[key]) : fallback;
 
-  const readLines = (key: string, fallback: string[]) =>
+  const _readLines = (key: string, fallback: string[]) =>
     Array.isArray(payload[key]) ? (payload[key] as unknown[]).map((item) => String(item)).join('\n') : fallback.join('\n');
-  const toLines = (value: string) => value.split('\n').map((item) => item.trim()).filter(Boolean);
+  const _toLines = (value: string) => value.split('\n').map((item) => item.trim()).filter(Boolean);
 
   // Structured rule groups: n8n payload (entryConditions/exitConditions) wins,
   // then the local planner's plan; the free-text boxes are only a fallback.
@@ -2319,7 +2319,7 @@ function AgentAlgoSections({
     if (draft.plan?.legs?.length) return draft.plan.legs as unknown as AnyLeg[];
     return null;
   })();
-  const riskBox = (payload.risk && typeof payload.risk === 'object' ? payload.risk : payload.globalTargets) as AnyLeg | undefined;
+  const _riskBox = (payload.risk && typeof payload.risk === 'object' ? payload.risk : payload.globalTargets) as AnyLeg | undefined;
 
   return (
     <div className="agent-algo-sections">

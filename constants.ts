@@ -82,6 +82,23 @@ export const EXPERIENCE = [
 ];
 
 export const PROJECTS: Project[] = [
+  {
+    id: 'liberty-md',
+    name: 'LibertyMD',
+    tagline: '100% Private AI Doctor & Instant Telemedicine for US & Europe.',
+    description: 'An anonymous AI primary and urgent care physician built on peer-reviewed clinical guidelines, offering instant symptom triage and €39 / $39 doctor consultations.',
+    longDescription: 'LibertyMD brings accessible, confidential AI healthcare to US and European residents. Functioning with zero PII retention under strict EU GDPR Article 9 and US HIPAA Safe Harbor standards, users receive real-time differential diagnosis, clinical action plans, and seamless video connect to licensed physicians across all 50 US states and 27 EU member states in under 30 minutes.',
+    role: 'Creator & Product Architect',
+    category: 'Healthcare AI',
+    imageUrl: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&q=80&w=1000',
+    gallery: [
+      'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&q=80&w=1000'
+    ],
+    techStack: ['React', 'Agentic RAG', 'GDPR/HIPAA Vault', 'WebGL Shaders', 'WebRTC'],
+    demoUrl: '/liberty-md',
+    status: 'completed',
+    ribbonLabel: 'Live Demo'
+  },
   // Showcase MVP / Existing Projects
   {
     id: 'ai-gate',

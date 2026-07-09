@@ -87,34 +87,134 @@ export const AICareChat: React.FC = () => {
         if (!text.trim() || !sessionId || emergencyAlert) return;
 
         const optimisticMsg: ChatMessage = { id: Date.now().toString(), role: 'user', content: text };
+        const streamingId = `${Date.now()}a`;
         setMessages(prev => [...prev, optimisticMsg]);
         setInputValue('');
         setLoading(true);
 
         try {
-            const { data, error } = await supabase.functions.invoke('ai-care-proxy', {
-                body: { action: 'send_message', session_id: sessionId, message: text }
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session?.access_token) {
+                navigate('/login?redirect=/ai-care/chat');
+                return;
+            }
+
+            const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL as string;
+            const anonKey = (import.meta as any).env.VITE_SUPABASE_ANON_KEY as string;
+            const res = await fetch(`${supabaseUrl}/functions/v1/ai-care-proxy`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${session.access_token}`,
+                    apikey: anonKey,
+                },
+                body: JSON.stringify({
+                    action: 'send_message',
+                    session_id: sessionId,
+                    message: text,
+                    stream: true,
+                }),
             });
 
-            if (error) throw error;
-
-            if (data.emergency) {
-                setEmergencyAlert(data.message);
-            } else if (data.diagnosis_ready) {
-                navigate('/ai-care/observations');
-            } else {
-                // Fetch the newly added assistant message from DB, or just use the response
-                const assistantMsg: ChatMessage = {
-                    id: Date.now().toString() + 'a',
-                    role: 'assistant',
-                    content: data.next_question,
-                    options: data.options
-                };
-                setMessages(prev => [...prev, assistantMsg]);
+            if (!res.ok) {
+                const errBody = await res.text().catch(() => '');
+                throw new Error(errBody || `Request failed (${res.status})`);
             }
+
+            const contentType = res.headers.get('content-type') || '';
+            // Fallback if proxy returns plain JSON (non-stream)
+            if (!contentType.includes('text/event-stream') || !res.body) {
+                const data = await res.json();
+                if (data.emergency) {
+                    setEmergencyAlert(data.message);
+                } else if (data.diagnosis_ready) {
+                    navigate('/ai-care/observations');
+                } else {
+                    setMessages(prev => [...prev, {
+                        id: streamingId,
+                        role: 'assistant',
+                        content: data.next_question,
+                        options: data.options,
+                    }]);
+                }
+                return;
+            }
+
+            setLoading(false);
+            setMessages(prev => [...prev, { id: streamingId, role: 'assistant', content: '' }]);
+
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let streamed = '';
+            let finalOptions: string[] | undefined;
+
+            const applyFinal = (data: any) => {
+                if (data.emergency || data.state === 'emergency_end') {
+                    setEmergencyAlert(data.message);
+                    setMessages(prev => prev.filter(m => m.id !== streamingId || m.content));
+                    return;
+                }
+                if (data.diagnosis_ready || data.state === 'diagnosis_ready') {
+                    navigate('/ai-care/observations');
+                    return;
+                }
+                if (data.error) throw new Error(data.error);
+                const full = data.next_question || streamed;
+                finalOptions = data.options;
+                setMessages(prev => prev.map(m =>
+                    m.id === streamingId
+                        ? { ...m, content: full, options: data.options }
+                        : m
+                ));
+            };
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const parts = buffer.split('\n\n');
+                buffer = parts.pop() || '';
+
+                for (const part of parts) {
+                    const lines = part.split('\n');
+                    let event = 'message';
+                    let dataLine = '';
+                    for (const line of lines) {
+                        if (line.startsWith('event:')) event = line.slice(6).trim();
+                        if (line.startsWith('data:')) dataLine += line.slice(5).trim();
+                    }
+                    if (!dataLine) continue;
+                    let data: any;
+                    try {
+                        data = JSON.parse(dataLine);
+                    } catch {
+                        continue;
+                    }
+
+                    if (event === 'token' && data.text) {
+                        streamed += data.text;
+                        setMessages(prev => prev.map(m =>
+                            m.id === streamingId ? { ...m, content: streamed } : m
+                        ));
+                    } else if (event === 'final') {
+                        applyFinal(data);
+                    }
+                }
+            }
+
+            // If stream ended without a usable assistant bubble, drop empty placeholder
+            setMessages(prev => {
+                const last = prev.find(m => m.id === streamingId);
+                if (last && !last.content && !finalOptions) {
+                    return prev.filter(m => m.id !== streamingId);
+                }
+                return prev;
+            });
         } catch (error) {
             console.error('Failed to send message', error);
             alert('Failed to connect to Dr. Jivi. Please try again.');
+            setMessages(prev => prev.filter(m => m.id !== streamingId));
         } finally {
             setLoading(false);
         }
