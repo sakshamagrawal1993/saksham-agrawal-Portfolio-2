@@ -167,18 +167,24 @@ function parseDiagnosisPayload(diagData: any) {
 
   let confScore = 0;
   let diagnosesList: any[] = [];
-  if (data?.confidence_score !== undefined) {
-    confScore = data.confidence_score;
-    diagnosesList = data.diagnoses || [];
+  if (Array.isArray(data?.differential_diagnosis) && data.differential_diagnosis.length) {
+    diagnosesList = data.differential_diagnosis;
+    if (typeof data.confidence_score === 'number') {
+      confScore = data.confidence_score;
+    } else {
+      const confString = String(data.differential_diagnosis[0].confidence || '0');
+      confScore = parseInt(confString.replace('%', ''), 10) || 0;
+    }
+  } else if (data?.confidence_score !== undefined) {
+    confScore = Number(data.confidence_score) || 0;
+    diagnosesList = data.diagnoses || data.differential_diagnosis || [];
   } else if (data?.diagnosis) {
     confScore = data.diagnosis.confidence || 0;
     diagnosesList = [data.diagnosis];
-  } else if (data?.differential_diagnosis?.length) {
-    const confString = String(data.differential_diagnosis[0].confidence || '0');
-    confScore = parseInt(confString.replace('%', ''), 10) || 0;
-    diagnosesList = data.differential_diagnosis;
   }
-  return { confScore, diagnosesList, raw: data };
+
+  const reportReady = data?.ui_state === 'report_ready' || data?.diagnosis_ready === true || diagnosesList.length > 0;
+  return { confScore, diagnosesList, raw: data, reportReady };
 }
 
 function chunkText(text: string, size = 18): string[] {
@@ -319,13 +325,9 @@ serve(async (req) => {
       // For early turns: parallel guardrail || QA
       // For later turns: parallel guardrail || diagnosis path decision still needs history; run guardrail || QA first unless count high
 
+      // Parallel: guardrail + QA. Abort QA if emergency wins.
       const guardPromise = fetchGuardrail(userMessage, messageHistory);
-
-      let qaPromise: Promise<{ next_question: string; options: string[]; ready_for_report: boolean }> | null = null;
-      const shouldStartQaEarly = userMessageCount <= 5;
-      if (shouldStartQaEarly) {
-        qaPromise = fetchQA(messageHistory, qaAbort.signal);
-      }
+      const qaPromise = fetchQA(messageHistory, qaAbort.signal);
 
       const guardrailData = await guardPromise;
       timing.guardrail_ms = Date.now() - timing.t0;
@@ -351,8 +353,14 @@ serve(async (req) => {
         };
       }
 
-      // Diagnosis path (after enough turns) — still after guardrail pass
-      if (userMessageCount > 5) {
+      emit?.('status', { state: 'generating_question' });
+      const qaData = await qaPromise;
+      timing.qa_ms = Date.now() - timing.t0;
+
+      const shouldRunDiagnosis =
+        !!qaData.ready_for_report || userMessageCount >= 8 || /home care|summary|i'?m done|give me (the )?report/i.test(userMessage);
+
+      if (shouldRunDiagnosis) {
         emit?.('status', { state: 'running_diagnosis' });
         const { data: systemMsg } = await supabaseClient
           .from('jivi_chat_messages')
@@ -381,19 +389,20 @@ serve(async (req) => {
           }),
         });
         const diagRaw = await diagRes.json().catch(() => ({ confidence_score: 0 }));
-        const { confScore, diagnosesList } = parseDiagnosisPayload(diagRaw);
+        const { confScore, diagnosesList, raw, reportReady } = parseDiagnosisPayload(diagRaw);
         timing.diagnosis_ms = Date.now() - timing.t0;
 
-        if (confScore >= 80 || userMessageCount >= 15) {
+        if (reportReady && (confScore >= 50 || qaData.ready_for_report || userMessageCount >= 8)) {
           await supabaseClient.from('jivi_diagnoses').insert({
             session_id: sessionId,
-            diagnosis_data: diagnosesList,
+            diagnosis_data: diagnosesList.length ? diagnosesList : raw,
             confidence_score: confScore,
           });
           await supabaseClient.from('jivi_chat_sessions').update({ status: 'completed' }).eq('id', sessionId);
           return {
             type: 'diagnosis_ready' as const,
             confidence_score: confScore,
+            report: raw,
             timing,
           };
         }
@@ -406,12 +415,6 @@ serve(async (req) => {
           });
         }
       }
-
-      emit?.('status', { state: 'generating_question' });
-      const qaData = qaPromise
-        ? await qaPromise
-        : await fetchQA(messageHistory);
-      timing.qa_ms = Date.now() - timing.t0;
 
       await supabaseClient.from('jivi_chat_messages').insert({
         session_id: sessionId,
@@ -426,7 +429,7 @@ serve(async (req) => {
         options: qaData.options,
         ready_for_report: qaData.ready_for_report,
         timing,
-        parallel: shouldStartQaEarly,
+        parallel: true,
       };
     };
 
@@ -444,6 +447,7 @@ serve(async (req) => {
         return jsonResponse({
           diagnosis_ready: true,
           confidence_score: result.confidence_score,
+          report: (result as any).report || null,
           timing: result.timing,
         });
       }
