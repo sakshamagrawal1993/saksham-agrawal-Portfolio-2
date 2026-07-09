@@ -54,7 +54,7 @@ export const AICareProfile: React.FC = () => {
             });
 
             if (error) throw error;
-            navigate('/ai-care/chat');
+            navigate('/ai-care/chat?new=1');
         } catch (error) {
             console.error('Error saving profile:', error);
             alert('Could not save profile.');

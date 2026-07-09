@@ -50,7 +50,8 @@ export const AICareLanding: React.FC = () => {
         if (!profileName) {
             navigate('/ai-care/profile');
         } else {
-            navigate('/ai-care/chat');
+            // Always open a fresh chat from the main input / categories
+            navigate('/ai-care/chat?new=1');
         }
     };
 
@@ -152,7 +153,8 @@ export const AICareLanding: React.FC = () => {
                                         if (session.status === 'completed') {
                                             navigate(`/ai-care/observations?sessionId=${session.id}`);
                                         } else {
-                                            navigate('/ai-care/chat');
+                                            // Resume only when user picks an active evaluation
+                                            navigate(`/ai-care/chat?sessionId=${session.id}`);
                                         }
                                     }}
                                     className="w-full bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between hover:border-orange-300 transition-colors text-left shadow-sm"

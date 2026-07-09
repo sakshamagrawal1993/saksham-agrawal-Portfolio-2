@@ -218,7 +218,7 @@ export const AICareObservations: React.FC = () => {
             {/* Sticky Action Footer */}
             <div className="p-6 mt-auto sticky bottom-0 bg-[#FDFBF9] border-t border-gray-100 shadow-md shadow-gray-100/10">
                  <button 
-                     onClick={() => navigate('/ai-care/chat')} 
+                     onClick={() => navigate('/ai-care/chat?new=1')} 
                      className="w-full bg-gradient-to-r from-orange-500 to-pink-600 hover:from-orange-600 hover:to-pink-700 text-white py-4 rounded-full font-semibold shadow-lg shadow-orange-500/10 hover:shadow-orange-500/20 hover:-translate-y-0.5 transition-all duration-300 flex items-center justify-center gap-2"
                  >
                      Start New Assessment
