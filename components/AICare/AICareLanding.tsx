@@ -153,7 +153,6 @@ export const AICareLanding: React.FC = () => {
                                         if (session.status === 'completed') {
                                             navigate(`/ai-care/observations?sessionId=${session.id}`);
                                         } else {
-                                            // Resume only when user picks an active evaluation
                                             navigate(`/ai-care/chat?sessionId=${session.id}`);
                                         }
                                     }}
@@ -161,7 +160,11 @@ export const AICareLanding: React.FC = () => {
                                 >
                                     <div>
                                         <h5 className="font-semibold text-gray-800 mb-1">
-                                            {session.status === 'completed' ? 'Diagnosis Report' : 'Active Evaluation'}
+                                            {session.status === 'completed'
+                                                ? 'Diagnosis Report'
+                                                : session.status === 'emergency_stopped'
+                                                    ? 'Safety Alert'
+                                                    : 'Active Evaluation'}
                                         </h5>
                                         <p className="text-xs text-gray-400">
                                             {new Date(session.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} | {new Date(session.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).toLowerCase()}

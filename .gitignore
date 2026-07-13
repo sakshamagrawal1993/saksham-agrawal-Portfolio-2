@@ -37,3 +37,8 @@ dist-ssr
 .loop-mind-coach/STATE.json
 .loop-mind-coach/runs/
 .loop-mind-coach/logs/
+
+# AI Care E2E generated artifacts (may contain short-lived session tokens)
+scratch/aicare_e2e_suite_out/
+scratch/aicare_fe_e2e_out/
+scratch/test_fundamentals_after_fix.json

@@ -4,23 +4,65 @@ import LibertyMDMedicalCrossLogo from './LibertyMDMedicalCrossLogo';
 interface LibertyMDPremiumLogoProps {
   scrollY?: number;
   className?: string;
+  dockHeadlineRef?: React.RefObject<HTMLElement | null>;
 }
 
 const portraitClass =
-  'absolute overflow-hidden rounded-full border-[5px] border-[#FBFCF8] bg-white shadow-[0_18px_45px_rgba(15,23,42,0.18)]';
+  'absolute overflow-hidden rounded-full border-[3px] border-[#FBFCF8] bg-white shadow-[0_18px_45px_rgba(15,23,42,0.18)]';
 
-export default function LibertyMDPremiumLogo({ scrollY = 0, className = '' }: LibertyMDPremiumLogoProps) {
+const libertyMDPortraitBase = `${String((import.meta as any).env.VITE_SUPABASE_URL || '').replace(/\/$/, '')}/storage/v1/object/public/libertymd-assets/portraits`;
+
+export default function LibertyMDPremiumLogo({
+  scrollY = 0,
+  className = '',
+  dockHeadlineRef,
+}: LibertyMDPremiumLogoProps) {
   const isCompact = typeof window !== 'undefined' && window.innerWidth < 640;
+  const rootRef = React.useRef<HTMLDivElement | null>(null);
+  const movingLogoRef = React.useRef<HTMLDivElement | null>(null);
 
-  // Floating logo travels smoothly on scroll, while solid pedestal remains anchored on the ground
-  const travel = Math.min(scrollY * (isCompact ? 0.85 : 1.25), isCompact ? 360 : 780);
-  const scale = Math.max(isCompact ? 0.6 : 0.45, 1 - scrollY / (isCompact ? 950 : 750));
-  const rotate = Math.min(scrollY / 90, 8);
+  // Match Freehand's three phases: natural scroll, accelerated transfer, then document-anchored rest.
+  const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 900;
+  const rootDocumentTop = rootRef.current
+    ? rootRef.current.getBoundingClientRect().top + scrollY
+    : Number.POSITIVE_INFINITY;
+  const headlineDocumentTop = dockHeadlineRef?.current
+    ? dockHeadlineRef.current.getBoundingClientRect().top + scrollY
+    : Number.POSITIVE_INFINITY;
+  const triggerScroll = rootDocumentTop;
+  const landingScroll = Number.isFinite(headlineDocumentTop)
+    ? Math.max(triggerScroll + 1, headlineDocumentTop - viewportHeight * 0.8)
+    : triggerScroll + (isCompact ? 300 : 360);
+  const rawProgress = Number.isFinite(triggerScroll)
+    ? Math.min(1, Math.max(0, (scrollY - triggerScroll) / (landingScroll - triggerScroll)))
+    : 0;
+  const easedProgress = rawProgress ** 3 * (rawProgress * (rawProgress * 6 - 15) + 10);
+  const transferProgress = Math.min(
+    1,
+    rawProgress + Math.sin(Math.PI * rawProgress) * 0.24,
+  );
+  const finalScale = isCompact ? 0.6 : 0.45;
+  const movingLogoHeight = movingLogoRef.current?.offsetHeight || (isCompact ? 240 : 330);
+  const targetBottom = Number.isFinite(headlineDocumentTop)
+    ? headlineDocumentTop - (isCompact ? 56 : 64)
+    : rootDocumentTop + (isCompact ? 920 : 1040);
+  const scaledBottomFromRoot = movingLogoHeight * (1 + finalScale) * 0.5;
+  const finalTravel = Number.isFinite(rootDocumentTop)
+    ? Math.max(0, targetBottom - rootDocumentTop - scaledBottomFromRoot)
+    : 0;
+  const travel = finalTravel * transferProgress;
+  const scale = 1 - (1 - finalScale) * easedProgress;
+  const rotate = 8 * easedProgress;
+  const scrollPhase = rawProgress <= 0 ? 'waiting' : rawProgress >= 1 ? 'docked' : 'travelling';
 
   return (
     <div
-      className={`relative mx-auto h-[310px] w-[260px] sm:h-[420px] sm:w-[360px] select-none ${className}`}
+      ref={rootRef}
+      className={`relative mx-auto h-[310px] w-[260px] select-none sm:h-[420px] sm:w-[360px] ${className}`}
       style={{ transformStyle: 'preserve-3d' }}
+      data-testid="libertymd-premium-logo"
+      data-scroll-phase={scrollPhase}
+      data-scroll-progress={rawProgress.toFixed(3)}
       aria-hidden="true"
     >
       <style>
@@ -33,7 +75,7 @@ export default function LibertyMDPremiumLogo({ scrollY = 0, className = '' }: Li
       </style>
 
       {/* 1. SOLID ARCHITECTURAL 3D CYLINDER PEDESTAL (Anchored firmly on the ground - DOES NOT MOVE WITH SCROLL) */}
-      <div className="absolute left-1/2 bottom-0 w-[220px] sm:w-[300px] -translate-x-1/2 pointer-events-none z-0">
+      <div className="pointer-events-none absolute bottom-0 left-1/2 z-0 w-[220px] -translate-x-1/2 sm:w-[300px]">
         {/* Ambient Floor Shadow under Pedestal */}
         <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 h-8 w-[90%] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(30,58,138,0.32)_0%,rgba(15,23,42,0.15)_50%,transparent_80%)] blur-md" />
 
@@ -131,11 +173,13 @@ export default function LibertyMDPremiumLogo({ scrollY = 0, className = '' }: Li
 
       {/* 2. FLOATING LOGO & ORBITING PORTRAITS (Moves & Floats independently above the solid cylinder pedestal) */}
       <div
-        className="absolute inset-x-0 top-0 h-[240px] sm:h-[330px] z-10"
+        ref={movingLogoRef}
+        className="absolute inset-x-0 top-0 z-10 h-[240px] sm:h-[330px]"
         style={{
           transform: `translate3d(0, ${travel}px, 0) scale(${scale}) rotateX(${rotate}deg)`,
-          transition: 'transform 180ms ease-out',
+          transition: 'transform 90ms linear',
           transformStyle: 'preserve-3d',
+          willChange: 'transform',
         }}
       >
         <div
@@ -162,7 +206,7 @@ export default function LibertyMDPremiumLogo({ scrollY = 0, className = '' }: Li
             className={`${portraitClass} left-[14px] top-[34px] h-[86px] w-[86px] sm:left-[20px] sm:top-[42px] sm:h-[108px] sm:w-[108px]`}
           >
             <img
-              src="https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=320&q=80"
+              src={`${libertyMDPortraitBase}/patient-portrait.jpg`}
               alt=""
               className="h-full w-full object-cover"
               loading="eager"
@@ -174,7 +218,7 @@ export default function LibertyMDPremiumLogo({ scrollY = 0, className = '' }: Li
             className={`${portraitClass} bottom-[42px] right-[14px] h-[68px] w-[68px] sm:bottom-[50px] sm:right-[20px] sm:h-[84px] sm:w-[84px]`}
           >
             <img
-              src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=260&q=80"
+              src={`${libertyMDPortraitBase}/doctor-portrait.jpg`}
               alt=""
               className="h-full w-full object-cover"
               loading="eager"

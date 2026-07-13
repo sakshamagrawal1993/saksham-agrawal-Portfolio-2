@@ -1,12 +1,98 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
-import { ChevronLeft, Loader2, AlertCircle, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import {
+    ChevronLeft,
+    Loader2,
+    AlertCircle,
+    ShieldAlert,
+    CheckCircle2,
+    Stethoscope,
+    Sparkles,
+    HeartPulse,
+    ClipboardList,
+    Phone,
+} from 'lucide-react';
+
+interface DiagnosisItem {
+    rank?: number;
+    full_name?: string;
+    name?: string;
+    common_name?: string;
+    confidence?: string | number;
+    reason?: string;
+    description?: string;
+    emergency?: string;
+    supporting_evidence?: string[];
+}
+
+interface DoctorHandoff {
+    recommended?: boolean;
+    required?: boolean;
+    reason?: string;
+    cta?: string;
+    specialty?: string;
+}
+
+interface ReportData {
+    headline?: string;
+    patient_summary?: string;
+    differential_diagnosis?: DiagnosisItem[];
+    diagnoses?: DiagnosisItem[];
+    assessment_and_plan?: {
+        assessment?: string;
+        plan?: string[];
+        self_care?: string[];
+        red_flags_to_watch?: string[];
+        when_to_seek_care?: string;
+    };
+    doctor_handoff?: DoctorHandoff;
+    confidence_score?: number;
+}
+
+function parseReport(raw: unknown): {
+    diagnoses: DiagnosisItem[];
+    report: ReportData;
+} {
+    if (!raw) return { diagnoses: [], report: {} };
+    if (Array.isArray(raw)) {
+        return { diagnoses: raw as DiagnosisItem[], report: { differential_diagnosis: raw as DiagnosisItem[] } };
+    }
+    const report = raw as ReportData;
+    const list = report.differential_diagnosis || report.diagnoses || [];
+    return { diagnoses: list, report };
+}
+
+function confidenceNum(score: string | number | undefined): number {
+    if (typeof score === 'number') return score;
+    const m = String(score || '').match(/(\d{1,3})/);
+    return m ? parseInt(m[1], 10) : 0;
+}
+
+function inferSpecialty(name: string): string {
+    const n = name.toLowerCase();
+    if (/headache|migraine|neuro|seizure|dizzy/.test(n)) return 'Neurology';
+    if (/skin|rash|eczema|acne|dermat|stye|hordeolum|eyelid/.test(n)) return 'Dermatology / Ophthalmology';
+    if (/heart|chest|cardiac|palpitation|hypertension/.test(n)) return 'Cardiology';
+    if (/lung|asthma|copd|cough|breath|respiratory/.test(n)) return 'Pulmonology';
+    if (/stomach|abdominal|gi|bowel|append|nausea|reflux/.test(n)) return 'Gastroenterology';
+    if (/diabetes|thyroid|endocrine|hormone/.test(n)) return 'Endocrinology';
+    if (/joint|muscle|back|msk|arthritis|sprain/.test(n)) return 'Orthopedics';
+    if (/anxiety|depression|mental|mood/.test(n)) return 'Psychiatry';
+    if (/urin|kidney|bladder|uti/.test(n)) return 'Urology';
+    return 'Primary Care';
+}
 
 export const AICareObservations: React.FC = () => {
     const navigate = useNavigate();
-    const [diagnoses, setDiagnoses] = useState<any[]>([]);
+    const [diagnoses, setDiagnoses] = useState<DiagnosisItem[]>([]);
+    const [report, setReport] = useState<ReportData>({});
+    const [profileLabel, setProfileLabel] = useState<string | null>(null);
+    const [sessionStatus, setSessionStatus] = useState<string | null>(null);
+    const [emergencyMessage, setEmergencyMessage] = useState<string | null>(null);
+    const [sessionId, setSessionId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
+    const [showDoctorModal, setShowDoctorModal] = useState(false);
 
     useEffect(() => {
         const fetchDiagnosis = async () => {
@@ -16,50 +102,85 @@ export const AICareObservations: React.FC = () => {
                 return;
             }
 
-            // Check if there is a specific session ID in URL
             const urlParams = new URLSearchParams(window.location.search);
             const specificSessionId = urlParams.get('sessionId');
-
             let activeSessionId = specificSessionId;
 
             if (!activeSessionId) {
-                // Get latest completed session if no specific session is requested
                 const { data: activeSession } = await supabase
                     .from('jivi_chat_sessions')
                     .select('id')
                     .eq('user_id', session.user.id)
+                    .eq('status', 'completed')
                     .order('updated_at', { ascending: false })
                     .limit(1)
-                    .single();
-                
-                if (activeSession) {
-                    activeSessionId = activeSession.id;
-                }
+                    .maybeSingle();
+                if (activeSession) activeSessionId = activeSession.id;
             }
 
             if (activeSessionId) {
+                setSessionId(activeSessionId);
+
+                const [{ data: chatSession }, { data: profile }] = await Promise.all([
+                    supabase
+                        .from('jivi_chat_sessions')
+                        .select('status')
+                        .eq('id', activeSessionId)
+                        .eq('user_id', session.user.id)
+                        .maybeSingle(),
+                    supabase
+                        .from('jivi_profiles')
+                        .select('name, age, gender, comorbidities')
+                        .eq('user_id', session.user.id)
+                        .limit(1)
+                        .maybeSingle(),
+                ]);
+
+                if (profile) {
+                    const comorb = (profile.comorbidities || []).slice(0, 2).join(', ');
+                    setProfileLabel(
+                        [profile.name, profile.age ? `${profile.age}y` : null, profile.gender, comorb || null]
+                            .filter(Boolean)
+                            .join(' · '),
+                    );
+                }
+
+                if (chatSession?.status) setSessionStatus(chatSession.status);
+
+                if (chatSession?.status === 'emergency_stopped') {
+                    const { data: alert } = await supabase
+                        .from('jivi_alerts')
+                        .select('message')
+                        .eq('session_id', activeSessionId)
+                        .order('created_at', { ascending: false })
+                        .limit(1)
+                        .maybeSingle();
+                    setEmergencyMessage(
+                        alert?.message ||
+                            'This evaluation was stopped for safety. Please seek emergency care if symptoms persist.',
+                    );
+                    setLoading(false);
+                    return;
+                }
+
                 const { data: diagData } = await supabase
                     .from('jivi_diagnoses')
                     .select('*')
                     .eq('session_id', activeSessionId)
                     .order('created_at', { ascending: false })
                     .limit(1)
-                    .single();
+                    .maybeSingle();
 
-                if (diagData && diagData.diagnosis_data) {
-                    // Normalize data structure if needed
-                    let list = Array.isArray(diagData.diagnosis_data) 
-                        ? diagData.diagnosis_data 
-                        : diagData.diagnosis_data.diagnoses || [];
-                    
-                    // Sort by confidence descending and take top 3
-                    list.sort((a: any, b: any) => {
-                        const scoreA = parseInt(String(a.confidence).replace('%', '')) || 0;
-                        const scoreB = parseInt(String(b.confidence).replace('%', '')) || 0;
-                        return scoreB - scoreA;
+                if (diagData?.diagnosis_data) {
+                    const parsed = parseReport(diagData.diagnosis_data);
+                    const sorted = [...parsed.diagnoses].sort(
+                        (a, b) => confidenceNum(b.confidence) - confidenceNum(a.confidence),
+                    );
+                    setDiagnoses(sorted.slice(0, 3));
+                    setReport({
+                        ...parsed.report,
+                        confidence_score: diagData.confidence_score ?? parsed.report.confidence_score,
                     });
-                    
-                    setDiagnoses(list.slice(0, 3));
                 }
             }
             setLoading(false);
@@ -67,163 +188,302 @@ export const AICareObservations: React.FC = () => {
         fetchDiagnosis();
     }, [navigate]);
 
-    const getLikelihoodInfo = (scoreStr: string | number) => {
-        const score = typeof scoreStr === 'string' ? parseInt(scoreStr.replace('%', '')) : scoreStr;
-        if (isNaN(score)) {
-            return {
-                label: 'Likelihood - Low',
-                badgeClass: 'bg-gray-50 text-gray-600 border-gray-200/60',
-                barClass: 'before:bg-gray-300'
-            };
-        }
-        if (score >= 80) {
-            return {
-                label: 'Likelihood - High',
-                badgeClass: 'bg-[#F5F2EB] text-[#A84A00] border-[#EBE7DE]',
-                barClass: 'before:bg-[#A84A00]'
-            };
-        }
-        if (score >= 60) {
-            return {
-                label: 'Likelihood - Medium',
-                badgeClass: 'bg-[#F5F2EB] text-[#D97706] border-[#EBE7DE]',
-                barClass: 'before:bg-[#D97706]'
-            };
-        }
-        return {
-            label: 'Likelihood - Low',
-            badgeClass: 'bg-[#F5F2EB] text-[#A8A29E] border-[#EBE7DE]',
-            barClass: 'before:bg-[#A8A29E]'
-        };
+    const topDx = diagnoses[0];
+    const handoff = report.doctor_handoff || {};
+    const specialty =
+        handoff.specialty ||
+        inferSpecialty(topDx?.full_name || topDx?.name || topDx?.common_name || '');
+    const showDoctorCta = handoff.recommended !== false && diagnoses.length > 0;
+    const plan = report.assessment_and_plan;
+
+    const likelihoodStyle = (score: number) => {
+        if (score >= 80) return { label: 'High likelihood', bar: 'bg-[#A84A00]', text: 'text-[#A84A00]' };
+        if (score >= 60) return { label: 'Moderate likelihood', bar: 'bg-amber-500', text: 'text-amber-700' };
+        return { label: 'Lower likelihood', bar: 'bg-stone-400', text: 'text-stone-600' };
     };
 
     return (
-        <div className="min-h-screen bg-[#FAF9F6] font-sans text-[#2C2A26] flex flex-col antialiased">
-            {/* Sticky Header */}
-            <header className="sticky top-0 z-50 bg-[#F5F2EB]/90 backdrop-blur-md border-b flex items-center justify-between px-6 py-4 border-[#EBE7DE]">
-                <div className="flex items-center gap-2">
-                    <button onClick={() => navigate('/portfolio')} className="mr-2 p-1">
-                        <ChevronLeft className="w-5 h-5 text-[#A8A29E] hover:text-[#2C2A26] transition-colors" />
-                    </button>
-                    <div className="bg-[#2C2A26] rounded-sm text-[#F5F2EB] font-serif w-8 h-8 flex items-center justify-center font-bold">
-                        J
-                    </div>
-                    <span className="font-serif text-lg font-bold tracking-tight text-[#2C2A26]">Dr. Jivi</span>
-                </div>
+        <div className="min-h-screen bg-[#F7F3EC] font-sans text-[#2C2A26] flex flex-col antialiased">
+            <div className="pointer-events-none fixed inset-0 overflow-hidden">
+                <div className="absolute -top-24 right-0 h-72 w-72 rounded-full bg-orange-200/30 blur-3xl" />
+                <div className="absolute bottom-0 left-0 h-80 w-80 rounded-full bg-rose-100/40 blur-3xl" />
+            </div>
 
-                <div className="flex items-center gap-6">
+            <header className="sticky top-0 z-50 bg-[#F7F3EC]/85 backdrop-blur-md border-b border-[#EBE7DE]">
+                <div className="max-w-3xl mx-auto flex items-center justify-between px-6 py-4">
+                    <div className="flex items-center gap-2">
+                        <button onClick={() => navigate('/ai-care')} className="mr-1 p-1">
+                            <ChevronLeft className="w-5 h-5 text-[#A8A29E]" />
+                        </button>
+                        <div className="bg-[#2C2A26] rounded-sm text-[#F5F2EB] font-serif w-8 h-8 flex items-center justify-center font-bold">
+                            J
+                        </div>
+                        <span className="font-serif text-lg font-bold tracking-tight">Clinical Report</span>
+                    </div>
                     <button
                         onClick={() => navigate('/portfolio')}
-                        className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#A8A29E] hover:text-[#2C2A26] transition-colors hidden sm:block"
+                        className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#A8A29E] hidden sm:block"
                     >
-                        BACK TO PORTFOLIO
+                        Portfolio
                     </button>
                 </div>
             </header>
 
-            <div className="flex-1 max-w-3xl w-full mx-auto px-6 py-8 flex flex-col">
-                {/* Visual Header Banner */}
-                <div className="bg-white border border-[#EBE7DE] border-l-4 border-l-[#A84A00] rounded-xl p-6 mb-8 shadow-sm relative overflow-hidden animate-fade-in-up">
-                    <div className="relative z-10">
-                        <div className="flex items-center gap-2 mb-3 bg-[#F5F2EB] text-[#2C2A26] px-3 py-1 rounded-sm w-max text-[10px] font-bold uppercase tracking-widest border border-[#EBE7DE]">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-[#A84A00]" /> Screening Complete
-                        </div>
-                        <h2 className="text-2xl font-serif font-bold tracking-tight mb-2 text-[#2C2A26]">Observations Summary</h2>
-                        <p className="text-sm text-[#A8A29E] leading-relaxed">
-                            Based on your symptoms and clinical interaction, our agent has generated these potential conditions. Please consult a qualified professional for formal medical advice.
-                        </p>
-                    </div>
-                </div>
-
+            <div className="relative flex-1 max-w-3xl w-full mx-auto px-6 py-8 pb-32">
                 {loading ? (
-                    <div className="flex-1 flex flex-col items-center justify-center py-20 gap-3">
-                        <Loader2 className="w-10 h-10 animate-spin text-orange-500" />
-                        <span className="text-sm font-medium text-gray-400">Analyzing clinical results...</span>
+                    <div className="flex flex-col items-center justify-center py-24 gap-3">
+                        <Loader2 className="w-10 h-10 animate-spin text-[#A84A00]" />
+                        <span className="text-sm text-[#A8A29E]">Preparing your clinical report...</span>
+                    </div>
+                ) : emergencyMessage ? (
+                    <div className="bg-white/90 border border-rose-200 rounded-2xl p-8 shadow-lg shadow-rose-100/50">
+                        <div className="flex gap-4 items-start">
+                            <div className="p-3 rounded-xl bg-rose-100">
+                                <ShieldAlert className="w-8 h-8 text-rose-600" />
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-rose-600 mb-2">Safety alert</p>
+                                <h2 className="font-serif text-2xl font-bold text-rose-950 mb-3">Seek emergency care now</h2>
+                                <p className="text-rose-900/90 leading-relaxed mb-4">{emergencyMessage}</p>
+                                <p className="text-sm font-semibold text-rose-800">
+                                    Call your local emergency number or go to the nearest ER. Do not wait for an online report.
+                                </p>
+                                <button
+                                    onClick={() => navigate(`/ai-care/chat?sessionId=${sessionId || ''}`)}
+                                    className="mt-6 text-sm font-semibold text-rose-700 underline"
+                                >
+                                    View chat transcript
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 ) : diagnoses.length > 0 ? (
                     <div className="space-y-6">
-                        {diagnoses.map((diag, idx) => {
-                            const likelihood = getLikelihoodInfo(diag.confidence);
-                            return (
-                                <div 
-                                    key={idx} 
-                                    className={`relative bg-white border border-[#EBE7DE] rounded-xl p-6 shadow-sm overflow-hidden transition-all duration-300 hover:shadow-md pl-8 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1.5 ${likelihood.barClass} animate-fade-in-up`}
-                                    style={{ animationDelay: `${idx * 150}ms`, animationFillMode: 'both' }}
-                                >
-                                    {/* Header Row */}
-                                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-4">
-                                        <h3 className="font-serif font-bold text-xl text-[#2C2A26] leading-snug">{diag.full_name || diag.name}</h3>
-                                        <div className="flex flex-wrap items-center gap-2 shrink-0">
-                                            {diag.emergency && (
-                                                <span className={`text-[10px] font-bold uppercase tracking-[0.1em] px-2.5 py-1 rounded-sm border flex items-center gap-1 ${
-                                                    diag.emergency.toLowerCase().includes('high') 
-                                                        ? 'bg-rose-50 text-rose-700 border-rose-200' 
-                                                        : diag.emergency.toLowerCase().includes('medium')
-                                                            ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                                            : 'bg-[#F5F2EB] text-[#2C2A26] border-[#EBE7DE]'
-                                                }`}>
-                                                    <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
-                                                    Emergency: {diag.emergency.charAt(0).toUpperCase() + diag.emergency.slice(1).toLowerCase()}
-                                                </span>
-                                            )}
-                                            {diag.confidence && (
-                                                <span className={`text-[10px] font-bold uppercase tracking-[0.1em] px-2.5 py-1 rounded-sm border ${likelihood.badgeClass}`}>
-                                                    {likelihood.label}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Description */}
-                                    <div className="mb-5">
-                                        <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#A8A29E] mb-1">Condition Description</h4>
-                                        <p className="text-[14px] text-[#2C2A26] leading-relaxed">{diag.description}</p>
-                                    </div>
-                                    
-                                    {/* Clinical Reason */}
-                                    {diag.reason && (
-                                        <div className="bg-[#F5F2EB] border border-[#EBE7DE] rounded-lg p-4 mb-5 flex gap-3 items-start">
-                                            <AlertCircle className="w-5 h-5 text-[#A84A00] shrink-0 mt-0.5" />
-                                            <div>
-                                                <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#A8A29E] mb-1">Why this was detected</h4>
-                                                <p className="text-[13px] text-[#2C2A26] leading-relaxed font-medium">{diag.reason}</p>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Supporting Evidence Tags */}
-                                    {(diag.supporting_evidence && diag.supporting_evidence.length > 0) && (
-                                        <div className="pt-3 border-t border-[#EBE7DE] flex flex-wrap gap-2">
-                                            {diag.supporting_evidence.map((tag: string, i: number) => (
-                                                <span key={i} className="bg-white border border-[#EBE7DE] text-[#5D5A53] text-[11px] px-3 py-1.5 rounded-sm font-medium flex items-center gap-1.5">
-                                                    <span className="w-1.5 h-1.5 rounded-full bg-[#A8A29E] shrink-0"></span>
-                                                    {tag}
-                                                </span>
-                                            ))}
-                                        </div>
-                                    )}
+                        {/* Hero */}
+                        <section className="bg-gradient-to-br from-white via-white to-[#FFF8F0] border border-[#EBE7DE] rounded-2xl p-7 shadow-sm">
+                            <div className="flex items-center gap-2 mb-4">
+                                <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#A84A00] bg-[#FFF3E8] border border-[#F0DFC8] px-3 py-1 rounded-full">
+                                    <CheckCircle2 className="w-3.5 h-3.5" /> Screening complete
+                                </span>
+                                {profileLabel && (
+                                    <span className="text-[10px] text-[#A8A29E] font-medium truncate">{profileLabel}</span>
+                                )}
+                            </div>
+                            <h1 className="font-serif text-3xl font-bold tracking-tight text-[#2C2A26] mb-3 leading-tight">
+                                {report.headline || topDx?.common_name || topDx?.full_name || 'Your differential diagnosis'}
+                            </h1>
+                            <p className="text-[15px] text-[#5D5A53] leading-relaxed">
+                                {report.patient_summary ||
+                                    'Based on your symptom interview, these are the most likely conditions. This is not a formal diagnosis — please consult a licensed clinician.'}
+                            </p>
+                            {typeof report.confidence_score === 'number' && (
+                                <div className="mt-5 flex items-center gap-3">
+                                    <Sparkles className="w-4 h-4 text-[#A84A00]" />
+                                    <span className="text-sm font-semibold text-[#2C2A26]">
+                                        Top match confidence: {Math.round(report.confidence_score)}%
+                                    </span>
                                 </div>
-                            );
-                        })}
+                            )}
+                        </section>
+
+                        {/* Differentials */}
+                        <section>
+                            <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#A8A29E] mb-4 flex items-center gap-2">
+                                <HeartPulse className="w-4 h-4" /> Differential diagnosis
+                            </h2>
+                            <div className="space-y-4">
+                                {diagnoses.map((diag, idx) => {
+                                    const score = confidenceNum(diag.confidence);
+                                    const style = likelihoodStyle(score);
+                                    const title = diag.full_name || diag.name || diag.common_name || 'Condition';
+                                    return (
+                                        <article
+                                            key={idx}
+                                            className="bg-white border border-[#EBE7DE] rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow"
+                                        >
+                                            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
+                                                <div>
+                                                    <p className="text-[10px] font-bold uppercase tracking-widest text-[#A8A29E] mb-1">
+                                                        #{diag.rank || idx + 1} · {diag.common_name || title}
+                                                    </p>
+                                                    <h3 className="font-serif text-xl font-bold text-[#2C2A26]">{title}</h3>
+                                                </div>
+                                                <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border bg-white ${style.text} border-current/20`}>
+                                                    {style.label}
+                                                </span>
+                                            </div>
+
+                                            <div className="mb-4">
+                                                <div className="h-2 rounded-full bg-[#F0EBE3] overflow-hidden">
+                                                    <div
+                                                        className={`h-full rounded-full transition-all ${style.bar}`}
+                                                        style={{ width: `${Math.min(100, score)}%` }}
+                                                    />
+                                                </div>
+                                                <p className="text-xs text-[#A8A29E] mt-1">{score}% match</p>
+                                            </div>
+
+                                            {diag.description && (
+                                                <p className="text-[14px] text-[#5D5A53] leading-relaxed mb-4">{diag.description}</p>
+                                            )}
+
+                                            {diag.reason && (
+                                                <div className="bg-[#FAF6EF] border border-[#EBE7DE] rounded-xl p-4 mb-4">
+                                                    <div className="flex gap-2 items-start">
+                                                        <AlertCircle className="w-4 h-4 text-[#A84A00] shrink-0 mt-0.5" />
+                                                        <div>
+                                                            <p className="text-[10px] font-bold uppercase tracking-widest text-[#A8A29E] mb-1">
+                                                                Why we think this
+                                                            </p>
+                                                            <p className="text-[13px] text-[#2C2A26] leading-relaxed font-medium">{diag.reason}</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {diag.supporting_evidence && diag.supporting_evidence.length > 0 && (
+                                                <div className="flex flex-wrap gap-2">
+                                                    {diag.supporting_evidence.map((tag, i) => (
+                                                        <span
+                                                            key={i}
+                                                            className="text-[11px] px-3 py-1.5 rounded-full bg-[#F7F3EC] border border-[#EBE7DE] text-[#5D5A53]"
+                                                        >
+                                                            {tag}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </article>
+                                    );
+                                })}
+                            </div>
+                        </section>
+
+                        {/* Assessment & plan */}
+                        {plan && (plan.assessment || (plan.plan && plan.plan.length > 0)) && (
+                            <section className="bg-white border border-[#EBE7DE] rounded-2xl p-6 shadow-sm">
+                                <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#A8A29E] mb-4 flex items-center gap-2">
+                                    <ClipboardList className="w-4 h-4" /> Assessment & care plan
+                                </h2>
+                                {plan.assessment && (
+                                    <p className="text-[14px] text-[#2C2A26] leading-relaxed mb-4">{plan.assessment}</p>
+                                )}
+                                {plan.plan && plan.plan.length > 0 && (
+                                    <ul className="space-y-2 mb-4">
+                                        {plan.plan.map((item, i) => (
+                                            <li key={i} className="flex gap-2 text-sm text-[#5D5A53]">
+                                                <span className="text-[#A84A00] font-bold">•</span>
+                                                {item}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                                {plan.self_care && plan.self_care.length > 0 && (
+                                    <div className="border-t border-[#EBE7DE] pt-4 mt-4">
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-[#A8A29E] mb-2">Self-care</p>
+                                        <ul className="space-y-1">
+                                            {plan.self_care.map((item, i) => (
+                                                <li key={i} className="text-sm text-[#5D5A53]">— {item}</li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+                                {plan.red_flags_to_watch && plan.red_flags_to_watch.length > 0 && (
+                                    <div className="mt-4 p-4 rounded-xl bg-amber-50 border border-amber-100">
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-amber-800 mb-2">Red flags</p>
+                                        <ul className="space-y-1">
+                                            {plan.red_flags_to_watch.map((item, i) => (
+                                                <li key={i} className="text-sm text-amber-900">• {item}</li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+                            </section>
+                        )}
+
+                        {/* Doctor handoff */}
+                        {showDoctorCta && (
+                            <section className="bg-gradient-to-r from-[#2C2A26] to-[#3D3830] rounded-2xl p-6 text-white shadow-lg">
+                                <div className="flex gap-4 items-start">
+                                    <div className="p-3 rounded-xl bg-white/10">
+                                        <Stethoscope className="w-7 h-7" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-white/60 mb-1">
+                                            Recommended next step
+                                        </p>
+                                        <h3 className="font-serif text-xl font-bold mb-2">
+                                            Connect with a {specialty} specialist
+                                        </h3>
+                                        <p className="text-sm text-white/80 leading-relaxed mb-5">
+                                            {handoff.reason ||
+                                                'A licensed clinician can confirm this assessment, order tests if needed, and prescribe treatment.'}
+                                        </p>
+                                        <button
+                                            onClick={() => setShowDoctorModal(true)}
+                                            className="inline-flex items-center gap-2 bg-[#A84A00] hover:bg-[#8A3D00] text-white text-sm font-semibold px-6 py-3 rounded-full transition-colors"
+                                        >
+                                            <Phone className="w-4 h-4" />
+                                            {handoff.cta || `Book ${specialty} consult`}
+                                        </button>
+                                    </div>
+                                </div>
+                            </section>
+                        )}
                     </div>
                 ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center py-20 text-center text-gray-500">
-                        <AlertCircle className="w-12 h-12 text-gray-300 mb-3" />
-                        <p className="font-semibold text-lg text-gray-700 mb-1">No observations found</p>
-                        <p className="text-sm text-gray-400 max-w-xs">There are no completed screening reports available for this session.</p>
+                    <div className="flex flex-col items-center justify-center py-24 text-center">
+                        <AlertCircle className="w-12 h-12 text-[#D6D0C4] mb-3" />
+                        <p className="font-serif text-xl font-bold text-[#2C2A26] mb-1">No report yet</p>
+                        <p className="text-sm text-[#A8A29E] max-w-xs">
+                            Complete a symptom screening to generate your differential diagnosis report.
+                        </p>
                     </div>
                 )}
             </div>
-            
-            {/* Sticky Action Footer */}
-            <div className="p-6 mt-auto sticky bottom-0 bg-[#FDFBF9] border-t border-gray-100 shadow-md shadow-gray-100/10">
-                 <button 
-                     onClick={() => navigate('/ai-care/chat?new=1')} 
-                     className="w-full bg-gradient-to-r from-orange-500 to-pink-600 hover:from-orange-600 hover:to-pink-700 text-white py-4 rounded-full font-semibold shadow-lg shadow-orange-500/10 hover:shadow-orange-500/20 hover:-translate-y-0.5 transition-all duration-300 flex items-center justify-center gap-2"
-                 >
-                     Start New Assessment
-                 </button>
+
+            <div className="fixed bottom-0 inset-x-0 z-40 bg-[#F7F3EC]/95 backdrop-blur border-t border-[#EBE7DE] p-4">
+                <div className="max-w-3xl mx-auto">
+                    <button
+                        onClick={() => navigate('/ai-care/chat?new=1')}
+                        className="w-full bg-gradient-to-r from-[#A84A00] to-[#C45C1A] text-white py-4 rounded-full font-semibold shadow-lg shadow-orange-900/10 hover:brightness-105 transition-all"
+                    >
+                        Start new assessment
+                    </button>
+                </div>
             </div>
+
+            {showDoctorModal && (
+                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
+                        <h3 className="font-serif text-xl font-bold mb-2">Connect with a doctor</h3>
+                        <p className="text-sm text-[#5D5A53] mb-4">
+                            We recommend a <strong>{specialty}</strong> consultation for your top differential:{' '}
+                            <strong>{topDx?.common_name || topDx?.full_name}</strong>.
+                        </p>
+                        <p className="text-xs text-[#A8A29E] mb-6">
+                            Demo mode: in production this would open telehealth scheduling with a matched specialist.
+                        </p>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setShowDoctorModal(false)}
+                                className="flex-1 py-3 rounded-full border border-[#EBE7DE] text-sm font-semibold"
+                            >
+                                Not now
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowDoctorModal(false);
+                                    window.open(`mailto:care@saksham-experiments.com?subject=${encodeURIComponent(`${specialty} consult request`)}`, '_blank');
+                                }}
+                                className="flex-1 py-3 rounded-full bg-[#A84A00] text-white text-sm font-semibold"
+                            >
+                                Request consult
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

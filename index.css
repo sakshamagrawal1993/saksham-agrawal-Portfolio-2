@@ -2,6 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* LibertyMD spacing follows a 4px base grid. Components consume semantic roles. */
+  --libertymd-space-xs: 0.25rem;
+  --libertymd-space-sm: 0.5rem;
+  --libertymd-space-md: 0.75rem;
+  --libertymd-space-lg: 1rem;
+  --libertymd-space-xl: 1.5rem;
+  --libertymd-space-2xl: 2rem;
+  --libertymd-space-3xl: 3rem;
+  --libertymd-space-section: 4rem;
+  --libertymd-gap-tagline-logo: var(--libertymd-space-md);
+  --libertymd-gap-pedestal-input: var(--libertymd-space-xl);
+}
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }

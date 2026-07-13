@@ -35,6 +35,28 @@ interface DatabaseMessage {
   created_at: string;
 }
 
+interface PatientProfile {
+  name?: string;
+  age?: number;
+  sex?: string;
+  comorbidities?: string[];
+}
+
+function buildPatientPayload(profile: {
+  name?: string;
+  age?: number;
+  gender?: string;
+  comorbidities?: string[] | null;
+} | null): PatientProfile {
+  if (!profile) return {};
+  return {
+    name: profile.name,
+    age: profile.age,
+    sex: profile.gender,
+    comorbidities: profile.comorbidities || [],
+  };
+}
+
 interface GuardrailResult {
   is_emergency: boolean;
   force_end?: boolean;
@@ -172,13 +194,19 @@ function normalizeQAPayload(raw: any) {
   };
 }
 
-async function fetchQAOnce(history: MessageItem[], timeoutMs: number, signal?: AbortSignal) {
+async function fetchQAOnce(
+  history: MessageItem[],
+  patient: PatientProfile,
+  turnCount: number,
+  timeoutMs: number,
+  signal?: AbortSignal,
+) {
   const { signal: timed, clear } = withTimeout(timeoutMs, signal);
   try {
     const res = await fetch(N8N_QA_WEBHOOK, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ history }),
+      body: JSON.stringify({ history, patient, turn_count: turnCount }),
       signal: timed,
     });
     if (!res.ok) {
@@ -195,11 +223,11 @@ async function fetchQAOnce(history: MessageItem[], timeoutMs: number, signal?: A
   }
 }
 
-async function fetchQA(history: MessageItem[], signal?: AbortSignal) {
+async function fetchQA(history: MessageItem[], patient: PatientProfile, turnCount: number, signal?: AbortSignal) {
   // Wait up to 20s for the real n8n agent question before using backup.
   try {
     if (!signal?.aborted) {
-      return await fetchQAOnce(history, 20_000, signal);
+      return await fetchQAOnce(history, patient, turnCount, 20_000, signal);
     }
   } catch (e) {
     console.error('qa fetch failed after 20s', e);
@@ -331,13 +359,14 @@ serve(async (req) => {
       const { data: profile } = actorUserId
         ? await supabaseClient
             .from('jivi_profiles')
-            .select('name')
+            .select('name, age, gender, comorbidities')
             .eq('user_id', actorUserId)
             .limit(1)
             .maybeSingle()
         : { data: null };
 
-      const rawName = profile?.name || user?.email?.split('@')[0] || '';
+      const patient = buildPatientPayload(profile);
+      const rawName = patient.name || user?.email?.split('@')[0] || '';
       const userName = rawName.split(' ')[0] || rawName;
       const initialQuestion = isLibertyMd
         ? `Hi${userName ? ` ${userName}` : ''}, I'm LibertyMd. Tell me what's going on today, including when it started and what worries you most.`
@@ -431,6 +460,16 @@ serve(async (req) => {
       messages?.map((m: DatabaseMessage) => ({ role: m.role, content: m.content })) || [];
     const userMessageCount = messageHistory.filter((m) => m.role === 'user').length;
 
+    const { data: profileRow } = actorUserId
+      ? await supabaseClient
+          .from('jivi_profiles')
+          .select('name, age, gender, comorbidities')
+          .eq('user_id', actorUserId)
+          .limit(1)
+          .maybeSingle()
+      : { data: null };
+    const patient = buildPatientPayload(profileRow);
+
     // Instant local emergency short-circuit (no network)
     const localEmergency = deterministicEmergency(userMessage);
     if (localEmergency) {
@@ -474,13 +513,13 @@ serve(async (req) => {
 
       emit?.('status', { state: 'checking_safety_and_generating' });
 
-      // Parallel: n8n guardrail + (QA or we'll decide diagnosis after)
-      // For early turns: parallel guardrail || QA
-      // For later turns: parallel guardrail || diagnosis path decision still needs history; run guardrail || QA first unless count high
-
-      // Parallel: guardrail + QA. Abort QA if emergency wins.
+      // Early turns (≤5): parallel guardrail + QA. Later turns: guardrail first, then diagnosis, then QA.
       const guardPromise = fetchGuardrail(userMessage, messageHistory);
-      const qaPromise = fetchQA(messageHistory, qaAbort.signal);
+      const shouldStartQaEarly = userMessageCount <= 5;
+      let qaPromise: ReturnType<typeof fetchQA> | null = null;
+      if (shouldStartQaEarly) {
+        qaPromise = fetchQA(messageHistory, patient, userMessageCount, qaAbort.signal);
+      }
 
       const guardrailData = await guardPromise;
       timing.guardrail_ms = Date.now() - timing.t0;
@@ -506,32 +545,9 @@ serve(async (req) => {
         };
       }
 
-      emit?.('status', { state: 'generating_question' });
-      const qaData = await qaPromise;
-      timing.qa_ms = Date.now() - timing.t0;
+      let lastDiagnosis: { confScore: number; diagnosesList: any[]; raw: any } | null = null;
 
-      if (!qaData.next_question) {
-        // Emergency abort or empty agent payload — use backup so the UI never stalls blank.
-        const backup = {
-          next_question:
-            'Sorry — that took too long. Could you briefly restate your main symptom and how long it has lasted?',
-          options: [
-            'Fever for a few days',
-            'Cough or sore throat',
-            'Pain somewhere specific',
-            'Something else — I will type it',
-          ],
-          ready_for_report: false,
-          qa_source: 'fallback' as const,
-        };
-        Object.assign(qaData, backup);
-      }
-
-      const shouldRunDiagnosis =
-        !!qaData.ready_for_report || userMessageCount >= 8 || /home care|summary|i'?m done|give me (the )?report/i.test(userMessage);
-
-      if (shouldRunDiagnosis) {
-        emit?.('status', { state: 'running_diagnosis' });
+      const runDiagnosisWorkflow = async () => {
         const { data: systemMsg } = await supabaseClient
           .from('jivi_chat_messages')
           .select('content')
@@ -550,7 +566,7 @@ serve(async (req) => {
           /* ignore */
         }
 
-        const { signal: diagSignal, clear: clearDiag } = withTimeout(8000);
+        const { signal: diagSignal, clear: clearDiag } = withTimeout(55_000);
         let diagRaw: any = { confidence_score: 0 };
         try {
           const diagRes = await fetch(N8N_DIAGNOSIS_WEBHOOK, {
@@ -558,6 +574,7 @@ serve(async (req) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               history: messageHistory,
+              patient,
               intermediate_diagnoses: intermediate,
             }),
             signal: diagSignal,
@@ -568,31 +585,97 @@ serve(async (req) => {
         } finally {
           clearDiag();
         }
-        const { confScore, diagnosesList, raw, reportReady } = parseDiagnosisPayload(diagRaw);
+        return parseDiagnosisPayload(diagRaw);
+      };
+
+      const maybeCompleteDiagnosis = async (
+        confScore: number,
+        diagnosesList: any[],
+        raw: any,
+        qaReady: boolean,
+      ) => {
+        const hasDx = diagnosesList.length > 0;
+        const shouldComplete =
+          confScore >= 80 ||
+          userMessageCount >= 15 ||
+          (qaReady && confScore >= 50 && hasDx);
+        if (!shouldComplete) return null;
+
+        const reportPayload = {
+          ...raw,
+          differential_diagnosis: diagnosesList.length ? diagnosesList : raw?.differential_diagnosis || [],
+          confidence_score: confScore,
+          diagnosis_ready: true,
+        };
+        await supabaseClient.from('jivi_diagnoses').insert({
+          session_id: sessionId,
+          diagnosis_data: reportPayload,
+          confidence_score: confScore,
+        });
+        await supabaseClient.from('jivi_chat_sessions').update({ status: 'completed' }).eq('id', sessionId);
+        return {
+          type: 'diagnosis_ready' as const,
+          confidence_score: confScore,
+          report: raw,
+          timing,
+        };
+      };
+
+      // After turn 5: run differential diagnosis every turn.
+      if (userMessageCount > 5) {
+        emit?.('status', { state: 'running_diagnosis' });
+        const parsed = await runDiagnosisWorkflow();
+        lastDiagnosis = parsed;
         timing.diagnosis_ms = Date.now() - timing.t0;
 
-        if (reportReady && (confScore >= 50 || qaData.ready_for_report || userMessageCount >= 8)) {
-          await supabaseClient.from('jivi_diagnoses').insert({
-            session_id: sessionId,
-            diagnosis_data: diagnosesList.length ? diagnosesList : raw,
-            confidence_score: confScore,
-          });
-          await supabaseClient.from('jivi_chat_sessions').update({ status: 'completed' }).eq('id', sessionId);
-          return {
-            type: 'diagnosis_ready' as const,
-            confidence_score: confScore,
-            report: raw,
-            timing,
-          };
-        }
+        const completed = await maybeCompleteDiagnosis(parsed.confScore, parsed.diagnosesList, parsed.raw, false);
+        if (completed) return completed;
 
-        if (diagnosesList.length > 0) {
+        if (parsed.diagnosesList.length > 0) {
           await supabaseClient.from('jivi_chat_messages').insert({
             session_id: sessionId,
             role: 'system',
-            content: JSON.stringify({ intermediate_diagnoses: diagnosesList }),
+            content: JSON.stringify({ intermediate_diagnoses: parsed.diagnosesList }),
           });
         }
+      }
+
+      emit?.('status', { state: 'generating_question' });
+      const qaData = qaPromise ? await qaPromise : await fetchQA(messageHistory, patient, userMessageCount);
+      timing.qa_ms = Date.now() - timing.t0;
+
+      // QA agent signaled enough info — run/accept diagnosis at ≥50% confidence.
+      if (qaData.ready_for_report) {
+        if (!lastDiagnosis || lastDiagnosis.confScore < 50) {
+          emit?.('status', { state: 'running_diagnosis' });
+          lastDiagnosis = await runDiagnosisWorkflow();
+          timing.diagnosis_ms = Date.now() - timing.t0;
+        }
+        if (lastDiagnosis) {
+          const completed = await maybeCompleteDiagnosis(
+            lastDiagnosis.confScore,
+            lastDiagnosis.diagnosesList,
+            lastDiagnosis.raw,
+            true,
+          );
+          if (completed) return completed;
+        }
+      }
+
+      if (!qaData.next_question) {
+        const backup = {
+          next_question:
+            'Sorry — that took too long. Could you briefly restate your main symptom and how long it has lasted?',
+          options: [
+            'Fever for a few days',
+            'Cough or sore throat',
+            'Pain somewhere specific',
+            'Something else — I will type it',
+          ],
+          ready_for_report: false,
+          qa_source: 'fallback' as const,
+        };
+        Object.assign(qaData, backup);
       }
 
       await supabaseClient.from('jivi_chat_messages').insert({
@@ -609,7 +692,7 @@ serve(async (req) => {
         ready_for_report: qaData.ready_for_report,
         qa_source: (qaData as any).qa_source || 'n8n',
         timing,
-        parallel: true,
+        parallel: shouldStartQaEarly,
       };
     };
 

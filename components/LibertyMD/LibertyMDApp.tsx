@@ -3,6 +3,7 @@ import {
   ShieldCheck, 
   Globe, 
   Send, 
+  ArrowRight,
   UserCheck, 
   Sparkles, 
   Clock, 
@@ -18,7 +19,9 @@ import {
   CheckCircle,
   Loader2,
   Mail,
+  Menu,
   RotateCcw,
+  Star,
   Stethoscope
 } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
@@ -143,7 +146,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
       id: '1',
       sender: 'ai',
       kind: 'system',
-      text: `Hi, I'm LibertyMD. Describe your symptoms and I will ask focused follow-up questions, screen for urgent warning signs, and create a doctor-ready care plan.`
+      text: `Tell me what is happening, when it started, and what worries you most. I'll ask a few focused questions and flag urgent warning signs.`
     }
   ]);
   const [isTyping, setIsTyping] = useState(false);
@@ -151,6 +154,9 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
   const [scrollY, setScrollY] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const chatPanelRef = useRef<HTMLDivElement | null>(null);
+  const logoDockHeadlineRef = useRef<HTMLHeadingElement | null>(null);
+  const heroSymptomsRef = useRef<HTMLTextAreaElement | null>(null);
+  const hasActiveConsultRef = useRef(false);
   const consentReady = consent.terms && consent.ai && consent.emergency;
   const demographicsReady = demographics.age.trim() && demographics.sex;
 
@@ -161,6 +167,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
   }, []);
 
   useEffect(() => {
+    if (!hasActiveConsultRef.current) return;
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [messages, isTyping, report]);
 
@@ -357,6 +364,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
     const text = (textToSend || input).trim();
     if (!text || isTyping || phase === 'emergency_end' || phase === 'report_ready') return;
 
+    hasActiveConsultRef.current = true;
     setPendingSymptom(text);
     setInput('');
     setReport(null);
@@ -380,6 +388,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
   };
 
   const resetConsult = () => {
+    hasActiveConsultRef.current = false;
     setInput('');
     setPhase('initial');
     setSessionId(null);
@@ -393,7 +402,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
         id: '1',
         sender: 'ai',
         kind: 'system',
-        text: `Hi, I'm LibertyMD. Describe your symptoms and I will ask focused follow-up questions, screen for urgent warning signs, and create a doctor-ready care plan.`
+        text: `Tell me what is happening, when it started, and what worries you most. I'll ask a few focused questions and flag urgent warning signs.`
       }
     ]);
   };
@@ -412,123 +421,293 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
       className="min-h-screen text-[#111827] font-sans selection:bg-[#2563EB] selection:text-white"
       style={{
         background:
-          'linear-gradient(180deg, #F8FAF7 0%, #F3F8FF 34%, #F4FAF2 58%, #EFF6FF 100%), repeating-linear-gradient(90deg, rgba(37,99,235,0.035) 0 1px, transparent 1px 96px)',
+          'linear-gradient(180deg, #FBFCF9 0%, #F5F9FF 34%, #F3F8F2 66%, #EFF6FF 100%)',
       }}
     >
-      <header className="sticky top-0 z-50 border-b border-white/70 bg-[#F8FAF7]/82 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 sm:px-8">
-          <div className="flex items-center gap-4">
-            {onBack && (
-              <button
-                onClick={onBack}
-                className="inline-flex items-center gap-2 text-sm font-medium text-[#475569] hover:text-[#111827]"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                <span className="hidden sm:inline">Portfolio</span>
-              </button>
-            )}
-            <div className="flex items-center gap-2.5">
-              <HeartPulse className="h-5 w-5 text-[#2563EB]" />
-              <span className="text-base font-black tracking-tight text-[#111827]">LibertyMD</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1 text-xs font-semibold text-[#64748B]">
-            {(['EU', 'US'] as const).map((item) => (
-              <button
-                key={item}
-                onClick={() => setRegion(item)}
-                className={`rounded-full px-3 py-1.5 transition ${
-                  region === item ? 'bg-[#111827] text-white' : 'hover:bg-white hover:text-[#111827]'
-                }`}
-              >
-                {item}
-              </button>
-            ))}
-          </div>
-        </div>
-      </header>
-
       <main>
-        <section className="relative z-10 overflow-visible px-5 pt-12 pb-24 sm:px-8 sm:pt-14 lg:pt-14 lg:pb-32">
-          <div className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(255,255,255,0.78)_0%,rgba(239,246,255,0.58)_52%,rgba(244,250,242,0.78)_100%)]" />
-          <div className="mx-auto flex max-w-4xl flex-col items-center text-center">
-            <p className="mb-3 text-xs font-bold uppercase tracking-[0.24em] text-[#2563EB]">
-              Private AI care
-            </p>
-            <h1 className="max-w-2xl text-4xl font-black leading-tight tracking-tight text-[#111827] sm:text-6xl">
-              Hi, I'm LibertyMD
-            </h1>
-            <p className="mt-3 max-w-md text-base leading-7 text-[#5B6472] sm:text-lg">
-              Tell us what hurts. LibertyMD handles the follow-up.
-            </p>
+        <section className="relative z-10 flex min-h-[100svh] flex-col overflow-visible px-5 sm:px-8">
+          <div className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(247,250,255,0.9)_54%,rgba(240,248,243,0.96)_100%)]" />
 
-            <LibertyMDPremiumLogo scrollY={scrollY} className="z-10 mt-4 sm:mt-6" />
-
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                handleSend();
-              }}
-              className="relative z-20 mt-2 flex w-full max-w-xl items-center gap-2 rounded-[24px] border border-white/80 bg-white/88 px-4 py-3 shadow-[0_24px_80px_rgba(37,99,235,0.16),inset_0_1px_0_rgba(255,255,255,0.95)] backdrop-blur-xl sm:mt-3"
+          <header className="mx-auto flex h-16 w-full max-w-7xl shrink-0 items-center justify-between">
+            <a
+              href="/liberty-md"
+              aria-label="LibertyMD home"
+              className="font-serif text-xl font-semibold text-[#111827] transition-colors hover:text-[#2563EB] sm:text-2xl"
             >
-              <input
-                type="text"
-                value={input}
-                onChange={(event) => setInput(event.target.value)}
-                placeholder="Describe symptoms..."
-                className="min-w-0 flex-1 bg-transparent text-sm font-medium text-[#111827] outline-none placeholder:text-[#94A3B8] sm:text-base"
-              />
+              LibertyMD
+            </a>
+
+            <div className="flex items-center gap-4 text-sm font-semibold text-[#334155] sm:gap-6">
+              <div aria-label="Care region" className="hidden items-center gap-2 text-xs text-[#64748B] sm:flex">
+                {(['EU', 'US'] as const).map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => setRegion(item)}
+                    aria-pressed={region === item}
+                    className={`border-b py-1 transition-colors ${
+                      region === item
+                        ? 'border-[#2563EB] text-[#2563EB]'
+                        : 'border-transparent hover:text-[#111827]'
+                    }`}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+              <a href="/login" className="transition-colors hover:text-[#2563EB]">Log in</a>
+              <a href="/login?mode=signup" className="hidden transition-colors hover:text-[#2563EB] sm:inline">Sign up</a>
               <button
-                type="submit"
-                disabled={!input.trim() || isTyping || phase === 'emergency_end' || phase === 'report_ready'}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#5661F6] text-white transition hover:bg-[#4651E6] disabled:cursor-not-allowed disabled:opacity-40"
+                type="button"
+                aria-label="View how LibertyMD works"
+                onClick={() => chatPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                className="inline-flex h-9 w-9 items-center justify-center text-[#111827] transition-colors hover:text-[#2563EB]"
               >
-                <Send className="h-4 w-4" />
+                <Menu className="h-5 w-5" />
               </button>
-            </form>
+            </div>
+          </header>
 
-            <div
-              className="mt-5 flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs font-medium text-[#64748B]"
-              style={{
-                opacity: Math.max(0, 1 - scrollY / 220),
-                transition: 'opacity 160ms ease-out',
-              }}
+          <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col items-center justify-center pb-8 text-center sm:pb-0 [@media(max-height:700px)]:pb-0">
+            <style>
+              {`
+                @keyframes libertymd-tagline-step-1 {
+                  0% { opacity: 0; transform: translateY(9px); filter: blur(3px); }
+                  8%, 78% { opacity: 1; transform: translateY(0); filter: blur(0); }
+                  88%, 100% { opacity: 0; transform: translateY(-5px); filter: blur(2px); }
+                }
+
+                @keyframes libertymd-tagline-step-2 {
+                  0%, 14% { opacity: 0; transform: translateY(9px); filter: blur(3px); }
+                  22%, 78% { opacity: 1; transform: translateY(0); filter: blur(0); }
+                  88%, 100% { opacity: 0; transform: translateY(-5px); filter: blur(2px); }
+                }
+
+                @keyframes libertymd-tagline-step-3 {
+                  0%, 29% { opacity: 0; transform: translateY(9px); filter: blur(3px); }
+                  37%, 78% { opacity: 1; transform: translateY(0); filter: blur(0); }
+                  88%, 100% { opacity: 0; transform: translateY(-5px); filter: blur(2px); }
+                }
+
+                .libertymd-start-chat-cta {
+                  box-shadow:
+                    inset 0 1px 0 rgba(255, 255, 255, 0.44),
+                    inset 0 -1px 0 rgba(15, 54, 153, 0.28),
+                    0 11px 26px rgba(37, 99, 235, 0.34);
+                  transform: translateY(0);
+                }
+
+                .libertymd-start-chat-cta::before {
+                  content: '';
+                  position: absolute;
+                  top: -35%;
+                  bottom: -35%;
+                  left: -42%;
+                  width: 24%;
+                  background: linear-gradient(
+                    105deg,
+                    rgba(255, 255, 255, 0) 0%,
+                    rgba(255, 255, 255, 0.16) 30%,
+                    rgba(255, 255, 255, 0.62) 50%,
+                    rgba(255, 255, 255, 0.16) 70%,
+                    rgba(255, 255, 255, 0) 100%
+                  );
+                  filter: blur(1px);
+                  pointer-events: none;
+                  transform: translateX(-180%) skewX(-16deg);
+                  will-change: transform;
+                }
+
+                @keyframes libertymd-start-chat-satin-shine {
+                  0% { transform: translateX(-180%) skewX(-16deg); }
+                  18% { transform: translateX(700%) skewX(-16deg); }
+                  100% { transform: translateX(700%) skewX(-16deg); }
+                }
+
+                @keyframes libertymd-start-chat-hover-shine {
+                  from { transform: translateX(-180%) skewX(-16deg); }
+                  to { transform: translateX(700%) skewX(-16deg); }
+                }
+
+                .libertymd-start-chat-cta--waiting::before {
+                  animation: libertymd-start-chat-satin-shine 9.6s cubic-bezier(0.4, 0, 0.2, 1) 1.2s infinite;
+                }
+
+                .libertymd-start-chat-cta:hover {
+                  background-color: #1D5FE2;
+                  box-shadow:
+                    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+                    inset 0 -1px 0 rgba(15, 54, 153, 0.3),
+                    0 13px 30px rgba(37, 99, 235, 0.4);
+                }
+
+                .libertymd-start-chat-cta:hover::before {
+                  animation: libertymd-start-chat-hover-shine 1.45s cubic-bezier(0.4, 0, 0.2, 1) 1;
+                }
+
+                .libertymd-start-chat-cta:active {
+                  transform: translateY(1px) scale(0.99);
+                  box-shadow:
+                    inset 0 1px 0 rgba(255, 255, 255, 0.34),
+                    inset 0 -1px 0 rgba(15, 54, 153, 0.34),
+                    0 7px 18px rgba(37, 99, 235, 0.3);
+                }
+
+                .libertymd-start-chat-arrow {
+                  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+                }
+
+                .libertymd-start-chat-cta:hover .libertymd-start-chat-arrow {
+                  transform: translateX(3px);
+                }
+
+                @media (prefers-reduced-motion: reduce) {
+                  .libertymd-tagline-word {
+                    animation: none !important;
+                    opacity: 1 !important;
+                    transform: none !important;
+                    filter: none !important;
+                  }
+
+                  .libertymd-start-chat-cta,
+                  .libertymd-start-chat-cta::before,
+                  .libertymd-start-chat-arrow {
+                    animation: none !important;
+                    transform: none !important;
+                  }
+                }
+              `}
+            </style>
+
+            <h1 className="font-serif text-6xl font-semibold leading-none text-[#111827] sm:text-7xl [@media(max-height:700px)]:whitespace-nowrap [@media(max-height:700px)]:text-5xl">
+              LibertyMD
+            </h1>
+            <p
+              className="mt-4 flex min-h-7 flex-wrap items-center justify-center gap-x-2 text-sm font-bold text-[#17325F] sm:mt-2 sm:gap-x-3 sm:text-lg [@media(max-height:700px)]:mt-2 [@media(max-height:700px)]:text-xs"
+              aria-label="Free, Anonymous, Built by Doctors"
             >
-              <span>Private by default</span>
-              <span>Doctor-ready SOAP</span>
-              <span>Emergency-aware</span>
-              <span>{region === 'EU' ? 'GDPR mode' : 'HIPAA mode'}</span>
+              {['Free', 'Anonymous', 'Built by Doctors'].map((phrase, index) => (
+                <React.Fragment key={phrase}>
+                  {index > 0 && (
+                    <span
+                      aria-hidden="true"
+                      className="libertymd-tagline-word opacity-0"
+                      style={{
+                        animation: `libertymd-tagline-step-${index + 1} 5.4s ease-in-out infinite`,
+                        willChange: 'opacity, transform, filter',
+                      }}
+                    >
+                      •
+                    </span>
+                  )}
+                  <span
+                    className="libertymd-tagline-word opacity-0"
+                    style={{
+                      animation: `libertymd-tagline-step-${index + 1} 5.4s ease-in-out infinite`,
+                      willChange: 'opacity, transform, filter',
+                    }}
+                  >
+                    {phrase}
+                  </span>
+                </React.Fragment>
+              ))}
+            </p>
+
+            <LibertyMDPremiumLogo
+              scrollY={phase === 'initial' ? scrollY : 0}
+              dockHeadlineRef={logoDockHeadlineRef}
+              className="z-10 mt-[var(--libertymd-gap-tagline-logo)] mb-[var(--libertymd-gap-pedestal-input)] [@media(max-height:700px)]:-mt-2 [@media(max-height:700px)]:mb-2"
+            />
+
+            <div className="relative z-20 w-full max-w-5xl">
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (!input.trim()) {
+                    heroSymptomsRef.current?.focus();
+                    return;
+                  }
+                  handleSend();
+                }}
+                className="relative min-h-[205px] w-full rounded-[22px] border border-white/80 bg-white/75 p-6 pt-8 text-left shadow-[0_18px_60px_rgba(15,23,42,0.08)] backdrop-blur-[2px] sm:min-h-[238px] sm:p-8 sm:pt-9 lg:min-h-[240px] [@media(max-height:700px)]:min-h-[160px] [@media(max-height:700px)]:p-4 [@media(max-height:700px)]:pt-7"
+              >
+                <label
+                  htmlFor="libertymd-hero-symptoms"
+                  className="absolute -top-5 left-6 rounded-t-[28px] rounded-br-[28px] bg-[#E5FFB8] px-5 py-3 text-base font-black text-[#111827] sm:left-10 sm:px-7 sm:text-xl [@media(max-height:700px)]:-top-4 [@media(max-height:700px)]:left-6 [@media(max-height:700px)]:px-5 [@media(max-height:700px)]:py-2 [@media(max-height:700px)]:text-sm"
+                >
+                  What brings you in?
+                </label>
+                <textarea
+                  ref={heroSymptomsRef}
+                  id="libertymd-hero-symptoms"
+                  aria-label="Describe your symptoms or ask a health question"
+                  rows={3}
+                  value={input}
+                  onChange={(event) => setInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && !event.shiftKey) {
+                      event.preventDefault();
+                      handleSend();
+                    }
+                  }}
+                  placeholder="Describe symptom or ask any health questions..."
+                  className="min-h-[88px] w-full resize-none bg-transparent text-base leading-7 text-[#334155] outline-none placeholder:text-[#5B5B5B] sm:min-h-[120px] sm:text-xl [@media(max-height:700px)]:min-h-[54px] [@media(max-height:700px)]:text-sm [@media(max-height:700px)]:leading-6"
+                />
+                <button
+                  type="submit"
+                  aria-label={input.trim() ? 'Start LibertyMD chat' : 'Start by describing your symptoms'}
+                  className={`libertymd-start-chat-cta ${!input.trim() ? 'libertymd-start-chat-cta--waiting' : ''} absolute bottom-6 left-6 right-6 isolate inline-flex h-14 cursor-pointer items-center justify-center gap-3 overflow-hidden rounded-full bg-[#2563EB] px-8 text-base font-bold text-white ring-1 ring-white/60 transition-[background-color,box-shadow,transform] duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#93C5FD] sm:bottom-8 sm:left-auto sm:right-8 sm:w-64 [@media(max-height:700px)]:bottom-4 [@media(max-height:700px)]:left-4 [@media(max-height:700px)]:right-4 [@media(max-height:700px)]:h-12 [@media(max-height:700px)]:w-auto`}
+                >
+                  <span className="relative z-10">Start chat</span>
+                  <ArrowRight className="libertymd-start-chat-arrow relative z-10 h-5 w-5" />
+                </button>
+              </form>
+
+              <div className="mt-5 flex flex-row items-center justify-between gap-3 text-xs font-medium text-[#626262] sm:mt-2 sm:text-sm [@media(max-height:700px)]:mt-0 [@media(max-height:700px)]:gap-1">
+                <div className="flex flex-nowrap items-center justify-start gap-2 [@media(max-height:700px)]:gap-1">
+                  <span>4.7</span>
+                  <span className="inline-flex gap-0.5" aria-label="4.7 out of 5 rating">
+                    {[0, 1, 2, 3, 4].map((item) => (
+                      <span key={item} className="inline-flex h-5 w-5 items-center justify-center bg-[#169B52] [@media(max-height:700px)]:h-4 [@media(max-height:700px)]:w-4">
+                        <Star className="h-3.5 w-3.5 fill-white text-white [@media(max-height:700px)]:h-3 [@media(max-height:700px)]:w-3" />
+                      </span>
+                    ))}
+                  </span>
+                </div>
+                <span className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap">
+                  <ShieldCheck className="h-5 w-5 text-[#626262]" />
+                  HIPAA Compliant &amp; Private
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* Continuous Background 3D Waved Point Cloud across Hero & Section 2 */}
-          <LibertyMDParticleWaveSeparator />
+          <LibertyMDParticleWaveSeparator className="opacity-[0.22] sm:opacity-[0.34]" />
         </section>
 
-        <section ref={chatPanelRef} className="relative z-0 bg-[linear-gradient(180deg,rgba(244,250,242,0.94),rgba(235,247,241,0.96))] px-5 pb-16 pt-14 sm:px-8 sm:pt-16">
+        <section ref={chatPanelRef} className="relative z-0 bg-[linear-gradient(180deg,rgba(245,250,243,0.96),rgba(237,247,241,0.98))] px-5 pb-16 pt-[300px] sm:px-8 sm:pt-[340px]">
           <div className="mx-auto max-w-3xl text-center">
-            <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#2563EB]">AI care chat</p>
-            <h2 className="mt-3 text-4xl font-black leading-tight tracking-tight text-[#111827] sm:text-5xl">
+            <p className="text-xs font-bold uppercase tracking-normal text-[#2563EB]">From symptom to next step</p>
+            <h2 ref={logoDockHeadlineRef} className="mt-3 text-4xl font-black leading-tight tracking-normal text-[#111827] sm:text-5xl">
               How LibertyMD works
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-[#5B6472] sm:text-base">
-              A focused symptom intake, safety screen, clinical follow-up, and doctor-ready report in one calm flow.
+              Describe what you feel. LibertyMD checks urgent warning signs, asks focused questions, and prepares a report you can share with a doctor.
             </p>
           </div>
 
-          <div className="mx-auto mt-16 grid max-w-6xl gap-12 text-left lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
+          <div className="mx-auto mt-14 grid max-w-6xl gap-12 text-left lg:grid-cols-[0.78fr_1.22fr] lg:items-start">
             <div className="lg:sticky lg:top-24">
-              <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#2563EB]">Clinical workflow</p>
-              <h2 className="mt-3 max-w-sm text-3xl font-black leading-tight tracking-tight text-[#111827] sm:text-4xl">
-                One clean flow from symptom to report.
+              <p className="text-xs font-bold uppercase tracking-normal text-[#2563EB]">Start a consultation</p>
+              <h2 className="mt-3 max-w-sm text-3xl font-black leading-tight tracking-normal text-[#111827] sm:text-4xl">
+                Begin in your own words.
               </h2>
               <p className="mt-4 max-w-sm text-sm leading-7 text-[#5B6472]">
-                The chat uses the existing AI Care guardrail, QA, and diagnosis workflows. The UI stays minimal so the medical conversation remains the focus.
+                A sentence is enough. LibertyMD will ask only the questions needed to understand timing, severity, and safety.
               </p>
 
               <div className="mt-8 space-y-3">
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#64748B]">Try a common case</p>
+                <p className="text-xs font-bold uppercase tracking-normal text-[#64748B]">Or try an example</p>
                 {SAMPLE_CASES.map((item) => (
                   <button
                     key={item.label}
@@ -539,14 +718,19 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                   </button>
                 ))}
               </div>
+
+              <div className="mt-7 flex max-w-sm items-start gap-3 border-t border-[#DDE7D8] pt-5 text-xs leading-6 text-[#64748B]">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#B45309]" />
+                <p>For severe chest pain, trouble breathing, fainting, or other dangerous symptoms, call emergency services now.</p>
+              </div>
             </div>
 
-            <div className="min-h-[620px]">
+            <div className="min-h-[560px]">
               <div className="mb-4 flex items-center justify-between border-b border-[#DDE7D8] pb-3">
                 <div className="flex items-center gap-2.5">
                   <span className="h-2.5 w-2.5 rounded-full bg-[#16A34A]" />
-                  <span className="text-sm font-bold text-[#111827]">LibertyMD Clinical Engine</span>
-                  <span className="hidden text-xs text-[#64748B] sm:inline">AI Care n8n workflows</span>
+                  <span className="text-sm font-bold text-[#111827]">LibertyMD care assistant</span>
+                  <span className="hidden text-xs text-[#64748B] sm:inline">Private session · {region}</span>
                 </div>
                 <button onClick={resetConsult} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#64748B] hover:text-[#2563EB]">
                   <RotateCcw className="h-3.5 w-3.5" />
@@ -558,7 +742,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                 {messages.map((message) => (
                   <div key={message.id} className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
                     <div
-                      className={`max-w-[88%] rounded-[22px] px-5 py-4 text-sm leading-7 shadow-[0_18px_46px_rgba(15,23,42,0.05)] ${
+                      className={`max-w-[88%] rounded-[20px] px-5 py-4 text-sm leading-7 shadow-[0_14px_40px_rgba(15,23,42,0.045)] ${
                         message.sender === 'user'
                           ? 'bg-[#5661F6] text-white'
                           : message.kind === 'emergency'
@@ -620,7 +804,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                       Age and biological sex help the AI Care workflow ask safer follow-up questions.
                     </p>
                     <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                      <label className="grid gap-2 text-xs font-bold uppercase tracking-[0.16em] text-[#64748B]">
+                      <label className="grid gap-2 text-xs font-bold uppercase tracking-normal text-[#64748B]">
                         Age
                         <input
                           inputMode="numeric"
@@ -630,7 +814,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                           className="border-b border-[#BFD2B7] bg-transparent py-3 text-base font-semibold normal-case tracking-normal text-[#111827] outline-none focus:border-[#5661F6]"
                         />
                       </label>
-                      <label className="grid gap-2 text-xs font-bold uppercase tracking-[0.16em] text-[#64748B]">
+                      <label className="grid gap-2 text-xs font-bold uppercase tracking-normal text-[#64748B]">
                         Biological sex
                         <select
                           value={demographics.sex}
@@ -672,8 +856,8 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                   <div className="border-t border-[#DDE7D8] pt-7">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                       <div>
-                        <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#2563EB]">Share LibertyMD Report</p>
-                        <h3 className="mt-2 text-3xl font-black tracking-tight text-[#111827]">Assessment & Plan</h3>
+                        <p className="text-xs font-bold uppercase tracking-normal text-[#2563EB]">Share LibertyMD Report</p>
+                        <h3 className="mt-2 text-3xl font-black tracking-normal text-[#111827]">Assessment & Plan</h3>
                       </div>
                       <button
                         type="button"
@@ -688,7 +872,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
 
                     {report.differentials.length > 0 && (
                       <div className="mt-8 space-y-5 border-t border-[#DDE7D8] pt-6">
-                        <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#64748B]">Clinical considerations</p>
+                        <p className="text-xs font-bold uppercase tracking-normal text-[#64748B]">Clinical considerations</p>
                         {report.differentials.map((item, index) => (
                           <div key={`${item.name}-${index}`} className="border-b border-[#DDE7D8] pb-5">
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -733,7 +917,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                           ['Plan', report.soap.plan]
                         ].map(([label, value]) => (
                           <div key={label}>
-                            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#64748B]">{label}</p>
+                            <p className="text-xs font-bold uppercase tracking-normal text-[#64748B]">{label}</p>
                             <p className="mt-2 whitespace-pre-line text-sm leading-7 text-[#334155]">{value}</p>
                           </div>
                         ))}
@@ -793,7 +977,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                     event.preventDefault();
                     handleSend();
                   }}
-                  className="flex items-center gap-2 rounded-[22px] border border-white/80 bg-white/90 px-4 py-3 shadow-[0_18px_55px_rgba(37,99,235,0.08)] backdrop-blur-xl"
+                  className="flex items-center gap-2 rounded-full border border-white bg-white/92 px-4 py-3 shadow-[0_16px_50px_rgba(37,99,235,0.07)] backdrop-blur-xl"
                 >
                   <input
                     type="text"
@@ -805,6 +989,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                   />
                   <button
                     type="submit"
+                    aria-label="Send message"
                     disabled={!input.trim() || isTyping || phase === 'emergency_end' || phase === 'report_ready'}
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#5661F6] text-white hover:bg-[#4651E6] disabled:cursor-not-allowed disabled:opacity-40"
                   >
@@ -819,8 +1004,8 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
         {selectedTab === 'doctors' && (
           <section className="border-t border-[#E6EDE3] bg-[linear-gradient(180deg,rgba(251,252,248,0.98),rgba(239,246,255,0.72))] px-5 py-16 sm:px-8">
             <div className="mx-auto max-w-6xl">
-              <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#2563EB]">Licensed handoff</p>
-              <h2 className="mt-3 max-w-xl text-3xl font-black tracking-tight text-[#111827] sm:text-4xl">
+              <p className="text-xs font-bold uppercase tracking-normal text-[#2563EB]">Licensed handoff</p>
+              <h2 className="mt-3 max-w-xl text-3xl font-black tracking-normal text-[#111827] sm:text-4xl">
                 Continue with a doctor when you need one.
               </h2>
               <div className="mt-10 grid gap-8 md:grid-cols-3">
@@ -830,7 +1015,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                   ['Dr. Barry Pevner, MD', 'Family Medicine', '18 mins']
                 ].map(([name, specialty, wait]) => (
                   <div key={name} className="border-t border-[#DDE7D8] pt-5">
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#64748B]">Available in {wait}</p>
+                    <p className="text-xs font-bold uppercase tracking-normal text-[#64748B]">Available in {wait}</p>
                     <h3 className="mt-3 text-lg font-black text-[#111827]">{name}</h3>
                     <p className="mt-1 text-sm font-semibold text-[#2563EB]">{specialty}</p>
                     <p className="mt-3 text-sm leading-7 text-[#5B6472]">
@@ -846,994 +1031,72 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
           </section>
         )}
 
-        <section className="border-t border-[#E6EDE3] bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(248,250,247,0.96))] px-5 py-16 sm:px-8">
+        {/* Ambient Clinical Care Film — calm full-width band. Video edges are feathered and a soft
+            glow sits behind so it melts into the surrounding sections instead of reading as a hard rectangle. */}
+        <section className="relative overflow-hidden border-t border-[#E6EDE3] bg-[linear-gradient(180deg,rgba(245,250,243,0.96)_0%,rgba(248,250,247,0.97)_100%)] px-5 py-16 sm:px-8 sm:py-20">
           <div className="mx-auto max-w-3xl text-center">
-              <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#2563EB]">Clinical pathway</p>
-              <h2 className="mx-auto mt-3 max-w-xl text-3xl font-black tracking-tight text-[#111827] sm:text-4xl">
-                Simple enough to use when you feel unwell.
-              </h2>
+            <p className="text-xs font-bold uppercase tracking-normal text-[#2563EB]">Human care</p>
+            <h2 className="mx-auto mt-3 max-w-xl text-3xl font-black tracking-normal text-[#111827] sm:text-4xl">
+              A doctor&rsquo;s attention, built in.
+            </h2>
+            <p className="mx-auto mt-4 max-w-lg text-sm leading-7 text-[#5B6472]">
+              Every triage is designed to hand off cleanly to a licensed physician.
+            </p>
           </div>
-          <div className="mx-auto mt-12 grid max-w-6xl gap-12 text-left lg:grid-cols-[0.9fr_1.1fr]">
-            <div className="hidden lg:block" />
-            <div className="space-y-7">
-              {pathwaySteps.map(([step, title, description]) => (
-                <div key={step} className="grid gap-4 border-t border-[#DDE7D8] pt-5 sm:grid-cols-[80px_1fr]">
-                  <span className="text-sm font-black text-[#2563EB]">{step}</span>
-                  <div>
-                    <h3 className="font-black text-[#111827]">{title}</h3>
-                    <p className="mt-2 text-sm leading-7 text-[#5B6472]">{description}</p>
-                  </div>
-                </div>
-              ))}
+          <div className="relative mx-auto mt-10 max-w-5xl">
+            {/* Soft blue/peach glow matching the film's palette so the seams disappear */}
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -inset-x-6 -inset-y-8 -z-0 bg-[radial-gradient(60%_60%_at_50%_50%,rgba(191,219,254,0.45),rgba(254,226,226,0.22)_55%,transparent_80%)] blur-2xl"
+            />
+            <div className="relative overflow-hidden rounded-3xl">
+              <video
+                className="w-full aspect-video object-cover [mask-image:linear-gradient(180deg,transparent_0%,#000_14%,#000_86%,transparent_100%)] [-webkit-mask-image:linear-gradient(180deg,transparent_0%,#000_14%,#000_86%,transparent_100%)]"
+                autoPlay
+                loop
+                muted
+                playsInline
+                preload="metadata"
+                poster="https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/libertymd-assets/video/doctor-consult-poster.jpg"
+                aria-label="Ambient LibertyMD film: a doctor gently examining a patient with a stethoscope in a soft, glowing style"
+              >
+                <source
+                  src="https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/libertymd-assets/video/doctor-consult-loop.webm"
+                  type="video/webm"
+                />
+                <source
+                  src="https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/libertymd-assets/video/doctor-consult-loop.mp4"
+                  type="video/mp4"
+                />
+              </video>
+              {/* Left/right feather so the film blends into the page gutters on wide screens */}
+              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(247,250,245,0.6)_0%,transparent_11%,transparent_89%,rgba(247,250,245,0.6)_100%)]" />
             </div>
           </div>
         </section>
-      </main>
 
-      {/* Exact Doctronic-Style 3D Volumetric Ribbon Footer in Blue */}
-      <footer className="relative mt-24 bg-gradient-to-b from-[#EFF6FF] via-[#F0F9FF] to-[#E0F2FE] text-[#0F172A] overflow-hidden min-h-[720px] flex flex-col justify-between">
-        {/* Three.js WebGL 3D Silk Wave Ribbon (Blue Theme) */}
-        <LibertyMDFooterRibbon />
-
-        {/* Top Content: Links + Trust Badges */}
-        <div className="relative z-10 max-w-7xl mx-auto px-6 sm:px-10 pt-16 w-full">
-          <div className="flex flex-col lg:flex-row justify-between items-start gap-12">
-            {/* Left Columns */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-8 text-xs font-medium text-[#334155]">
-              <div className="space-y-4">
-                <p className="font-semibold text-sm text-[#0F172A]">Clinical Care</p>
-                <ul className="space-y-2.5">
-                  <li className="hover:text-[#2563EB] cursor-pointer">Symptom Checker</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">Urgent Care Specialist</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">Primary Telehealth</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">Prescription Refills</li>
-                </ul>
-
-                <p className="font-semibold text-sm text-[#0F172A] pt-4">Help & Privacy</p>
-                <ul className="space-y-2.5">
-                  <li className="hover:text-[#2563EB] cursor-pointer">FAQs</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">GDPR Privacy Policy</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">HIPAA Compliance</li>
-                </ul>
-              </div>
-
-              <div className="space-y-4">
-                <p className="font-semibold text-sm text-[#0F172A]">Company</p>
-                <ul className="space-y-2.5">
-                  <li className="hover:text-[#2563EB] cursor-pointer">About LibertyMD</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">Careers</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">Medical Reviewers</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">Team</li>
-                </ul>
-              </div>
-
-              <div className="space-y-4">
-                <p className="font-semibold text-sm text-[#0F172A]">Conditions</p>
-                <ul className="space-y-2.5">
-                  <li className="hover:text-[#2563EB] cursor-pointer">Respiratory Care</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">Cardiovascular</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">Neurology & Migraine</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">All Conditions</li>
-                </ul>
-
-                <p className="font-semibold text-sm text-[#0F172A] pt-4">Research</p>
-                <ul className="space-y-2.5">
-                  <li className="hover:text-[#2563EB] cursor-pointer">Clinical Blog</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">Peer-Reviewed RAG</li>
-                </ul>
-              </div>
-
-              <div className="space-y-4">
-                <p className="font-semibold text-sm text-[#0F172A]">Partnerships</p>
-                <ul className="space-y-2.5">
-                  <li className="hover:text-[#2563EB] cursor-pointer">Become a Partner</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">EU Health Systems</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">US Insurance Network</li>
-                </ul>
-              </div>
-            </div>
-
-            {/* Right Side: CARIN / HIPAA / LegitScript Badges using real image URLs */}
-            <div className="flex items-center gap-6 shrink-0 self-start">
-              <img
-                src="https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/libertymd-assets/carin-accredited.png"
-                alt="CARIN Accredited Code of Conduct"
-                className="h-16 w-auto object-contain hover:scale-105 transition-transform drop-shadow-sm"
-              />
-              <img
-                src="https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/libertymd-assets/hipaa-certified.png"
-                alt="HIPAA Certified"
-                className="h-16 w-auto object-contain hover:scale-105 transition-transform drop-shadow-sm"
-              />
-              <img
-                src="https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/libertymd-assets/legit_script.png"
-                alt="LegitScript Certified"
-                className="h-16 w-auto object-contain hover:scale-105 transition-transform drop-shadow-sm"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Center Patient Oath Emblem + Floating Medical Input Pill */}
-        <div className="relative z-10 flex flex-col items-center justify-center py-12 px-4">
-          {/* Patient Oath Circle Seal Emblem */}
-          <div className="mb-10 hover:scale-105 transition-transform">
-            <PatientOathEmblem className="w-48 h-48" />
-          </div>
-
-          {/* Floating Pill Search Box */}
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSend();
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            className="w-full max-w-2xl bg-white/90 backdrop-blur-md rounded-full p-2 pl-6 shadow-2xl border border-white/80 flex items-center gap-3 transition-all hover:shadow-3xl hover:bg-white"
-          >
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask about your health..."
-              className="flex-1 bg-transparent border-none text-base text-[#0F172A] placeholder-[#64748B] focus:outline-none"
-            />
-            <button
-              type="submit"
-              className="w-12 h-12 rounded-full bg-[#2563EB] hover:bg-[#1D4ED8] text-white flex items-center justify-center shadow-lg shadow-[#2563EB]/30 transition-transform active:scale-95"
-            >
-              <Send className="w-5 h-5" />
-            </button>
-          </form>
-        </div>
-
-        {/* Bottom Copyright */}
-        <div className="relative z-10 max-w-7xl mx-auto px-6 sm:px-10 py-6 w-full flex flex-col sm:flex-row items-center justify-between text-xs text-[#475569] border-t border-[#CBD5E1]/60">
-          <p>© {new Date().getFullYear()} LibertyMD Health Technologies. All rights reserved.</p>
-          <p>Privacy-first AI triage • EU GDPR Article 9 & US HIPAA Safe Harbor</p>
-        </div>
-      </footer>
-    </div>
-  );
-
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-[#EFF6FF] via-[#F0F9FF] to-[#E0F2FE] relative text-[#0F172A] font-sans flex flex-col selection:bg-[#2563EB] selection:text-white overflow-x-hidden">
-      {/* Top Banner & Navigation */}
-      <header className="border-b border-[#E2E8F0] bg-white/85 backdrop-blur-md sticky top-0 z-50 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            {onBack && (
-              <button
-                onClick={onBack}
-                className="p-2 rounded-lg text-[#64748B] hover:text-[#0F172A] hover:bg-[#F1F5F9] transition-colors flex items-center gap-2 text-sm font-medium"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Back to Portfolio
-              </button>
-            )}
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] flex items-center justify-center shadow-lg shadow-[#2563EB]/20">
-                <HeartPulse className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-[#1E40AF] via-[#2563EB] to-[#0284C7] bg-clip-text text-transparent">
-                  LibertyMD
-                </span>
-                <span className="hidden sm:inline-block ml-2 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#EFF6FF] text-[#1D4ED8] border border-[#BFDBFE]">
-                  100% PRIVATE AI DOCTOR
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Region Toggle: EU vs US */}
-          <div className="flex items-center gap-3">
-            <div className="bg-[#F1F5F9] border border-[#E2E8F0] p-1 rounded-xl flex items-center text-xs font-medium">
-              <button
-                onClick={() => setRegion('EU')}
-                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-                  region === 'EU'
-                    ? 'bg-white text-[#1E40AF] font-semibold shadow-sm border border-[#CBD5E1]'
-                    : 'text-[#64748B] hover:text-[#0F172A]'
-                }`}
-              >
-                <Globe className="w-3.5 h-3.5 text-[#2563EB]" />
-                <span>EU (GDPR Vault)</span>
-              </button>
-              <button
-                onClick={() => setRegion('US')}
-                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-                  region === 'US'
-                    ? 'bg-white text-[#1E40AF] font-semibold shadow-sm border border-[#CBD5E1]'
-                    : 'text-[#64748B] hover:text-[#0F172A]'
-                }`}
-              >
-                <Lock className="w-3.5 h-3.5 text-[#0284C7]" />
-                <span>US (HIPAA Certified)</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* 3-Column Interactive Hero Section (Dribbble Layout: Left Person Interacting, Center 3D Logo + Footer-style Textbox, Right Person Interacting) */}
-      <section className="relative z-10 pt-12 pb-20 border-b border-[#E2E8F0] bg-gradient-to-b from-[#EFF6FF] via-[#F0F9FF] to-[#E0F2FE] overflow-hidden">
-        {/* Architectural Grid Lines */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-1/3 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#2563EB]/[0.08] to-transparent" />
-          <div className="absolute top-2/3 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#2563EB]/[0.08] to-transparent" />
-          <div className="absolute top-0 bottom-0 left-1/4 w-px bg-gradient-to-b from-transparent via-[#2563EB]/[0.08] to-transparent" />
-          <div className="absolute top-0 bottom-0 right-1/4 w-px bg-gradient-to-b from-transparent via-[#2563EB]/[0.08] to-transparent" />
-        </div>
-
-        {/* Soft Ambient White & Sky-Blue Profile Glows */}
-        <div className="absolute -top-10 -left-20 w-[480px] h-[480px] rounded-full bg-gradient-to-r from-[#DBEAFE]/80 via-[#EFF6FF]/60 to-transparent blur-[110px] pointer-events-none" />
-        <div className="absolute -top-10 -right-20 w-[480px] h-[480px] rounded-full bg-gradient-to-l from-[#E0F2FE]/80 via-[#EFF6FF]/60 to-transparent blur-[110px] pointer-events-none" />
-
-        {/* Freehand AI Style: Background 3D Medical Cross Logo floating behind translucent layer (z-0), smoothly gliding down into the 2nd section */}
-        <div
-          className="absolute top-[80px] sm:top-[110px] left-0 right-0 z-0 flex items-center justify-center pointer-events-none transition-transform duration-75 ease-out"
-          style={{
-            transform: `translate3d(0, ${scrollY * 0.58}px, 0)`,
-            opacity: Math.max(0.18, 1 - scrollY / 1100)
-          }}
-        >
-          <div className="w-[280px] h-[280px] sm:w-[380px] sm:h-[380px] lg:w-[440px] lg:h-[440px] flex items-center justify-center">
-            <LibertyMDMedicalCrossLogo size={420} colorTheme="blue" />
-          </div>
-        </div>
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 min-h-[560px] flex items-center justify-center">
-          {/* Freehand AI Translucent Glass Workspace Layer (z-10) — Text sits crisp on top while 3D Logo glides visibly behind */}
-          <div className="max-w-4xl mx-auto px-6 sm:px-10 lg:px-12 py-10 rounded-3xl bg-white/70 backdrop-blur-xl border border-white/80 shadow-2xl relative z-20 flex flex-col items-center justify-center text-center">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#EFF6FF] border border-[#BFDBFE] text-xs font-semibold text-[#1D4ED8] mb-4 shadow-sm">
-              <ShieldCheck className="w-4 h-4 text-[#2563EB]" />
-              <span>
-                {region === 'EU'
-                  ? 'GDPR Sovereign Encrypted Vault • Anonymous Storage'
-                  : 'HIPAA Certified • 50-State Physician Network • Zero Data Resale'}
-              </span>
-            </div>
-
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-[#0F172A] mb-3 leading-tight">
-              Hi, I'm LibertyMD.<br />
-              <span className="bg-gradient-to-r from-[#1E40AF] via-[#2563EB] to-[#0284C7] bg-clip-text text-transparent">
-                Free private AI care.
-              </span>
-            </h1>
-            <p className="text-base sm:text-lg text-[#475569] leading-relaxed max-w-2xl mb-6">
-              Describe your symptoms and receive focused follow-up questions, emergency-aware triage, and a doctor-ready care plan.
-            </p>
-
-            {/* Input Textbox (Exactly like in footer ribbon) */}
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleSend();
-              }}
-              className="w-full max-w-xl bg-white/95 backdrop-blur-md rounded-full p-2 pl-6 shadow-xl border border-[#E2E8F0] flex items-center gap-3 transition-all hover:shadow-2xl hover:bg-white relative z-30 mt-2"
-            >
-              <Sparkles className="w-5 h-5 text-[#2563EB] shrink-0" />
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask about symptoms, medication, or next steps..."
-                className="flex-1 bg-transparent border-none text-base text-[#0F172A] placeholder-[#64748B] focus:outline-none font-medium"
-              />
-              <button
-                type="submit"
-                className="w-12 h-12 rounded-full bg-[#2563EB] hover:bg-[#1D4ED8] text-white flex items-center justify-center shadow-lg shadow-[#2563EB]/30 transition-transform active:scale-95 shrink-0"
-              >
-                <Send className="w-5 h-5" />
-              </button>
-            </form>
-
-            {/* Mode Switcher Tabs */}
-            <div className="flex justify-center gap-3 mt-7">
-              <button
-                onClick={() => setSelectedTab('chat')}
-                className={`px-5 py-2.5 rounded-xl font-medium text-xs transition-all flex items-center gap-2 ${
-                  selectedTab === 'chat'
-                    ? 'bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] text-white shadow-lg shadow-[#2563EB]/25 border border-[#2563EB]'
-                    : 'bg-white border border-[#E2E8F0] text-[#64748B] hover:text-[#0F172A] hover:bg-[#F8FAFC] shadow-sm'
-                }`}
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                AI Symptom & Triage Chat
-              </button>
-              <button
-                onClick={() => setSelectedTab('doctors')}
-                className={`px-5 py-2.5 rounded-xl font-medium text-xs transition-all flex items-center gap-2 ${
-                  selectedTab === 'doctors'
-                    ? 'bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] text-white shadow-lg shadow-[#2563EB]/25 border border-[#2563EB]'
-                    : 'bg-white border border-[#E2E8F0] text-[#64748B] hover:text-[#0F172A] hover:bg-[#F8FAFC] shadow-sm'
-                }`}
-              >
-                <Video className="w-3.5 h-3.5" />
-                See Licensed Doctors ({region === 'EU' ? '€39' : '$39'})
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
-        {selectedTab === 'chat' ? (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Left Column: Sample Cases & Clinical Trust Info */}
-            <div className="lg:col-span-1 space-y-6">
-              <div className="bg-white/85 backdrop-blur-md border border-[#E2E8F0] rounded-2xl p-5 shadow-lg">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-[#64748B] mb-3">
-                  Try a Care Flow
-                </h3>
-                <p className="text-xs text-[#64748B] mb-4">
-                  Start with a common presentation and LibertyMD will route it through the AI Care guardrail, QA, and diagnosis workflows.
-                </p>
-                <div className="space-y-2.5">
-                  {SAMPLE_CASES.map((c, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => handleSend(c.symptom)}
-                      className="w-full text-left p-3 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] hover:border-[#93C5FD] hover:bg-[#EFF6FF]/60 transition-all group"
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-semibold text-[#0F172A] group-hover:text-[#2563EB] transition-colors">
-                          Case #{idx + 1}
-                        </span>
-                        <Activity className="w-3.5 h-3.5 text-[#2563EB]" />
-                      </div>
-                      <p className="text-xs text-[#64748B] line-clamp-2">
-                        {c.label}
-                      </p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Privacy Guarantee Card */}
-              <div className="bg-gradient-to-br from-[#EFF6FF] to-[#DBEAFE]/40 border border-[#BFDBFE] rounded-2xl p-5">
-                <div className="flex items-center gap-2.5 text-[#1E40AF] font-bold text-sm mb-2">
-                  <ShieldCheck className="w-5 h-5 text-[#2563EB]" />
-                  <span>Sovereign Privacy Architecture</span>
-                </div>
-                <p className="text-xs text-[#334155] leading-relaxed">
-                  Unlike conventional search engines, LibertyMD does not store PII or sell query logs to third-party insurers. All consultations operate within strict {region === 'EU' ? 'EU GDPR Article 9' : 'HIPAA Safe Harbor'} encryption boundaries.
-                </p>
-              </div>
-            </div>
-
-            {/* Right Column: Interactive Chat Interface */}
-            <div ref={chatPanelRef} className="lg:col-span-2 flex flex-col bg-white border border-[#E2E8F0] rounded-2xl overflow-hidden h-[720px] shadow-xl">
-              {/* Chat Header */}
-              <div className="px-5 py-3.5 border-b border-[#E2E8F0] bg-[#F8FAFC] flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#10B981] animate-pulse" />
-                  <span className="text-sm font-semibold text-[#0F172A]">LibertyMD Clinical Engine</span>
-                  <span className="text-xs text-[#64748B] font-mono">AI Care n8n workflows</span>
-                  <span className="hidden sm:inline-flex px-2 py-0.5 rounded-full bg-[#EFF6FF] text-[#1D4ED8] text-[10px] font-bold uppercase tracking-wide">
-                    {phase.replaceAll('_', ' ')}
-                  </span>
-                </div>
-                <button
-                  onClick={resetConsult}
-                  className="inline-flex items-center gap-1.5 text-xs text-[#64748B] hover:text-[#2563EB] transition-colors font-medium"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  Reset Consultation
-                </button>
-              </div>
-
-              {/* Chat Messages */}
-              <div className="flex-1 overflow-y-auto p-5 space-y-5">
-                {messages.map((m) => (
-                  <div
-                    key={m.id}
-                    className={`flex ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div
-                      className={`max-w-[88%] rounded-2xl p-4.5 ${
-                        m.sender === 'user'
-                          ? 'bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] text-white rounded-br-none shadow-md'
-                          : m.kind === 'emergency'
-                          ? 'bg-[#FEF2F2] border border-[#FECACA] text-[#7F1D1D] rounded-bl-none shadow-sm'
-                          : m.kind === 'report'
-                          ? 'bg-[#F0FDF4] border border-[#BBF7D0] text-[#14532D] rounded-bl-none shadow-sm'
-                          : 'bg-[#F8FAFC] border border-[#E2E8F0] text-[#1E293B] rounded-bl-none shadow-sm'
-                      }`}
-                    >
-                      <p className="text-sm leading-relaxed whitespace-pre-line mb-3">
-                        {m.text}
-                      </p>
-
-                      {/* Structured Triage Output if present */}
-                      {m.triageData && (
-                        <div className="mt-4 pt-4 border-t border-[#E2E8F0] space-y-4">
-                          {/* Severity Badge */}
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">
-                              Triage Acuity:
-                            </span>
-                            <span
-                              className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${
-                                m.triageData.severity === 'urgent'
-                                  ? 'bg-[#FEE2E2] text-[#DC2626] border border-[#FECACA]'
-                                  : m.triageData.severity === 'moderate'
-                                  ? 'bg-[#FEF3C7] text-[#D97706] border border-[#FDE68A]'
-                                  : 'bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE]'
-                              }`}
-                            >
-                              {m.triageData.severity}
-                            </span>
-                          </div>
-
-                          {/* Possible Differential Causes */}
-                          <div>
-                            <span className="text-xs font-semibold text-[#64748B] uppercase tracking-wider block mb-2">
-                              Primary Clinical Differentials
-                            </span>
-                            <ul className="space-y-1">
-                              {m.triageData.possibleCauses.map((item, i) => (
-                                <li key={i} className="text-xs text-[#1E293B] flex items-center gap-2">
-                                  <CheckCircle2 className="w-3.5 h-3.5 text-[#2563EB] shrink-0" />
-                                  <span>{item}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-
-                          {/* Recommended Action Plan */}
-                          <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-xl p-3.5">
-                            <span className="text-xs font-semibold text-[#1E40AF] block mb-2">
-                              Recommended Medical Action Plan
-                            </span>
-                            <ul className="space-y-1.5">
-                              {m.triageData.actionPlan.map((act, i) => (
-                                <li key={i} className="text-xs text-[#1E3A8A] flex items-start gap-2">
-                                  <span className="text-[#2563EB] font-bold">•</span>
-                                  <span>{act}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-
-                          {/* Red Flags */}
-                          {m.triageData.redFlags.length > 0 && (
-                            <div className="bg-[#FEF2F2] border border-[#FECACA] rounded-xl p-3.5">
-                              <span className="text-xs font-semibold text-[#991B1B] flex items-center gap-1.5 mb-2">
-                                <AlertTriangle className="w-3.5 h-3.5 text-[#DC2626]" />
-                                Urgent Red Flag Symptoms (Seek ER Care if present)
-                              </span>
-                              <ul className="space-y-1">
-                                {m.triageData.redFlags.map((flag, i) => (
-                                  <li key={i} className="text-xs text-[#7F1D1D]">
-                                    - {flag}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-
-                {phase === 'consent_required' && (
-                  <div className="bg-white border border-[#BFDBFE] rounded-2xl p-5 shadow-sm">
-                    <div className="flex items-center gap-2 text-[#1E40AF] font-bold mb-2">
-                      <ShieldCheck className="w-5 h-5" />
-                      Before we continue
-                    </div>
-                    <p className="text-sm text-[#475569] leading-relaxed mb-4">
-                      LibertyMD is an AI care assistant, not a replacement for emergency services or a licensed clinician.
-                    </p>
-                    <div className="space-y-2.5">
-                      {[
-                        ['terms', 'I accept the LibertyMD terms for this AI consult.'],
-                        ['ai', 'I understand this is AI guidance, not a formal diagnosis.'],
-                        ['emergency', 'I will call emergency services for severe or dangerous symptoms.']
-                      ].map(([key, label]) => (
-                        <label key={key} className="flex items-start gap-3 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] p-3 text-sm text-[#334155]">
-                          <input
-                            type="checkbox"
-                            checked={consent[key as keyof typeof consent]}
-                            onChange={(event) => setConsent(prev => ({ ...prev, [key]: event.target.checked }))}
-                            className="mt-1 h-4 w-4 rounded border-[#CBD5E1] text-[#2563EB]"
-                          />
-                          <span>{label}</span>
-                        </label>
-                      ))}
-                    </div>
-                    <button
-                      type="button"
-                      disabled={!consentReady}
-                      onClick={() => setPhase('demographics_required')}
-                      className="mt-4 px-5 py-2.5 bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-40 rounded-xl text-white font-medium text-sm transition-all"
-                    >
-                      Continue
-                    </button>
-                  </div>
-                )}
-
-                {phase === 'demographics_required' && (
-                  <form
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      if (demographicsReady) void continueAfterGates();
-                    }}
-                    className="bg-white border border-[#BFDBFE] rounded-2xl p-5 shadow-sm"
-                  >
-                    <div className="flex items-center gap-2 text-[#1E40AF] font-bold mb-2">
-                      <UserCheck className="w-5 h-5" />
-                      Basic clinical context
-                    </div>
-                    <p className="text-sm text-[#475569] leading-relaxed mb-4">
-                      Age and biological sex help the AI Care workflow ask safer follow-up questions.
-                    </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <label className="grid gap-1.5 text-sm font-semibold text-[#334155]">
-                        Age
-                        <input
-                          inputMode="numeric"
-                          value={demographics.age}
-                          onChange={(event) => setDemographics(prev => ({ ...prev, age: event.target.value }))}
-                          placeholder="e.g. 34"
-                          className="rounded-xl border border-[#CBD5E1] px-4 py-3 font-normal text-[#0F172A] focus:outline-none focus:border-[#2563EB]"
-                        />
-                      </label>
-                      <label className="grid gap-1.5 text-sm font-semibold text-[#334155]">
-                        Biological sex
-                        <select
-                          value={demographics.sex}
-                          onChange={(event) => setDemographics(prev => ({ ...prev, sex: event.target.value }))}
-                          className="rounded-xl border border-[#CBD5E1] px-4 py-3 font-normal text-[#0F172A] focus:outline-none focus:border-[#2563EB]"
-                        >
-                          <option value="">Select</option>
-                          <option value="female">Female</option>
-                          <option value="male">Male</option>
-                          <option value="intersex">Intersex</option>
-                          <option value="prefer_not_to_say">Prefer not to say</option>
-                        </select>
-                      </label>
-                    </div>
-                    <button
-                      disabled={!demographicsReady || isTyping}
-                      className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-40 rounded-xl text-white font-medium text-sm transition-all"
-                    >
-                      {isTyping && <Loader2 className="w-4 h-4 animate-spin" />}
-                      Start AI Care intake
-                    </button>
-                  </form>
-                )}
-
-                {error && (
-                  <div className="bg-[#FFFBEB] border border-[#FDE68A] text-[#92400E] rounded-2xl p-4 text-sm">
-                    {error}
-                  </div>
-                )}
-
-                {isTyping && (
-                  <div className="flex justify-start">
-                    <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl px-4 py-3 flex items-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin text-[#2563EB]" />
-                      <span className="text-sm text-[#64748B]">Checking safety and generating the next clinical step...</span>
-                    </div>
-                  </div>
-                )}
-
-                {report && (
-                  <div className="bg-white border border-[#BFDBFE] rounded-2xl p-5 shadow-sm space-y-5">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#2563EB]">Share LibertyMD Report</p>
-                        <h3 className="text-xl font-bold text-[#0F172A] mt-1">Assessment & Plan</h3>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedTab('doctors')}
-                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#2563EB] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#2563EB]/20 hover:bg-[#1D4ED8]"
-                      >
-                        <Video className="w-4 h-4" />
-                        Continue to a licensed doctor
-                      </button>
-                    </div>
-
-                    <div className="rounded-xl border border-[#BFDBFE] bg-[#F4F9FF] p-4">
-                      <p className="text-sm leading-7 text-[#334155]">{report.summary}</p>
-                    </div>
-
-                    {report.differentials.length > 0 && (
-                      <div className="space-y-3">
-                        <p className="text-xs font-bold uppercase tracking-wider text-[#64748B]">Clinical considerations</p>
-                        {report.differentials.map((item, index) => (
-                          <div key={`${item.name}-${index}`} className="rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-4">
-                            <div className="flex items-start justify-between gap-3">
-                              <div>
-                                <h4 className="font-semibold text-[#0F172A]">{item.name}</h4>
-                                {item.description && <p className="mt-1 text-sm leading-6 text-[#475569]">{item.description}</p>}
-                                {item.reason && <p className="mt-2 text-xs leading-5 text-[#64748B]">{item.reason}</p>}
-                              </div>
-                              {item.confidence && (
-                                <span className="rounded-full border border-[#BFDBFE] bg-white px-2.5 py-1 text-[10px] font-bold uppercase text-[#1D4ED8]">
-                                  {item.confidence}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="rounded-xl border border-[#BBF7D0] bg-[#F0FDF4] p-4">
-                        <h4 className="mb-2 flex items-center gap-2 font-semibold text-[#166534]">
-                          <CheckCircle2 className="w-4 h-4" />
-                          Care Plan
-                        </h4>
-                        <ul className="space-y-2 text-sm leading-6 text-[#14532D]">
-                          {(report.plan.length ? report.plan : ['Monitor symptoms, rest, hydrate, and follow up if symptoms worsen.']).map((item, index) => (
-                            <li key={index} className="flex gap-2">
-                              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#16A34A]" />
-                              <span>{item}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                      <div className="rounded-xl border border-[#FECACA] bg-[#FEF2F2] p-4">
-                        <h4 className="mb-2 flex items-center gap-2 font-semibold text-[#991B1B]">
-                          <AlertTriangle className="w-4 h-4" />
-                          Red Flags
-                        </h4>
-                        <ul className="space-y-2 text-sm leading-6 text-[#7F1D1D]">
-                          {(report.redFlags.length ? report.redFlags : ['Seek urgent care for chest pain, trouble breathing, confusion, fainting, severe worsening pain, or symptoms that feel dangerous.']).map((item, index) => (
-                            <li key={index} className="flex gap-2">
-                              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#DC2626]" />
-                              <span>{item}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-
-                    <div className="rounded-xl border border-[#E2E8F0] bg-white p-4">
-                      <h4 className="mb-3 flex items-center gap-2 font-semibold text-[#0F172A]">
-                        <FileText className="w-4 h-4 text-[#2563EB]" />
-                        SOAP Note
-                      </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {[
-                          ['Subjective', report.soap.subjective],
-                          ['Objective', report.soap.objective],
-                          ['Assessment', report.soap.assessment],
-                          ['Plan', report.soap.plan]
-                        ].map(([label, value]) => (
-                          <div key={label} className="rounded-xl bg-[#F8FAFC] p-3">
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-[#64748B]">{label}</p>
-                            <p className="mt-1 whitespace-pre-line text-sm leading-6 text-[#334155]">{value}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <form
-                      onSubmit={(event) => {
-                        event.preventDefault();
-                        if (!email.trim()) return;
-                        setSavedEmail(email.trim());
-                        setEmail('');
-                      }}
-                      className="flex flex-col gap-3 rounded-xl border border-[#DCEBFA] bg-[#F8FBFF] p-4 sm:flex-row sm:items-center"
-                    >
-                      <div className="flex items-center gap-2 text-sm text-[#475569] sm:flex-1">
-                        <Mail className="w-4 h-4 text-[#2563EB]" />
-                        <span>{savedEmail ? `Report saved for ${savedEmail}` : 'Email this report or use it for doctor handoff.'}</span>
-                      </div>
-                      {!savedEmail && (
-                        <>
-                          <input
-                            type="email"
-                            value={email}
-                            onChange={(event) => setEmail(event.target.value)}
-                            placeholder="you@example.com"
-                            className="min-w-0 rounded-xl border border-[#CBD5E1] bg-white px-4 py-2 text-sm outline-none focus:border-[#2563EB]"
-                          />
-                          <button className="rounded-xl bg-[#0F172A] px-5 py-2 text-sm font-semibold text-white hover:bg-[#1E293B]">
-                            Save
-                          </button>
-                        </>
-                      )}
-                    </form>
-                  </div>
-                )}
-                <div ref={messagesEndRef} />
-              </div>
-
-              {/* Chat Input */}
-              <div className="p-4 border-t border-[#E2E8F0] bg-[#F8FAFC]">
-                {phase !== 'emergency_end' && phase !== 'report_ready' && messages[messages.length - 1]?.options?.length ? (
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {messages[messages.length - 1].options!.map((option) => (
-                      <button
-                        key={option}
-                        type="button"
-                        disabled={isTyping}
-                        onClick={() => handleSend(option)}
-                        className="rounded-xl border border-[#BFDBFE] bg-[#EFF6FF] px-3 py-2 text-xs font-semibold text-[#1D4ED8] hover:bg-[#DBEAFE] disabled:opacity-50"
-                      >
-                        {option}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    handleSend();
-                  }}
-                  className="flex items-center gap-2"
-                >
-                  <input
-                    type="text"
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    disabled={isTyping || phase === 'emergency_end' || phase === 'report_ready'}
-                    placeholder={phase === 'report_ready' ? 'Report is ready above' : 'Describe symptoms or answer the follow-up question...'}
-                    className="flex-1 bg-white border border-[#CBD5E1] rounded-xl px-4 py-3 text-sm text-[#0F172A] placeholder-[#94A3B8] focus:outline-none focus:border-[#2563EB] shadow-sm"
-                  />
-                  <button
-                    type="submit"
-                    disabled={!input.trim() || isTyping || phase === 'emergency_end' || phase === 'report_ready'}
-                    className="px-5 py-3 bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-40 rounded-xl text-white font-medium text-sm transition-all flex items-center gap-2 shadow-lg shadow-[#2563EB]/20"
-                  >
-                    <span>Analyze</span>
-                    <Send className="w-4 h-4" />
-                  </button>
-                </form>
-              </div>
-            </div>
-          </div>
-        ) : (
-          /* Doctors Telemedicine Panel */
-          <div className="space-y-6">
-            <div className="text-center max-w-2xl mx-auto mb-8">
-              <h2 className="text-2xl font-bold text-[#0F172A] mb-2">
-                Licensed Physicians Ready in Under 30 Minutes
+        <section className="border-t border-[#E6EDE3] bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(248,250,247,0.96))] px-5 py-16 sm:px-8 sm:py-20">
+          <div className="mx-auto max-w-3xl text-center">
+              <p className="text-xs font-bold uppercase tracking-normal text-[#2563EB]">Clinical pathway</p>
+              <h2 className="mx-auto mt-3 max-w-xl text-3xl font-black tracking-normal text-[#111827] sm:text-4xl">
+                Simple enough to use when you feel unwell.
               </h2>
-              <p className="text-sm text-[#64748B]">
-                LibertyMD doctors already have access to your AI symptom triage summary — saving you time explaining and letting you focus on recovery.
+              <p className="mx-auto mt-4 max-w-lg text-sm leading-7 text-[#5B6472]">
+                A calm, structured intake that keeps the medical conversation moving.
               </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {[
-                {
-                  name: region === 'EU' ? 'Dr. Elena Rostova, MD' : 'Dr. Jeffrey Jones, MD',
-                  specialty: 'Emergency Medicine & Urgent Care',
-                  credentials: region === 'EU' ? 'Charité Universitätsmedizin Berlin • 18y Exp' : 'Indiana University School of Medicine • 22y Exp',
-                  rating: '4.98',
-                  availableIn: '9 mins'
-                },
-                {
-                  name: region === 'EU' ? 'Dr. Marco Rossi, MD' : 'Dr. Rajiv Patel, MD',
-                  specialty: 'Internal Medicine & Cardiovascular Care',
-                  credentials: region === 'EU' ? 'Università di Milano • 21y Exp' : 'Indiana-Purdue IUPUI • 25y Exp',
-                  rating: '4.95',
-                  availableIn: '14 mins'
-                },
-                {
-                  name: region === 'EU' ? 'Dr. Astrid Lindqvist, MD' : 'Dr. Barry Pevner, MD',
-                  specialty: 'Family Medicine & Primary Care',
-                  credentials: region === 'EU' ? 'Karolinska Institutet Stockholm • 19y Exp' : 'Hahnemann University Drexel • 25y Exp',
-                  rating: '4.97',
-                  availableIn: '18 mins'
-                }
-              ].map((doc, idx) => (
-                <div
-                  key={idx}
-                  className="bg-white border border-[#E2E8F0] rounded-2xl p-6 flex flex-col justify-between hover:border-[#93C5FD] shadow-lg hover:shadow-xl transition-all"
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE] flex items-center gap-1.5">
-                        <Clock className="w-3 h-3" />
-                        Available in {doc.availableIn}
-                      </span>
-                      <span className="text-xs text-[#0F172A] font-bold">★ {doc.rating}</span>
-                    </div>
-                    <h3 className="text-lg font-bold text-[#0F172A] mb-1">{doc.name}</h3>
-                    <p className="text-xs font-semibold text-[#2563EB] mb-3">{doc.specialty}</p>
-                    <p className="text-xs text-[#64748B] leading-relaxed mb-6">{doc.credentials}</p>
-                  </div>
-
-                  <button
-                    onClick={() => alert(`Starting simulated secure video visit with ${doc.name} for ${region === 'EU' ? '€39' : '$39'}.`)}
-                    className="w-full py-3 rounded-xl bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] hover:from-[#1D4ED8] hover:to-[#1E40AF] text-white font-medium text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#2563EB]/25"
-                  >
-                    <Video className="w-4 h-4" />
-                    <span>Start Visit ({region === 'EU' ? '€39' : '$39'})</span>
-                  </button>
-                </div>
-              ))}
-            </div>
           </div>
-        )}
-
-        {/* --- Doctronic-Inspired Expansive Body Sections (With white glassmorphic backdrop so text remains crystal clear as the 3D logo traverses behind!) --- */}
-        <div className="pt-24 space-y-28">
-          {/* Section 1: How LibertyMD Autonomous Clinical Triage Works */}
-          <section className="relative z-10 bg-white/90 backdrop-blur-md border border-[#E2E8F0] rounded-3xl p-8 sm:p-12 shadow-xl">
-            <div className="max-w-3xl mx-auto text-center mb-12">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#EFF6FF] border border-[#BFDBFE] text-xs font-semibold text-[#1D4ED8] mb-4">
-                <Activity className="w-3.5 h-3.5 text-[#2563EB]" />
-                <span>Autonomous Medical Engine</span>
-              </div>
-              <h2 className="text-3xl sm:text-4xl font-extrabold text-[#0F172A] tracking-tight mb-4">
-                How LibertyMD Autonomous Clinical Triage Works
-              </h2>
-              <p className="text-[#64748B] text-base sm:text-lg leading-relaxed">
-                Traditional healthcare fragments triage, diagnostics, and prescription refills. LibertyMD unifies peer-reviewed medical intelligence with live 50-state and European physician networks.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {[
-                {
-                  step: '01',
-                  title: 'Symptom Ingestion & NLP Parsing',
-                  desc: 'Structured extraction of primary complaints, onset duration, and co-morbidities using clinical natural language processing.'
-                },
-                {
-                  step: '02',
-                  title: 'Peer-Reviewed Diagnostic Engine',
-                  desc: 'Cross-referenced against 40M+ Cochrane systematic reviews, PubMed literature, and international clinical guidelines.'
-                },
-                {
-                  step: '03',
-                  title: 'Sovereign Encrypted Enclave',
-                  desc: 'Full isolation under EU GDPR Article 9 & US HIPAA Safe Harbor. Your data never trains public LLMs or gets resold.'
-                },
-                {
-                  step: '04',
-                  title: 'Physician Verification & Prescription',
-                  desc: 'Instant review by a licensed human physician with e-prescription dispatch to your local pharmacy in under 15 minutes.'
-                }
-              ].map((item, idx) => (
-                <div
-                  key={idx}
-                  className="bg-[#F8FAFC] border border-[#E2E8F0] hover:border-[#93C5FD] hover:bg-white rounded-2xl p-6 flex flex-col justify-between transition-all group shadow-sm hover:shadow-md"
-                >
-                  <div>
-                    <span className="text-3xl font-black text-[#2563EB]/30 group-hover:text-[#2563EB] transition-colors font-mono">
-                      {item.step}
-                    </span>
-                    <h3 className="text-lg font-bold text-[#0F172A] mt-3 mb-2">
-                      {item.title}
-                    </h3>
-                    <p className="text-xs text-[#64748B] leading-relaxed">
-                      {item.desc}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Section 2: Enterprise Healthcare Spend Governance */}
-          <section className="relative z-10 bg-white/90 backdrop-blur-md border border-[#E2E8F0] rounded-3xl p-8 sm:p-12 shadow-xl">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-              <div>
-                <span className="text-xs font-bold uppercase tracking-widest text-[#2563EB] mb-2 block">
-                  Enterprise Spend Governance
-                </span>
-                <h2 className="text-3xl sm:text-4xl font-extrabold text-[#0F172A] tracking-tight mb-4">
-                  Recover employee productivity & healthcare margins
-                </h2>
-                <p className="text-[#64748B] text-base leading-relaxed mb-6">
-                  Employers lose up to 12 days per employee annually waiting for primary care appointments and unnecessary emergency room visits. LibertyMD provides instant, autonomous clinical triage and telehealth resolution at a fraction of traditional insurance claims.
-                </p>
-                <div className="space-y-3 text-sm text-[#334155]">
-                  <div className="flex items-center gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-[#2563EB] shrink-0" />
-                    <span>100% auditable diagnostic logs with physician sign-off</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-[#2563EB] shrink-0" />
-                    <span>Zero out-of-pocket surprise bills or deductible barriers</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-[#2563EB] shrink-0" />
-                    <span>Seamless integration with European and US employer health plans</span>
-                  </div>
+          <div className="mx-auto mt-12 grid max-w-6xl gap-x-8 gap-y-9 text-left sm:grid-cols-2 lg:grid-cols-4">
+            {pathwaySteps.map(([step, title, description]) => (
+              <div key={step} className="border-t border-[#CBD9C6] pt-5">
+                <span className="text-sm font-black text-[#2563EB]">{step}</span>
+                <div className="mt-6">
+                  <h3 className="font-black text-[#111827]">{title}</h3>
+                  <p className="mt-2 text-sm leading-7 text-[#5B6472]">{description}</p>
                 </div>
               </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-6 text-center shadow-sm">
-                  <div className="text-4xl font-black text-[#2563EB] mb-2">99.4%</div>
-                  <div className="text-sm font-semibold text-[#0F172A]">Diagnostic Concordance</div>
-                  <p className="text-xs text-[#64748B] mt-1">Matched against board-certified human panel</p>
-                </div>
-                <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-6 text-center shadow-sm">
-                  <div className="text-4xl font-black text-[#0284C7] mb-2">&lt; 15m</div>
-                  <div className="text-sm font-semibold text-[#0F172A]">Physician Response</div>
-                  <p className="text-xs text-[#64748B] mt-1">From initial triage to prescription dispatch</p>
-                </div>
-                <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-6 text-center shadow-sm">
-                  <div className="text-4xl font-black text-[#1D4ED8] mb-2">40M+</div>
-                  <div className="text-sm font-semibold text-[#0F172A]">Clinical Citations</div>
-                  <p className="text-xs text-[#64748B] mt-1">Indexed peer-reviewed medical literature</p>
-                </div>
-                <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-6 text-center shadow-sm">
-                  <div className="text-4xl font-black text-[#1E40AF] mb-2">0%</div>
-                  <div className="text-sm font-semibold text-[#0F172A]">Data Resale</div>
-                  <p className="text-xs text-[#64748B] mt-1">Encrypted zero-knowledge storage vault</p>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Section 3: Sovereign Diagnostic Architecture */}
-          <section className="relative z-10 bg-white/90 backdrop-blur-md border border-[#E2E8F0] rounded-3xl p-8 sm:p-12 shadow-xl">
-            <div className="max-w-3xl mx-auto text-center mb-10">
-              <h2 className="text-3xl font-extrabold text-[#0F172A] tracking-tight mb-3">
-                Peer-Reviewed Clinical Protocol Architecture
-              </h2>
-              <p className="text-sm text-[#64748B]">
-                Every recommendation generated by LibertyMD is backed by explicit citations from major medical institutions.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-6 shadow-sm hover:shadow-md transition-all">
-                <FileText className="w-8 h-8 text-[#2563EB] mb-4" />
-                <h3 className="text-base font-bold text-[#0F172A] mb-2">Cochrane & PubMed Grounding</h3>
-                <p className="text-xs text-[#64748B] leading-relaxed">
-                  Real-time retrieval augmented generation over authoritative randomized controlled trials and clinical meta-analyses.
-                </p>
-              </div>
-              <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-6 shadow-sm hover:shadow-md transition-all">
-                <AlertTriangle className="w-8 h-8 text-[#0284C7] mb-4" />
-                <h3 className="text-base font-bold text-[#0F172A] mb-2">Automated Red-Flag Screening</h3>
-                <p className="text-xs text-[#64748B] leading-relaxed">
-                  Continuous evaluation for high-risk presentations including Status Migrainosus, Sepsis criteria, and acute ischemia.
-                </p>
-              </div>
-              <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-6 shadow-sm hover:shadow-md transition-all">
-                <Lock className="w-8 h-8 text-[#1D4ED8] mb-4" />
-                <h3 className="text-base font-bold text-[#0F172A] mb-2">Sovereign Patient Ownership</h3>
-                <p className="text-xs text-[#64748B] leading-relaxed">
-                  Your medical profile is stored in an encrypted tenant belonging exclusively to you under strict EU & US compliance.
-                </p>
-              </div>
-            </div>
-          </section>
-
-          {/* Section 4: Sovereign Clinical Care & Patient Oath Docking Destination Area */}
-          <section
-            ref={dockZoneRef}
-            className="relative z-10 bg-gradient-to-br from-white via-[#F8FAFC] to-[#EFF6FF] backdrop-blur-md border-2 border-[#BFDBFE] rounded-3xl p-10 sm:p-16 shadow-xl text-center overflow-hidden"
-          >
-            {/* Direct Sovereign 3D Medical Cross Emblem */}
-            <div className="h-72 sm:h-80 w-full flex items-center justify-center relative mb-6">
-              <div className="relative z-10 flex items-center justify-center">
-                <LibertyMDMedicalCrossLogo size={260} colorTheme="blue" />
-              </div>
-            </div>
-
-            <div className="max-w-2xl mx-auto">
-              <span className="text-xs font-black tracking-widest text-[#2563EB] uppercase block mb-2">
-                SOVEREIGN CLINICAL CARE PLEDGE
-              </span>
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-[#0F172A] mb-4">
-                The LibertyMD Patient Oath
-              </h2>
-              <p className="text-sm sm:text-base text-[#475569] leading-relaxed">
-                We pledge that every clinical triage assessment is grounded strictly in peer-reviewed medical science, isolated within a private encrypted enclave, and verified by a licensed human physician before intervention. Your health is sovereign.
-              </p>
-            </div>
-          </section>
-        </div>
+            ))}
+          </div>
+        </section>
       </main>
 
       {/* Exact Doctronic-Style 3D Volumetric Ribbon Footer in Blue */}

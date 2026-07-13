@@ -252,13 +252,29 @@ export const AICareChat: React.FC = () => {
             return;
         }
 
-        if (existing.status === 'completed' || existing.status === 'emergency_stopped') {
+        if (existing.status === 'completed') {
             navigate(`/ai-care/observations?sessionId=${id}`);
             return;
         }
 
         setSessionId(existing.id);
         await loadMessages(existing.id);
+
+        if (existing.status === 'emergency_stopped') {
+            const { data: alert } = await supabase
+                .from('jivi_alerts')
+                .select('message')
+                .eq('session_id', id)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+            setEmergencyAlert(
+                alert?.message ||
+                    'This evaluation was stopped for safety. Please seek emergency care if symptoms persist.',
+            );
+            return;
+        }
+
         setResumePrompt(true);
     };
 
@@ -280,7 +296,7 @@ export const AICareChat: React.FC = () => {
             return;
         }
         if (data?.diagnosis_ready || data?.state === 'diagnosis_ready') {
-            navigate('/ai-care/observations');
+            navigate(sessionId ? `/ai-care/observations?sessionId=${sessionId}` : '/ai-care/observations');
             return;
         }
         if (data?.next_question) {

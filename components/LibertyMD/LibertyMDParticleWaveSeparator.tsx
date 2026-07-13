@@ -152,12 +152,15 @@ export default function LibertyMDParticleWaveSeparator({
       powerPreference: 'high-performance',
     });
     renderer.setSize(container.clientWidth, container.clientHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     container.appendChild(renderer.domElement);
 
-    // High-density 3D Point Cloud Wave: 240 x 70 = 16,800 dots
-    const cols = 240;
-    const rows = 70;
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // Use a tighter grid on large screens while keeping the mobile GPU load bounded.
+    const isCompactViewport = window.innerWidth < 640;
+    const cols = isCompactViewport ? 192 : 224;
+    const rows = isCompactViewport ? 60 : 72;
     const totalParticles = cols * rows;
 
     const positions = new Float32Array(totalParticles * 3);
@@ -230,7 +233,7 @@ export default function LibertyMDParticleWaveSeparator({
       targetMouseRef.current.set(x, y);
     };
 
-    window.addEventListener('mousemove', handlePointerMove);
+    if (!prefersReducedMotion) window.addEventListener('mousemove', handlePointerMove);
 
     const resizeObserver = new ResizeObserver(() => {
       if (!container) return;
@@ -240,7 +243,7 @@ export default function LibertyMDParticleWaveSeparator({
     });
     resizeObserver.observe(container);
 
-    let animationFrameId: number;
+    let animationFrameId: number | undefined;
     const clock = new THREE.Clock();
 
     const animate = () => {
@@ -259,12 +262,16 @@ export default function LibertyMDParticleWaveSeparator({
       renderer.render(scene, camera);
     };
 
-    animate();
+    if (prefersReducedMotion) {
+      renderer.render(scene, camera);
+    } else {
+      animate();
+    }
 
     return () => {
-      cancelAnimationFrame(animationFrameId);
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
       resizeObserver.disconnect();
-      window.removeEventListener('mousemove', handlePointerMove);
+      if (!prefersReducedMotion) window.removeEventListener('mousemove', handlePointerMove);
       if (renderer.domElement && container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
       }
@@ -276,7 +283,7 @@ export default function LibertyMDParticleWaveSeparator({
 
   return (
     <div
-      className={`absolute inset-x-0 -bottom-48 sm:-bottom-60 h-[360px] sm:h-[450px] w-full pointer-events-none select-none overflow-visible -z-10 ${className}`}
+      className={`pointer-events-none absolute inset-x-0 -bottom-28 -z-10 h-[260px] w-full select-none overflow-hidden sm:-bottom-36 sm:h-[320px] ${className}`}
       aria-hidden="true"
     >
       <div ref={containerRef} className="w-full h-full" />
