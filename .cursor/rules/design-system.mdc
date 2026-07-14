@@ -1,0 +1,13 @@
+---
+description: Design system rules — which of the two systems (Saksham Experiments / LibertyMD) to use and their tokens
+globs: ["**/*.tsx", "**/*.ts", "**/*.css"]
+alwaysApply: true
+---
+
+Follow the repo design systems. Full rules: [AI-DESIGN-RULES.md](mdc:design-system/AI-DESIGN-RULES.md).
+Canonical tokens: [design-tokens.json](mdc:design-system/design-tokens.json).
+
+- **LibertyMD routes / `components/LibertyMD/*`** → LibertyMD system: Trust Blue `#2563EB`, slate neutrals, clinical green `#169B52`, `--libertymd-space-*` scale, Inter + Playfair-italic tagline. Reuse `components/LibertyMD/*`.
+- **Everything else** → Saksham Experiments system: brand `#2C2A26`/`#F5F2EB`, shadcn/ui semantic tokens (`bg-primary`, `border-border`…), Playfair (`font-serif`) + Inter (`font-sans`), `--radius: 0.5rem`. Reuse `components/ui/*` — never rebuild a Button/Card.
+
+Never hardcode a raw hex/px when a token exists. Add missing tokens to `design-tokens.json` first.

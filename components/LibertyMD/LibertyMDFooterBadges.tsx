@@ -151,12 +151,12 @@ export function PatientOathEmblem({ className = "w-48 h-48" }: { className?: str
 
       {/* Center Pristine Glassmorphic Seal Crest */}
       <div className="relative z-10 w-28 h-28 rounded-full bg-white/95 backdrop-blur-md border-2 border-[#3B82F6]/50 shadow-2xl flex flex-col items-center justify-center p-3 group-hover:scale-105 transition-transform duration-300">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#1E40AF] via-[#2563EB] to-[#3B82F6] shadow-md flex items-center justify-center text-white transform group-hover:rotate-6 transition-transform">
-          <svg viewBox="0 0 24 24" className="w-7 h-7 stroke-current fill-none stroke-2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-            <circle cx="12" cy="12" r="9" className="opacity-30" />
-          </svg>
-        </div>
+        <img
+          src="/images/libertymd-logo-mark.svg"
+          alt=""
+          aria-hidden="true"
+          className="h-12 w-12 object-contain drop-shadow-md transition-transform duration-300 group-hover:rotate-3 group-hover:scale-105"
+        />
         <span className="text-[8px] font-black tracking-widest text-[#1E3A8A] uppercase mt-2.5 select-none">
           PATIENT OATH
         </span>

@@ -1,0 +1,520 @@
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+  type TouchEvent as ReactTouchEvent,
+} from 'react';
+import { motion, useReducedMotion, useScroll, useTransform } from 'framer-motion';
+import {
+  ArrowRight,
+  BookOpen,
+  CalendarClock,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  CircleDollarSign,
+  Clock3,
+  Globe2,
+  HeartPulse,
+  Play,
+  ShieldCheck,
+  Sparkles,
+} from 'lucide-react';
+
+const unsplash = (id: string, width = 1200) =>
+  `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${width}&q=82`;
+
+const phoneImages = {
+  doctor: unsplash('photo-1559839734-2b71ea197ec2', 900),
+  patientLeft: unsplash('photo-1500648767791-00dcc994a43e', 640),
+  patientRight: unsplash('photo-1494790108377-be9c29b29330', 640),
+  caller: unsplash('photo-1507003211169-0a1dd7228f2d', 360),
+};
+
+const patientStories = [
+  {
+    category: 'Preparing for a visit',
+    title: 'I arrived knowing what to explain.',
+    quote: 'LibertyMD organized the timeline and warning signs, so my appointment started with the details that mattered.',
+    name: 'Jordan, 34',
+    image: unsplash('photo-1534528741775-53994a69daeb', 1200),
+  },
+  {
+    category: 'Finding peace of mind',
+    title: 'The next step finally felt clear.',
+    quote: 'The conversation separated what I could monitor at home from the symptoms that would need urgent care.',
+    name: 'Marcus, 41',
+    image: unsplash('photo-1506794778202-cad84cf45f1d', 1200),
+  },
+  {
+    category: 'Understanding symptoms',
+    title: 'I had better questions for my doctor.',
+    quote: 'Instead of searching through dozens of pages, I left with a concise report and a focused list of questions.',
+    name: 'Ana, 29',
+    image: unsplash('photo-1544005313-94ddf0286df2', 1200),
+  },
+];
+
+const healthArticles = [
+  {
+    category: 'Everyday care',
+    title: 'When a fever needs more than rest',
+    description: 'A practical guide to duration, hydration, warning signs, and when to seek an evaluation.',
+    image: unsplash('photo-1505751172876-fa1923c5c528', 1000),
+  },
+  {
+    category: 'Heart health',
+    title: 'Chest discomfort: the details that matter',
+    description: 'Learn how timing, exertion, breathing, and associated symptoms change the urgency of care.',
+    image: unsplash('photo-1532938911079-1b06ac7ceec7', 1000),
+  },
+  {
+    category: 'Preparing for care',
+    title: 'How to build a useful symptom timeline',
+    description: 'Turn scattered observations into a concise story that is easier for a clinician to assess.',
+    image: unsplash('photo-1576091160399-112ba8d25d1d', 1000),
+  },
+];
+
+interface MarketingSectionProps {
+  onStartChat: () => void;
+}
+
+export function LibertyMDPhoneCareSection({ onStartChat }: MarketingSectionProps) {
+  const visualRef = useRef<HTMLDivElement | null>(null);
+  const reduceMotion = useReducedMotion();
+  const [isMobileVisual, setIsMobileVisual] = useState(false);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 639px)');
+    const updateLayout = () => setIsMobileVisual(mediaQuery.matches);
+
+    updateLayout();
+    mediaQuery.addEventListener('change', updateLayout);
+    return () => mediaQuery.removeEventListener('change', updateLayout);
+  }, []);
+
+  const { scrollYProgress } = useScroll({
+    target: visualRef,
+    offset: ['start 0.96', 'center 0.45'],
+  });
+  const revealEnd = isMobileVisual ? 0.62 : 0.82;
+  const leftX = useTransform(scrollYProgress, [0, revealEnd], [isMobileVisual ? '115%' : '175%', isMobileVisual ? '-18%' : '-8%']);
+  const rightX = useTransform(scrollYProgress, [0, revealEnd], [isMobileVisual ? '-105%' : '-160%', isMobileVisual ? '18%' : '6%']);
+  const leftY = useTransform(scrollYProgress, [0, revealEnd], [isMobileVisual ? 70 : 110, 0]);
+  const rightY = useTransform(scrollYProgress, [0, revealEnd], [isMobileVisual ? -55 : -85, 0]);
+  const leftRotate = useTransform(scrollYProgress, [0, revealEnd], [-14, -4]);
+  const rightRotate = useTransform(scrollYProgress, [0, revealEnd], [14, 5]);
+  const photoOpacity = useTransform(
+    scrollYProgress,
+    isMobileVisual ? [0, 0.45] : [0.05, 0.78],
+    isMobileVisual ? [0.22, 1] : [0.08, 1]
+  );
+  const photoScale = useTransform(
+    scrollYProgress,
+    isMobileVisual ? [0, 0.55] : [0.05, 0.78],
+    isMobileVisual ? [0.82, 1] : [0.72, 1]
+  );
+  const pillY = useTransform(scrollYProgress, isMobileVisual ? [0.36, 0.76] : [0.55, 0.95], [24, 0]);
+  const pillOpacity = useTransform(scrollYProgress, isMobileVisual ? [0.36, 0.76] : [0.55, 0.95], [0, 1]);
+  const phoneY = useTransform(scrollYProgress, [0, 0.88], [78, 0]);
+  const phoneScale = useTransform(scrollYProgress, [0, 0.88], [0.9, 1]);
+  const phoneRotate = useTransform(scrollYProgress, [0, 0.88], [2.5, 0]);
+  const phoneOpacity = useTransform(scrollYProgress, [0, 0.38], [0.72, 1]);
+  const unfoldedPhotoStyle = reduceMotion ? { opacity: 1, scale: 1 } : undefined;
+  const revealedPhoneStyle = reduceMotion
+    ? { opacity: 1, scale: 1 }
+    : { y: phoneY, scale: phoneScale, rotate: phoneRotate, opacity: phoneOpacity };
+  const revealedPillStyle = reduceMotion ? { opacity: 1, y: 0 } : undefined;
+
+  return (
+    <section
+      className="libertymd-page-gutter libertymd-section-spacing relative overflow-hidden border-t border-[#E6EDE3] bg-[#F1F8F1]"
+    >
+      <div className="libertymd-shell grid items-center gap-[var(--libertymd-layout-gap)] lg:min-h-[720px] lg:grid-cols-[minmax(17rem,0.72fr)_minmax(34rem,1.28fr)]">
+        <div className="mx-auto max-w-xl text-center lg:mx-0 lg:text-left">
+          <p className="text-xs font-bold uppercase text-[#2563EB]">One continuous care story</p>
+          <h2 className="mx-auto mt-3 max-w-2xl font-serif text-4xl font-semibold leading-tight text-[#111827] sm:text-5xl lg:mx-0">
+            Urgent and primary care, without starting over.
+          </h2>
+          <p className="mt-7 text-lg font-bold leading-8 text-[#111827] sm:text-xl">
+            AI that is always available.<br />
+            <span className="text-[#2563EB]">Licensed doctors</span> when you need them.
+          </p>
+          <p className="mx-auto mt-7 max-w-lg border-t border-dashed border-[#B9C9B5] pt-7 text-sm leading-7 text-[#5B6472] sm:text-base lg:mx-0">
+            Your complete intake moves with you, so a physician already has the symptom history and context. Less time repeating yourself. More time focused on care.
+          </p>
+          <p className="mt-7 text-sm font-semibold text-[#475569] sm:text-base">
+            Video visits with licensed doctors for <span className="font-black text-[#2563EB]">$39 / visit</span>
+          </p>
+          <button
+            type="button"
+            onClick={onStartChat}
+            className="mt-7 inline-flex items-center gap-2 rounded-full bg-[#2563EB] px-6 py-3 text-sm font-bold text-white shadow-[0_12px_28px_rgba(37,99,235,0.28)] transition hover:bg-[#1D4ED8]"
+          >
+            Start a free chat <ArrowRight className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div ref={visualRef} className="relative mx-auto h-[500px] w-full max-w-[720px] sm:h-[650px] lg:h-[clamp(680px,47vw,760px)] lg:max-w-[clamp(44rem,54vw,54rem)]">
+          <motion.div
+            style={unfoldedPhotoStyle || { x: leftX, y: leftY, rotate: leftRotate, opacity: photoOpacity, scale: photoScale }}
+            className="absolute left-[1%] top-[39%] z-0 h-52 w-36 overflow-hidden rounded-lg shadow-[0_24px_70px_rgba(15,23,42,0.16)] sm:left-[5%] sm:top-[35%] sm:h-72 sm:w-48 lg:h-[clamp(19rem,22vw,23rem)] lg:w-[clamp(13rem,15vw,15.5rem)]"
+          >
+            <img src={phoneImages.patientLeft} alt="Patient preparing for a LibertyMD visit" className="h-full w-full object-cover" />
+          </motion.div>
+
+          <motion.div
+            style={unfoldedPhotoStyle || { x: rightX, y: rightY, rotate: rightRotate, opacity: photoOpacity, scale: photoScale }}
+            className="absolute right-[1%] top-[17%] z-0 h-52 w-36 overflow-hidden rounded-lg shadow-[0_24px_70px_rgba(15,23,42,0.16)] sm:right-[3%] sm:top-[12%] sm:h-72 sm:w-48 lg:h-[clamp(20rem,23vw,24rem)] lg:w-[clamp(13rem,15vw,15.5rem)]"
+          >
+            <img src={phoneImages.patientRight} alt="Patient connecting with LibertyMD" className="h-full w-full object-cover" />
+          </motion.div>
+
+          <div className="absolute left-1/2 top-0 z-10 h-[420px] w-[208px] -translate-x-1/2 sm:h-[620px] sm:w-[306px] lg:left-[54%] lg:h-[clamp(660px,45vw,740px)] lg:w-[clamp(326px,22.3vw,366px)]">
+            <motion.div
+              style={revealedPhoneStyle}
+              className="h-full w-full overflow-hidden rounded-[42px] border-[9px] border-[#111827] bg-[#111827] shadow-[0_34px_90px_rgba(15,23,42,0.24)] sm:rounded-[50px] sm:border-[11px]"
+            >
+              <div className="relative h-full w-full overflow-hidden rounded-[31px] bg-[#E8EEF3] sm:rounded-[38px]">
+                <img src={phoneImages.doctor} alt="LibertyMD physician on a video visit" className="h-full w-full object-cover object-center" />
+                <div className="absolute left-1/2 top-3 h-6 w-20 -translate-x-1/2 rounded-full bg-[#050505] sm:h-7 sm:w-24" />
+                <div className="absolute inset-x-3 top-12 rounded-lg bg-[#111827]/70 px-3 py-2 text-left text-[10px] font-semibold text-white backdrop-blur-md sm:top-14 sm:text-xs">
+                  <span className="block">Dr. Maya Chen, MD</span>
+                  <span className="font-normal text-white/75">Reviewing your LibertyMD intake</span>
+                </div>
+                <div className="absolute bottom-5 right-4 h-20 w-16 overflow-hidden rounded-lg border-2 border-white shadow-lg sm:h-24 sm:w-20">
+                  <img src={phoneImages.caller} alt="Patient video preview" className="h-full w-full object-cover" />
+                </div>
+                <div className="absolute bottom-4 left-1/2 h-1 w-24 -translate-x-1/2 rounded-full bg-black/75" />
+              </div>
+            </motion.div>
+          </div>
+
+          <motion.div
+            style={revealedPillStyle || { opacity: pillOpacity, y: pillY }}
+            className="absolute -top-8 left-[1%] z-20 inline-flex items-center gap-2 whitespace-nowrap rounded-full bg-[#E5FFB8] px-4 py-2 text-xs font-bold text-[#111827] shadow-sm sm:left-[7%] sm:top-[6%] sm:px-5 sm:text-sm lg:left-[2%] lg:top-[16%]"
+          >
+            <CalendarClock className="h-4 w-4" /> ASAP or schedule ahead
+          </motion.div>
+          <motion.div
+            style={revealedPillStyle || { opacity: pillOpacity, y: pillY }}
+            className="absolute right-0 top-[48%] z-20 inline-flex items-center gap-2 whitespace-nowrap rounded-full bg-[#E5FFB8] px-4 py-2 text-xs font-bold text-[#111827] shadow-sm sm:right-[1%] sm:px-5 sm:text-sm"
+          >
+            <HeartPulse className="h-4 w-4" /> Doctors who know the context
+          </motion.div>
+          <div className="absolute inset-x-0 bottom-[1%] z-20 flex justify-center lg:justify-start lg:pl-[22%]">
+            <motion.div
+              style={revealedPillStyle || { opacity: pillOpacity, y: pillY }}
+              className="inline-flex items-center gap-2 whitespace-nowrap rounded-full bg-[#E5FFB8] px-4 py-2 text-xs font-bold text-[#111827] shadow-sm sm:px-5 sm:text-sm"
+            >
+              <Clock3 className="h-4 w-4" /> Available 24/7
+            </motion.div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export function LibertyMDPricingSection({ onStartChat }: MarketingSectionProps) {
+  const reduceMotion = useReducedMotion();
+  const pricingCardRef = useRef<HTMLDivElement | null>(null);
+  const pricingCardActiveRef = useRef(false);
+  const rows = [
+    ['Private AI care chat', 'Free'],
+    ['Urgency and red-flag screening', 'Free'],
+    ['Doctor-ready health report', 'Free'],
+    ['Unlimited follow-up questions', 'Free'],
+    ['Prescription support', 'From $0'],
+    ['Video visit with a physician', '$39 / visit'],
+  ];
+
+  const resetPricingCard = (card: HTMLDivElement) => {
+    pricingCardActiveRef.current = false;
+    card.style.transition = 'transform 700ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 700ms cubic-bezier(0.23, 1, 0.32, 1)';
+    card.style.setProperty('--pricing-rotate-x', '0deg');
+    card.style.setProperty('--pricing-rotate-y', '0deg');
+    card.style.setProperty('--pricing-glare-x', '50%');
+    card.style.setProperty('--pricing-glare-y', '50%');
+    card.style.setProperty('--pricing-holo-x', '50%');
+    card.style.setProperty('--pricing-holo-y', '50%');
+    card.style.setProperty('--pricing-shadow-x', '0px');
+    card.style.setProperty('--pricing-shadow-y', '26px');
+    card.style.setProperty('--pricing-holo-opacity', '0.35');
+    card.style.setProperty('--pricing-glare-opacity', '0');
+  };
+
+  const movePricingCard = (card: HTMLDivElement, clientX: number, clientY: number, intensity = 1) => {
+    if (reduceMotion) return;
+
+    const rect = card.getBoundingClientRect();
+    const x = Math.min(Math.max((clientX - rect.left) / rect.width, 0), 1);
+    const y = Math.min(Math.max((clientY - rect.top) / rect.height, 0), 1);
+
+    pricingCardActiveRef.current = true;
+    card.style.transition = 'transform 100ms ease-out, box-shadow 100ms ease-out';
+    card.style.setProperty('--pricing-rotate-x', `${(0.5 - y) * 9 * intensity}deg`);
+    card.style.setProperty('--pricing-rotate-y', `${(x - 0.5) * 11 * intensity}deg`);
+    card.style.setProperty('--pricing-glare-x', `${x * 100}%`);
+    card.style.setProperty('--pricing-glare-y', `${y * 100}%`);
+    card.style.setProperty('--pricing-holo-x', `${(1 - x) * 100}%`);
+    card.style.setProperty('--pricing-holo-y', `${(1 - y) * 100}%`);
+    card.style.setProperty('--pricing-shadow-x', `${(0.5 - x) * 20}px`);
+    card.style.setProperty('--pricing-shadow-y', `${18 + y * 16}px`);
+    card.style.setProperty('--pricing-holo-opacity', '1');
+    card.style.setProperty('--pricing-glare-opacity', '0.9');
+  };
+
+  const handlePricingPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'touch') return;
+    movePricingCard(event.currentTarget, event.clientX, event.clientY);
+  };
+
+  const handlePricingTouch = (event: ReactTouchEvent<HTMLDivElement>) => {
+    const touch = event.touches[0];
+    if (!touch) return;
+    movePricingCard(event.currentTarget, touch.clientX, touch.clientY, 0.72);
+  };
+
+  useEffect(() => {
+    if (reduceMotion) return undefined;
+
+    const handleDocumentPointerMove = (event: PointerEvent) => {
+      const card = pricingCardRef.current;
+      if (!card || !pricingCardActiveRef.current || event.pointerType === 'touch') return;
+
+      const rect = card.getBoundingClientRect();
+      const isOutside =
+        event.clientX < rect.left ||
+        event.clientX > rect.right ||
+        event.clientY < rect.top ||
+        event.clientY > rect.bottom;
+
+      if (isOutside) resetPricingCard(card);
+    };
+
+    document.addEventListener('pointermove', handleDocumentPointerMove, { passive: true });
+    return () => document.removeEventListener('pointermove', handleDocumentPointerMove);
+  }, [reduceMotion]);
+
+  const pricingCardStyle = {
+    '--pricing-rotate-x': '0deg',
+    '--pricing-rotate-y': '0deg',
+    '--pricing-glare-x': '50%',
+    '--pricing-glare-y': '50%',
+    '--pricing-holo-x': '50%',
+    '--pricing-holo-y': '50%',
+    '--pricing-shadow-x': '0px',
+    '--pricing-shadow-y': '26px',
+    '--pricing-holo-opacity': '0.35',
+    '--pricing-glare-opacity': '0',
+    transform: reduceMotion
+      ? 'none'
+      : 'perspective(1100px) rotateX(var(--pricing-rotate-x)) rotateY(var(--pricing-rotate-y)) translateZ(0)',
+    boxShadow:
+      'var(--pricing-shadow-x) var(--pricing-shadow-y) 54px -20px rgba(15,23,42,0.28), inset 0 1px 1px rgba(255,255,255,0.9), inset 0 -1px 1px rgba(15,23,42,0.06)',
+    transformStyle: 'preserve-3d',
+    transition: 'transform 700ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 700ms cubic-bezier(0.23, 1, 0.32, 1)',
+  } as CSSProperties;
+
+  return (
+    <section className="libertymd-page-gutter libertymd-section-spacing border-t border-[#E6EDE3] bg-[#FBFCF8] text-center">
+      <div className="libertymd-content-shell grid items-center gap-[var(--libertymd-layout-gap)] lg:grid-cols-[minmax(19rem,0.74fr)_minmax(32rem,1.26fr)]">
+        <div>
+          <p className="text-xs font-bold uppercase text-[#2563EB]">Simple pricing</p>
+          <h2 className="mx-auto mt-3 max-w-lg font-serif text-4xl font-semibold leading-tight text-[#111827] sm:text-5xl">
+            Care that stays clear about cost.
+          </h2>
+          <p className="mx-auto mt-5 max-w-md text-sm leading-7 text-[#5B6472] sm:text-base">
+            Start with a free private chat. Continue to a licensed online doctor only when you choose to.
+          </p>
+          <div className="mt-7 flex flex-wrap justify-center gap-3 text-sm font-bold text-[#111827]">
+            <span className="inline-flex items-center gap-2 rounded-full bg-[#E8EEF3] px-4 py-2">
+              <Globe2 className="h-4 w-4" /> Available nationwide
+            </span>
+            <span className="inline-flex items-center gap-2 rounded-full bg-[#E8EEF3] px-4 py-2">
+              <ShieldCheck className="h-4 w-4" /> Insurance supported
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onStartChat}
+            className="mt-8 inline-flex items-center gap-2 rounded-full bg-[#2563EB] px-7 py-3.5 text-sm font-bold text-white shadow-[0_12px_28px_rgba(37,99,235,0.28)] transition hover:bg-[#1D4ED8]"
+          >
+            Start a free chat <ArrowRight className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="relative px-1 py-4 sm:px-4 sm:py-8 [perspective:1100px]">
+          <div
+            ref={pricingCardRef}
+            data-testid="libertymd-pricing-card"
+            onPointerDown={handlePricingPointerMove}
+            onPointerMove={handlePricingPointerMove}
+            onPointerUp={(event) => resetPricingCard(event.currentTarget)}
+            onPointerLeave={(event) => {
+              resetPricingCard(event.currentTarget);
+            }}
+            onPointerCancel={(event) => resetPricingCard(event.currentTarget)}
+            onTouchStart={handlePricingTouch}
+            onTouchMove={handlePricingTouch}
+            onTouchEnd={(event) => resetPricingCard(event.currentTarget)}
+            onTouchCancel={(event) => resetPricingCard(event.currentTarget)}
+            style={pricingCardStyle}
+            className="relative isolate touch-pan-y select-none overflow-hidden rounded-[28px] border border-white/90 bg-[#FDFDF7] p-4 text-center will-change-transform sm:rounded-[34px] sm:p-9"
+          >
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 z-0 bg-[linear-gradient(115deg,transparent_0%,transparent_24%,rgba(255,154,209,0.24)_35%,rgba(128,208,255,0.24)_45%,rgba(255,228,153,0.22)_55%,rgba(216,180,254,0.24)_65%,transparent_76%,transparent_100%)] bg-[length:300%_300%] transition-opacity duration-500"
+              style={{
+                backgroundPosition: 'var(--pricing-holo-x) var(--pricing-holo-y)',
+                opacity: 'var(--pricing-holo-opacity)',
+              }}
+            />
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 z-0 transition-opacity duration-500"
+              style={{
+                background:
+                  'radial-gradient(circle at var(--pricing-glare-x) var(--pricing-glare-y), rgba(255,255,255,0.92) 6%, rgba(255,255,255,0.42) 22%, transparent 52%)',
+                opacity: 'var(--pricing-glare-opacity)',
+              }}
+            />
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 z-0 opacity-[0.13] mix-blend-multiply"
+              style={{
+                backgroundImage:
+                  'url("data:image/svg+xml,%3Csvg viewBox=%270 0 180 180%27 xmlns=%27http://www.w3.org/2000/svg%27%3E%3Cfilter id=%27n%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%270.9%27 numOctaves=%274%27 stitchTiles=%27stitch%27/%3E%3C/filter%3E%3Crect width=%27100%25%27 height=%27100%25%27 filter=%27url(%23n)%27 opacity=%270.35%27/%3E%3C/svg%3E")',
+              }}
+            />
+
+            <div className="relative z-10" style={{ transform: reduceMotion ? undefined : 'translateZ(18px)' }}>
+              <div className="flex items-center justify-center gap-2 font-serif text-2xl font-semibold text-[#111827]">
+                <Sparkles className="h-5 w-5 text-[#2563EB]" /> LibertyMD
+              </div>
+              <div className="mt-8 space-y-5">
+                {rows.map(([label, value]) => (
+                  <div key={label} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 text-xs sm:gap-3 sm:text-sm xl:text-base">
+                    <div className="flex min-w-0 items-center gap-2 text-left sm:gap-3">
+                      <span className="shrink-0 whitespace-nowrap font-bold text-[#334155]">{label}</span>
+                      <span className="mb-1 min-w-3 flex-1 border-b-2 border-dotted border-[#94A3B8]/70 sm:min-w-5" />
+                    </div>
+                    <span className="whitespace-nowrap text-right font-black uppercase text-[#2563EB]">{value}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-10 flex flex-col items-center justify-between gap-4 border-t border-[#CBD5E1]/70 pt-6 text-sm font-bold text-[#64748B] sm:flex-row">
+                <span className="inline-flex items-center gap-2"><CircleDollarSign className="h-5 w-5" /> FSA + HSA accepted</span>
+                <span className="inline-flex items-center gap-2 text-[#2563EB]"><Check className="h-5 w-5" /> No subscription required</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export function LibertyMDPatientStoriesSection() {
+  const [activeStory, setActiveStory] = useState(0);
+  const story = patientStories[activeStory];
+  const move = (direction: number) => {
+    setActiveStory((current) => (current + direction + patientStories.length) % patientStories.length);
+  };
+
+  return (
+    <section className="libertymd-page-gutter libertymd-section-spacing border-t border-[#E6EDE3] bg-[#F8FAF7] text-center">
+      <div className="mx-auto max-w-3xl">
+        <p className="text-xs font-bold uppercase text-[#2563EB]">Patient stories</p>
+        <h2 className="mx-auto mt-3 max-w-2xl font-serif text-4xl font-semibold leading-tight text-[#111827] sm:text-5xl">
+          Answers that changed the next step.
+        </h2>
+        <p className="mx-auto mt-5 max-w-xl text-sm leading-7 text-[#5B6472] sm:text-base">
+          Sample stories showing how a structured conversation can make care feel more understandable and less overwhelming.
+        </p>
+      </div>
+
+      <div className="mx-auto mt-9 flex max-w-4xl flex-wrap justify-center gap-x-6 gap-y-3 border-b border-[#DDE7D8] pb-5">
+        {patientStories.map((item, index) => (
+          <button
+            key={item.category}
+            type="button"
+            onClick={() => setActiveStory(index)}
+            aria-pressed={activeStory === index}
+            className={`text-sm font-bold transition ${activeStory === index ? 'text-[#2563EB]' : 'text-[#64748B] hover:text-[#111827]'}`}
+          >
+            {item.category}
+          </button>
+        ))}
+      </div>
+
+      <div className="libertymd-content-shell mt-10 grid items-stretch overflow-hidden rounded-lg border border-[#E2E8F0] bg-white md:grid-cols-[0.95fr_1.05fr]">
+        <div className="relative min-h-[360px] md:min-h-[500px]">
+          <motion.img
+            key={story.image}
+            initial={{ opacity: 0.35, scale: 1.03 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.55 }}
+            src={story.image}
+            alt={`${story.name}: ${story.category}`}
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+          <span className="absolute left-5 top-5 inline-flex items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-xs font-bold text-[#111827] backdrop-blur-md">
+            <Play className="h-4 w-4 fill-[#2563EB] text-[#2563EB]" /> Patient story
+          </span>
+        </div>
+        <div className="flex min-h-[360px] flex-col items-center justify-center px-7 py-10 text-center sm:px-12">
+          <p className="text-xs font-bold uppercase text-[#2563EB]">{story.category}</p>
+          <h3 className="mt-4 font-serif text-3xl font-semibold leading-tight text-[#111827] sm:text-4xl">{story.title}</h3>
+          <blockquote className="mt-6 max-w-lg text-base leading-8 text-[#475569]">“{story.quote}”</blockquote>
+          <p className="mt-6 text-sm font-black text-[#111827]">{story.name}</p>
+          <div className="mt-9 flex items-center gap-3">
+            <button type="button" onClick={() => move(-1)} aria-label="Previous patient story" className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#CBD5E1] text-[#111827] hover:border-[#2563EB] hover:text-[#2563EB]">
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span className="text-xs font-bold text-[#64748B]">{activeStory + 1} / {patientStories.length}</span>
+            <button type="button" onClick={() => move(1)} aria-label="Next patient story" className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#CBD5E1] text-[#111827] hover:border-[#2563EB] hover:text-[#2563EB]">
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export function LibertyMDHealthLibrarySection() {
+  return (
+    <section className="libertymd-page-gutter libertymd-section-spacing border-t border-[#E6EDE3] bg-white text-center">
+      <div className="libertymd-content-shell flex flex-col items-center gap-5 border-b border-[#DDE7D8] pb-8">
+        <div className="text-center">
+          <p className="text-xs font-bold uppercase text-[#2563EB]">LibertyMD health library</p>
+          <h2 className="mt-3 font-serif text-4xl font-semibold text-[#111827] sm:text-5xl">Understand your health.</h2>
+        </div>
+        <button type="button" className="inline-flex items-center gap-2 text-sm font-bold text-[#2563EB] hover:text-[#111827]">
+          Explore the library <BookOpen className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="libertymd-content-shell mt-10 grid gap-[clamp(2rem,3.5vw,4rem)] md:grid-cols-3">
+        {healthArticles.map((article) => (
+          <article key={article.title} className="group text-center">
+            <div className="aspect-[4/3] overflow-hidden rounded-lg bg-[#E8EEF3]">
+              <img src={article.image} alt="" className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" />
+            </div>
+            <p className="mt-5 text-xs font-bold uppercase text-[#2563EB]">{article.category}</p>
+            <h3 className="mt-3 text-xl font-black leading-snug text-[#111827]">{article.title}</h3>
+            <p className="mt-3 text-sm leading-7 text-[#5B6472]">{article.description}</p>
+            <button type="button" className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-[#2563EB] group-hover:text-[#111827]">
+              Read guide <ArrowRight className="h-4 w-4" />
+            </button>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}

@@ -14,6 +14,151 @@
   --libertymd-space-section: 4rem;
   --libertymd-gap-tagline-logo: var(--libertymd-space-md);
   --libertymd-gap-pedestal-input: var(--libertymd-space-xl);
+  /* Fluid desktop geometry. These interpolate continuously between laptop and
+     wide desktop sizes while preserving comfortable mobile gutters. */
+  --libertymd-page-gutter: clamp(1.25rem, 4.2vw, 5.75rem);
+  --libertymd-shell-max: 96rem;
+  --libertymd-content-max: 88rem;
+  --libertymd-section-y: clamp(5rem, 7vw, 7.5rem);
+  --libertymd-layout-gap: clamp(2.5rem, 5vw, 6rem);
+}
+
+.libertymd-page-gutter {
+  padding-inline: var(--libertymd-page-gutter);
+}
+
+.libertymd-shell {
+  width: 100%;
+  max-width: var(--libertymd-shell-max);
+  margin-inline: auto;
+}
+
+.libertymd-content-shell {
+  width: 100%;
+  max-width: var(--libertymd-content-max);
+  margin-inline: auto;
+}
+
+.libertymd-section-spacing {
+  padding-block: var(--libertymd-section-y);
+}
+
+.libertymd-composer-width {
+  width: 100%;
+}
+
+@media (min-width: 48rem) {
+  .libertymd-composer-width {
+    width: clamp(46rem, 74vw, 74rem);
+    max-width: 100%;
+  }
+}
+
+/* Keep the complete hero action visible on short desktop windows. Tall
+   desktops retain the full-size stage; only vertical geometry is compressed. */
+@media (min-width: 48rem) {
+  .libertymd-hero-content {
+    justify-content: flex-start;
+    padding-top: clamp(0.25rem, 1.2vh, 0.75rem);
+    padding-bottom: 0.5rem;
+  }
+
+  .libertymd-premium-logo-stage {
+    width: clamp(12rem, 31vh, 19.25rem);
+    height: clamp(13rem, 36vh, 22.5rem);
+    margin-top: 0.25rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .libertymd-premium-logo-pedestal {
+    width: clamp(10.9375rem, 29vh, 16.875rem);
+  }
+
+  .libertymd-premium-logo-moving {
+    height: clamp(11.25rem, 30vh, 18.75rem);
+  }
+
+  .libertymd-hero-composer {
+    min-height: clamp(9.25rem, 22vh, 12.5rem);
+    padding: 1.25rem;
+    padding-top: 1.75rem;
+  }
+
+  .libertymd-hero-composer-field {
+    height: clamp(3rem, 8vh, 4.5rem);
+  }
+
+  .libertymd-hero-composer .libertymd-start-chat-cta {
+    right: 1.25rem;
+    bottom: 1.25rem;
+  }
+}
+
+@media (min-width: 48rem) and (max-height: 35rem) {
+  .libertymd-hero-header {
+    height: 3rem;
+  }
+
+  .libertymd-hero-content {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  .libertymd-hero-wordmark {
+    gap: 0.5rem;
+  }
+
+  .libertymd-hero-wordmark-icon {
+    width: 2rem;
+    height: 2rem;
+  }
+
+  .libertymd-hero-title {
+    font-size: 2.5rem;
+  }
+
+  .libertymd-hero-tagline {
+    min-height: 1.125rem;
+    margin-top: 0;
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+
+  .libertymd-premium-logo-stage {
+    width: 10rem;
+    height: 10.625rem;
+    margin-top: 0;
+    margin-bottom: 0.375rem;
+  }
+
+  .libertymd-premium-logo-pedestal {
+    width: 9.375rem;
+  }
+
+  .libertymd-premium-logo-moving {
+    height: 9.0625rem;
+  }
+
+  .libertymd-hero-composer {
+    min-height: 8.25rem;
+    padding: 0.75rem;
+    padding-top: 1.25rem;
+  }
+
+  .libertymd-hero-composer-field {
+    height: 2.5rem;
+  }
+
+  .libertymd-hero-composer .libertymd-start-chat-cta {
+    right: 0.75rem;
+    bottom: 0.75rem;
+    height: 2.75rem;
+  }
+
+  .libertymd-hero-trust-row {
+    margin-top: 0.125rem;
+    font-size: 0.625rem;
+  }
 }
 
 @keyframes fadeIn {

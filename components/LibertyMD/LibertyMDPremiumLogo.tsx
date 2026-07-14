@@ -58,7 +58,7 @@ export default function LibertyMDPremiumLogo({
   return (
     <div
       ref={rootRef}
-      className={`relative mx-auto h-[310px] w-[260px] select-none sm:h-[420px] sm:w-[360px] ${className}`}
+      className={`libertymd-premium-logo-stage relative mx-auto h-[310px] w-[260px] select-none sm:h-[360px] sm:w-[308px] ${className}`}
       style={{ transformStyle: 'preserve-3d' }}
       data-testid="libertymd-premium-logo"
       data-scroll-phase={scrollPhase}
@@ -75,7 +75,7 @@ export default function LibertyMDPremiumLogo({
       </style>
 
       {/* 1. SOLID ARCHITECTURAL 3D CYLINDER PEDESTAL (Anchored firmly on the ground - DOES NOT MOVE WITH SCROLL) */}
-      <div className="pointer-events-none absolute bottom-0 left-1/2 z-0 w-[220px] -translate-x-1/2 sm:w-[300px]">
+      <div className="libertymd-premium-logo-pedestal pointer-events-none absolute bottom-0 left-1/2 z-0 w-[220px] -translate-x-1/2 sm:w-[270px]">
         {/* Ambient Floor Shadow under Pedestal */}
         <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 h-8 w-[90%] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(30,58,138,0.32)_0%,rgba(15,23,42,0.15)_50%,transparent_80%)] blur-md" />
 
@@ -174,7 +174,7 @@ export default function LibertyMDPremiumLogo({
       {/* 2. FLOATING LOGO & ORBITING PORTRAITS (Moves & Floats independently above the solid cylinder pedestal) */}
       <div
         ref={movingLogoRef}
-        className="absolute inset-x-0 top-0 z-10 h-[240px] sm:h-[330px]"
+        className="libertymd-premium-logo-moving absolute inset-x-0 top-0 z-10 h-[240px] sm:h-[300px]"
         style={{
           transform: `translate3d(0, ${travel}px, 0) scale(${scale}) rotateX(${rotate}deg)`,
           transition: 'transform 90ms linear',

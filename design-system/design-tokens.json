@@ -1,0 +1,86 @@
+{
+  "$schema": "https://design-tokens.github.io/community-group/format/",
+  "_meta": {
+    "description": "Canonical design tokens for saksham-agrawal-Portfolio-2. Two systems: 'saksham-experiments' (portfolio-wide) and 'libertymd' (medical product surface). Synced to Claude Design at claude.ai/design.",
+    "claudeDesignProjects": {
+      "saksham-experiments": "491ef4bf-91f5-458b-9889-a889c5f95672",
+      "libertymd": "e7f3af3d-9a36-492d-8c13-47fc49240b0c"
+    },
+    "sourceOfTruth": {
+      "saksham-experiments": ["index.css", "tailwind.config.js", "components/ui/"],
+      "libertymd": ["index.css (--libertymd-space-*)", "components/LibertyMD/"]
+    }
+  },
+
+  "saksham-experiments": {
+    "color": {
+      "brand": {
+        "dark":  { "value": "#2C2A26", "role": "ink / headings" },
+        "light": { "value": "#F5F2EB", "role": "canvas" },
+        "gray":  { "value": "#A8A29E", "role": "muted" },
+        "text":  { "value": "#5D5A53", "role": "body" },
+        "gold":  { "value": "#8B7644", "role": "links / rules" }
+      },
+      "semantic": {
+        "_note": "shadcn/ui HSL CSS variables; hex is the light-theme resolution",
+        "background":            { "value": "#FFFFFF", "hsl": "0 0% 100%" },
+        "foreground":            { "value": "#0A0A0A", "hsl": "0 0% 3.9%" },
+        "primary":               { "value": "#171717", "hsl": "0 0% 9%" },
+        "primary-foreground":    { "value": "#FAFAFA", "hsl": "0 0% 98%" },
+        "secondary":             { "value": "#F5F5F5", "hsl": "0 0% 96.1%" },
+        "muted-foreground":      { "value": "#737373", "hsl": "0 0% 45.1%" },
+        "accent":                { "value": "#F5F5F5", "hsl": "0 0% 96.1%" },
+        "destructive":           { "value": "#EF4444", "hsl": "0 84.2% 60.2%" },
+        "border":                { "value": "#E5E5E5", "hsl": "0 0% 89.8%" },
+        "input":                 { "value": "#E5E5E5", "hsl": "0 0% 89.8%" },
+        "ring":                  { "value": "#0A0A0A", "hsl": "0 0% 3.9%" }
+      }
+    },
+    "font": {
+      "serif": { "value": "'Playfair Display', Georgia, serif", "use": "display & headings" },
+      "sans":  { "value": "'Inter', system-ui, sans-serif", "use": "body & UI" }
+    },
+    "radius": { "sm": "4px", "md": "6px", "lg": "8px", "base": "0.5rem" },
+    "components": "shadcn/ui in components/ui/ — Button (6 variants), Badge (4), Card, Input, Label, Select, Tabs, Dialog, Table, Popover, Separator, Skeleton"
+  },
+
+  "libertymd": {
+    "color": {
+      "primary": {
+        "blue-900": { "value": "#1E3A8A" },
+        "blue-800": { "value": "#1E40AF" },
+        "blue-700": { "value": "#1D4ED8" },
+        "blue-600": { "value": "#2563EB", "role": "primary action / links" },
+        "blue-500": { "value": "#3B82F6" },
+        "blue-50":  { "value": "#EFF6FF", "role": "wash" }
+      },
+      "neutral": {
+        "ink-900":   { "value": "#111827" },
+        "slate-900": { "value": "#0F172A" },
+        "slate-700": { "value": "#334155" },
+        "slate-500": { "value": "#64748B" },
+        "slate-300": { "value": "#CBD5E1" },
+        "slate-200": { "value": "#E2E8F0" }
+      },
+      "accent": {
+        "green-600": { "value": "#169B52", "role": "positive / in-network" },
+        "emerald":   { "value": "#10B981" },
+        "sage":      { "value": "#DDE7D8" },
+        "indigo":    { "value": "#5661F6" }
+      },
+      "surface": {
+        "wash": { "value": "linear-gradient(180deg,#FBFCF9 0%,#F5F9FF 34%,#F3F8F2 66%,#EFF6FF 100%)" }
+      }
+    },
+    "font": {
+      "sans":    { "value": "'Inter', system-ui, sans-serif", "use": "UI & body" },
+      "tagline": { "value": "'Playfair Display', Georgia, serif", "use": "italic editorial tagline" }
+    },
+    "spacing": {
+      "_note": "4px base grid; --libertymd-space-* in index.css",
+      "xs": "0.25rem", "sm": "0.5rem", "md": "0.75rem", "lg": "1rem",
+      "xl": "1.5rem", "2xl": "2rem", "3xl": "3rem", "section": "4rem"
+    },
+    "components": "components/LibertyMD/ — logo lockups, trust/credential badges, CTA buttons, marketing sections, footer ribbon (live logos/separators use 3D/particle canvas)"
+  }
+}

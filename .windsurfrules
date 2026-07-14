@@ -1,0 +1,11 @@
+# Windsurf rules
+
+Design system: read and follow `design-system/AI-DESIGN-RULES.md` (canonical tokens in
+`design-system/design-tokens.json`). Two systems:
+
+- LibertyMD routes / `components/LibertyMD/*` → LibertyMD (Trust Blue #2563EB, slate, clinical green
+  #169B52, `--libertymd-space-*`, Inter + Playfair-italic tagline; reuse `components/LibertyMD/*`).
+- Everything else → Saksham Experiments (brand #2C2A26/#F5F2EB, shadcn/ui semantic tokens, Playfair +
+  Inter, `--radius: 0.5rem`; reuse `components/ui/*` — never rebuild a Button/Card).
+
+Never hardcode a raw hex/px when a token exists.

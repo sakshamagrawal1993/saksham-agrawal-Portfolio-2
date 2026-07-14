@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="60 36 392 440" role="img" aria-labelledby="title description">
+  <title id="title">LibertyMD logo mark</title>
+  <desc id="description">A navy medical cross combined with a Statue of Liberty inspired torch, a blue flame, and a mint accent.</desc>
+
+  <!-- Locked brand colors: navy #0B2E63, blue #1769FF, mint #67D7B4. -->
+  <path
+    fill="#0B2E63"
+    d="M216 48h80c8 0 14 6 14 14v84h116c8 0 14 6 14 14v106c0 8-6 14-14 14H86c-8 0-14-6-14-14V160c0-8 6-14 14-14h116V62c0-8 6-14 14-14Z"
+  />
+
+  <path
+    fill="#0B2E63"
+    d="M204 296h104c6 0 10 4 10 10s-4 10-10 10H204c-6 0-10-4-10-10s4-10 10-10Z"
+  />
+
+  <path
+    fill="#67D7B4"
+    d="M208 326h96v8c0 7-5 12-12 12h-72c-7 0-12-5-12-12v-8Z"
+  />
+
+  <path
+    fill="#0B2E63"
+    d="M214 356h84l-12 24-8 84h-44l-8-84-12-24Z"
+  />
+
+  <path fill="#FFFFFF" d="M242 380h10v84h-18l8-84Z" />
+  <path fill="#FFFFFF" d="M260 380h10l8 84h-18v-84Z" />
+
+  <path
+    fill="#FFFFFF"
+    d="M256 108c-8 31-31 49-41 83-13 43 2 78 25 102l-4 23h40l-4-23c23-24 38-59 25-102-10-34-33-52-41-83Z"
+  />
+
+  <path
+    fill="#FFFFFF"
+    d="M256 76c3 28 18 43 47 47-29 4-44 19-47 47-3-28-18-43-47-47 29-4 44-19 47-47Z"
+  />
+
+  <path
+    fill="#1769FF"
+    d="M256 145c-2 30-17 49-24 72-7 24 2 46 17 64-1-23 7-40 23-55 6 25 3 47-16 70 29-19 39-47 30-75-7-24-23-43-30-76Z"
+  />
+</svg>

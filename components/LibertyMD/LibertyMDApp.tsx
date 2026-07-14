@@ -32,6 +32,12 @@ import LibertyMDMedicalCrossLogo from './LibertyMDMedicalCrossLogo';
 import LibertyMDHumanSilhouettes from './LibertyMDHumanSilhouettes';
 import LibertyMDPremiumLogo from './LibertyMDPremiumLogo';
 import LibertyMDParticleWaveSeparator from './LibertyMDParticleWaveSeparator';
+import {
+  LibertyMDHealthLibrarySection,
+  LibertyMDPatientStoriesSection,
+  LibertyMDPhoneCareSection,
+  LibertyMDPricingSection,
+} from './LibertyMDMarketingSections';
 
 interface LibertyMDAppProps {
   onBack?: () => void;
@@ -152,9 +158,12 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
   const [isTyping, setIsTyping] = useState(false);
   const [selectedTab, setSelectedTab] = useState<'chat' | 'doctors'>('chat');
   const [scrollY, setScrollY] = useState(0);
+  const [isFloatingComposerVisible, setIsFloatingComposerVisible] = useState(false);
+  const [isHeroInputFocused, setIsHeroInputFocused] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const chatPanelRef = useRef<HTMLDivElement | null>(null);
   const logoDockHeadlineRef = useRef<HTMLHeadingElement | null>(null);
+  const heroComposerRef = useRef<HTMLFormElement | null>(null);
   const heroSymptomsRef = useRef<HTMLTextAreaElement | null>(null);
   const hasActiveConsultRef = useRef(false);
   const consentReady = consent.terms && consent.ai && consent.emergency;
@@ -164,6 +173,21 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
     const handleScroll = () => setScrollY(window.scrollY);
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  useEffect(() => {
+    const composer = heroComposerRef.current;
+    if (!composer) return undefined;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsFloatingComposerVisible(!entry.isIntersecting && entry.boundingClientRect.bottom <= 0);
+      },
+      { threshold: [0, 0.01] }
+    );
+
+    observer.observe(composer);
+    return () => observer.disconnect();
   }, []);
 
   useEffect(() => {
@@ -418,22 +442,28 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
 
   return (
     <div
-      className="min-h-screen text-[#111827] font-sans selection:bg-[#2563EB] selection:text-white"
+      className="min-h-screen text-center text-[#111827] font-sans selection:bg-[#2563EB] selection:text-white [&_input]:text-center [&_select]:text-center [&_textarea]:text-center"
       style={{
         background:
           'linear-gradient(180deg, #FBFCF9 0%, #F5F9FF 34%, #F3F8F2 66%, #EFF6FF 100%)',
       }}
     >
       <main>
-        <section className="relative z-10 flex min-h-[100svh] flex-col overflow-visible px-5 sm:px-8">
+        <section className="libertymd-page-gutter relative z-10 flex min-h-[100svh] flex-col overflow-visible">
           <div className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(247,250,255,0.9)_54%,rgba(240,248,243,0.96)_100%)]" />
 
-          <header className="mx-auto flex h-16 w-full max-w-7xl shrink-0 items-center justify-between">
+          <header className="libertymd-hero-header libertymd-shell flex h-16 shrink-0 items-center justify-between">
             <a
               href="/liberty-md"
               aria-label="LibertyMD home"
-              className="font-serif text-xl font-semibold text-[#111827] transition-colors hover:text-[#2563EB] sm:text-2xl"
+              className="inline-flex items-center gap-2 font-serif text-xl font-semibold text-[#111827] transition-colors hover:text-[#2563EB] sm:gap-2.5 sm:text-2xl"
             >
+              <img
+                src="/images/libertymd-logo-mark.svg"
+                alt=""
+                aria-hidden="true"
+                className="h-8 w-8 shrink-0 object-contain sm:h-9 sm:w-9"
+              />
               LibertyMD
             </a>
 
@@ -468,7 +498,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
             </div>
           </header>
 
-          <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col items-center justify-center pb-8 text-center sm:pb-0 [@media(max-height:700px)]:pb-0">
+          <div className="libertymd-hero-content libertymd-shell flex flex-1 flex-col items-center justify-center pb-8 text-center sm:pb-0 [@media(max-height:700px)]:pb-0">
             <style>
               {`
                 @keyframes libertymd-tagline-step-1 {
@@ -487,6 +517,18 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                   0%, 29% { opacity: 0; transform: translateY(9px); filter: blur(3px); }
                   37%, 78% { opacity: 1; transform: translateY(0); filter: blur(0); }
                   88%, 100% { opacity: 0; transform: translateY(-5px); filter: blur(2px); }
+                }
+
+                @keyframes libertymd-placeholder-dot-pulse {
+                  0%, 62%, 100% { opacity: 0.24; transform: translateY(0); }
+                  28% { opacity: 1; transform: translateY(-2px); }
+                }
+
+                .libertymd-placeholder-dot {
+                  display: inline-block;
+                  animation: libertymd-placeholder-dot-pulse 1.5s ease-in-out infinite;
+                  color: #2563EB;
+                  will-change: opacity, transform;
                 }
 
                 .libertymd-start-chat-cta {
@@ -571,19 +613,30 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
 
                   .libertymd-start-chat-cta,
                   .libertymd-start-chat-cta::before,
-                  .libertymd-start-chat-arrow {
+                  .libertymd-start-chat-arrow,
+                  .libertymd-placeholder-dot {
                     animation: none !important;
                     transform: none !important;
                   }
+
+                  .libertymd-placeholder-dot { opacity: 1 !important; }
                 }
               `}
             </style>
 
-            <h1 className="font-serif text-6xl font-semibold leading-none text-[#111827] sm:text-7xl [@media(max-height:700px)]:whitespace-nowrap [@media(max-height:700px)]:text-5xl">
-              LibertyMD
-            </h1>
+            <div className="libertymd-hero-wordmark flex items-center justify-center gap-2.5 sm:gap-4">
+              <img
+                src="/images/libertymd-logo-mark.svg"
+                alt=""
+                aria-hidden="true"
+                className="libertymd-hero-wordmark-icon h-9 w-9 shrink-0 translate-y-[2px] object-contain sm:h-14 sm:w-14 [@media(max-height:700px)]:h-8 [@media(max-height:700px)]:w-8"
+              />
+              <h1 className="libertymd-hero-title font-serif text-[56px] font-semibold leading-none text-[#111827] sm:text-7xl [@media(max-height:700px)]:whitespace-nowrap [@media(max-height:700px)]:text-5xl">
+                LibertyMD
+              </h1>
+            </div>
             <p
-              className="mt-4 flex min-h-7 flex-wrap items-center justify-center gap-x-2 text-sm font-bold text-[#17325F] sm:mt-2 sm:gap-x-3 sm:text-lg [@media(max-height:700px)]:mt-2 [@media(max-height:700px)]:text-xs"
+              className="libertymd-hero-tagline mt-4 flex min-h-7 flex-wrap items-center justify-center gap-x-2 text-sm font-bold text-[#17325F] sm:mt-2 sm:gap-x-3 sm:text-lg [@media(max-height:700px)]:mt-2 [@media(max-height:700px)]:text-xs"
               aria-label="Free, Anonymous, Built by Doctors"
             >
               {['Free', 'Anonymous', 'Built by Doctors'].map((phrase, index) => (
@@ -616,11 +669,12 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
             <LibertyMDPremiumLogo
               scrollY={phase === 'initial' ? scrollY : 0}
               dockHeadlineRef={logoDockHeadlineRef}
-              className="z-10 mt-[var(--libertymd-gap-tagline-logo)] mb-[var(--libertymd-gap-pedestal-input)] [@media(max-height:700px)]:-mt-2 [@media(max-height:700px)]:mb-2"
+              className="z-10 mt-[var(--libertymd-gap-tagline-logo)] mb-4 sm:mb-[var(--libertymd-gap-pedestal-input)] [@media(max-height:700px)]:-mt-2 [@media(max-height:700px)]:mb-2"
             />
 
-            <div className="relative z-20 w-full max-w-5xl">
+            <div className="libertymd-composer-width relative z-20">
               <form
+                ref={heroComposerRef}
                 onSubmit={(event) => {
                   event.preventDefault();
                   if (!input.trim()) {
@@ -629,46 +683,75 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                   }
                   handleSend();
                 }}
-                className="relative min-h-[205px] w-full rounded-[22px] border border-white/80 bg-white/75 p-6 pt-8 text-left shadow-[0_18px_60px_rgba(15,23,42,0.08)] backdrop-blur-[2px] sm:min-h-[238px] sm:p-8 sm:pt-9 lg:min-h-[240px] [@media(max-height:700px)]:min-h-[160px] [@media(max-height:700px)]:p-4 [@media(max-height:700px)]:pt-7"
+                className="libertymd-hero-composer relative min-h-[180px] w-full rounded-[20px] border-[1.5px] border-[#BFD0EE] bg-white/[0.94] p-5 pt-7 text-center shadow-[0_18px_48px_rgba(37,99,235,0.16),0_4px_14px_rgba(15,23,42,0.1),inset_0_1px_0_rgba(255,255,255,0.95)] ring-1 ring-[#2563EB]/10 backdrop-blur-md sm:min-h-[200px] sm:bg-white/[0.94] sm:p-5 sm:pt-7 sm:shadow-[0_18px_60px_rgba(15,23,42,0.1),0_4px_18px_rgba(37,99,235,0.08)] lg:min-h-[200px] [@media(max-height:700px)]:min-h-[158px] [@media(max-height:700px)]:p-4 [@media(max-height:700px)]:pt-7"
               >
                 <label
                   htmlFor="libertymd-hero-symptoms"
-                  className="absolute -top-5 left-6 rounded-t-[28px] rounded-br-[28px] bg-[#E5FFB8] px-5 py-3 text-base font-black text-[#111827] sm:left-10 sm:px-7 sm:text-xl [@media(max-height:700px)]:-top-4 [@media(max-height:700px)]:left-6 [@media(max-height:700px)]:px-5 [@media(max-height:700px)]:py-2 [@media(max-height:700px)]:text-sm"
+                  className="absolute -top-4 left-5 rounded-full bg-[#E5FFB8] px-4 py-2 text-sm font-black text-[#111827] shadow-[0_4px_12px_rgba(91,125,44,0.08)] sm:left-8 sm:px-5 sm:text-base [@media(max-height:700px)]:left-5 [@media(max-height:700px)]:px-4 [@media(max-height:700px)]:py-2 [@media(max-height:700px)]:text-xs"
                 >
                   What brings you in?
                 </label>
-                <textarea
-                  ref={heroSymptomsRef}
-                  id="libertymd-hero-symptoms"
-                  aria-label="Describe your symptoms or ask a health question"
-                  rows={3}
-                  value={input}
-                  onChange={(event) => setInput(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' && !event.shiftKey) {
-                      event.preventDefault();
-                      handleSend();
-                    }
-                  }}
-                  placeholder="Describe symptom or ask any health questions..."
-                  className="min-h-[88px] w-full resize-none bg-transparent text-base leading-7 text-[#334155] outline-none placeholder:text-[#5B5B5B] sm:min-h-[120px] sm:text-xl [@media(max-height:700px)]:min-h-[54px] [@media(max-height:700px)]:text-sm [@media(max-height:700px)]:leading-6"
-                />
+                <div className="libertymd-hero-composer-field relative h-[74px] w-full sm:h-[72px] [@media(max-height:700px)]:h-[50px]">
+                  {!input && !isHeroInputFocused && (
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-x-0 top-0 px-4 py-2 !text-left text-base leading-7 text-[#64748B] sm:px-5 sm:py-4 sm:text-xl [@media(max-height:700px)]:px-3 [@media(max-height:700px)]:py-1 [@media(max-height:700px)]:text-xs [@media(max-height:700px)]:leading-5"
+                    >
+                      Describe symptom or ask any health questions
+                      <span className="ml-0.5 inline-flex" aria-hidden="true">
+                        {[0, 1, 2].map((dot) => (
+                          <span
+                            key={dot}
+                            className="libertymd-placeholder-dot"
+                            style={{ animationDelay: `${dot * 180}ms` }}
+                          >
+                            .
+                          </span>
+                        ))}
+                      </span>
+                    </div>
+                  )}
+                  <textarea
+                    ref={heroSymptomsRef}
+                    id="libertymd-hero-symptoms"
+                    aria-label="Describe your symptoms or ask a health question"
+                    rows={3}
+                    value={input}
+                    onChange={(event) => setInput(event.target.value)}
+                    onFocus={() => setIsHeroInputFocused(true)}
+                    onBlur={() => setIsHeroInputFocused(false)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' && !event.shiftKey) {
+                        event.preventDefault();
+                        handleSend();
+                      }
+                    }}
+                    className="h-full min-h-0 w-full resize-none overflow-y-auto bg-transparent px-4 py-2 !text-left text-base leading-7 text-[#334155] caret-[#2563EB] outline-none sm:px-5 sm:py-4 sm:text-xl [@media(max-height:700px)]:px-3 [@media(max-height:700px)]:py-1 [@media(max-height:700px)]:text-xs [@media(max-height:700px)]:leading-5"
+                  />
+                </div>
                 <button
                   type="submit"
                   aria-label={input.trim() ? 'Start LibertyMD chat' : 'Start by describing your symptoms'}
-                  className={`libertymd-start-chat-cta ${!input.trim() ? 'libertymd-start-chat-cta--waiting' : ''} absolute bottom-6 left-6 right-6 isolate inline-flex h-14 cursor-pointer items-center justify-center gap-3 overflow-hidden rounded-full bg-[#2563EB] px-8 text-base font-bold text-white ring-1 ring-white/60 transition-[background-color,box-shadow,transform] duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#93C5FD] sm:bottom-8 sm:left-auto sm:right-8 sm:w-64 [@media(max-height:700px)]:bottom-4 [@media(max-height:700px)]:left-4 [@media(max-height:700px)]:right-4 [@media(max-height:700px)]:h-12 [@media(max-height:700px)]:w-auto`}
+                  className={`libertymd-start-chat-cta ${!input.trim() ? 'libertymd-start-chat-cta--waiting' : ''} absolute bottom-5 left-5 right-5 isolate inline-flex h-[52px] cursor-pointer items-center justify-center gap-3 overflow-hidden rounded-full bg-[#2563EB] px-8 text-base font-bold text-white ring-1 ring-white/60 transition-[background-color,box-shadow,transform] duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#93C5FD] sm:bottom-5 sm:left-auto sm:right-5 sm:h-14 sm:w-64 [@media(max-height:700px)]:bottom-4 [@media(max-height:700px)]:left-4 [@media(max-height:700px)]:right-4 [@media(max-height:700px)]:h-12 [@media(max-height:700px)]:w-auto`}
                 >
                   <span className="relative z-10">Start chat</span>
                   <ArrowRight className="libertymd-start-chat-arrow relative z-10 h-5 w-5" />
                 </button>
               </form>
 
-              <div className="mt-5 flex flex-row items-center justify-between gap-3 text-xs font-medium text-[#626262] sm:mt-2 sm:text-sm [@media(max-height:700px)]:mt-0 [@media(max-height:700px)]:gap-1">
+              <div className="libertymd-hero-trust-row mt-2 flex flex-row items-center justify-between gap-2 text-xs font-medium text-[#626262] sm:text-sm [@media(max-height:700px)]:mt-0 [@media(max-height:700px)]:gap-1">
                 <div className="flex flex-nowrap items-center justify-start gap-2 [@media(max-height:700px)]:gap-1">
-                  <span>4.7</span>
-                  <span className="inline-flex gap-0.5" aria-label="4.7 out of 5 rating">
+                  <span>4.5</span>
+                  <span className="inline-flex gap-0.5" aria-label="4.5 out of 5 rating">
                     {[0, 1, 2, 3, 4].map((item) => (
-                      <span key={item} className="inline-flex h-5 w-5 items-center justify-center bg-[#169B52] [@media(max-height:700px)]:h-4 [@media(max-height:700px)]:w-4">
+                      <span
+                        key={item}
+                        className={`inline-flex h-5 w-5 items-center justify-center [@media(max-height:700px)]:h-4 [@media(max-height:700px)]:w-4 ${
+                          item === 4
+                            ? 'bg-[linear-gradient(90deg,#169B52_0%,#169B52_50%,#D4D4D4_50%,#D4D4D4_100%)]'
+                            : 'bg-[#169B52]'
+                        }`}
+                      >
                         <Star className="h-3.5 w-3.5 fill-white text-white [@media(max-height:700px)]:h-3 [@media(max-height:700px)]:w-3" />
                       </span>
                     ))}
@@ -682,10 +765,10 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
             </div>
           </div>
 
-          <LibertyMDParticleWaveSeparator className="opacity-[0.22] sm:opacity-[0.34]" />
+          <LibertyMDParticleWaveSeparator />
         </section>
 
-        <section ref={chatPanelRef} className="relative z-0 bg-[linear-gradient(180deg,rgba(245,250,243,0.96),rgba(237,247,241,0.98))] px-5 pb-16 pt-[300px] sm:px-8 sm:pt-[340px]">
+        <section ref={chatPanelRef} className="libertymd-page-gutter relative z-0 bg-[linear-gradient(180deg,rgba(245,250,243,0.96),rgba(237,247,241,0.98))] pb-16 pt-[300px] sm:pt-[340px]">
           <div className="mx-auto max-w-3xl text-center">
             <p className="text-xs font-bold uppercase tracking-normal text-[#2563EB]">From symptom to next step</p>
             <h2 ref={logoDockHeadlineRef} className="mt-3 text-4xl font-black leading-tight tracking-normal text-[#111827] sm:text-5xl">
@@ -696,7 +779,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
             </p>
           </div>
 
-          <div className="mx-auto mt-14 grid max-w-6xl gap-12 text-left lg:grid-cols-[0.78fr_1.22fr] lg:items-start">
+          <div className="libertymd-content-shell mx-auto mt-14 grid gap-[var(--libertymd-layout-gap)] text-center lg:grid-cols-[minmax(17.5rem,0.72fr)_minmax(32rem,1.28fr)] lg:items-start">
             <div className="lg:sticky lg:top-24">
               <p className="text-xs font-bold uppercase tracking-normal text-[#2563EB]">Start a consultation</p>
               <h2 className="mt-3 max-w-sm text-3xl font-black leading-tight tracking-normal text-[#111827] sm:text-4xl">
@@ -712,7 +795,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                   <button
                     key={item.label}
                     onClick={() => handleSend(item.symptom)}
-                    className="block w-full border-t border-[#DDE7D8] py-3 text-left text-sm font-medium leading-6 text-[#334155] transition hover:text-[#2563EB]"
+                    className="block w-full border-t border-[#DDE7D8] py-3 text-center text-sm font-medium leading-6 text-[#334155] transition hover:text-[#2563EB]"
                   >
                     {item.label}
                   </button>
@@ -964,7 +1047,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                         type="button"
                         disabled={isTyping}
                         onClick={() => handleSend(option)}
-                        className="text-left text-xs font-semibold leading-5 text-[#2563EB] hover:text-[#111827] disabled:opacity-50"
+                        className="text-center text-xs font-semibold leading-5 text-[#2563EB] hover:text-[#111827] disabled:opacity-50"
                       >
                         {option}
                       </button>
@@ -1001,11 +1084,18 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
           </div>
         </section>
 
+        <LibertyMDPhoneCareSection
+          onStartChat={() => {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            window.setTimeout(() => heroSymptomsRef.current?.focus(), 650);
+          }}
+        />
+
         {selectedTab === 'doctors' && (
-          <section className="border-t border-[#E6EDE3] bg-[linear-gradient(180deg,rgba(251,252,248,0.98),rgba(239,246,255,0.72))] px-5 py-16 sm:px-8">
-            <div className="mx-auto max-w-6xl">
+          <section className="libertymd-page-gutter libertymd-section-spacing border-t border-[#E6EDE3] bg-[linear-gradient(180deg,rgba(251,252,248,0.98),rgba(239,246,255,0.72))]">
+            <div className="libertymd-content-shell">
               <p className="text-xs font-bold uppercase tracking-normal text-[#2563EB]">Licensed handoff</p>
-              <h2 className="mt-3 max-w-xl text-3xl font-black tracking-normal text-[#111827] sm:text-4xl">
+              <h2 className="mx-auto mt-3 max-w-xl text-3xl font-black tracking-normal text-[#111827] sm:text-4xl">
                 Continue with a doctor when you need one.
               </h2>
               <div className="mt-10 grid gap-8 md:grid-cols-3">
@@ -1031,9 +1121,16 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
           </section>
         )}
 
+        <LibertyMDPricingSection
+          onStartChat={() => {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            window.setTimeout(() => heroSymptomsRef.current?.focus(), 650);
+          }}
+        />
+
         {/* Ambient Clinical Care Film — calm full-width band. Video edges are feathered and a soft
             glow sits behind so it melts into the surrounding sections instead of reading as a hard rectangle. */}
-        <section className="relative overflow-hidden border-t border-[#E6EDE3] bg-[linear-gradient(180deg,rgba(245,250,243,0.96)_0%,rgba(248,250,247,0.97)_100%)] px-5 py-16 sm:px-8 sm:py-20">
+        <section className="libertymd-page-gutter libertymd-section-spacing relative overflow-hidden border-t border-[#E6EDE3] bg-[linear-gradient(180deg,rgba(245,250,243,0.96)_0%,rgba(248,250,247,0.97)_100%)]">
           <div className="mx-auto max-w-3xl text-center">
             <p className="text-xs font-bold uppercase tracking-normal text-[#2563EB]">Human care</p>
             <h2 className="mx-auto mt-3 max-w-xl text-3xl font-black tracking-normal text-[#111827] sm:text-4xl">
@@ -1043,7 +1140,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
               Every triage is designed to hand off cleanly to a licensed physician.
             </p>
           </div>
-          <div className="relative mx-auto mt-10 max-w-5xl">
+          <div className="relative mx-auto mt-10 w-full max-w-[80rem]">
             {/* Soft blue/peach glow matching the film's palette so the seams disappear */}
             <div
               aria-hidden="true"
@@ -1075,7 +1172,11 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
           </div>
         </section>
 
-        <section className="border-t border-[#E6EDE3] bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(248,250,247,0.96))] px-5 py-16 sm:px-8 sm:py-20">
+        <LibertyMDPatientStoriesSection />
+
+        <LibertyMDHealthLibrarySection />
+
+        <section className="libertymd-page-gutter libertymd-section-spacing border-t border-[#E6EDE3] bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(248,250,247,0.96))]">
           <div className="mx-auto max-w-3xl text-center">
               <p className="text-xs font-bold uppercase tracking-normal text-[#2563EB]">Clinical pathway</p>
               <h2 className="mx-auto mt-3 max-w-xl text-3xl font-black tracking-normal text-[#111827] sm:text-4xl">
@@ -1085,7 +1186,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                 A calm, structured intake that keeps the medical conversation moving.
               </p>
           </div>
-          <div className="mx-auto mt-12 grid max-w-6xl gap-x-8 gap-y-9 text-left sm:grid-cols-2 lg:grid-cols-4">
+          <div className="libertymd-content-shell mx-auto mt-12 grid gap-x-[clamp(2rem,4vw,4.5rem)] gap-y-9 text-center sm:grid-cols-2 lg:grid-cols-4">
             {pathwaySteps.map(([step, title, description]) => (
               <div key={step} className="border-t border-[#CBD9C6] pt-5">
                 <span className="text-sm font-black text-[#2563EB]">{step}</span>
@@ -1098,6 +1199,49 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
           </div>
         </section>
       </main>
+
+      <div
+        aria-hidden={!isFloatingComposerVisible}
+        style={{ transitionTimingFunction: 'cubic-bezier(0.22, 1, 0.36, 1)' }}
+        className={`pointer-events-none fixed inset-x-0 bottom-[max(14px,env(safe-area-inset-bottom))] z-[70] px-3 transition-[opacity,transform] duration-500 sm:px-6 ${
+          isFloatingComposerVisible ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'
+        }`}
+      >
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!input.trim()) {
+              const floatingInput = event.currentTarget.elements.namedItem('floating-health-question');
+              if (floatingInput instanceof HTMLInputElement) floatingInput.focus();
+              return;
+            }
+            handleSend();
+          }}
+          className={`pointer-events-auto mx-auto flex h-16 w-full max-w-[64rem] items-center gap-2 rounded-full border border-white/75 bg-white/[0.58] p-2 pl-5 shadow-[0_22px_65px_rgba(15,23,42,0.18),inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-2xl backdrop-saturate-150 transition-[background-color,box-shadow] hover:bg-white/[0.68] hover:shadow-[0_26px_75px_rgba(15,23,42,0.22),inset_0_1px_0_rgba(255,255,255,0.9)] sm:h-20 sm:pl-8 ${
+            isFloatingComposerVisible ? '' : 'pointer-events-none'
+          }`}
+        >
+          <input
+            name="floating-health-question"
+            type="text"
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
+            placeholder="Ask about your health..."
+            aria-label="Ask LibertyMD about your health"
+            tabIndex={isFloatingComposerVisible ? 0 : -1}
+            className="min-w-0 flex-1 bg-transparent px-1 text-center text-sm font-medium text-[#0F172A] outline-none placeholder:text-[#64748B] sm:text-lg"
+          />
+          <button
+            type="submit"
+            aria-label="Send health question"
+            tabIndex={isFloatingComposerVisible ? 0 : -1}
+            disabled={isTyping || phase === 'emergency_end' || phase === 'report_ready'}
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#2563EB] text-white shadow-[0_10px_24px_rgba(37,99,235,0.38)] transition-[background-color,box-shadow,transform] hover:bg-[#1D4ED8] hover:shadow-[0_13px_30px_rgba(37,99,235,0.45)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 sm:h-16 sm:w-16"
+          >
+            <Send className="h-5 w-5 sm:h-6 sm:w-6" />
+          </button>
+        </form>
+      </div>
 
       {/* Exact Doctronic-Style 3D Volumetric Ribbon Footer in Blue */}
       <footer className="relative mt-24 bg-gradient-to-b from-[#EFF6FF] via-[#F0F9FF] to-[#E0F2FE] text-[#0F172A] overflow-hidden min-h-[720px] flex flex-col justify-between">
@@ -1183,36 +1327,12 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
           </div>
         </div>
 
-        {/* Center Patient Oath Emblem + Floating Medical Input Pill */}
+        {/* Center Patient Oath Emblem */}
         <div className="relative z-10 flex flex-col items-center justify-center py-12 px-4">
           {/* Patient Oath Circle Seal Emblem */}
-          <div className="mb-10 hover:scale-105 transition-transform">
+          <div className="hover:scale-105 transition-transform">
             <PatientOathEmblem className="w-48 h-48" />
           </div>
-
-          {/* Floating Pill Search Box */}
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSend();
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            className="w-full max-w-2xl bg-white/90 backdrop-blur-md rounded-full p-2 pl-6 shadow-2xl border border-white/80 flex items-center gap-3 transition-all hover:shadow-3xl hover:bg-white"
-          >
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask about your health..."
-              className="flex-1 bg-transparent border-none text-base text-[#0F172A] placeholder-[#64748B] focus:outline-none"
-            />
-            <button
-              type="submit"
-              className="w-12 h-12 rounded-full bg-[#2563EB] hover:bg-[#1D4ED8] text-white flex items-center justify-center shadow-lg shadow-[#2563EB]/30 transition-transform active:scale-95"
-            >
-              <Send className="w-5 h-5" />
-            </button>
-          </form>
         </div>
 
         {/* Bottom Copyright */}
