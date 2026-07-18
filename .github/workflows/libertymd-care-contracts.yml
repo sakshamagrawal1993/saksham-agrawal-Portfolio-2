@@ -49,10 +49,20 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: latest
+      - name: Prepare isolated LibertyMD database project
+        run: |
+          mkdir -p /tmp/libertymd-supabase
+          cd /tmp/libertymd-supabase
+          supabase init
+          cp "$GITHUB_WORKSPACE"/supabase/migrations/*libertymd*.sql supabase/migrations/
+          cp "$GITHUB_WORKSPACE"/supabase/tests/libertymd_care_rls.test.sql supabase/tests/
       - name: Start local Supabase
+        working-directory: /tmp/libertymd-supabase
         run: supabase start
       - name: Run LibertyMD database tests
+        working-directory: /tmp/libertymd-supabase
         run: supabase test db
       - name: Stop local Supabase
         if: always()
+        working-directory: /tmp/libertymd-supabase
         run: supabase stop --no-backup
