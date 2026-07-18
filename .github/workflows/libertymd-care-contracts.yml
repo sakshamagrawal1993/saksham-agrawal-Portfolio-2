@@ -54,6 +54,7 @@ jobs:
           mkdir -p /tmp/libertymd-supabase
           cd /tmp/libertymd-supabase
           supabase init
+          mkdir -p supabase/migrations supabase/tests
           cp "$GITHUB_WORKSPACE"/supabase/migrations/*libertymd*.sql supabase/migrations/
           cp "$GITHUB_WORKSPACE"/supabase/tests/libertymd_care_rls.test.sql supabase/tests/
       - name: Start local Supabase
