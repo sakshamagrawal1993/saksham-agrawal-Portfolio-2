@@ -22,7 +22,8 @@ import {
   Menu,
   RotateCcw,
   Star,
-  Stethoscope
+  Stethoscope,
+  UsersRound
 } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import LibertyMDFooterRibbon from './LibertyMDFooterRibbon';
@@ -38,6 +39,12 @@ import {
   LibertyMDPhoneCareSection,
   LibertyMDPricingSection,
 } from './LibertyMDMarketingSections';
+import {
+  LibertyMDAccountDrawer,
+  LibertyMDDemographicsPrompt,
+  LibertyMDReportGate,
+  type LibertyMDHistoryItem,
+} from './LibertyMDCareControls';
 
 interface LibertyMDAppProps {
   onBack?: () => void;
@@ -59,12 +66,21 @@ interface ChatMessage {
 
 type ChatPhase =
   | 'initial'
-  | 'consent_required'
   | 'demographics_required'
   | 'intake'
+  | 'report_gate'
   | 'report_ready'
   | 'emergency_end'
+  | 'clinical_review_needed'
   | 'error';
+
+interface LibertyMDProfile {
+  display_name?: string | null;
+  email?: string | null;
+  avatar_url?: string | null;
+  age?: number | null;
+  sex_at_birth?: string | null;
+}
 
 interface LibertyReport {
   summary: string;
@@ -135,18 +151,179 @@ const normalizeReport = (raw: any): LibertyReport => {
   };
 };
 
+const HOW_IT_WORKS_ROTATION_MS = 5600;
+
+const howItWorksSteps = [
+  {
+    title: 'Share your symptoms',
+    eyebrow: 'Start naturally',
+    description: 'Tell LibertyMD what you feel, when it began, and what worries you most. You do not need to know the medical words.',
+    placeholder: 'Video placeholder: symptom entry and conversation start',
+    icon: Sparkles,
+  },
+  {
+    title: 'Focussed Follow-up',
+    eyebrow: 'Only what matters',
+    description: 'LibertyMD asks concise questions about timing, severity, history, and context, adapting each follow-up to your answers.',
+    placeholder: 'Video placeholder: adaptive follow-up questions',
+    icon: Activity,
+  },
+  {
+    title: 'Safety Screen',
+    eyebrow: 'Urgency checked early',
+    description: 'Clinical guardrails look for warning signs throughout the conversation and clearly explain when urgent or emergency care is needed.',
+    placeholder: 'Video placeholder: safety screening and escalation',
+    icon: ShieldCheck,
+  },
+  {
+    title: 'Doctor Ready Report',
+    eyebrow: 'Context ready to share',
+    description: 'Your answers become a structured summary with the symptom timeline, safety guidance, next steps, and a doctor-ready SOAP note.',
+    placeholder: 'Video placeholder: doctor-ready report and handoff',
+    icon: FileText,
+  },
+];
+
+function LibertyMDHowItWorksTabs() {
+  const [activeStep, setActiveStep] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const [cycleKey, setCycleKey] = useState(0);
+  const tabRailRef = useRef<HTMLDivElement | null>(null);
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const currentStep = howItWorksSteps[activeStep];
+
+  useEffect(() => {
+    if (isPaused || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    const timer = window.setTimeout(() => {
+      setActiveStep((current) => (current + 1) % howItWorksSteps.length);
+      setCycleKey((current) => current + 1);
+    }, HOW_IT_WORKS_ROTATION_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [activeStep, cycleKey, isPaused]);
+
+  useEffect(() => {
+    const rail = tabRailRef.current;
+    const tab = tabRefs.current[activeStep];
+    if (!rail || !tab) return;
+
+    const railRect = rail.getBoundingClientRect();
+    const tabRect = tab.getBoundingClientRect();
+    rail.scrollTo({
+      left: rail.scrollLeft + tabRect.left - railRect.left - (rail.clientWidth - tabRect.width) / 2,
+      behavior: 'smooth',
+    });
+  }, [activeStep]);
+
+  const selectStep = (index: number) => {
+    setActiveStep(index);
+    setCycleKey((current) => current + 1);
+  };
+
+  const resumeRotation = () => {
+    setIsPaused(false);
+    setCycleKey((current) => current + 1);
+  };
+
+  return (
+    <div
+      className="libertymd-content-shell mx-auto mt-12"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={resumeRotation}
+      onFocusCapture={() => setIsPaused(true)}
+      onBlurCapture={resumeRotation}
+    >
+      <div
+        ref={tabRailRef}
+        role="tablist"
+        aria-label="How LibertyMD works"
+        className="libertymd-how-tabs flex snap-x snap-mandatory gap-4 overflow-x-auto border-b border-[#CAD8D0] pb-0 lg:grid lg:grid-cols-4 lg:gap-7"
+      >
+        {howItWorksSteps.map((step, index) => {
+          const Icon = step.icon;
+          const isActive = index === activeStep;
+
+          return (
+            <button
+              key={step.title}
+              ref={(node) => { tabRefs.current[index] = node; }}
+              type="button"
+              role="tab"
+              id={`libertymd-how-tab-${index}`}
+              aria-controls="libertymd-how-panel"
+              aria-selected={isActive}
+              tabIndex={isActive ? 0 : -1}
+              onClick={() => selectStep(index)}
+              className={`relative flex min-w-[12.5rem] snap-start items-center gap-3 pb-5 text-left transition-colors sm:min-w-[15rem] lg:min-w-0 ${
+                isActive ? 'text-[#17325F]' : 'text-[#8290A0] hover:text-[#334155]'
+              }`}
+            >
+              <Icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-[#2563EB]' : 'text-[#A9B5C0]'}`} />
+              <span className="text-sm font-bold leading-5">{step.title}</span>
+              <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[3px] overflow-hidden bg-[#D8E2DC]">
+                {index < activeStep && <span className="block h-full w-full bg-[#8AAEEB]" />}
+                {isActive && (
+                  <span
+                    key={`${activeStep}-${cycleKey}`}
+                    className="libertymd-how-progress block h-full w-full bg-[#2563EB]"
+                    style={{
+                      animationDuration: `${HOW_IT_WORKS_ROTATION_MS}ms`,
+                      animationPlayState: isPaused ? 'paused' : 'running',
+                    }}
+                  />
+                )}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div
+        id="libertymd-how-panel"
+        role="tabpanel"
+        aria-labelledby={`libertymd-how-tab-${activeStep}`}
+        className="mt-10 grid items-center gap-9 lg:grid-cols-[minmax(17rem,0.58fr)_minmax(34rem,1.42fr)] lg:gap-[clamp(3rem,6vw,7rem)]"
+      >
+        <div className="order-2 mx-auto max-w-lg text-center lg:order-1 lg:mx-0 lg:text-left">
+          <p className="text-xs font-bold uppercase text-[#2563EB]">Step {String(activeStep + 1).padStart(2, '0')} · {currentStep.eyebrow}</p>
+          <h3 className="mt-4 font-serif text-3xl font-semibold leading-tight text-[#111827] sm:text-4xl">{currentStep.title}</h3>
+          <p className="mt-5 text-sm leading-7 text-[#5B6472] sm:text-base">{currentStep.description}</p>
+        </div>
+
+        <div className="order-1 lg:order-2">
+          <div className="relative aspect-video overflow-hidden rounded-lg border border-[#C9D9E9] bg-[linear-gradient(145deg,rgba(255,255,255,0.92),rgba(225,238,251,0.82)_55%,rgba(225,245,239,0.9))] shadow-[0_24px_70px_rgba(23,50,95,0.11)]">
+            <div className="absolute inset-0 opacity-[0.16] [background-image:linear-gradient(rgba(37,99,235,0.18)_1px,transparent_1px),linear-gradient(90deg,rgba(37,99,235,0.18)_1px,transparent_1px)] [background-size:32px_32px]" />
+            <div className="relative flex h-full flex-col items-center justify-center px-6 text-center">
+              <span className="inline-flex h-14 w-14 items-center justify-center rounded-full border border-white/90 bg-white/70 text-[#2563EB] shadow-[0_12px_34px_rgba(37,99,235,0.13)] backdrop-blur-md">
+                <Video className="h-6 w-6" />
+              </span>
+              <p className="mt-5 text-sm font-semibold text-[#435775] sm:text-base">{currentStep.placeholder}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
-  const [region, setRegion] = useState<'EU' | 'US'>('EU');
+  const [region] = useState<'EU' | 'US'>('EU');
   const [input, setInput] = useState('');
   const [phase, setPhase] = useState<ChatPhase>('initial');
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [pendingSymptom, setPendingSymptom] = useState('');
-  const [consent, setConsent] = useState({ terms: false, ai: false, emergency: false });
   const [demographics, setDemographics] = useState({ age: '', sex: '' });
   const [report, setReport] = useState<LibertyReport | null>(null);
-  const [email, setEmail] = useState('');
-  const [savedEmail, setSavedEmail] = useState('');
   const [error, setError] = useState('');
+  const [safetyNotice, setSafetyNotice] = useState('');
+  const [isAnonymous, setIsAnonymous] = useState(true);
+  const [greetingName, setGreetingName] = useState('');
+  const [profile, setProfile] = useState<LibertyMDProfile | null>(null);
+  const [history, setHistory] = useState<LibertyMDHistoryItem[]>([]);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isReportGateOpen, setIsReportGateOpen] = useState(false);
+  const [isAccountLoading, setIsAccountLoading] = useState(true);
+  const [isAuthBusy, setIsAuthBusy] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: '1',
@@ -157,7 +334,6 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
   ]);
   const [isTyping, setIsTyping] = useState(false);
   const [selectedTab, setSelectedTab] = useState<'chat' | 'doctors'>('chat');
-  const [scrollY, setScrollY] = useState(0);
   const [isFloatingComposerVisible, setIsFloatingComposerVisible] = useState(false);
   const [isHeroInputFocused, setIsHeroInputFocused] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -166,14 +342,9 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
   const heroComposerRef = useRef<HTMLFormElement | null>(null);
   const heroSymptomsRef = useRef<HTMLTextAreaElement | null>(null);
   const hasActiveConsultRef = useRef(false);
-  const consentReady = consent.terms && consent.ai && consent.emergency;
   const demographicsReady = demographics.age.trim() && demographics.sex;
-
-  useEffect(() => {
-    const handleScroll = () => setScrollY(window.scrollY);
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  const shouldShowFloatingComposer = isFloatingComposerVisible && phase === 'initial';
+  const identityPromiseRef = useRef<Promise<unknown> | null>(null);
 
   useEffect(() => {
     const composer = heroComposerRef.current;
@@ -195,113 +366,127 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [messages, isTyping, report]);
 
-  const SAMPLE_CASES = [
-    {
-      label: 'Sharp lower right abdominal pain & mild fever',
-      symptom: 'I have sharp pain in my lower right abdomen that started 6 hours ago near my belly button, with nausea and low fever.',
-      response: {
-        text: 'Based on your presentation of acute right lower quadrant (RLQ) abdominal pain originating periumbilically with associated nausea and low-grade pyrexia, acute appendicitis is a primary clinical differential that must be urgently evaluated.',
-        triageData: {
-          severity: 'urgent' as const,
-          possibleCauses: [
-            'Acute Appendicitis (McBurney point tenderness)',
-            'Mesenteric Lymphadenitis',
-            'Right-sided Renal Colic / Nephrolithiasis'
-          ],
-          actionPlan: [
-            'Seek immediate evaluation at an Urgent Care or Emergency Department.',
-            'Do not consume solid foods or analgesics that mask peritoneal signs prior to surgical consult.',
-            'Connect with a LibertyMD physician below for an instant priority referral.'
-          ],
-          redFlags: [
-            'Rebound tenderness or rigid abdomen',
-            'Temperature exceeding 38.5°C (101.3°F)',
-            'Inability to stand upright or walk without severe guarding'
-          ]
-        }
-      }
-    },
-    {
-      label: 'Persistent 3-day migraine & photophobia',
-      symptom: 'I have had a throbbing unilateral headache on my left temple for 3 days with sensitivity to bright lights and nausea.',
-      response: {
-        text: 'Your symptoms align closely with Acute Migraine with Photophobia. Because symptoms have persisted for 72 hours (Status Migrainosus risk), targeted abortive therapy or a clinical evaluation is recommended.',
-        triageData: {
-          severity: 'moderate' as const,
-          possibleCauses: [
-            'Migraine Headache without Aura',
-            'Tension-type Headache with nausea overlay',
-            'Cervicogenic Headache'
-          ],
-          actionPlan: [
-            'Rest in a dark, quiet room and maintain hydration with electrolytes.',
-            'Consider NSAIDs or Triptans if previously prescribed by your doctor.',
-            'Book a €39 / $39 LibertyMD video consultation for immediate prescription refill or rescue medication.'
-          ],
-          redFlags: [
-            'Sudden thunderclap onset reaching maximum intensity within 60 seconds',
-            'Associated limb weakness, slurred speech, or vision loss',
-            'Headache following recent head trauma'
-          ]
-        }
-      }
-    },
-    {
-      label: 'Mild dry cough & scratchy throat',
-      symptom: 'I have had a mild dry cough and a scratchy throat for 2 days. No high fever or shortness of breath.',
-      response: {
-        text: 'This presentation is most consistent with an uncomplicated Viral Upper Respiratory Tract Infection (Common Cold or early Pharyngitis).',
-        triageData: {
-          severity: 'low' as const,
-          possibleCauses: [
-            'Viral Upper Respiratory Infection (URI)',
-            'Seasonal Allergic Rhinitis / Post-nasal drip',
-            'Mild Acute Pharyngitis'
-          ],
-          actionPlan: [
-            'Supportive care: warm salt-water gargles, honey tea, and adequate rest.',
-            'Monitor for secondary bacterial symptoms over the next 48-72 hours.',
-            'Request a digital doctor note for work/university if needed.'
-          ],
-          redFlags: [
-            'Difficulty breathing or wheezing at rest',
-            'Fever > 39°C persisting beyond 3 days',
-            'Inability to swallow fluids due to severe throat swelling'
-          ]
-        }
-      }
+  const ensureIdentity = async () => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (sessionData.session) return sessionData.session;
+    if (!identityPromiseRef.current) {
+      identityPromiseRef.current = supabase.auth.signInAnonymously().then(({ data, error: authError }) => {
+        if (authError || !data.session) throw authError || new Error('Unable to create a private LibertyMD session.');
+        return data.session;
+      });
     }
-  ];
+    return identityPromiseRef.current;
+  };
 
   const invokeCareProxy = async (body: Record<string, unknown>) => {
-    const { data, error: fnError } = await supabase.functions.invoke('ai-care-proxy', {
-      body: {
-        product: 'libertymd',
-        anonymous: true,
-        region,
-        demographics,
-        ...body
-      }
+    await ensureIdentity();
+    const { data, error: fnError } = await supabase.functions.invoke('libertymd-care-proxy', {
+      body: { region, ...body }
     });
     if (fnError) throw fnError;
     return data;
   };
 
-  const startSessionIfNeeded = async () => {
-    if (sessionId) return sessionId;
-    const data = await invokeCareProxy({ action: 'start_session' });
-    if (!data?.session_id) throw new Error('Unable to start LibertyMD session.');
-    setSessionId(data.session_id);
-    if (data.initial_question) {
+  const refreshHistory = async () => {
+    if (isAnonymous) return;
+    setIsAccountLoading(true);
+    try {
+      const data = await invokeCareProxy({ action: 'get_history' });
+      setHistory(Array.isArray(data?.history) ? data.history : []);
+    } catch (historyError) {
+      console.error('Unable to refresh LibertyMD history', historyError);
+    } finally {
+      setIsAccountLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      setIsAccountLoading(true);
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const oauthConsultation = params.get('consultation');
+        const action = params.get('auth') === 'complete' ? 'sync_identity' : 'bootstrap';
+        const data = await invokeCareProxy({ action, consultation_id: oauthConsultation || undefined });
+        if (cancelled) return;
+        setIsAnonymous(Boolean(data?.is_anonymous));
+        setGreetingName(String(data?.greeting_name || ''));
+        setProfile(data?.profile || null);
+        if (data?.profile?.age || data?.profile?.sex_at_birth) {
+          setDemographics({
+            age: data.profile.age ? String(data.profile.age) : '',
+            sex: String(data.profile.sex_at_birth || ''),
+          });
+        }
+        setHistory(Array.isArray(data?.history) ? data.history : []);
+        if (data?.report && oauthConsultation) {
+          setSessionId(oauthConsultation);
+          setReport(normalizeReport(data.report));
+          setPhase('report_ready');
+          hasActiveConsultRef.current = true;
+          const consult = await invokeCareProxy({ action: 'get_consultation', consultation_id: oauthConsultation });
+          if (!cancelled && Array.isArray(consult?.messages)) {
+            setMessages(consult.messages.map((item: any, index: number) => ({
+              id: `${oauthConsultation}-${index}`,
+              sender: item.role === 'user' ? 'user' : 'ai',
+              text: item.content,
+              options: Array.isArray(item.options) ? item.options : [],
+              kind: item.message_type === 'safety' ? 'emergency' : item.message_type === 'report_gate' ? 'report' : 'normal',
+            })));
+          }
+        } else if (data?.greeting_name) {
+          setMessages([{
+            id: '1',
+            sender: 'ai',
+            kind: 'system',
+            text: `Hi ${data.greeting_name}, tell me what is happening, when it started, and what worries you most.`,
+          }]);
+        }
+        if (params.has('auth')) {
+          window.history.replaceState({}, '', window.location.pathname);
+        }
+      } catch (bootstrapError) {
+        if (!cancelled) setError(bootstrapError instanceof Error ? bootstrapError.message : 'Unable to initialize LibertyMD.');
+      } finally {
+        if (!cancelled) setIsAccountLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const beginConsultation = async (symptom: string) => {
+    setIsTyping(true);
+    setError('');
+    setSafetyNotice('');
+    try {
+      const data = await invokeCareProxy({ action: 'start_consultation', message: symptom });
+      if (!data?.consultation_id) throw new Error('Unable to start LibertyMD consultation.');
+      setSessionId(data.consultation_id);
+      if (data?.emergency) {
+        setPhase('emergency_end');
+        setMessages(prev => [...prev, {
+          id: `${Date.now()}-emergency`,
+          sender: 'ai',
+          kind: 'emergency',
+          text: data.message || 'These symptoms may be an emergency. Seek emergency care now.',
+        }]);
+        return;
+      }
+      setPhase('demographics_required');
+      if (data?.safety?.message) setSafetyNotice(String(data.safety.message));
       setMessages(prev => [...prev, {
-        id: `${Date.now()}-initial`,
+        id: `${Date.now()}-demographics`,
         sender: 'ai',
         kind: 'system',
-        text: data.initial_question,
-        options: Array.isArray(data.options) ? data.options : [],
+        text: data.acknowledgement || 'I’m sorry you are dealing with that. First, what is the patient’s age and sex assigned at birth?',
       }]);
+    } catch (startError) {
+      setError(startError instanceof Error ? startError.message : 'The LibertyMD workflow is temporarily unavailable.');
+      setPhase('error');
+    } finally {
+      setIsTyping(false);
     }
-    return data.session_id as string;
   };
 
   const sendToWorkflow = async (text: string, activeSessionId?: string) => {
@@ -310,12 +495,25 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
     setIsTyping(true);
     setError('');
     try {
-      const data = await invokeCareProxy({
-        action: 'send_message',
-        session_id: sid,
-        message: text,
-        stream: false,
-      });
+      const clientMessageId = crypto.randomUUID();
+      let data: any = null;
+      let lastError: unknown = null;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          data = await invokeCareProxy({
+            action: 'send_message',
+            consultation_id: sid,
+            message: text,
+            client_message_id: clientMessageId,
+          });
+          lastError = null;
+          break;
+        } catch (invokeError) {
+          lastError = invokeError;
+          if (attempt === 0) await new Promise(resolve => window.setTimeout(resolve, 500));
+        }
+      }
+      if (lastError) throw lastError;
 
       if (data?.emergency) {
         setPhase('emergency_end');
@@ -328,20 +526,39 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
         return;
       }
 
-      if (data?.diagnosis_ready || data?.report) {
-        const nextReport = normalizeReport(data.report || data);
-        setReport(nextReport);
-        setPhase('report_ready');
+      if (data?.clinical_review_needed) {
+        setPhase('clinical_review_needed');
+        setMessages(prev => [...prev, {
+          id: `${Date.now()}-review`,
+          sender: 'ai',
+          kind: 'system',
+          text: data.message || 'A reliable report could not be generated. Please continue with a licensed clinician.',
+        }]);
+        return;
+      }
+
+      if (data?.report_ready) {
+        if (data?.auth_required) {
+          setPhase('report_gate');
+          setIsReportGateOpen(true);
+        } else if (data?.report) {
+          setReport(normalizeReport(data.report));
+          setPhase('report_ready');
+          await refreshHistory();
+        }
         setMessages(prev => [...prev, {
           id: `${Date.now()}-report`,
           sender: 'ai',
           kind: 'report',
-          text: 'Your LibertyMD report is ready. Review the care plan, red flags, and SOAP note below.',
+          text: data?.auth_required
+            ? 'Your LibertyMD report is ready. Link Google to save it, or continue without saving.'
+            : 'Your LibertyMD report is ready and saved in your consultation history.',
         }]);
         return;
       }
 
       setPhase('intake');
+      setSafetyNotice(data?.safety?.message ? String(data.safety.message) : '');
       setMessages(prev => [...prev, {
         id: `${Date.now()}-ai`,
         sender: 'ai',
@@ -363,52 +580,119 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
     }
   };
 
-  const continueAfterGates = async (symptom = pendingSymptom) => {
-    if (!symptom.trim()) return;
-    setPhase('intake');
-    chatPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const submitDemographics = async () => {
+    if (!sessionId || !demographicsReady || isTyping) return;
+    setIsTyping(true);
+    setError('');
     try {
-      const sid = await startSessionIfNeeded();
-      await sendToWorkflow(symptom, sid);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'The LibertyMD AI Care workflow is temporarily unavailable.';
-      setError(message);
-      setPhase('error');
+      const data = await invokeCareProxy({
+        action: 'save_demographics',
+        consultation_id: sessionId,
+        age: Number(demographics.age),
+        sex_at_birth: demographics.sex,
+      });
+      setProfile(prev => ({ ...prev, age: Number(demographics.age), sex_at_birth: demographics.sex }));
+      setPhase('intake');
+      setMessages(prev => [...prev,
+        {
+          id: `${Date.now()}-demographic-answer`,
+          sender: 'user',
+          text: `Age ${demographics.age}; ${demographics.sex}`,
+        },
+        {
+          id: `${Date.now()}-first-question`,
+          sender: 'ai',
+          text: data?.next_question || 'When did this symptom begin?',
+          options: Array.isArray(data?.options) ? data.options : [],
+        },
+      ]);
+    } catch (demographicsError) {
+      setError(demographicsError instanceof Error ? demographicsError.message : 'Unable to save the clinical context.');
+      setPhase('demographics_required');
+    } finally {
       setIsTyping(false);
-      setMessages(prev => [...prev, {
-        id: `${Date.now()}-startup-error`,
-        sender: 'ai',
-        kind: 'system',
-        text: 'I could not start the AI Care workflow. Please try again in a moment.',
-      }]);
     }
   };
 
   const handleSend = (textToSend?: string) => {
     const text = (textToSend || input).trim();
-    if (!text || isTyping || phase === 'emergency_end' || phase === 'report_ready') return;
+    if (!text || isTyping || ['demographics_required', 'report_gate', 'report_ready', 'emergency_end', 'clinical_review_needed'].includes(phase)) return;
 
     hasActiveConsultRef.current = true;
-    setPendingSymptom(text);
     setInput('');
     setReport(null);
-    setSavedEmail('');
     setMessages(prev => [...prev, {
       id: Date.now().toString(),
       sender: 'user',
       text
     }]);
     chatPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (!sessionId || phase === 'initial' || phase === 'error') void beginConsultation(text);
+    else void sendToWorkflow(text);
+  };
 
-    if (!consentReady) {
-      setPhase('consent_required');
-      return;
+  const startGoogleLink = async () => {
+    setIsAuthBusy(true);
+    setError('');
+    try {
+      await ensureIdentity();
+      const query = new URLSearchParams({ auth: 'complete' });
+      if (sessionId) query.set('consultation', sessionId);
+      const { error: linkError } = await supabase.auth.linkIdentity({
+        provider: 'google',
+        options: { redirectTo: `${window.location.origin}/liberty-md?${query.toString()}` },
+      });
+      if (linkError) throw linkError;
+    } catch (linkError) {
+      setError(linkError instanceof Error ? linkError.message : 'Unable to start Google sign in.');
+      setIsAuthBusy(false);
     }
-    if (!demographicsReady) {
-      setPhase('demographics_required');
-      return;
+  };
+
+  const skipReportGate = async () => {
+    if (!sessionId) return;
+    setIsAuthBusy(true);
+    try {
+      const data = await invokeCareProxy({ action: 'release_report', consultation_id: sessionId, mode: 'skip' });
+      setReport(normalizeReport(data.report));
+      setPhase('report_ready');
+      setIsReportGateOpen(false);
+    } catch (releaseError) {
+      setError(releaseError instanceof Error ? releaseError.message : 'Unable to release the report.');
+    } finally {
+      setIsAuthBusy(false);
     }
-    void continueAfterGates(text);
+  };
+
+  const loadConsultation = async (consultationId: string) => {
+    setIsAccountLoading(true);
+    try {
+      const data = await invokeCareProxy({ action: 'get_consultation', consultation_id: consultationId });
+      setSessionId(consultationId);
+      setMessages((data.messages || []).map((item: any, index: number) => ({
+        id: `${consultationId}-${index}`,
+        sender: item.role === 'user' ? 'user' : 'ai',
+        text: item.content,
+        options: Array.isArray(item.options) ? item.options : [],
+        kind: item.message_type === 'safety' ? 'emergency' : item.message_type === 'report_gate' ? 'report' : 'normal',
+      })));
+      if (data.report) {
+        setReport(normalizeReport(data.report));
+        setPhase('report_ready');
+      } else {
+        const status = data.consultation?.status;
+        const nextPhase = status === 'awaiting_demographics' ? 'demographics_required' : status === 'report_pending_auth' ? 'report_gate' : status === 'emergency_stopped' ? 'emergency_end' : 'intake';
+        setPhase(nextPhase);
+        setIsReportGateOpen(nextPhase === 'report_gate');
+      }
+      hasActiveConsultRef.current = true;
+      setIsMenuOpen(false);
+      chatPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (historyError) {
+      setError(historyError instanceof Error ? historyError.message : 'Unable to load the consultation.');
+    } finally {
+      setIsAccountLoading(false);
+    }
   };
 
   const resetConsult = () => {
@@ -416,30 +700,24 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
     setInput('');
     setPhase('initial');
     setSessionId(null);
-    setPendingSymptom('');
     setReport(null);
-    setSavedEmail('');
-    setEmail('');
     setError('');
+    setSafetyNotice('');
+    setIsReportGateOpen(false);
+    setDemographics({ age: profile?.age ? String(profile.age) : '', sex: profile?.sex_at_birth || '' });
     setMessages([
       {
         id: '1',
         sender: 'ai',
         kind: 'system',
-        text: `Tell me what is happening, when it started, and what worries you most. I'll ask a few focused questions and flag urgent warning signs.`
+        text: `${greetingName ? `Hi ${greetingName}, ` : ''}tell me what is happening, when it started, and what worries you most.`
       }
     ]);
   };
 
   const dockZoneRef = useRef<HTMLDivElement | null>(null);
   const activeOptions = messages[messages.length - 1]?.options || [];
-  const pathwaySteps = [
-    ['01', 'Share what is happening', 'Start with symptoms, timeline, medications, and what worries you most.'],
-    ['02', 'Safety screen', 'AI Care guardrails check for urgent warning signs before normal intake continues.'],
-    ['03', 'Focused follow-up', 'The workflow asks concise questions until it has enough context for a report.'],
-    ['04', 'Doctor-ready report', 'LibertyMD creates a summary, care plan, red flags, and SOAP note for handoff.']
-  ];
-
+  const isComposerLocked = isTyping || ['demographics_required', 'report_gate', 'report_ready', 'emergency_end', 'clinical_review_needed'].includes(phase);
   return (
     <div
       className="min-h-screen text-center text-[#111827] font-sans selection:bg-[#2563EB] selection:text-white [&_input]:text-center [&_select]:text-center [&_textarea]:text-center"
@@ -467,30 +745,15 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
               LibertyMD
             </a>
 
-            <div className="flex items-center gap-4 text-sm font-semibold text-[#334155] sm:gap-6">
-              <div aria-label="Care region" className="hidden items-center gap-2 text-xs text-[#64748B] sm:flex">
-                {(['EU', 'US'] as const).map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    onClick={() => setRegion(item)}
-                    aria-pressed={region === item}
-                    className={`border-b py-1 transition-colors ${
-                      region === item
-                        ? 'border-[#2563EB] text-[#2563EB]'
-                        : 'border-transparent hover:text-[#111827]'
-                    }`}
-                  >
-                    {item}
-                  </button>
-                ))}
-              </div>
-              <a href="/login" className="transition-colors hover:text-[#2563EB]">Log in</a>
-              <a href="/login?mode=signup" className="hidden transition-colors hover:text-[#2563EB] sm:inline">Sign up</a>
+            <div className="flex items-center gap-3 text-sm font-semibold text-[#334155] sm:gap-5">
+              {!isAnonymous && greetingName && <span className="hidden sm:inline">Hi, {greetingName}</span>}
               <button
                 type="button"
-                aria-label="View how LibertyMD works"
-                onClick={() => chatPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                aria-label="Open profile and consultation history"
+                onClick={() => {
+                  setIsMenuOpen(true);
+                  if (!isAnonymous) void refreshHistory();
+                }}
                 className="inline-flex h-9 w-9 items-center justify-center text-[#111827] transition-colors hover:text-[#2563EB]"
               >
                 <Menu className="h-5 w-5" />
@@ -501,22 +764,14 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
           <div className="libertymd-hero-content libertymd-shell flex flex-1 flex-col items-center justify-center pb-8 text-center sm:pb-0 [@media(max-height:700px)]:pb-0">
             <style>
               {`
-                @keyframes libertymd-tagline-step-1 {
-                  0% { opacity: 0; transform: translateY(9px); filter: blur(3px); }
-                  8%, 78% { opacity: 1; transform: translateY(0); filter: blur(0); }
-                  88%, 100% { opacity: 0; transform: translateY(-5px); filter: blur(2px); }
+                @keyframes libertymd-proof-reveal {
+                  from { opacity: 0; transform: translateY(5px); }
+                  to { opacity: 1; transform: translateY(0); }
                 }
 
-                @keyframes libertymd-tagline-step-2 {
-                  0%, 14% { opacity: 0; transform: translateY(9px); filter: blur(3px); }
-                  22%, 78% { opacity: 1; transform: translateY(0); filter: blur(0); }
-                  88%, 100% { opacity: 0; transform: translateY(-5px); filter: blur(2px); }
-                }
-
-                @keyframes libertymd-tagline-step-3 {
-                  0%, 29% { opacity: 0; transform: translateY(9px); filter: blur(3px); }
-                  37%, 78% { opacity: 1; transform: translateY(0); filter: blur(0); }
-                  88%, 100% { opacity: 0; transform: translateY(-5px); filter: blur(2px); }
+                .libertymd-tagline-word {
+                  opacity: 0;
+                  animation: libertymd-proof-reveal 520ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
                 }
 
                 @keyframes libertymd-placeholder-dot-pulse {
@@ -604,22 +859,19 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                 }
 
                 @media (prefers-reduced-motion: reduce) {
-                  .libertymd-tagline-word {
-                    animation: none !important;
-                    opacity: 1 !important;
-                    transform: none !important;
-                    filter: none !important;
-                  }
-
                   .libertymd-start-chat-cta,
                   .libertymd-start-chat-cta::before,
                   .libertymd-start-chat-arrow,
+                  .libertymd-tagline-word,
                   .libertymd-placeholder-dot {
                     animation: none !important;
                     transform: none !important;
                   }
 
-                  .libertymd-placeholder-dot { opacity: 1 !important; }
+                  .libertymd-tagline-word,
+                  .libertymd-placeholder-dot {
+                    opacity: 1 !important;
+                  }
                 }
               `}
             </style>
@@ -635,41 +887,33 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                 LibertyMD
               </h1>
             </div>
+            <p className="libertymd-hero-value mt-3 text-base font-semibold leading-6 text-[#334155] sm:text-lg">
+              Clinically verified guidance for your symptoms.
+            </p>
             <p
-              className="libertymd-hero-tagline mt-4 flex min-h-7 flex-wrap items-center justify-center gap-x-2 text-sm font-bold text-[#17325F] sm:mt-2 sm:gap-x-3 sm:text-lg [@media(max-height:700px)]:mt-2 [@media(max-height:700px)]:text-xs"
+              className="libertymd-hero-tagline mt-2 flex min-h-6 flex-wrap items-center justify-center gap-x-2 text-sm font-bold text-[#17325F] sm:gap-x-3 sm:text-base"
               aria-label="Free, Anonymous, Built by Doctors"
             >
               {['Free', 'Anonymous', 'Built by Doctors'].map((phrase, index) => (
-                <React.Fragment key={phrase}>
+                <span
+                  key={phrase}
+                  className="libertymd-tagline-word inline-flex items-center gap-2 sm:gap-3"
+                  style={{ animationDelay: `${220 + index * 120}ms` }}
+                >
                   {index > 0 && (
-                    <span
-                      aria-hidden="true"
-                      className="libertymd-tagline-word opacity-0"
-                      style={{
-                        animation: `libertymd-tagline-step-${index + 1} 5.4s ease-in-out infinite`,
-                        willChange: 'opacity, transform, filter',
-                      }}
-                    >
+                    <span aria-hidden="true" className="text-[#2563EB]">
                       •
                     </span>
                   )}
-                  <span
-                    className="libertymd-tagline-word opacity-0"
-                    style={{
-                      animation: `libertymd-tagline-step-${index + 1} 5.4s ease-in-out infinite`,
-                      willChange: 'opacity, transform, filter',
-                    }}
-                  >
-                    {phrase}
-                  </span>
-                </React.Fragment>
+                  <span>{phrase}</span>
+                </span>
               ))}
             </p>
 
             <LibertyMDPremiumLogo
-              scrollY={phase === 'initial' ? scrollY : 0}
+              active={phase === 'initial'}
               dockHeadlineRef={logoDockHeadlineRef}
-              className="z-10 mt-[var(--libertymd-gap-tagline-logo)] mb-4 sm:mb-[var(--libertymd-gap-pedestal-input)] [@media(max-height:700px)]:-mt-2 [@media(max-height:700px)]:mb-2"
+              className="z-10 mt-[var(--libertymd-gap-tagline-logo)] mb-4 sm:mb-[var(--libertymd-gap-pedestal-input)]"
             />
 
             <div className="libertymd-composer-width relative z-20">
@@ -683,7 +927,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                   }
                   handleSend();
                 }}
-                className="libertymd-hero-composer relative min-h-[180px] w-full rounded-[20px] border-[1.5px] border-[#BFD0EE] bg-white/[0.94] p-5 pt-7 text-center shadow-[0_18px_48px_rgba(37,99,235,0.16),0_4px_14px_rgba(15,23,42,0.1),inset_0_1px_0_rgba(255,255,255,0.95)] ring-1 ring-[#2563EB]/10 backdrop-blur-md sm:min-h-[200px] sm:bg-white/[0.94] sm:p-5 sm:pt-7 sm:shadow-[0_18px_60px_rgba(15,23,42,0.1),0_4px_18px_rgba(37,99,235,0.08)] lg:min-h-[200px] [@media(max-height:700px)]:min-h-[158px] [@media(max-height:700px)]:p-4 [@media(max-height:700px)]:pt-7"
+                className="libertymd-hero-composer relative w-full rounded-[20px] border-[1.5px] border-[#BFD0EE] bg-white/[0.94] p-5 pt-7 text-center shadow-[0_18px_48px_rgba(37,99,235,0.16),0_4px_14px_rgba(15,23,42,0.1),inset_0_1px_0_rgba(255,255,255,0.95)] ring-1 ring-[#2563EB]/10 backdrop-blur-md sm:bg-white/[0.94] sm:shadow-[0_18px_60px_rgba(15,23,42,0.1),0_4px_18px_rgba(37,99,235,0.08)]"
               >
                 <label
                   htmlFor="libertymd-hero-symptoms"
@@ -691,13 +935,14 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                 >
                   What brings you in?
                 </label>
-                <div className="libertymd-hero-composer-field relative h-[74px] w-full sm:h-[72px] [@media(max-height:700px)]:h-[50px]">
+                <div className="libertymd-hero-composer-field relative w-full">
                   {!input && !isHeroInputFocused && (
                     <div
                       aria-hidden="true"
                       className="pointer-events-none absolute inset-x-0 top-0 px-4 py-2 !text-left text-base leading-7 text-[#64748B] sm:px-5 sm:py-4 sm:text-xl [@media(max-height:700px)]:px-3 [@media(max-height:700px)]:py-1 [@media(max-height:700px)]:text-xs [@media(max-height:700px)]:leading-5"
                     >
-                      Describe symptom or ask any health questions
+                      <span className="sm:hidden">Describe your symptoms</span>
+                      <span className="hidden sm:inline">Describe symptom or ask any health questions</span>
                       <span className="ml-0.5 inline-flex" aria-hidden="true">
                         {[0, 1, 2].map((dot) => (
                           <span
@@ -726,7 +971,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                         handleSend();
                       }
                     }}
-                    className="h-full min-h-0 w-full resize-none overflow-y-auto bg-transparent px-4 py-2 !text-left text-base leading-7 text-[#334155] caret-[#2563EB] outline-none sm:px-5 sm:py-4 sm:text-xl [@media(max-height:700px)]:px-3 [@media(max-height:700px)]:py-1 [@media(max-height:700px)]:text-xs [@media(max-height:700px)]:leading-5"
+                    className="libertymd-hero-symptoms h-full min-h-0 w-full resize-none overflow-y-auto bg-transparent px-4 py-2 !text-left text-base leading-7 text-[#334155] caret-[#2563EB] outline-none sm:px-5 sm:py-4 sm:text-xl [@media(max-height:700px)]:px-3 [@media(max-height:700px)]:py-1 [@media(max-height:700px)]:text-xs [@media(max-height:700px)]:leading-5"
                   />
                 </div>
                 <button
@@ -742,7 +987,10 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
               <div className="libertymd-hero-trust-row mt-2 flex flex-row items-center justify-between gap-2 text-xs font-medium text-[#626262] sm:text-sm [@media(max-height:700px)]:mt-0 [@media(max-height:700px)]:gap-1">
                 <div className="flex flex-nowrap items-center justify-start gap-2 [@media(max-height:700px)]:gap-1">
                   <span>4.5</span>
-                  <span className="inline-flex gap-0.5" aria-label="4.5 out of 5 rating">
+                  <span className="inline-flex h-4 w-4 items-center justify-center bg-[#169B52] sm:hidden" aria-hidden="true">
+                    <Star className="h-3 w-3 fill-white text-white" />
+                  </span>
+                  <span className="hidden gap-0.5 sm:inline-flex" aria-label="4.5 out of 5 rating">
                     {[0, 1, 2, 3, 4].map((item) => (
                       <span
                         key={item}
@@ -757,9 +1005,18 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                     ))}
                   </span>
                 </div>
-                <span className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap">
-                  <ShieldCheck className="h-5 w-5 text-[#626262]" />
-                  HIPAA Compliant &amp; Private
+                <span
+                  className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap font-semibold text-[#17325F] sm:gap-2"
+                  aria-label="Trusted by more than 1,000,000 users"
+                >
+                  <UsersRound className="h-4 w-4 shrink-0 text-[#17325F] sm:h-5 sm:w-5" aria-hidden="true" />
+                  <span className="sm:hidden">1M+ users</span>
+                  <span className="hidden sm:inline">Trusted by 1,000,000+ users</span>
+                </span>
+                <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[#17325F] sm:gap-2">
+                  <ShieldCheck className="h-4 w-4 text-[#17325F] sm:h-5 sm:w-5" />
+                  <span className="sm:hidden">HIPAA Private</span>
+                  <span className="hidden sm:inline">HIPAA Compliant &amp; Private</span>
                 </span>
               </div>
             </div>
@@ -774,41 +1031,16 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
             <h2 ref={logoDockHeadlineRef} className="mt-3 text-4xl font-black leading-tight tracking-normal text-[#111827] sm:text-5xl">
               How LibertyMD works
             </h2>
-            <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-[#5B6472] sm:text-base">
-              Describe what you feel. LibertyMD checks urgent warning signs, asks focused questions, and prepares a report you can share with a doctor.
+            <p className="mx-auto mt-4 max-w-xl text-base font-bold leading-7 text-[#17325F] sm:text-lg">
+              Simple enough to use when you feel unwell.
             </p>
           </div>
 
-          <div className="libertymd-content-shell mx-auto mt-14 grid gap-[var(--libertymd-layout-gap)] text-center lg:grid-cols-[minmax(17.5rem,0.72fr)_minmax(32rem,1.28fr)] lg:items-start">
-            <div className="lg:sticky lg:top-24">
-              <p className="text-xs font-bold uppercase tracking-normal text-[#2563EB]">Start a consultation</p>
-              <h2 className="mt-3 max-w-sm text-3xl font-black leading-tight tracking-normal text-[#111827] sm:text-4xl">
-                Begin in your own words.
-              </h2>
-              <p className="mt-4 max-w-sm text-sm leading-7 text-[#5B6472]">
-                A sentence is enough. LibertyMD will ask only the questions needed to understand timing, severity, and safety.
-              </p>
-
-              <div className="mt-8 space-y-3">
-                <p className="text-xs font-bold uppercase tracking-normal text-[#64748B]">Or try an example</p>
-                {SAMPLE_CASES.map((item) => (
-                  <button
-                    key={item.label}
-                    onClick={() => handleSend(item.symptom)}
-                    className="block w-full border-t border-[#DDE7D8] py-3 text-center text-sm font-medium leading-6 text-[#334155] transition hover:text-[#2563EB]"
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="mt-7 flex max-w-sm items-start gap-3 border-t border-[#DDE7D8] pt-5 text-xs leading-6 text-[#64748B]">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#B45309]" />
-                <p>For severe chest pain, trouble breathing, fainting, or other dangerous symptoms, call emergency services now.</p>
-              </div>
-            </div>
-
-            <div className="min-h-[560px]">
+          {phase === 'initial' ? (
+            <LibertyMDHowItWorksTabs />
+          ) : (
+            <div className="libertymd-content-shell mx-auto mt-14 max-w-4xl text-center">
+              <div className="min-h-[560px]">
               <div className="mb-4 flex items-center justify-between border-b border-[#DDE7D8] pb-3">
                 <div className="flex items-center gap-2.5">
                   <span className="h-2.5 w-2.5 rounded-full bg-[#16A34A]" />
@@ -840,89 +1072,35 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                   </div>
                 ))}
 
-                {phase === 'consent_required' && (
-                  <div className="border-t border-[#DDE7D8] pt-6">
-                    <h3 className="text-lg font-black text-[#111827]">Before we continue</h3>
-                    <p className="mt-2 max-w-2xl text-sm leading-7 text-[#5B6472]">
-                      LibertyMD is an AI care assistant, not a replacement for emergency services or a licensed clinician.
-                    </p>
-                    <div className="mt-5 space-y-3">
-                      {[
-                        ['terms', 'I accept the LibertyMD terms for this AI consult.'],
-                        ['ai', 'I understand this is AI guidance, not a formal diagnosis.'],
-                        ['emergency', 'I will call emergency services for severe or dangerous symptoms.']
-                      ].map(([key, label]) => (
-                        <label key={key} className="flex items-start gap-3 text-sm leading-6 text-[#334155]">
-                          <input
-                            type="checkbox"
-                            checked={consent[key as keyof typeof consent]}
-                            onChange={(event) => setConsent(prev => ({ ...prev, [key]: event.target.checked }))}
-                            className="mt-1 h-4 w-4 rounded border-[#CBD5E1] text-[#5661F6]"
-                          />
-                          <span>{label}</span>
-                        </label>
-                      ))}
-                    </div>
-                    <button
-                      type="button"
-                      disabled={!consentReady}
-                      onClick={() => setPhase('demographics_required')}
-                      className="mt-5 rounded-full bg-[#5661F6] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#4651E6] disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      Continue
-                    </button>
+                {phase === 'demographics_required' && (
+                  <LibertyMDDemographicsPrompt
+                    age={demographics.age}
+                    sex={demographics.sex}
+                    loading={isTyping}
+                    error={error}
+                    onAgeChange={(age) => setDemographics(prev => ({ ...prev, age }))}
+                    onSexChange={(sex) => setDemographics(prev => ({ ...prev, sex }))}
+                    onSubmit={submitDemographics}
+                  />
+                )}
+
+                {safetyNotice && phase !== 'emergency_end' && (
+                  <div className="mx-auto max-w-2xl border-l-2 border-amber-500 bg-amber-50 px-4 py-3 text-left text-sm leading-6 text-amber-900">
+                    {safetyNotice}
                   </div>
                 )}
 
-                {phase === 'demographics_required' && (
-                  <form
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      if (demographicsReady) void continueAfterGates();
-                    }}
-                    className="border-t border-[#DDE7D8] pt-6"
+                {phase === 'report_gate' && !isReportGateOpen && (
+                  <button
+                    type="button"
+                    onClick={() => setIsReportGateOpen(true)}
+                    className="mx-auto inline-flex h-11 items-center justify-center rounded-full bg-libertymd-blue-600 px-6 text-sm font-bold text-white shadow-lg shadow-libertymd-blue-600/20 hover:bg-libertymd-blue-700"
                   >
-                    <h3 className="text-lg font-black text-[#111827]">Basic clinical context</h3>
-                    <p className="mt-2 max-w-2xl text-sm leading-7 text-[#5B6472]">
-                      Age and biological sex help the AI Care workflow ask safer follow-up questions.
-                    </p>
-                    <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                      <label className="grid gap-2 text-xs font-bold uppercase tracking-normal text-[#64748B]">
-                        Age
-                        <input
-                          inputMode="numeric"
-                          value={demographics.age}
-                          onChange={(event) => setDemographics(prev => ({ ...prev, age: event.target.value }))}
-                          placeholder="34"
-                          className="border-b border-[#BFD2B7] bg-transparent py-3 text-base font-semibold normal-case tracking-normal text-[#111827] outline-none focus:border-[#5661F6]"
-                        />
-                      </label>
-                      <label className="grid gap-2 text-xs font-bold uppercase tracking-normal text-[#64748B]">
-                        Biological sex
-                        <select
-                          value={demographics.sex}
-                          onChange={(event) => setDemographics(prev => ({ ...prev, sex: event.target.value }))}
-                          className="border-b border-[#BFD2B7] bg-transparent py-3 text-base font-semibold normal-case tracking-normal text-[#111827] outline-none focus:border-[#5661F6]"
-                        >
-                          <option value="">Select</option>
-                          <option value="female">Female</option>
-                          <option value="male">Male</option>
-                          <option value="intersex">Intersex</option>
-                          <option value="prefer_not_to_say">Prefer not to say</option>
-                        </select>
-                      </label>
-                    </div>
-                    <button
-                      disabled={!demographicsReady || isTyping}
-                      className="mt-5 inline-flex items-center gap-2 rounded-full bg-[#5661F6] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#4651E6] disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      {isTyping && <Loader2 className="h-4 w-4 animate-spin" />}
-                      Start intake
-                    </button>
-                  </form>
+                    View report options
+                  </button>
                 )}
 
-                {error && (
+                {error && phase !== 'demographics_required' && (
                   <div className="border-t border-[#FDE68A] pt-5 text-sm leading-6 text-[#92400E]">
                     {error}
                   </div>
@@ -1007,31 +1185,10 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                       </div>
                     </div>
 
-                    <form
-                      onSubmit={(event) => {
-                        event.preventDefault();
-                        if (!email.trim()) return;
-                        setSavedEmail(email.trim());
-                        setEmail('');
-                      }}
-                      className="mt-8 flex flex-col gap-3 border-t border-[#DDE7D8] pt-5 sm:flex-row sm:items-center"
-                    >
-                      <span className="text-sm text-[#5B6472] sm:flex-1">
-                        {savedEmail ? `Report saved for ${savedEmail}` : 'Email this report or use it for doctor handoff.'}
-                      </span>
-                      {!savedEmail && (
-                        <>
-                          <input
-                            type="email"
-                            value={email}
-                            onChange={(event) => setEmail(event.target.value)}
-                            placeholder="you@example.com"
-                            className="border-b border-[#BFD2B7] bg-transparent px-1 py-2 text-sm outline-none focus:border-[#5661F6]"
-                          />
-                          <button className="rounded-full bg-[#111827] px-5 py-2 text-sm font-bold text-white">Save</button>
-                        </>
-                      )}
-                    </form>
+                    <div className="mt-8 flex items-center gap-2 border-t border-[#DDE7D8] pt-5 text-sm text-[#5B6472]">
+                      <ShieldCheck className="h-4 w-4 text-[#2563EB]" />
+                      {isAnonymous ? 'Guest report available for seven days.' : 'Saved privately to your LibertyMD history.'}
+                    </div>
                   </div>
                 )}
 
@@ -1039,7 +1196,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
               </div>
 
               <div className="mt-6 border-t border-[#DDE7D8] pt-4">
-                {phase !== 'emergency_end' && phase !== 'report_ready' && activeOptions.length > 0 && (
+                {!isComposerLocked && activeOptions.length > 0 && (
                   <div className="mb-4 flex flex-wrap gap-x-4 gap-y-2">
                     {activeOptions.map((option) => (
                       <button
@@ -1066,14 +1223,14 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                     type="text"
                     value={input}
                     onChange={(event) => setInput(event.target.value)}
-                    disabled={isTyping || phase === 'emergency_end' || phase === 'report_ready'}
-                    placeholder={phase === 'report_ready' ? 'Report is ready above' : 'Answer the follow-up question...'}
+                    disabled={isComposerLocked}
+                    placeholder={phase === 'report_ready' ? 'Report is ready above' : phase === 'report_gate' ? 'Unlock your report to continue' : 'Answer the follow-up question...'}
                     className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[#94A3B8]"
                   />
                   <button
                     type="submit"
                     aria-label="Send message"
-                    disabled={!input.trim() || isTyping || phase === 'emergency_end' || phase === 'report_ready'}
+                    disabled={!input.trim() || isComposerLocked}
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#5661F6] text-white hover:bg-[#4651E6] disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <Send className="h-4 w-4" />
@@ -1081,7 +1238,8 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                 </form>
               </div>
             </div>
-          </div>
+            </div>
+          )}
         </section>
 
         <LibertyMDPhoneCareSection
@@ -1176,35 +1334,36 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
 
         <LibertyMDHealthLibrarySection />
 
-        <section className="libertymd-page-gutter libertymd-section-spacing border-t border-[#E6EDE3] bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(248,250,247,0.96))]">
-          <div className="mx-auto max-w-3xl text-center">
-              <p className="text-xs font-bold uppercase tracking-normal text-[#2563EB]">Clinical pathway</p>
-              <h2 className="mx-auto mt-3 max-w-xl text-3xl font-black tracking-normal text-[#111827] sm:text-4xl">
-                Simple enough to use when you feel unwell.
-              </h2>
-              <p className="mx-auto mt-4 max-w-lg text-sm leading-7 text-[#5B6472]">
-                A calm, structured intake that keeps the medical conversation moving.
-              </p>
-          </div>
-          <div className="libertymd-content-shell mx-auto mt-12 grid gap-x-[clamp(2rem,4vw,4.5rem)] gap-y-9 text-center sm:grid-cols-2 lg:grid-cols-4">
-            {pathwaySteps.map(([step, title, description]) => (
-              <div key={step} className="border-t border-[#CBD9C6] pt-5">
-                <span className="text-sm font-black text-[#2563EB]">{step}</span>
-                <div className="mt-6">
-                  <h3 className="font-black text-[#111827]">{title}</h3>
-                  <p className="mt-2 text-sm leading-7 text-[#5B6472]">{description}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
       </main>
 
+      {phase === 'report_gate' && isReportGateOpen && (
+        <LibertyMDReportGate
+          loading={isAuthBusy}
+          onGoogle={startGoogleLink}
+          onSkip={skipReportGate}
+          onClose={() => setIsReportGateOpen(false)}
+        />
+      )}
+
+      <LibertyMDAccountDrawer
+        open={isMenuOpen}
+        isAnonymous={isAnonymous}
+        displayName={profile?.display_name}
+        email={profile?.email}
+        avatarUrl={profile?.avatar_url}
+        age={profile?.age}
+        sexAtBirth={profile?.sex_at_birth}
+        history={history}
+        loading={isAccountLoading}
+        onClose={() => setIsMenuOpen(false)}
+        onSelectConsultation={loadConsultation}
+      />
+
       <div
-        aria-hidden={!isFloatingComposerVisible}
+        aria-hidden={!shouldShowFloatingComposer}
         style={{ transitionTimingFunction: 'cubic-bezier(0.22, 1, 0.36, 1)' }}
         className={`pointer-events-none fixed inset-x-0 bottom-[max(14px,env(safe-area-inset-bottom))] z-[70] px-3 transition-[opacity,transform] duration-500 sm:px-6 ${
-          isFloatingComposerVisible ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'
+          shouldShowFloatingComposer ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'
         }`}
       >
         <form
@@ -1218,7 +1377,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
             handleSend();
           }}
           className={`pointer-events-auto mx-auto flex h-16 w-full max-w-[64rem] items-center gap-2 rounded-full border border-white/75 bg-white/[0.58] p-2 pl-5 shadow-[0_22px_65px_rgba(15,23,42,0.18),inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-2xl backdrop-saturate-150 transition-[background-color,box-shadow] hover:bg-white/[0.68] hover:shadow-[0_26px_75px_rgba(15,23,42,0.22),inset_0_1px_0_rgba(255,255,255,0.9)] sm:h-20 sm:pl-8 ${
-            isFloatingComposerVisible ? '' : 'pointer-events-none'
+            shouldShowFloatingComposer ? '' : 'pointer-events-none'
           }`}
         >
           <input
@@ -1226,16 +1385,17 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
             type="text"
             value={input}
             onChange={(event) => setInput(event.target.value)}
+            disabled={isComposerLocked}
             placeholder="Ask about your health..."
             aria-label="Ask LibertyMD about your health"
-            tabIndex={isFloatingComposerVisible ? 0 : -1}
+            tabIndex={shouldShowFloatingComposer ? 0 : -1}
             className="min-w-0 flex-1 bg-transparent px-1 text-center text-sm font-medium text-[#0F172A] outline-none placeholder:text-[#64748B] sm:text-lg"
           />
           <button
             type="submit"
             aria-label="Send health question"
-            tabIndex={isFloatingComposerVisible ? 0 : -1}
-            disabled={isTyping || phase === 'emergency_end' || phase === 'report_ready'}
+            tabIndex={shouldShowFloatingComposer ? 0 : -1}
+            disabled={isComposerLocked}
             className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#2563EB] text-white shadow-[0_10px_24px_rgba(37,99,235,0.38)] transition-[background-color,box-shadow,transform] hover:bg-[#1D4ED8] hover:shadow-[0_13px_30px_rgba(37,99,235,0.45)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 sm:h-16 sm:w-16"
           >
             <Send className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -1327,12 +1487,19 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
           </div>
         </div>
 
-        {/* Center Patient Oath Emblem */}
-        <div className="relative z-10 flex flex-col items-center justify-center py-12 px-4">
+        {/* Center Patient Oath Emblem and pledge */}
+        <div className="relative z-10 flex flex-col items-center justify-center px-6 py-12 text-center sm:px-10 sm:py-16">
           {/* Patient Oath Circle Seal Emblem */}
           <div className="hover:scale-105 transition-transform">
             <PatientOathEmblem className="w-48 h-48" />
           </div>
+
+          <p className="libertymd-type-footer-oath mx-auto mt-10 max-w-4xl text-balance font-medium text-[#0F172A] sm:mt-12">
+            I{' '}
+            <strong className="font-extrabold">
+              will first do no harm. Every response, every recommendation, and every action taken by LibertyMD will be measured against one question: does this serve the patient’s wellbeing?
+            </strong>
+          </p>
         </div>
 
         {/* Bottom Copyright */}

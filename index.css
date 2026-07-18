@@ -21,6 +21,90 @@
   --libertymd-content-max: 88rem;
   --libertymd-section-y: clamp(5rem, 7vw, 7.5rem);
   --libertymd-layout-gap: clamp(2.5rem, 5vw, 6rem);
+
+  /* LibertyMD semantic type scale. Mobile sizes are the default; larger
+     display tiers step up at the existing 640px responsive breakpoint. */
+  --libertymd-type-display: 3.5rem;
+  --libertymd-type-section-title: 2.25rem;
+  --libertymd-type-subsection-title: 1.875rem;
+  --libertymd-type-card-title: 1.25rem;
+  --libertymd-type-lead: 1.125rem;
+  --libertymd-type-body: 1rem;
+  --libertymd-type-body-small: 0.875rem;
+  --libertymd-type-label: 0.75rem;
+  --libertymd-type-legal: 0.75rem;
+  --libertymd-type-footer-oath: 1.125rem;
+  --libertymd-font-display: 'Playfair Display', Georgia, serif;
+  --libertymd-font-ui: 'Inter', system-ui, sans-serif;
+}
+
+@media (min-width: 40rem) {
+  :root {
+    --libertymd-type-display: 4.5rem;
+    --libertymd-type-section-title: 3rem;
+    --libertymd-type-subsection-title: 2.25rem;
+    --libertymd-type-footer-oath: 1.5rem;
+  }
+}
+
+.libertymd-type-display {
+  font-family: var(--libertymd-font-display);
+  font-size: var(--libertymd-type-display);
+  line-height: 1;
+}
+
+.libertymd-type-section-title {
+  font-family: var(--libertymd-font-display);
+  font-size: var(--libertymd-type-section-title);
+  line-height: 1.12;
+}
+
+.libertymd-type-subsection-title {
+  font-family: var(--libertymd-font-display);
+  font-size: var(--libertymd-type-subsection-title);
+  line-height: 1.18;
+}
+
+.libertymd-type-card-title {
+  font-family: var(--libertymd-font-ui);
+  font-size: var(--libertymd-type-card-title);
+  line-height: 1.3;
+}
+
+.libertymd-type-lead {
+  font-family: var(--libertymd-font-ui);
+  font-size: var(--libertymd-type-lead);
+  line-height: 1.55;
+}
+
+.libertymd-type-body {
+  font-family: var(--libertymd-font-ui);
+  font-size: var(--libertymd-type-body);
+  line-height: 1.7;
+}
+
+.libertymd-type-body-small {
+  font-family: var(--libertymd-font-ui);
+  font-size: var(--libertymd-type-body-small);
+  line-height: 1.7;
+}
+
+.libertymd-type-label {
+  font-family: var(--libertymd-font-ui);
+  font-size: var(--libertymd-type-label);
+  line-height: 1.4;
+}
+
+.libertymd-type-legal {
+  font-family: var(--libertymd-font-ui);
+  font-size: var(--libertymd-type-legal);
+  line-height: 1.6;
+}
+
+.libertymd-type-footer-oath {
+  font-family: var(--libertymd-font-ui);
+  font-size: var(--libertymd-type-footer-oath);
+  line-height: 1.4;
 }
 
 .libertymd-page-gutter {
@@ -43,8 +127,151 @@
   padding-block: var(--libertymd-section-y);
 }
 
+.libertymd-story-rail {
+  scrollbar-width: none;
+  overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.libertymd-story-rail::-webkit-scrollbar {
+  display: none;
+}
+
+.libertymd-how-tabs {
+  scrollbar-width: none;
+  overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.libertymd-how-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes libertymd-how-progress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+.libertymd-how-progress {
+  transform-origin: left center;
+  animation-name: libertymd-how-progress;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .libertymd-how-progress {
+    animation: none;
+    transform: scaleX(1);
+  }
+}
+
 .libertymd-composer-width {
   width: 100%;
+}
+
+.libertymd-premium-logo-stage {
+  width: 16.25rem;
+  height: 19.375rem;
+}
+
+.libertymd-premium-logo-pedestal {
+  width: 13.75rem;
+}
+
+.libertymd-premium-logo-moving {
+  height: 15rem;
+}
+
+.libertymd-hero-composer {
+  min-height: 11.25rem;
+}
+
+.libertymd-hero-composer-field {
+  height: 4.625rem;
+}
+
+.libertymd-hero-symptoms {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.libertymd-hero-symptoms::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.libertymd-hero-trust-row {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}
+
+/* Compact phones keep the same full cross width and reclaim vertical room
+   from the stage, pedestal gap, and composer instead. */
+@media (max-width: 47.999rem) and (max-height: 48rem) {
+  .libertymd-hero-header {
+    height: 3.5rem;
+  }
+
+  .libertymd-hero-content {
+    justify-content: flex-start;
+    padding-top: 0.25rem;
+    padding-bottom: 0;
+  }
+
+  .libertymd-hero-wordmark {
+    gap: 0.5rem;
+  }
+
+  .libertymd-hero-wordmark-icon {
+    width: 2rem;
+    height: 2rem;
+  }
+
+  .libertymd-hero-title {
+    font-size: 3rem;
+  }
+
+  .libertymd-hero-value {
+    margin-top: 0.25rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+
+  .libertymd-hero-tagline {
+    min-height: 1rem;
+    margin-top: 0.125rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+
+  .libertymd-premium-logo-stage {
+    height: 17rem;
+    margin-top: 0.25rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .libertymd-hero-composer {
+    min-height: 10.25rem;
+    padding: 0.875rem;
+    padding-top: 1.5rem;
+  }
+
+  .libertymd-hero-composer-field {
+    height: 3.25rem;
+  }
+
+  .libertymd-hero-composer .libertymd-start-chat-cta {
+    right: 0.75rem;
+    bottom: 0.75rem;
+    left: 0.75rem;
+    height: 3rem;
+  }
+
+  .libertymd-hero-trust-row {
+    margin-top: 0.25rem;
+    font-size: 0.6875rem;
+  }
 }
 
 @media (min-width: 48rem) {
@@ -54,8 +281,8 @@
   }
 }
 
-/* Keep the complete hero action visible on short desktop windows. Tall
-   desktops retain the full-size stage; only vertical geometry is compressed. */
+/* Keep the complete hero action visible on short desktop windows. Geometry
+   scales continuously before entering two compact height tiers. */
 @media (min-width: 48rem) {
   .libertymd-hero-content {
     justify-content: flex-start;
@@ -64,18 +291,18 @@
   }
 
   .libertymd-premium-logo-stage {
-    width: clamp(12rem, 31vh, 19.25rem);
-    height: clamp(13rem, 36vh, 22.5rem);
+    width: clamp(14rem, 31vh, 19.25rem);
+    height: clamp(17rem, 38vh, 22.5rem);
     margin-top: 0.25rem;
     margin-bottom: 0.75rem;
   }
 
   .libertymd-premium-logo-pedestal {
-    width: clamp(10.9375rem, 29vh, 16.875rem);
+    width: clamp(12rem, 29vh, 16.875rem);
   }
 
   .libertymd-premium-logo-moving {
-    height: clamp(11.25rem, 30vh, 18.75rem);
+    height: clamp(13rem, 30vh, 18.75rem);
   }
 
   .libertymd-hero-composer {
@@ -92,9 +319,85 @@
     right: 1.25rem;
     bottom: 1.25rem;
   }
+
+  .libertymd-hero-trust-row {
+    padding-bottom: 0;
+  }
 }
 
-@media (min-width: 48rem) and (max-height: 35rem) {
+@media (min-width: 48rem) and (max-height: 50rem) {
+  .libertymd-hero-header {
+    height: 3.5rem;
+  }
+
+  .libertymd-hero-content {
+    padding-top: 0;
+    padding-bottom: 0.25rem;
+  }
+
+  .libertymd-hero-wordmark {
+    gap: 0.75rem;
+  }
+
+  .libertymd-hero-wordmark-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  .libertymd-hero-title {
+    font-size: 3.5rem;
+  }
+
+  .libertymd-hero-value {
+    margin-top: 0.25rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+
+  .libertymd-hero-tagline {
+    min-height: 1rem;
+    margin-top: 0.125rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+
+  .libertymd-premium-logo-stage {
+    width: clamp(14rem, 34vh, 15.5rem);
+    height: clamp(14rem, 36vh, 17rem);
+    margin-top: 0.25rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .libertymd-premium-logo-pedestal {
+    width: clamp(12.5rem, 30vh, 13.75rem);
+  }
+
+  .libertymd-premium-logo-moving {
+    height: clamp(13.5rem, 32vh, 15rem);
+  }
+
+  .libertymd-hero-composer {
+    min-height: clamp(9rem, 21vh, 9.75rem);
+    padding: 0.875rem;
+    padding-top: 1.5rem;
+  }
+
+  .libertymd-hero-composer-field {
+    height: 3rem;
+  }
+
+  .libertymd-hero-composer .libertymd-start-chat-cta {
+    right: 0.75rem;
+    bottom: 0.75rem;
+  }
+
+  .libertymd-hero-trust-row {
+    margin-top: 0.25rem;
+    font-size: 0.75rem;
+  }
+}
+
+@media (min-width: 48rem) and (max-height: 42.5rem) {
   .libertymd-hero-header {
     height: 3rem;
   }
@@ -114,7 +417,13 @@
   }
 
   .libertymd-hero-title {
-    font-size: 2.5rem;
+    font-size: 3rem;
+  }
+
+  .libertymd-hero-value {
+    margin-top: 0.125rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
   }
 
   .libertymd-hero-tagline {
@@ -125,22 +434,22 @@
   }
 
   .libertymd-premium-logo-stage {
-    width: 10rem;
-    height: 10.625rem;
-    margin-top: 0;
+    width: 11.5rem;
+    height: 12.75rem;
+    margin-top: 0.125rem;
     margin-bottom: 0.375rem;
   }
 
   .libertymd-premium-logo-pedestal {
-    width: 9.375rem;
+    width: 10.75rem;
   }
 
   .libertymd-premium-logo-moving {
-    height: 9.0625rem;
+    height: 11.25rem;
   }
 
   .libertymd-hero-composer {
-    min-height: 8.25rem;
+    min-height: 8.75rem;
     padding: 0.75rem;
     padding-top: 1.25rem;
   }

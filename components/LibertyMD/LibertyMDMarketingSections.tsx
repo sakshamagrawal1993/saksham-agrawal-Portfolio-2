@@ -18,7 +18,9 @@ import {
   Clock3,
   Globe2,
   HeartPulse,
+  Pause,
   Play,
+  Quote,
   ShieldCheck,
   Sparkles,
 } from 'lucide-react';
@@ -40,6 +42,7 @@ const patientStories = [
     quote: 'LibertyMD organized the timeline and warning signs, so my appointment started with the details that mattered.',
     name: 'Jordan, 34',
     image: unsplash('photo-1534528741775-53994a69daeb', 1200),
+    format: 'portrait',
   },
   {
     category: 'Finding peace of mind',
@@ -47,6 +50,7 @@ const patientStories = [
     quote: 'The conversation separated what I could monitor at home from the symptoms that would need urgent care.',
     name: 'Marcus, 41',
     image: unsplash('photo-1506794778202-cad84cf45f1d', 1200),
+    format: 'quote',
   },
   {
     category: 'Understanding symptoms',
@@ -54,6 +58,79 @@ const patientStories = [
     quote: 'Instead of searching through dozens of pages, I left with a concise report and a focused list of questions.',
     name: 'Ana, 29',
     image: unsplash('photo-1544005313-94ddf0286df2', 1200),
+    format: 'portrait',
+  },
+  {
+    category: 'Recognizing urgency',
+    title: 'It made the warning signs easy to understand.',
+    quote: 'The safety questions were calm and direct. I understood why same-day care mattered and what to tell the clinician.',
+    name: 'Priya, 38',
+    image: unsplash('photo-1488426862026-3ee34a7d66df', 1200),
+    format: 'quote',
+  },
+  {
+    category: 'Following up',
+    title: 'I could pick up without starting over.',
+    quote: 'My timeline, medications, and next steps stayed together, which made the follow-up conversation much less scattered.',
+    name: 'Daniel, 46',
+    image: unsplash('photo-1519345182560-3f2917c472ef', 1200),
+    format: 'portrait',
+  },
+  {
+    category: 'Managing a fever',
+    title: 'I knew what to watch overnight.',
+    quote: 'The plan gave me practical checkpoints for hydration, temperature, and the changes that would mean getting help.',
+    name: 'Leah, 32',
+    image: unsplash('photo-1508214751196-bcfd4ca60f91', 1200),
+    format: 'quote',
+  },
+  {
+    category: 'Medication questions',
+    title: 'The conversation made my options simpler.',
+    quote: 'I could explain what I had already tried and understand which questions to take to my pharmacist and doctor.',
+    name: 'Ethan, 52',
+    image: unsplash('photo-1519085360753-af0119f7cbe7', 1200),
+    format: 'portrait',
+  },
+  {
+    category: 'After an injury',
+    title: 'I stopped guessing about the swelling.',
+    quote: 'LibertyMD helped me describe the injury clearly and understand when an examination or imaging could be appropriate.',
+    name: 'Noah, 27',
+    image: unsplash('photo-1527980965255-d3b416303d12', 1200),
+    format: 'quote',
+  },
+  {
+    category: 'Caring for family',
+    title: 'I felt calmer making the decision.',
+    quote: 'The questions helped me organize what had changed and decide what kind of care my mother needed next.',
+    name: 'Maya, 44',
+    image: unsplash('photo-1531123897727-8f129e1688ce', 1200),
+    format: 'portrait',
+  },
+  {
+    category: 'Recurring symptoms',
+    title: 'The pattern finally became visible.',
+    quote: 'Seeing the timing and triggers together gave me a much better starting point for a longer-term conversation.',
+    name: 'Sofia, 36',
+    image: unsplash('photo-1524504388940-b1c1722653e1', 1200),
+    format: 'quote',
+  },
+  {
+    category: 'Getting a second view',
+    title: 'I could think before choosing the next step.',
+    quote: 'The summary gave me language for my concerns without making the situation feel more frightening than it was.',
+    name: 'James, 58',
+    image: unsplash('photo-1501196354995-cbb51c65aaea', 1200),
+    format: 'portrait',
+  },
+  {
+    category: 'Preparing for follow-up',
+    title: 'Nothing important slipped through the cracks.',
+    quote: 'I had one place for the symptom changes, questions, and next steps I wanted to cover at my follow-up.',
+    name: 'Amir, 40',
+    image: unsplash('photo-1535713875002-d1d0cf377fde', 1200),
+    format: 'quote',
   },
 ];
 
@@ -85,7 +162,9 @@ interface MarketingSectionProps {
 export function LibertyMDPhoneCareSection({ onStartChat }: MarketingSectionProps) {
   const visualRef = useRef<HTMLDivElement | null>(null);
   const reduceMotion = useReducedMotion();
-  const [isMobileVisual, setIsMobileVisual] = useState(false);
+  const [isMobileVisual, setIsMobileVisual] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches,
+  );
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 639px)');
@@ -104,29 +183,23 @@ export function LibertyMDPhoneCareSection({ onStartChat }: MarketingSectionProps
   const leftX = useTransform(scrollYProgress, [0, revealEnd], [isMobileVisual ? '115%' : '175%', isMobileVisual ? '-18%' : '-8%']);
   const rightX = useTransform(scrollYProgress, [0, revealEnd], [isMobileVisual ? '-105%' : '-160%', isMobileVisual ? '18%' : '6%']);
   const leftY = useTransform(scrollYProgress, [0, revealEnd], [isMobileVisual ? 70 : 110, 0]);
-  const rightY = useTransform(scrollYProgress, [0, revealEnd], [isMobileVisual ? -55 : -85, 0]);
+  const rightY = useTransform(scrollYProgress, [0, revealEnd], [isMobileVisual ? 32 : 52, 0]);
   const leftRotate = useTransform(scrollYProgress, [0, revealEnd], [-14, -4]);
   const rightRotate = useTransform(scrollYProgress, [0, revealEnd], [14, 5]);
   const photoOpacity = useTransform(
     scrollYProgress,
-    isMobileVisual ? [0, 0.45] : [0.05, 0.78],
-    isMobileVisual ? [0.22, 1] : [0.08, 1]
+    isMobileVisual ? [0, 0.45] : [0, 0.78],
+    [0, 1]
   );
   const photoScale = useTransform(
     scrollYProgress,
-    isMobileVisual ? [0, 0.55] : [0.05, 0.78],
-    isMobileVisual ? [0.82, 1] : [0.72, 1]
+    isMobileVisual ? [0, 0.55] : [0, 0.78],
+    isMobileVisual ? [0.9, 1] : [0.86, 1]
   );
   const pillY = useTransform(scrollYProgress, isMobileVisual ? [0.36, 0.76] : [0.55, 0.95], [24, 0]);
   const pillOpacity = useTransform(scrollYProgress, isMobileVisual ? [0.36, 0.76] : [0.55, 0.95], [0, 1]);
-  const phoneY = useTransform(scrollYProgress, [0, 0.88], [78, 0]);
-  const phoneScale = useTransform(scrollYProgress, [0, 0.88], [0.9, 1]);
-  const phoneRotate = useTransform(scrollYProgress, [0, 0.88], [2.5, 0]);
-  const phoneOpacity = useTransform(scrollYProgress, [0, 0.38], [0.72, 1]);
   const unfoldedPhotoStyle = reduceMotion ? { opacity: 1, scale: 1 } : undefined;
-  const revealedPhoneStyle = reduceMotion
-    ? { opacity: 1, scale: 1 }
-    : { y: phoneY, scale: phoneScale, rotate: phoneRotate, opacity: phoneOpacity };
+  const revealedPhoneStyle = { opacity: 1, scale: 1, y: 0, rotate: 0 };
   const revealedPillStyle = reduceMotion ? { opacity: 1, y: 0 } : undefined;
 
   return (
@@ -421,68 +494,191 @@ export function LibertyMDPricingSection({ onStartChat }: MarketingSectionProps) 
 
 export function LibertyMDPatientStoriesSection() {
   const [activeStory, setActiveStory] = useState(0);
-  const story = patientStories[activeStory];
-  const move = (direction: number) => {
-    setActiveStory((current) => (current + direction + patientStories.length) % patientStories.length);
+  const [isUserPaused, setIsUserPaused] = useState(false);
+  const [isInteracting, setIsInteracting] = useState(false);
+  const railRef = useRef<HTMLDivElement | null>(null);
+  const storyRefs = useRef<(HTMLElement | null)[]>([]);
+  const reduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    const rail = railRef.current;
+    if (!rail) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const mostVisible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+
+        if (mostVisible?.target instanceof HTMLElement) {
+          setActiveStory(Number(mostVisible.target.dataset.storyIndex));
+        }
+      },
+      { root: rail, threshold: [0.45, 0.7, 0.9] }
+    );
+
+    storyRefs.current.forEach((card) => card && observer.observe(card));
+    return () => observer.disconnect();
+  }, []);
+
+  const goToStory = (index: number, behavior: ScrollBehavior = 'smooth') => {
+    const nextIndex = (index + patientStories.length) % patientStories.length;
+    const rail = railRef.current;
+    const card = storyRefs.current[nextIndex];
+
+    setActiveStory(nextIndex);
+    if (rail && card) {
+      const railRect = rail.getBoundingClientRect();
+      const cardRect = card.getBoundingClientRect();
+      rail.scrollTo({
+        left: rail.scrollLeft + cardRect.left - railRect.left - (rail.clientWidth - cardRect.width) / 2,
+        behavior,
+      });
+    }
   };
 
+  const move = (direction: number) => {
+    goToStory(activeStory + direction);
+  };
+
+  useEffect(() => {
+    if (isUserPaused || isInteracting || reduceMotion) return;
+
+    const timer = window.setTimeout(() => {
+      const wrapsToStart = activeStory === patientStories.length - 1;
+      goToStory(activeStory + 1, wrapsToStart ? 'auto' : 'smooth');
+    }, 2000);
+
+    return () => window.clearTimeout(timer);
+  }, [activeStory, isInteracting, isUserPaused, reduceMotion]);
+
   return (
-    <section className="libertymd-page-gutter libertymd-section-spacing border-t border-[#E6EDE3] bg-[#F8FAF7] text-center">
-      <div className="mx-auto max-w-3xl">
-        <p className="text-xs font-bold uppercase text-[#2563EB]">Patient stories</p>
-        <h2 className="mx-auto mt-3 max-w-2xl font-serif text-4xl font-semibold leading-tight text-[#111827] sm:text-5xl">
-          Answers that changed the next step.
-        </h2>
-        <p className="mx-auto mt-5 max-w-xl text-sm leading-7 text-[#5B6472] sm:text-base">
-          Sample stories showing how a structured conversation can make care feel more understandable and less overwhelming.
-        </p>
-      </div>
+    <section className="libertymd-section-spacing overflow-hidden border-t border-[#DCE8F4] bg-[#F5F9FD] text-center">
+      <div className="libertymd-page-gutter libertymd-content-shell">
+        <div className="flex flex-col items-center justify-between gap-7 sm:flex-row sm:items-end sm:text-left">
+          <div className="max-w-3xl text-center sm:text-left">
+            <p className="text-xs font-bold uppercase text-[#2563EB]">LibertyMD stories</p>
+            <h2 className="mt-3 max-w-2xl font-serif text-4xl font-semibold leading-tight text-[#111827] sm:text-5xl">
+              A clearer conversation can change what happens next.
+            </h2>
+            <p className="mt-5 max-w-xl text-sm leading-7 text-[#5B6472] sm:text-base">
+              Sample patient stories showing how a structured health conversation can bring clarity before the next step.
+            </p>
+          </div>
 
-      <div className="mx-auto mt-9 flex max-w-4xl flex-wrap justify-center gap-x-6 gap-y-3 border-b border-[#DDE7D8] pb-5">
-        {patientStories.map((item, index) => (
-          <button
-            key={item.category}
-            type="button"
-            onClick={() => setActiveStory(index)}
-            aria-pressed={activeStory === index}
-            className={`text-sm font-bold transition ${activeStory === index ? 'text-[#2563EB]' : 'text-[#64748B] hover:text-[#111827]'}`}
-          >
-            {item.category}
-          </button>
-        ))}
-      </div>
-
-      <div className="libertymd-content-shell mt-10 grid items-stretch overflow-hidden rounded-lg border border-[#E2E8F0] bg-white md:grid-cols-[0.95fr_1.05fr]">
-        <div className="relative min-h-[360px] md:min-h-[500px]">
-          <motion.img
-            key={story.image}
-            initial={{ opacity: 0.35, scale: 1.03 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.55 }}
-            src={story.image}
-            alt={`${story.name}: ${story.category}`}
-            className="absolute inset-0 h-full w-full object-cover"
-          />
-          <span className="absolute left-5 top-5 inline-flex items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-xs font-bold text-[#111827] backdrop-blur-md">
-            <Play className="h-4 w-4 fill-[#2563EB] text-[#2563EB]" /> Patient story
-          </span>
-        </div>
-        <div className="flex min-h-[360px] flex-col items-center justify-center px-7 py-10 text-center sm:px-12">
-          <p className="text-xs font-bold uppercase text-[#2563EB]">{story.category}</p>
-          <h3 className="mt-4 font-serif text-3xl font-semibold leading-tight text-[#111827] sm:text-4xl">{story.title}</h3>
-          <blockquote className="mt-6 max-w-lg text-base leading-8 text-[#475569]">“{story.quote}”</blockquote>
-          <p className="mt-6 text-sm font-black text-[#111827]">{story.name}</p>
-          <div className="mt-9 flex items-center gap-3">
-            <button type="button" onClick={() => move(-1)} aria-label="Previous patient story" className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#CBD5E1] text-[#111827] hover:border-[#2563EB] hover:text-[#2563EB]">
-              <ChevronLeft className="h-4 w-4" />
+          <div className="flex shrink-0 items-center gap-3">
+            <span className="mr-1 text-xs font-bold tabular-nums text-[#64748B]">
+              {String(activeStory + 1).padStart(2, '0')} / {String(patientStories.length).padStart(2, '0')}
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsUserPaused((current) => !current)}
+              aria-label={isUserPaused ? 'Play patient stories' : 'Pause patient stories'}
+              aria-pressed={isUserPaused}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#B9CBE0] bg-white text-[#0B2E63] shadow-sm transition hover:border-[#2563EB] hover:text-[#2563EB] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563EB]"
+            >
+              {isUserPaused ? <Play className="h-4 w-4 fill-current" /> : <Pause className="h-4 w-4 fill-current" />}
             </button>
-            <span className="text-xs font-bold text-[#64748B]">{activeStory + 1} / {patientStories.length}</span>
-            <button type="button" onClick={() => move(1)} aria-label="Next patient story" className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#CBD5E1] text-[#111827] hover:border-[#2563EB] hover:text-[#2563EB]">
-              <ChevronRight className="h-4 w-4" />
+            <button
+              type="button"
+              onClick={() => move(-1)}
+              aria-label="Previous patient story"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#B9CBE0] bg-white text-[#0B2E63] shadow-sm transition hover:border-[#2563EB] hover:text-[#2563EB] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563EB]"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => move(1)}
+              aria-label="Next patient story"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#B9CBE0] bg-[#0B2E63] text-white shadow-[0_10px_24px_rgba(11,46,99,0.18)] transition hover:bg-[#2563EB] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563EB]"
+            >
+              <ChevronRight className="h-5 w-5" />
             </button>
           </div>
         </div>
       </div>
+
+      <div
+        ref={railRef}
+        aria-label="Sample LibertyMD patient stories"
+        onMouseEnter={() => setIsInteracting(true)}
+        onMouseLeave={() => setIsInteracting(false)}
+        onFocusCapture={() => setIsInteracting(true)}
+        onBlurCapture={() => setIsInteracting(false)}
+        onPointerDown={() => setIsInteracting(true)}
+        onPointerUp={() => setIsInteracting(false)}
+        onPointerCancel={() => setIsInteracting(false)}
+        className="libertymd-story-rail mt-10 flex snap-x snap-mandatory gap-4 overflow-x-auto px-[var(--libertymd-page-gutter)] pb-4 text-left sm:mt-12"
+      >
+        {patientStories.map((story, index) => {
+          const isQuoteCard = story.format === 'quote';
+
+          return (
+            <motion.article
+              key={story.name}
+              ref={(node) => { storyRefs.current[index] = node; }}
+              data-story-index={index}
+              aria-label={`${story.name}: ${story.title}`}
+              initial={{ opacity: 0, y: 22 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.25 }}
+              transition={{ duration: 0.5, delay: Math.min(index * 0.06, 0.18) }}
+              className="relative aspect-[4/5] w-[82vw] max-w-[22rem] shrink-0 snap-center overflow-hidden rounded-2xl bg-[#0B2E63] shadow-[0_22px_55px_rgba(15,46,84,0.14)] sm:w-[22rem] lg:w-[calc((100%_-_2rem)/3)] lg:max-w-none"
+            >
+              {isQuoteCard ? (
+                <>
+                  <div className="absolute inset-0 bg-[#0B2E63]" />
+                  <img
+                    src="/images/libertymd-logo-mark.svg"
+                    alt=""
+                    aria-hidden="true"
+                    className="absolute -bottom-8 -right-10 w-64 opacity-[0.07]"
+                  />
+                  <div className="absolute inset-x-0 top-0 h-px bg-[#62D9CE]/70" />
+                  <div className="relative flex h-full flex-col p-7 sm:p-8">
+                    <div className="flex items-center justify-between gap-4">
+                      <img
+                        src={story.image}
+                        alt=""
+                        className="h-16 w-16 rounded-full border-2 border-white/80 object-cover shadow-lg"
+                      />
+                      <Quote className="h-8 w-8 text-[#62D9CE]" aria-hidden="true" />
+                    </div>
+                    <blockquote className="mt-7 text-lg font-semibold leading-[1.5] text-white sm:text-xl">
+                      “{story.quote}”
+                    </blockquote>
+                    <div className="mt-auto pt-8">
+                      <p className="font-serif text-2xl font-semibold text-white">{story.name}</p>
+                      <p className="mt-2 text-xs font-bold uppercase text-[#9FE8E1]">{story.category}</p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <img src={story.image} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                  <div className="absolute inset-0 bg-gradient-to-b from-[#071B36]/5 via-[#071B36]/10 to-[#071B36]/95" />
+                  <div className="absolute inset-x-0 top-0 flex items-center justify-between p-5 sm:p-6">
+                    <span className="rounded-full border border-white/40 bg-[#071B36]/35 px-3 py-1.5 text-[11px] font-bold uppercase text-white backdrop-blur-md">
+                      Patient story
+                    </span>
+                    <span className="h-2 w-2 rounded-full bg-[#62D9CE] shadow-[0_0_0_5px_rgba(98,217,206,0.18)]" />
+                  </div>
+                  <div className="absolute inset-x-0 bottom-0 p-6 sm:p-7">
+                    <p className="text-xs font-bold uppercase text-[#9FE8E1]">{story.category}</p>
+                    <h3 className="mt-3 font-serif text-3xl font-semibold leading-tight text-white">{story.title}</h3>
+                    <p className="mt-5 text-sm font-black text-white/90">{story.name}</p>
+                  </div>
+                </>
+              )}
+            </motion.article>
+          );
+        })}
+      </div>
+
+      <p className="libertymd-page-gutter mt-5 text-center text-xs leading-5 text-[#718096]">
+        Illustrative stories and imagery. Individual experiences and outcomes vary.
+      </p>
     </section>
   );
 }

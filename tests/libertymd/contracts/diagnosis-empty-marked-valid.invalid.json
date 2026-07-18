@@ -1,0 +1,11 @@
+{
+  "ui_state": "report_ready",
+  "differential_diagnosis": [],
+  "confidence_score": 95,
+  "diagnosis_ready": true,
+  "valid_report": true,
+  "evidence_score": 100,
+  "sufficient_evidence": true,
+  "validation_reason": "validated",
+  "error": null
+}

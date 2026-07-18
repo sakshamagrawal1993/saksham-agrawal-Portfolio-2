@@ -1,0 +1,9 @@
+{
+  "status": "force_end",
+  "risk_level": "low",
+  "crisis_type": "acs_chest_pain",
+  "force_end": false,
+  "care_setting": "home",
+  "message": "Continue chatting.",
+  "red_flags": []
+}

@@ -1,0 +1,11 @@
+{
+  "ui_state": "report_invalid",
+  "differential_diagnosis": [],
+  "confidence_score": 70,
+  "diagnosis_ready": false,
+  "valid_report": false,
+  "evidence_score": 35,
+  "sufficient_evidence": false,
+  "validation_reason": "insufficient_clinical_information",
+  "error": "Report withheld: insufficient_clinical_information"
+}

@@ -1,0 +1,19 @@
+{
+  "version": "1.0.0",
+  "status": "pending_clinical_approval",
+  "engineering_regression_gates": {
+    "known_case_failures_allowed": 0,
+    "invalid_contract_fixtures_accepted": 0,
+    "empty_valid_differentials_allowed": 0,
+    "off_topic_slot_updates_allowed": 0
+  },
+  "clinical_performance_targets": {
+    "emergency_sensitivity_minimum": null,
+    "emergency_specificity_minimum": null,
+    "care_setting_agreement_minimum": null,
+    "top_differential_agreement_minimum": null,
+    "approved_by": null,
+    "approved_at": null,
+    "rationale": "A licensed clinical owner must set these thresholds against a representative reviewed dataset before public launch."
+  }
+}

@@ -21,7 +21,8 @@ Use for: the portfolio shell, journal/blog, case-study pages, marketing, dashboa
 ## 2. LibertyMD — medical product system
 Use **only** for LibertyMD routes / `components/LibertyMD/*`.
 
-- **Type:** Inter for UI; Playfair Display *italic* for the editorial tagline ("Internal Medicine").
+- **Fonts:** Playfair Display for the hero and editorial marketing headings (italic only for editorial taglines); Inter for UI, body, chat, cards, reports, oath, and legal text. These are the only LibertyMD font families.
+- **Type scale:** use the semantic `--libertymd-type-*` tokens and matching `.libertymd-type-*` classes in `index.css`. Display `56/72`, section title `36/48`, subsection title `30/36`, card title `20`, lead `18`, body/chat `16`, supporting body `14`, label/legal `12`, and footer oath `18/24` (mobile/desktop where two values are listed). Do not invent intermediate sizes for new LibertyMD surfaces.
 - **Color:** primary **Trust Blue `#2563EB`** (scale 900→50), slate neutrals for ink/structure, **clinical green `#169B52`** for positive/in-network, indigo `#5661F6` accent, soft blue/green **surface wash** gradient.
 - **Spacing:** semantic 4px-grid scale via `--libertymd-space-*` (`xs 4 → section 64`). Use these, not arbitrary px.
 - **Components:** reuse `components/LibertyMD/*` (logo lockups, trust badges, CTA buttons, marketing sections, footer ribbon). CTAs use the blue gradient + `10px` radius + blue glow shadow.

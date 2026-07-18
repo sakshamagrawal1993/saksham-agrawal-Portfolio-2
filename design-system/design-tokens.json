@@ -73,8 +73,21 @@
       }
     },
     "font": {
-      "sans":    { "value": "'Inter', system-ui, sans-serif", "use": "UI & body" },
-      "tagline": { "value": "'Playfair Display', Georgia, serif", "use": "italic editorial tagline" }
+      "display": { "value": "'Playfair Display', Georgia, serif", "use": "Hero and editorial marketing headings; italic for editorial taglines" },
+      "sans":    { "value": "'Inter', system-ui, sans-serif", "use": "UI, body, chat, cards, reports, and legal copy" }
+    },
+    "typeScale": {
+      "_note": "Exact semantic sizes. Display tiers use the mobile value below 640px and desktop value at 640px and above. Do not scale type continuously with viewport width.",
+      "display":          { "mobile": "3.5rem",   "desktop": "4.5rem",  "role": "Hero product name only" },
+      "section-title":    { "mobile": "2.25rem",  "desktop": "3rem",    "role": "Primary marketing section headings" },
+      "subsection-title": { "mobile": "1.875rem", "desktop": "2.25rem", "role": "Feature panels and report headings" },
+      "card-title":       { "value": "1.25rem",   "role": "Cards and article titles" },
+      "lead":             { "value": "1.125rem",  "role": "Taglines and emphasized supporting copy" },
+      "body":             { "value": "1rem",      "role": "Body and chat copy" },
+      "body-small":       { "value": "0.875rem",  "role": "Supporting copy and compact UI" },
+      "label":            { "value": "0.75rem",   "role": "Eyebrows, metadata, and control labels" },
+      "legal":            { "value": "0.75rem",   "role": "Disclaimers, consent helper, and copyright" },
+      "footer-oath":      { "mobile": "1.125rem", "desktop": "1.5rem", "role": "Patient oath statement" }
     },
     "spacing": {
       "_note": "4px base grid; --libertymd-space-* in index.css",

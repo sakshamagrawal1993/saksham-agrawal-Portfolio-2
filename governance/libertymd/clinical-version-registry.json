@@ -1,0 +1,38 @@
+{
+  "registry_version": "1.0.0",
+  "product": "LibertyMD",
+  "release_status": "engineering_validated_clinical_approval_pending",
+  "current": {
+    "care_contract": "libertymd-care-v1",
+    "deterministic_policy": "libertymd-policy-v1",
+    "guardrail_workflow": { "id": "9qeE6tUcEY74OYV8", "version": "libertymd-v1" },
+    "interview_workflow": { "id": "hqT6SFsmdRy1kWKa", "version": "libertymd-v1" },
+    "diagnosis_workflow": { "id": "vljapWQv5ug7pFA9", "version": "libertymd-v1" },
+    "model": "models/gemini-3.1-flash-lite",
+    "guardrail_schema": "guardrail-response-v1",
+    "interview_schema": "interview-response-v1",
+    "diagnosis_schema": "diagnosis-response-v1",
+    "clinical_scenario_suite": "0.1.0-draft",
+    "evidence_policy": {
+      "version": "1.0.0",
+      "minimum_score": 65,
+      "minimum_report_confidence": 60
+    }
+  },
+  "approvals": {
+    "engineering": { "status": "validated", "evidence": "20-loop ledger and automated CI contracts" },
+    "clinical": { "status": "pending", "owner": null, "approved_at": null },
+    "privacy": { "status": "pending", "owner": null, "approved_at": null },
+    "legal_regulatory": { "status": "pending", "owner": null, "approved_at": null }
+  },
+  "rollback": {
+    "last_known_good": "libertymd-care-v1",
+    "trigger_conditions": [
+      "emergency contract regression",
+      "report released with empty differential",
+      "off-topic content written to clinical slots",
+      "unauthorized report disclosure",
+      "sustained workflow error or timeout threshold breach"
+    ]
+  }
+}

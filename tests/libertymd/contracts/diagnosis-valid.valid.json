@@ -1,0 +1,25 @@
+{
+  "ui_state": "report_ready",
+  "headline": "Low-grade fever",
+  "patient_summary": "Mild fever for two days without emergency warning signs.",
+  "differential_diagnosis": [
+    {
+      "rank": 1,
+      "full_name": "Self-limited viral infection",
+      "common_name": "Viral illness",
+      "confidence": "70%",
+      "supporting_evidence": ["Low-grade fever", "Fatigue", "Mild body aches"],
+      "conflicting_evidence": [],
+      "reason": "The symptom pattern is compatible with an uncomplicated viral illness.",
+      "description": "A common short-lived viral syndrome.",
+      "emergency": "low"
+    }
+  ],
+  "confidence_score": 70,
+  "diagnosis_ready": true,
+  "valid_report": true,
+  "evidence_score": 100,
+  "sufficient_evidence": true,
+  "validation_reason": "validated",
+  "error": null
+}

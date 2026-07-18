@@ -1,3 +1,21 @@
+# Design system (all UI work, every agent)
+
+This repo ships **two** design systems. Before writing or editing any UI, read
+`design-system/AI-DESIGN-RULES.md` and use `design-system/design-tokens.json` as the
+only source of values. Full rationale: `design-system/DESIGN-SYSTEM-BLUEPRINT.md`.
+
+- **LibertyMD** (`components/LibertyMD/*`, LibertyMD routes) → Trust Blue `#2563EB`, slate
+  neutrals, clinical green `#169B52`, `--libertymd-space-*` / `--libertymd-type-*`, Inter +
+  Playfair-italic taglines. Reuse `components/LibertyMD/*`.
+- **Everything else** → Saksham Experiments: `brand-*` colors, shadcn semantic tokens
+  (`bg-primary`, `border-border`…), Playfair (`font-serif`) + Inter (`font-sans`),
+  `--radius: 0.5rem`. Reuse `components/ui/*` — never rebuild a Button or Card.
+
+**Never hardcode a raw hex or px when a token exists** — add the token to
+`design-tokens.json` first, then use it. CI (`design-guard`) rejects raw hex/px in UI code.
+
+---
+
 # Health Twin autonomous engineering loop
 
 Before acting on Health Twin work, read:

@@ -1,0 +1,12 @@
+{
+  "ui_state": "redirecting",
+  "question": "Please answer the health question so I can continue safely.",
+  "next_question": "Please answer the health question so I can continue safely.",
+  "options": ["Yes", "No", "Not sure", "Prefer to type"],
+  "ready_for_report": false,
+  "target_slot": "onset",
+  "slot_updates": {},
+  "missing_slots": ["onset", "duration", "severity", "associated_symptoms", "red_flag_negatives", "relevant_history"],
+  "input_relevance": "off_topic",
+  "input_relevance_reason": "The answer is unrelated to health."
+}

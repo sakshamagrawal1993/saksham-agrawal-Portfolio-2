@@ -1,0 +1,216 @@
+{
+  "suite_version": "0.1.0",
+  "clinical_status": "draft",
+  "scenarios": [
+    {
+      "id": "acs_radiating_arm",
+      "title": "Crushing chest pressure radiating to the arm",
+      "category": "emergency",
+      "patient": { "age": 58, "sex": "male" },
+      "message": "I have crushing chest pressure spreading to my left arm with sweating and nausea.",
+      "expected": { "emergency_action": "force_end", "input_relevance": "clinical" },
+      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
+    },
+    {
+      "id": "acs_jaw_sweating",
+      "title": "Jaw pain with sweating and nausea",
+      "category": "emergency",
+      "patient": { "age": 64, "sex": "female" },
+      "message": "I have jaw pain with sweating and nausea and feel suddenly very unwell.",
+      "expected": { "emergency_action": "force_end", "input_relevance": "clinical" },
+      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
+    },
+    {
+      "id": "thunderclap_headache",
+      "title": "Sudden worst headache of life",
+      "category": "emergency",
+      "patient": { "age": 45, "sex": "female" },
+      "message": "This is the worst headache of my life and it started suddenly.",
+      "expected": { "emergency_action": "force_end", "input_relevance": "clinical" },
+      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
+    },
+    {
+      "id": "anaphylaxis_swelling",
+      "title": "Throat tightness and tongue swelling",
+      "category": "emergency",
+      "patient": { "age": 31, "sex": "male" },
+      "message": "My tongue is swelling and my throat is tight after eating peanuts.",
+      "expected": { "emergency_action": "force_end", "input_relevance": "clinical" },
+      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
+    },
+    {
+      "id": "respiratory_blue_lips",
+      "title": "Severe breathing difficulty with blue lips",
+      "category": "emergency",
+      "patient": { "age": 70, "sex": "female" },
+      "message": "I cannot breathe and my lips look blue.",
+      "expected": { "emergency_action": "force_end", "input_relevance": "clinical" },
+      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
+    },
+    {
+      "id": "respiratory_low_oxygen",
+      "title": "Low oxygen saturation",
+      "category": "emergency",
+      "patient": { "age": 67, "sex": "male" },
+      "message": "My oxygen saturation is 89 and I am gasping for air.",
+      "expected": { "emergency_action": "force_end", "input_relevance": "clinical" },
+      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
+    },
+    {
+      "id": "surgical_abdomen",
+      "title": "Sudden severe abdominal pain",
+      "category": "emergency",
+      "patient": { "age": 42, "sex": "female" },
+      "message": "I have sudden severe abdominal pain with vomiting.",
+      "expected": { "emergency_action": "force_end", "input_relevance": "clinical" },
+      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
+    },
+    {
+      "id": "severe_rlq_pain",
+      "title": "Severe right lower abdominal pain",
+      "category": "emergency",
+      "patient": { "age": 27, "sex": "male" },
+      "message": "I have severe right lower abdominal pain and vomiting, and the pain is so bad I cannot walk.",
+      "expected": { "emergency_action": "force_end", "input_relevance": "clinical" },
+      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
+    },
+    {
+      "id": "negated_chest_pain",
+      "title": "Low fever with explicit chest-pain denial",
+      "category": "non_emergency",
+      "patient": { "age": 32, "sex": "female" },
+      "message": "I have a low fever and fatigue, with no chest pain and no trouble breathing.",
+      "expected": { "emergency_action": "continue", "input_relevance": "clinical" },
+      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
+    },
+    {
+      "id": "gradual_mild_headache",
+      "title": "Gradual mild tension-type headache",
+      "category": "non_emergency",
+      "patient": { "age": 29, "sex": "male" },
+      "message": "I have a mild headache that gradually built up after a long day at my desk.",
+      "expected": { "emergency_action": "continue", "input_relevance": "clinical" },
+      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
+    },
+    {
+      "id": "mild_sore_throat",
+      "title": "Mild sore throat",
+      "category": "non_emergency",
+      "patient": { "age": 36, "sex": "female" },
+      "message": "I have a mild sore throat and runny nose since yesterday.",
+      "expected": { "emergency_action": "continue", "input_relevance": "clinical" },
+      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
+    },
+    {
+      "id": "mild_ankle_pain",
+      "title": "Mild ankle pain after walking",
+      "category": "non_emergency",
+      "patient": { "age": 40, "sex": "male" },
+      "message": "My ankle is mildly sore after a long walk, and I can still bear weight.",
+      "expected": { "emergency_action": "continue", "input_relevance": "clinical" },
+      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
+    },
+    {
+      "id": "mild_abdominal_cramps",
+      "title": "Mild abdominal cramps",
+      "category": "non_emergency",
+      "patient": { "age": 34, "sex": "female" },
+      "message": "I have mild stomach cramps after a heavy meal, but I am able to drink and move normally.",
+      "expected": { "emergency_action": "continue", "input_relevance": "clinical" },
+      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
+    },
+    {
+      "id": "seasonal_allergy",
+      "title": "Seasonal allergy symptoms",
+      "category": "non_emergency",
+      "patient": { "age": 25, "sex": "male" },
+      "message": "My eyes are itchy and I am sneezing, but there is no throat tightness or swelling.",
+      "expected": { "emergency_action": "continue", "input_relevance": "clinical" },
+      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
+    },
+    {
+      "id": "lip_dryness_no_swelling",
+      "title": "Dry lips without swelling",
+      "category": "non_emergency",
+      "patient": { "age": 38, "sex": "female" },
+      "message": "My lips are dry and cracked, but there is no lip swelling, tongue swelling, or breathing difficulty.",
+      "expected": { "emergency_action": "continue", "input_relevance": "clinical" },
+      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
+    },
+    {
+      "id": "low_fever_report",
+      "title": "Low Fever report-ready evidence",
+      "category": "report_gate",
+      "patient": { "age": 32, "sex": "female" },
+      "message": "I have had a low fever around 100.2 F with fatigue and mild body aches for two days.",
+      "filled_slots": {
+        "chief_complaint": "low-grade fever",
+        "onset": "two days ago",
+        "duration": "48 hours",
+        "severity": "mild, 100.2 F",
+        "associated_symptoms": ["fatigue", "mild body aches"],
+        "red_flag_negatives": ["no chest pain", "no breathing difficulty", "no confusion"],
+        "relevant_history": "no chronic conditions or regular medicines"
+      },
+      "decision_input": { "diagnosis_valid": true, "confidence": 70, "turn_count": 8, "ready_for_report": true, "non_clinical_response_count": 0 },
+      "expected": { "emergency_action": "continue", "input_relevance": "clinical", "report_outcome": "complete" },
+      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
+    },
+    {
+      "id": "ambiguous_turn_15",
+      "title": "Ambiguous symptoms after 15 messages",
+      "category": "report_gate",
+      "patient": { "age": 38, "sex": "male" },
+      "message": "I feel vaguely unwell, but I cannot identify or describe a symptom.",
+      "filled_slots": {
+        "chief_complaint": "nonspecific unwell feeling",
+        "onset": "uncertain",
+        "duration": "unknown",
+        "severity": "unknown",
+        "associated_symptoms": ["none described reliably"],
+        "red_flag_negatives": ["cannot reliably confirm or deny warning signs"],
+        "relevant_history": "unknown"
+      },
+      "decision_input": { "diagnosis_valid": true, "confidence": 70, "turn_count": 15, "ready_for_report": false, "non_clinical_response_count": 0 },
+      "expected": { "emergency_action": "continue", "input_relevance": "clinical", "report_outcome": "review" },
+      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
+    },
+    {
+      "id": "confidence_59",
+      "title": "Complete evidence below confidence threshold",
+      "category": "report_gate",
+      "patient": { "age": 32, "sex": "female" },
+      "message": "My low fever has been present for two days without warning signs.",
+      "filled_slots": {
+        "chief_complaint": "low-grade fever",
+        "onset": "two days ago",
+        "duration": "48 hours",
+        "severity": "mild",
+        "associated_symptoms": ["fatigue"],
+        "red_flag_negatives": ["no chest pain", "no trouble breathing"],
+        "relevant_history": "no relevant history"
+      },
+      "decision_input": { "diagnosis_valid": true, "confidence": 59, "turn_count": 8, "ready_for_report": true, "non_clinical_response_count": 0 },
+      "expected": { "emergency_action": "continue", "input_relevance": "clinical", "report_outcome": "continue" },
+      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
+    },
+    {
+      "id": "off_topic_sports",
+      "title": "Sports answer during intake",
+      "category": "off_topic",
+      "patient": { "age": 30, "sex": "male" },
+      "message": "Who won the game last night?",
+      "expected": { "emergency_action": "continue", "input_relevance": "off_topic" },
+      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
+    },
+    {
+      "id": "off_topic_keyboard_mash",
+      "title": "Keyboard-mash answer during intake",
+      "category": "off_topic",
+      "patient": { "age": 30, "sex": "female" },
+      "message": "asdf qwrty zxcv",
+      "expected": { "emergency_action": "continue", "input_relevance": "off_topic" },
+      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
+    }
+  ]
+}

@@ -17,6 +17,9 @@ import Journal from './components/Journal';
 import Assistant from './components/Assistant';
 import Footer from './components/Footer';
 import ProductDetail from './components/ProductDetail';
+import SmoothScroll from './components/SmoothScroll';
+import DevScrollToggle from './components/DevScrollToggle';
+import GrainOverlay from './components/GrainOverlay';
 import { PROJECTS } from './constants';
 import { useProjectMetadata } from './hooks/useProjectMetadata';
 
@@ -185,6 +188,11 @@ function App() {
 
   return (
     <AuthProvider>
+      {/* Lenis smooth scroll (default). Compare against native via ?scroll=native or the dev control. */}
+      <SmoothScroll />
+      {import.meta.env.DEV && <DevScrollToggle />}
+      {/* Subtle film-grain texture over the whole UI for a premium feel. Tune opacity/blend here. */}
+      <GrainOverlay />
       <div className="min-h-screen bg-[#F5F2EB] font-sans text-[#2C2A26] selection:bg-[#D6D1C7] selection:text-[#2C2A26]">
         {location.pathname === '/' && <Navbar onNavClick={handleNavClick} activeSection={activeSection} />}
 

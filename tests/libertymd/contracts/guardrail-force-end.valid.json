@@ -1,0 +1,11 @@
+{
+  "status": "force_end",
+  "risk_level": "emergency",
+  "crisis_type": "acs_chest_pain",
+  "force_end": true,
+  "is_emergency": true,
+  "care_setting": "call_911",
+  "message": "Call 911 now and do not drive yourself.",
+  "red_flags": ["acs_chest_pain"],
+  "source": "deterministic"
+}

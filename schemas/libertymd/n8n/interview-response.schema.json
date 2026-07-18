@@ -1,0 +1,101 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://libertymd.example/schemas/n8n/interview-response-v1.json",
+  "title": "LibertyMD Interview Response v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "ui_state",
+    "question",
+    "next_question",
+    "options",
+    "ready_for_report",
+    "target_slot",
+    "slot_updates",
+    "missing_slots",
+    "input_relevance",
+    "input_relevance_reason"
+  ],
+  "properties": {
+    "ui_state": {
+      "type": "string",
+      "enum": ["asking_question", "redirecting", "report_ready"]
+    },
+    "question": { "type": "string", "minLength": 1, "maxLength": 2000 },
+    "next_question": { "type": "string", "minLength": 1, "maxLength": 2000 },
+    "options": {
+      "type": "array",
+      "maxItems": 4,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 240 }
+    },
+    "ready_for_report": { "type": "boolean" },
+    "target_slot": { "type": "string", "minLength": 1 },
+    "slot_updates": {
+      "type": "object",
+      "propertyNames": {
+        "enum": [
+          "chief_complaint",
+          "onset",
+          "duration",
+          "severity",
+          "location",
+          "character",
+          "associated_symptoms",
+          "red_flag_negatives",
+          "functional_impact",
+          "relevant_history",
+          "medications",
+          "allergies",
+          "pregnancy_status"
+        ]
+      },
+      "additionalProperties": {
+        "anyOf": [
+          { "type": "string", "maxLength": 1000 },
+          { "type": "number" },
+          { "type": "boolean" },
+          {
+            "type": "array",
+            "maxItems": 20,
+            "items": { "type": "string", "maxLength": 1000 }
+          }
+        ]
+      }
+    },
+    "missing_slots": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": ["onset", "duration", "severity", "associated_symptoms", "red_flag_negatives", "relevant_history"]
+      }
+    },
+    "input_relevance": {
+      "type": "string",
+      "enum": ["clinical", "unclear", "off_topic"]
+    },
+    "input_relevance_reason": { "type": "string", "maxLength": 1000 }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "input_relevance": { "const": "off_topic" } }, "required": ["input_relevance"] },
+      "then": {
+        "properties": {
+          "slot_updates": { "type": "object", "maxProperties": 0 },
+          "ready_for_report": { "const": false },
+          "ui_state": { "const": "redirecting" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "ready_for_report": { "const": true } }, "required": ["ready_for_report"] },
+      "then": {
+        "properties": {
+          "ui_state": { "const": "report_ready" },
+          "options": { "type": "array", "maxItems": 0 }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+name: design-guard
+
+# Layer 4 of design-system/DESIGN-SYSTEM-BLUEPRINT.md.
+# Fails the build when UI code hardcodes a raw hex/px instead of a design token.
+
+on:
+  pull_request:
+    paths:
+      - 'components/**'
+      - 'src/**'
+      - 'context/**'
+      - 'App.tsx'
+      - 'constants.ts'
+      - 'design-system/**'
+  push:
+    branches: [main]
+
+jobs:
+  tokens:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # ADVISORY MODE: reports raw hex/px but never fails the build — the site is
+      # still being designed. When the look is settled, run `npm run design:baseline`
+      # on a clean tree, then change `--warn` below to `--ratchet` to start blocking
+      # new violations. See design-system/DESIGN-SYSTEM-BLUEPRINT.md §2.
+      - name: Check design tokens (advisory — report only)
+        run: node design-system/scripts/check-design-tokens.mjs --warn

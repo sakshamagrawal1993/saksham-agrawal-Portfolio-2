@@ -1,0 +1,12 @@
+{
+  "ui_state": "redirecting",
+  "question": "Please answer the health question.",
+  "next_question": "Please answer the health question.",
+  "options": [],
+  "ready_for_report": false,
+  "target_slot": "onset",
+  "slot_updates": { "onset": "yesterday" },
+  "missing_slots": ["duration"],
+  "input_relevance": "off_topic",
+  "input_relevance_reason": "The answer is unrelated."
+}

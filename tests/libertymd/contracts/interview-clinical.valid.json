@@ -1,0 +1,12 @@
+{
+  "ui_state": "asking_question",
+  "question": "When did the fever begin?",
+  "next_question": "When did the fever begin?",
+  "options": ["Today", "Yesterday", "Two to three days ago", "More than a week ago"],
+  "ready_for_report": false,
+  "target_slot": "onset",
+  "slot_updates": { "severity": "mild, 100.2 F" },
+  "missing_slots": ["onset", "duration", "red_flag_negatives", "relevant_history"],
+  "input_relevance": "clinical",
+  "input_relevance_reason": "The answer describes fever severity."
+}
