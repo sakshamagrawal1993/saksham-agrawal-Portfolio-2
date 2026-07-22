@@ -1,0 +1,305 @@
+{
+  "_meta": {
+    "status": "approved",
+    "version": "1",
+    "source": "machine",
+    "approved_by": "saksham (testing approval)",
+    "approved_at": "2026-07-20"
+  },
+  "common": {
+    "startChat": "Iniciar conversa",
+    "send": "Enviar",
+    "back": "Voltar",
+    "retry": "Tentar novamente",
+    "loading": "Carregando…",
+    "cancel": "Cancelar",
+    "close": "Fechar",
+    "yes": "Sim",
+    "no": "Não",
+    "notSure": "Não tenho certeza",
+    "preferToType": "Prefiro digitar",
+    "betaLanguage": "Este idioma está em beta. Mensagens de segurança podem aparecer em inglês."
+  },
+  "hero": {
+    "title": "Orientação com base clínica para os seus sintomas.",
+    "subtitle": "Grátis. Anônimo. Descreva seus sintomas e receba um relatório de saúde pronto para o seu médico.",
+    "placeholder": "Descreva seu sintoma, ex.: \"Estou com dor de cabeça desde ontem\"",
+    "privacy": "Não precisa de conta para começar. Sua conversa é privada.",
+    "whatBringsYouIn": "O que traz você aqui?",
+    "taglineFree": "Grátis",
+    "taglineAnonymous": "Anônimo",
+    "taglineBuiltByDoctors": "Criado por médicos",
+    "placeholderShort": "Descreva seus sintomas",
+    "placeholderLong": "Descreva um sintoma ou faça qualquer pergunta de saúde",
+    "startChatOpening": "Abrindo conversa"
+  },
+  "chat": {
+    "typing": "LibertyMD está pensando…",
+    "inputPlaceholder": "Digite sua resposta…",
+    "newConsultation": "Nova consulta",
+    "redirect": "Vamos manter o foco na sua pergunta de saúde para eu poder ajudar."
+  },
+  "demographics": {
+    "prompt": "Para dar uma orientação segura e relevante, preciso de dois dados.",
+    "ageLabel": "Sua idade",
+    "sexLabel": "Sexo ao nascer",
+    "sexFemale": "Feminino",
+    "sexMale": "Masculino",
+    "sexIntersex": "Intersexo",
+    "sexPreferNot": "Prefiro não dizer",
+    "continue": "Continuar"
+  },
+  "reportGate": {
+    "title": "Seu relatório está pronto",
+    "body": "Entre com o Google para salvar este relatório e seu histórico, ou continue como convidado.",
+    "google": "Continuar com Google",
+    "skip": "Ver uma vez como convidado",
+    "skipNote": "Relatórios de convidado ficam disponíveis por 7 dias e não são salvos em uma conta."
+  },
+  "report": {
+    "title": "Seu relatório de saúde",
+    "likely": "Possibilidades prováveis",
+    "evidence": "Evidências a favor",
+    "uncertainty": "O que permanece incerto",
+    "warningSigns": "Sinais de alerta a observar",
+    "selfCare": "Autocuidado",
+    "careSetting": "Próximo passo recomendado",
+    "download": "Baixar relatório",
+    "share": "Compartilhar com seu médico"
+  },
+  "safety": {
+    "emergencyTitle": "Isto pode ser uma emergência",
+    "highRiskTitle": "Leia com atenção",
+    "reviewTitle": "Um profissional de saúde deve revisar isto",
+    "disclaimer": "O LibertyMD é um serviço informativo e não substitui aconselhamento, diagnóstico ou tratamento médico profissional."
+  },
+  "menu": {
+    "profile": "Perfil",
+    "history": "Minhas consultas",
+    "signOut": "Sair",
+    "signIn": "Entrar"
+  },
+  "errors": {
+    "generic": "Algo deu errado. Sua conversa está segura.",
+    "offline": "Você parece estar offline. Reconecte-se para continuar.",
+    "retryMessage": "Toque para reenviar sua última mensagem."
+  },
+  "app": {
+    "howItWorksKicker": "Do sintoma ao próximo passo",
+    "howItWorksTitle": "Como o LibertyMD funciona",
+    "howItWorksSubtitle": "Simples o bastante para usar quando você não está bem.",
+    "trustedBy": "Mais de 1.000.000 de usuários confiam",
+    "trustedByShort": "+1M de usuários",
+    "hipaaShort": "Privacidade HIPAA",
+    "hipaaLong": "Compatível com HIPAA e privado",
+    "careAssistant": "Assistente de saúde LibertyMD",
+    "shareReport": "Compartilhar relatório LibertyMD",
+    "clinicalConsiderations": "Considerações clínicas",
+    "carePlan": "Plano de cuidado",
+    "redFlags": "Sinais de alerta",
+    "soapNote": "Nota SOAP",
+    "handoffKicker": "Encaminhamento licenciado",
+    "handoffTitle": "Continue com um médico quando precisar.",
+    "availableIn": "Disponível em {wait}",
+    "doctorReview": "Pode revisar o relatório da IA e orientar os próximos passos por {price}.",
+    "humanCareKicker": "Cuidado humano",
+    "humanCareTitle": "A atenção de um médico, integrada.",
+    "humanCareSubtitle": "Cada triagem é projetada para passar de forma limpa a um médico licenciado.",
+    "steps": [
+      {
+        "title": "Conte seus sintomas",
+        "eyebrow": "Comece naturalmente",
+        "description": "Diga ao LibertyMD o que sente, quando começou e o que mais preocupa. Você não precisa saber os termos médicos."
+      },
+      {
+        "title": "Perguntas focadas",
+        "eyebrow": "Só o que importa",
+        "description": "O LibertyMD faz perguntas concisas sobre tempo, intensidade, histórico e contexto, adaptando cada pergunta às suas respostas."
+      },
+      {
+        "title": "Triagem de segurança",
+        "eyebrow": "Urgência verificada cedo",
+        "description": "As proteções clínicas procuram sinais de alerta durante toda a conversa e explicam claramente quando é preciso atendimento urgente ou de emergência."
+      },
+      {
+        "title": "Relatório pronto para o médico",
+        "eyebrow": "Contexto pronto para compartilhar",
+        "description": "Suas respostas viram um resumo estruturado com linha do tempo, orientações de segurança, próximos passos e uma nota SOAP pronta para o médico."
+      }
+    ]
+  },
+  "marketing": {
+    "care": {
+      "kicker": "Uma história de cuidado contínua",
+      "title": "Atendimento de urgência e primário, sem recomeçar.",
+      "aiLine": "IA sempre disponível.",
+      "doctorsHighlight": "Médicos licenciados",
+      "doctorsRest": "quando você precisar.",
+      "body": "Sua triagem completa acompanha você, então o médico já conhece o histórico e o contexto dos sintomas. Menos tempo se repetindo. Mais tempo focado no cuidado.",
+      "priceLead": "Consultas por vídeo com médicos licenciados por",
+      "price": "US$ 39 / consulta",
+      "cta": "Comece um chat grátis",
+      "drName": "Dra. Maya Chen, MD",
+      "drRole": "Revisando sua triagem do LibertyMD"
+    },
+    "pricing": {
+      "kicker": "Preços simples",
+      "title": "Cuidado com custos sempre claros.",
+      "body": "Comece com um chat privado grátis. Continue com um médico online licenciado apenas quando você decidir.",
+      "nationwide": "Disponível em todo o país",
+      "insurance": "Aceita convênios",
+      "cta": "Comece um chat grátis"
+    },
+    "stories": {
+      "kicker": "Histórias LibertyMD",
+      "title": "Uma conversa mais clara pode mudar o que vem depois.",
+      "body": "Histórias de exemplo mostrando como uma conversa de saúde estruturada traz clareza antes do próximo passo.",
+      "play": "Reproduzir histórias",
+      "pause": "Pausar histórias",
+      "prev": "História anterior",
+      "next": "Próxima história",
+      "items": [
+        {
+          "category": "Preparando uma consulta",
+          "title": "Cheguei sabendo o que explicar.",
+          "quote": "O LibertyMD organizou a linha do tempo e os sinais de alerta, então minha consulta começou pelos detalhes que importavam."
+        },
+        {
+          "category": "Buscando tranquilidade",
+          "title": "O próximo passo enfim ficou claro.",
+          "quote": "A conversa separou o que eu podia monitorar em casa dos sintomas que precisariam de atendimento urgente."
+        },
+        {
+          "category": "Entendendo sintomas",
+          "title": "Levei perguntas melhores ao meu médico.",
+          "quote": "Em vez de vasculhar dezenas de páginas, saí com um relatório conciso e uma lista focada de perguntas."
+        },
+        {
+          "category": "Reconhecendo urgência",
+          "title": "Tornou os sinais de alerta fáceis de entender.",
+          "quote": "As perguntas de segurança foram calmas e diretas. Entendi por que o atendimento no mesmo dia importava e o que dizer ao médico."
+        },
+        {
+          "category": "Fazendo acompanhamento",
+          "title": "Pude continuar sem recomeçar.",
+          "quote": "Minha linha do tempo, medicamentos e próximos passos ficaram juntos, o que deixou a conversa de retorno muito menos dispersa."
+        },
+        {
+          "category": "Cuidando de uma febre",
+          "title": "Sabia o que observar durante a noite.",
+          "quote": "O plano me deu pontos práticos de checagem de hidratação, temperatura e as mudanças que significariam procurar ajuda."
+        },
+        {
+          "category": "Dúvidas de medicação",
+          "title": "A conversa simplificou minhas opções.",
+          "quote": "Pude explicar o que já tinha tentado e entender quais perguntas levar ao farmacêutico e ao médico."
+        },
+        {
+          "category": "Depois de uma lesão",
+          "title": "Parei de adivinhar sobre o inchaço.",
+          "quote": "O LibertyMD me ajudou a descrever a lesão com clareza e a entender quando um exame ou imagem poderia ser apropriado."
+        },
+        {
+          "category": "Cuidando da família",
+          "title": "Me senti mais calma ao decidir.",
+          "quote": "As perguntas me ajudaram a organizar o que havia mudado e decidir que tipo de cuidado minha mãe precisava."
+        },
+        {
+          "category": "Sintomas recorrentes",
+          "title": "O padrão enfim ficou visível.",
+          "quote": "Ver os horários e gatilhos juntos me deu um ponto de partida muito melhor para uma conversa de longo prazo."
+        },
+        {
+          "category": "Uma segunda opinião",
+          "title": "Pude pensar antes de escolher o próximo passo.",
+          "quote": "O resumo me deu palavras para minhas preocupações sem tornar a situação mais assustadora do que era."
+        },
+        {
+          "category": "Preparando o retorno",
+          "title": "Nada importante ficou de fora.",
+          "quote": "Tive um só lugar para as mudanças de sintomas, perguntas e próximos passos que queria tratar no retorno."
+        }
+      ]
+    },
+    "library": {
+      "kicker": "Biblioteca de saúde LibertyMD",
+      "title": "Entenda sua saúde.",
+      "explore": "Explorar a biblioteca",
+      "read": "Ler o guia",
+      "items": [
+        {
+          "category": "Cuidado diário",
+          "title": "Quando uma febre precisa de mais que repouso",
+          "description": "Um guia prático sobre duração, hidratação, sinais de alerta e quando buscar avaliação."
+        },
+        {
+          "category": "Saúde do coração",
+          "title": "Desconforto no peito: os detalhes que importam",
+          "description": "Saiba como tempo, esforço, respiração e sintomas associados mudam a urgência do atendimento."
+        },
+        {
+          "category": "Preparando-se para a consulta",
+          "title": "Como montar uma linha do tempo útil de sintomas",
+          "description": "Transforme observações dispersas em uma história concisa e mais fácil de o médico avaliar."
+        }
+      ]
+    }
+  },
+  "footer": {
+    "clinicalCare": "Cuidado clínico",
+    "symptomChecker": "Verificador de sintomas",
+    "urgentCare": "Especialista em urgências",
+    "primaryTelehealth": "Telemedicina primária",
+    "refills": "Renovação de receitas",
+    "privacyGdpr": "Política de privacidade GDPR",
+    "hipaa": "Conformidade HIPAA",
+    "company": "Empresa",
+    "about": "Sobre o LibertyMD",
+    "careers": "Carreiras",
+    "reviewers": "Revisores médicos",
+    "conditions": "Condições",
+    "respiratory": "Cuidado respiratório",
+    "cardiovascular": "Cardiovascular",
+    "allConditions": "Todas as condições",
+    "research": "Pesquisa",
+    "blog": "Blog clínico",
+    "partnerships": "Parcerias",
+    "becomePartner": "Torne-se parceiro",
+    "euHealth": "Sistemas de saúde da UE",
+    "helpPrivacy": "Ajuda e privacidade",
+    "faqs": "Perguntas frequentes",
+    "team": "Equipe",
+    "neurology": "Neurologia e enxaqueca",
+    "usInsurance": "Rede de seguros dos EUA"
+  },
+  "careControls": {
+    "agePlaceholder": "Idade (18+)",
+    "sexLegend": "Sexo atribuído ao nascer",
+    "female": "Feminino",
+    "male": "Masculino",
+    "mergeNotice": "Essa conta do Google já tem histórico no LibertyMD. Entre para mesclar esta consulta com segurança.",
+    "signInMerge": "Entrar e mesclar",
+    "skipOnce": "Pular e ver uma vez",
+    "privateDefault": "Privado por padrão. Relatórios de convidado expiram em sete dias.",
+    "yourLibertyMD": "Seu LibertyMD",
+    "emptyHistory": "Suas consultas concluídas aparecerão aqui.",
+    "privateGuest": "Convidado privado"
+  },
+  "chatx": {
+    "newChat": "Nova conversa",
+    "privateConsult": "Consulta privada de saúde com IA",
+    "emergencyNow": "Procure atendimento de emergência agora",
+    "assessment": "Avaliação e próximos passos",
+    "carePlan": "Plano de cuidado",
+    "redFlags": "Sinais de alerta",
+    "soap": "Nota SOAP",
+    "clinical": "Considerações clínicas",
+    "phOpening": "Abrindo a consulta...",
+    "phDemo": "Adicione idade e sexo acima para continuar",
+    "phReportGate": "Escolha como ver seu relatório",
+    "phReportReady": "Seu relatório está pronto acima",
+    "phEnded": "Esta consulta foi encerrada por segurança",
+    "phAnswer": "Responda à pergunta de acompanhamento...",
+    "sendMessage": "Enviar mensagem"
+  }
+}

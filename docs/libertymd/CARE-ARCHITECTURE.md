@@ -2,7 +2,7 @@
 
 ## Product Contract
 
-LibertyMD starts with an anonymous Supabase Auth identity. The visitor is not asked to register before describing symptoms, but every clinical row still has a stable `auth.users.id` owner. Google is linked to that same identity only when the report is ready, so consultation ownership never needs to be migrated.
+LibertyMD starts with an anonymous Supabase Auth identity. The visitor is not asked to register before describing symptoms, but every clinical row still has a stable `auth.users.id` owner. Google is offered only when a report is ready. The normal path links Google to the same identity; if that Google identity already has a LibertyMD account, a short-lived, one-time transfer moves the anonymous consultation into the existing account.
 
 ## Consultation State Machine
 
@@ -26,14 +26,20 @@ stateDiagram-v2
 | Table | Purpose | Important fields |
 | --- | --- | --- |
 | `libertymd_profiles` | One profile per auth identity | unique `user_id`, age, sex, Google name/email/avatar, anonymous flag |
-| `libertymd_consultations` | Durable state machine and request lease | status, version, active request, explicit slots, missing slots, intermediate differentials, safety state, report gate |
+| `libertymd_patients` | Patient identity separated from the account | owner, relationship, age, sex at birth, display label, active flag |
+| `libertymd_consultations` | Durable state machine and request lease | patient, immutable patient snapshot, status, version, active request, explicit slots, missing slots, intermediate differentials, safety state, report gate |
 | `libertymd_messages` | Ordered, idempotent transcript | role, type, client message ID, options, target slot, slot updates, workflow metadata |
 | `libertymd_safety_events` | Auditable safety decisions | `high_risk_continue`, emergency status, setting, red flags, source |
 | `libertymd_reports` | Gated clinical output | report JSON, confidence, withheld/saved/guest access, retention |
+| `libertymd_diagnostic_runs` | Append-only diagnosis attempts and reasoning | input snapshot, clinical summary/reasoning, differential, confidence, evidence, validation reason, model/workflow metadata |
+| `libertymd_identity_events` | Identity-link audit trail | link start/completion/cancel/conflict and account transfer events |
+| `libertymd_account_merges` | Existing-Google-account recovery | hashed one-time token, source/target account, expiry, completion status |
+| `libertymd_consent_events` | Append-only consent ledger | consent type/version, decision, patient, consultation, source |
+| `libertymd_product_events` | Non-clinical funnel telemetry | allow-listed event name and operational metadata only |
 
 The Edge Function is the only clinical writer. Authenticated clients have read-only RLS access to their own records, and withheld reports cannot be read directly through the Supabase API.
 
-Each patient submission carries a stable client-generated UUID. A database function atomically claims a short lease for the consultation, rejects competing turns, recognizes completed retries, and permits recovery when the patient turn exists but its assistant response was interrupted. The client retries once with the same UUID, so a network retry cannot create a duplicate patient message.
+Each patient submission carries a stable client-generated UUID and the consultation version last read by the client. A database function atomically claims a short lease, rejects stale or competing turns, recognizes completed retries, and permits recovery when the patient turn exists but its assistant response was interrupted. The client retries once with the same UUID, so a network retry cannot create a duplicate patient message.
 
 ## Workflow Contract
 
@@ -55,8 +61,10 @@ At and after turn six, diagnosis runs every second turn and whenever the intervi
 ## Report Gate
 
 - A generated report is stored as `withheld`; the response contains no report body.
-- `linkIdentity({ provider: 'google' })` upgrades the anonymous auth user in place.
-- After OAuth, `sync_identity` records Google name, email, avatar, and provider and releases the report as `saved`.
+- `linkIdentity({ provider: 'google' })` normally upgrades the anonymous auth user in place.
+- Before OAuth, the backend issues a ten-minute transfer secret and stores only its SHA-256 hash.
+- After same-ID OAuth, `sync_identity` records Google name, email, avatar, and provider and releases the report as `saved`.
+- If Google already belongs to another account, the user signs into that account and the service-role-only merge transaction reassigns LibertyMD consultations, reports, diagnostic runs, patients, consent, identity, and product events. It removes only the source LibertyMD profile and preserves the shared-project `auth.users` row.
 - Skip releases only the current report as `guest_released` and sets a seven-day retention deadline.
 - Linked users have no consultation-retention deadline and can load history from the menu.
 
@@ -67,4 +75,4 @@ At and after turn six, diagnosis runs every second turn and whenever the intervi
 - n8n performs no database writes. It is a stateless inference layer behind the Edge Function.
 - LibertyMD workflows disable successful/error/manual execution payload retention. The n8n host should also enable execution pruning as a defense in depth control.
 - `cleanup_expired_libertymd_data()` should run daily using Supabase Cron or an external scheduler.
-- Production anonymous sign-in should be protected by CAPTCHA/Turnstile and platform rate limits.
+- Hosted anonymous sign-in and manual identity linking are enabled. Production anonymous sign-in still requires CAPTCHA/Turnstile, monitored rate limits, and abuse alerts before public launch.

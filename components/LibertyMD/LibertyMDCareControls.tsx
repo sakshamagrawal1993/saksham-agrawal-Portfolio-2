@@ -1,4 +1,5 @@
 import React from 'react';
+import { useI18n } from '../../i18n';
 import {
   Brain,
   Check,
@@ -7,6 +8,8 @@ import {
   FileClock,
   Loader2,
   LogIn,
+  Plus,
+  RotateCcw,
   ShieldCheck,
   UserRound,
   X,
@@ -38,6 +41,7 @@ export function LibertyMDDemographicsPrompt({
   onSexChange,
   onSubmit,
 }: DemographicsPromptProps) {
+  const { t } = useI18n();
   const canSubmit = Number(age) >= 18 && Number(age) <= 120 && Boolean(sex) && !loading;
 
   return (
@@ -58,15 +62,15 @@ export function LibertyMDDemographicsPrompt({
           max="120"
           value={age}
           onChange={(event) => onAgeChange(event.target.value.replace(/\D/g, '').slice(0, 3))}
-          placeholder="Age (18+)"
+          placeholder={t('careControls.agePlaceholder')}
           className="h-14 rounded-lg border border-libertymd-slate-300 bg-white px-libertymd-lg text-left text-base font-semibold text-libertymd-ink outline-none transition focus:border-libertymd-blue-600 focus:ring-4 focus:ring-libertymd-blue-50"
         />
 
         <fieldset className="grid h-14 grid-cols-2 rounded-lg bg-libertymd-blue-50 p-1">
-          <legend className="sr-only">Sex assigned at birth</legend>
+          <legend className="sr-only">{t('careControls.sexLegend')}</legend>
           {[
-            ['female', 'Female'],
-            ['male', 'Male'],
+            ['female', t('careControls.female')],
+            ['male', t('careControls.male')],
           ].map(([value, label]) => {
             const active = sex === value;
             return (
@@ -106,14 +110,85 @@ export function LibertyMDDemographicsPrompt({
   );
 }
 
+interface AbandonedRecoveryPromptProps {
+  loading: boolean;
+  error?: string;
+  onResume: () => void;
+  onStartOver: () => void;
+}
+
+export function LibertyMDAbandonedRecoveryPrompt({
+  loading,
+  error,
+  onResume,
+  onStartOver,
+}: AbandonedRecoveryPromptProps) {
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-libertymd-slate-900/35 p-libertymd-md backdrop-blur-sm">
+      <section
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="libertymd-recovery-title"
+        aria-describedby="libertymd-recovery-description"
+        className="w-full max-w-lg rounded-lg border border-white/80 bg-white p-libertymd-xl text-left shadow-2xl sm:p-libertymd-2xl"
+      >
+        <p className="text-xs font-bold uppercase text-libertymd-blue-600">Consultation paused</p>
+        <h2 id="libertymd-recovery-title" className="mt-libertymd-sm font-serif text-3xl font-semibold leading-tight text-libertymd-ink">
+          Continue where you left off?
+        </h2>
+        <p id="libertymd-recovery-description" className="mt-libertymd-md text-base leading-7 text-libertymd-slate-700">
+          Your previous answers are still private and available. Resume this consultation, or leave it closed and start over with a new concern.
+        </p>
+
+        {error && (
+          <p className="mt-libertymd-md rounded-md border border-amber-200 bg-amber-50 px-libertymd-md py-libertymd-sm text-sm font-semibold text-amber-900">
+            {error}
+          </p>
+        )}
+
+        <div className="mt-libertymd-xl grid gap-libertymd-sm sm:grid-cols-2">
+          <button
+            type="button"
+            disabled={loading}
+            onClick={onResume}
+            className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-libertymd-blue-600 px-5 text-sm font-bold text-white shadow-lg shadow-libertymd-blue-600/20 transition hover:bg-libertymd-blue-700 disabled:opacity-50"
+          >
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+            Resume consultation
+          </button>
+          <button
+            type="button"
+            disabled={loading}
+            onClick={onStartOver}
+            className="inline-flex h-12 items-center justify-center gap-2 rounded-full border border-libertymd-blue-200 bg-white px-5 text-sm font-bold text-libertymd-slate-700 transition hover:border-libertymd-blue-600 hover:text-libertymd-blue-700 disabled:opacity-50"
+          >
+            <Plus className="h-4 w-4" />
+            Start over
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 interface ReportGateProps {
   loading: boolean;
+  identityConflict?: boolean;
   onGoogle: () => void;
+  onExistingGoogle?: () => void;
   onSkip: () => void;
   onClose: () => void;
 }
 
-export function LibertyMDReportGate({ loading, onGoogle, onSkip, onClose }: ReportGateProps) {
+export function LibertyMDReportGate({
+  loading,
+  identityConflict = false,
+  onGoogle,
+  onExistingGoogle,
+  onSkip,
+  onClose,
+}: ReportGateProps) {
+  const { t } = useI18n();
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-libertymd-slate-900/35 p-libertymd-md backdrop-blur-sm">
       <section
@@ -131,7 +206,7 @@ export function LibertyMDReportGate({ loading, onGoogle, onSkip, onClose }: Repo
           <X className="h-5 w-5" />
         </button>
 
-        <p className="text-xs font-bold uppercase text-libertymd-blue-600">Your report is ready</p>
+        <p className="text-xs font-bold uppercase text-libertymd-blue-600">{t('reportGate.title')}</p>
         <h2 id="libertymd-report-gate-title" className="mt-libertymd-sm max-w-2xl font-serif text-4xl font-semibold leading-tight text-libertymd-ink sm:text-5xl">
           Don&apos;t lose this consult
         </h2>
@@ -162,8 +237,25 @@ export function LibertyMDReportGate({ loading, onGoogle, onSkip, onClose }: Repo
           className="mt-libertymd-xl inline-flex h-14 w-full items-center justify-center gap-3 rounded-full bg-libertymd-blue-600 px-6 text-base font-bold text-white shadow-xl shadow-libertymd-blue-600/20 transition hover:bg-libertymd-blue-700 disabled:opacity-50"
         >
           {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <LogIn className="h-5 w-5" />}
-          Continue with Google
+          {t('reportGate.google')}
         </button>
+
+        {identityConflict && onExistingGoogle && (
+          <div className="mt-libertymd-md rounded-lg border border-libertymd-blue-200 bg-libertymd-blue-50 p-libertymd-md text-center">
+            <p className="text-sm font-semibold text-libertymd-slate-700">
+              {t('careControls.mergeNotice')}
+            </p>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={onExistingGoogle}
+              className="mt-libertymd-sm inline-flex h-11 items-center justify-center gap-2 rounded-full border border-libertymd-blue-600 bg-white px-6 text-sm font-bold text-libertymd-blue-700 transition hover:bg-libertymd-blue-100 disabled:opacity-50"
+            >
+              <LogIn className="h-4 w-4" />
+              {t('careControls.signInMerge')}
+            </button>
+          </div>
+        )}
 
         <button
           type="button"
@@ -171,12 +263,12 @@ export function LibertyMDReportGate({ loading, onGoogle, onSkip, onClose }: Repo
           onClick={onSkip}
           className="mt-libertymd-sm h-11 w-full text-sm font-bold text-libertymd-slate-500 transition hover:text-libertymd-blue-600 disabled:opacity-50"
         >
-          Skip and view once
+          {t('careControls.skipOnce')}
         </button>
 
         <div className="mt-libertymd-lg flex items-center justify-center gap-2 text-xs text-libertymd-slate-500">
           <ShieldCheck className="h-4 w-4" />
-          Private by default. Guest reports expire after seven days.
+          {t('careControls.privateDefault')}
         </div>
       </section>
     </div>
@@ -210,6 +302,7 @@ export function LibertyMDAccountDrawer({
   onClose,
   onSelectConsultation,
 }: AccountDrawerProps) {
+  const { t } = useI18n();
   if (!open) return null;
 
   const formattedSex = sexAtBirth
@@ -224,7 +317,7 @@ export function LibertyMDAccountDrawer({
         aria-label="LibertyMD account and consultation history"
       >
         <div className="flex items-center justify-between">
-          <h2 className="font-serif text-2xl font-semibold text-libertymd-ink">Your LibertyMD</h2>
+          <h2 className="font-serif text-2xl font-semibold text-libertymd-ink">{t('careControls.yourLibertyMD')}</h2>
           <button type="button" onClick={onClose} aria-label="Close menu" className="inline-flex h-10 w-10 items-center justify-center rounded-full hover:bg-libertymd-blue-50">
             <X className="h-5 w-5" />
           </button>
@@ -239,7 +332,7 @@ export function LibertyMDAccountDrawer({
             </span>
           )}
           <div className="min-w-0">
-            <p className="truncate font-bold text-libertymd-ink">{displayName || 'Private guest'}</p>
+            <p className="truncate font-bold text-libertymd-ink">{displayName || t('careControls.privateGuest')}</p>
             <p className="truncate text-sm text-libertymd-slate-500">{email || 'No account linked'}</p>
             {!isAnonymous && (age || formattedSex) && (
               <p className="mt-1 truncate text-xs font-semibold text-libertymd-slate-500">
@@ -278,7 +371,7 @@ export function LibertyMDAccountDrawer({
                 ))}
               </div>
             ) : (
-              <p className="mt-libertymd-lg text-sm text-libertymd-slate-500">Your completed consultations will appear here.</p>
+              <p className="mt-libertymd-lg text-sm text-libertymd-slate-500">{t('careControls.emptyHistory')}</p>
             )}
           </div>
         )}

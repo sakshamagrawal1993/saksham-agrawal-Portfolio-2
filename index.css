@@ -111,6 +111,15 @@
   padding-inline: var(--libertymd-page-gutter);
 }
 
+@media (max-width: 39.999rem) {
+  .libertymd-pricing-card {
+    --pricing-separation-shadow:
+      0 0 0 1px rgba(148, 163, 184, 0.48),
+      0 16px 34px -16px rgba(15, 23, 42, 0.38);
+    border-color: rgba(148, 163, 184, 0.58);
+  }
+}
+
 .libertymd-shell {
   width: 100%;
   max-width: var(--libertymd-shell-max);
@@ -130,6 +139,7 @@
 .libertymd-story-rail {
   scrollbar-width: none;
   overscroll-behavior-inline: contain;
+  touch-action: pan-x pinch-zoom;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -180,7 +190,10 @@
 }
 
 .libertymd-premium-logo-moving {
-  height: 15rem;
+  /* Proportional to the stage, so the cross keeps the SAME relationship to the pedestal
+     at every breakpoint. Fixed/clamped heights here drifted against the stage height and
+     made the cross sink through the pedestal on shorter viewports. */
+  height: 73%;
 }
 
 .libertymd-hero-composer {
@@ -301,10 +314,6 @@
     width: clamp(12rem, 29vh, 16.875rem);
   }
 
-  .libertymd-premium-logo-moving {
-    height: clamp(13rem, 30vh, 18.75rem);
-  }
-
   .libertymd-hero-composer {
     min-height: clamp(9.25rem, 22vh, 12.5rem);
     padding: 1.25rem;
@@ -370,10 +379,6 @@
 
   .libertymd-premium-logo-pedestal {
     width: clamp(12.5rem, 30vh, 13.75rem);
-  }
-
-  .libertymd-premium-logo-moving {
-    height: clamp(13.5rem, 32vh, 15rem);
   }
 
   .libertymd-hero-composer {
@@ -442,10 +447,6 @@
 
   .libertymd-premium-logo-pedestal {
     width: 10.75rem;
-  }
-
-  .libertymd-premium-logo-moving {
-    height: 11.25rem;
   }
 
   .libertymd-hero-composer {
@@ -707,4 +708,129 @@
 .post-content span[class*="text-[#8B7644]"] {
   color: #8B7644;
   font-weight: 500;
+}
+
+/* LibertyMD consultation presence orb */
+.libertymd-care-orb {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.94);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 28% 68%, rgba(255, 207, 180, 0.96), transparent 42%),
+    radial-gradient(circle at 72% 28%, rgba(245, 174, 219, 0.96), transparent 45%),
+    radial-gradient(circle at 70% 73%, #a5d1ff, transparent 56%),
+    #7f73df;
+  box-shadow:
+    0 5px 15px rgba(80, 70, 185, 0.22),
+    inset 0 0 0 1px rgba(38, 43, 102, 0.09);
+  isolation: isolate;
+  pointer-events: none;
+}
+
+.libertymd-care-orb--sm {
+  width: 2rem;
+  height: 2rem;
+}
+
+.libertymd-care-orb--lg {
+  width: 2.25rem;
+  height: 2.25rem;
+}
+
+.libertymd-care-orb__canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: inherit;
+}
+
+.libertymd-care-orb::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border-radius: inherit;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cfilter id='grain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' seed='8' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23grain)' opacity='.82'/%3E%3C/svg%3E");
+  background-size: 72px 72px;
+  mix-blend-mode: soft-light;
+  opacity: 0.38;
+}
+
+.libertymd-care-orb--animated::after {
+  content: '';
+  position: absolute;
+  z-index: 2;
+  top: -30%;
+  bottom: -30%;
+  left: -62%;
+  width: 52%;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.34);
+  filter: blur(2px);
+  mix-blend-mode: screen;
+  transform: rotate(18deg);
+  animation: libertymd-orb-satin-sweep 1.8s ease-in-out infinite alternate;
+}
+
+@keyframes libertymd-orb-satin-sweep {
+  from {
+    transform: translate3d(-8%, 8%, 0) rotate(18deg) scaleX(0.72);
+    opacity: 0.34;
+  }
+  to {
+    transform: translate3d(310%, -8%, 0) rotate(18deg) scaleX(1);
+    opacity: 0.82;
+  }
+}
+
+.libertymd-care-orb--waiting {
+  animation: libertymd-orb-waiting-bounce 1.25s cubic-bezier(0.45, 0, 0.22, 1) infinite;
+  will-change: transform;
+}
+
+@keyframes libertymd-orb-waiting-bounce {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  46% {
+    transform: translate3d(0, -4px, 0);
+  }
+  62% {
+    transform: translate3d(0, -3.5px, 0);
+  }
+}
+
+.libertymd-care-orb__fallback {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .libertymd-care-orb--waiting,
+  .libertymd-care-orb--animated::after {
+    animation: none;
+  }
+}
+
+.libertymd-care-orb--thinking {
+  box-shadow:
+    0 5px 17px rgba(100, 82, 217, 0.28),
+    0 0 0 3px rgba(111, 184, 255, 0.08);
+}
+
+.libertymd-care-orb--alert {
+  box-shadow: 0 5px 14px rgba(180, 35, 24, 0.2), inset 0 0 0 1px rgba(127, 29, 29, 0.12);
+}
+
+.libertymd-care-orb--report {
+  box-shadow: 0 5px 14px rgba(36, 106, 143, 0.22), inset 0 0 0 1px rgba(13, 118, 110, 0.1);
 }

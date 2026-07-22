@@ -1,0 +1,23 @@
+{
+  "_meta": {
+    "status": "approved",
+    "version": "1",
+    "source": "machine",
+    "approved_by": "saksham (testing approval)",
+    "approved_at": "2026-07-20",
+    "variant_of": "es",
+    "note": "Delta bundle: only keys that differ in Peninsular Spanish. Everything else inherits from es (Latin American) via the fallback chain es-ES -> es -> en."
+  },
+  "footer": {
+    "refills": "Renovación de recetas",
+    "privacyGdpr": "Política de privacidad (RGPD)"
+  },
+  "marketing": {
+    "care": {
+      "price": "39 € / consulta"
+    }
+  },
+  "chatx": {
+    "phAnswer": "Responde a la pregunta de seguimiento..."
+  }
+}

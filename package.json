@@ -29,11 +29,12 @@
     "test:mind-coach:qa": "npm run test:mind-coach:contract && npm run test:mind-coach:browser",
     "test:libertymd:contracts": "node scripts/libertymd-contract-validation.mjs",
     "test:libertymd:policy": "deno test --no-config tests/libertymd/clinical-policy.test.ts",
+    "test:libertymd:recovery": "deno test --no-config tests/libertymd/abandoned-chat-recovery.test.ts",
     "test:libertymd:simulations": "node scripts/libertymd-run-simulations.mjs",
     "test:libertymd:evaluation": "deno run --no-config --allow-read scripts/libertymd-clinical-evaluation.ts",
     "test:libertymd:db": "supabase test db",
     "test:libertymd:live": "node --env-file=.env scripts/libertymd-live-backend-smoke.mjs",
-    "test:libertymd:ci": "npm run test:libertymd:contracts && npm run test:libertymd:policy && npm run test:libertymd:simulations && npm run test:libertymd:evaluation",
+    "test:libertymd:ci": "npm run test:libertymd:contracts && npm run test:libertymd:policy && npm run test:libertymd:recovery && npm run test:libertymd:simulations && npm run test:libertymd:evaluation",
     "test:demo-smoke": "node scripts/demo_smoke_runner.mjs"
   },
   "dependencies": {

@@ -215,9 +215,12 @@ export default function LibertyMDMedicalCrossLogo({
     <div
       className={`relative flex items-center justify-center select-none transition-transform duration-500 hover:scale-[1.015] ${className}`}
       style={{
-        width: '100%',
+        // Height-driven square. Setting BOTH width and height to 100% made CSS ignore
+        // aspect-ratio, so the cross stretched to the container and rendered wider than
+        // tall. Letting width derive from height keeps the cross geometrically square.
         height: '100%',
-        maxWidth: `${size}px`,
+        width: 'auto',
+        maxWidth: '100%',
         maxHeight: `${size}px`,
         aspectRatio: '1 / 1'
       }}

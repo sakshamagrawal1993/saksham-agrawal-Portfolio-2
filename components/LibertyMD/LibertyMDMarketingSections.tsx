@@ -6,33 +6,34 @@ import {
   type PointerEvent as ReactPointerEvent,
   type TouchEvent as ReactTouchEvent,
 } from 'react';
+import { useI18n } from '../../i18n';
 import { motion, useReducedMotion, useScroll, useTransform } from 'framer-motion';
 import {
   ArrowRight,
   BookOpen,
   CalendarClock,
   Check,
-  ChevronLeft,
-  ChevronRight,
   CircleDollarSign,
   Clock3,
   Globe2,
   HeartPulse,
-  Pause,
-  Play,
   Quote,
   ShieldCheck,
   Sparkles,
 } from 'lucide-react';
 
-const unsplash = (id: string, width = 1200) =>
-  `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${width}&q=82`;
+const libertyMDAssetBase = `${String(
+  (import.meta as ImportMeta & { env?: Record<string, string> }).env?.VITE_SUPABASE_URL
+    || 'https://ralhkmpbslsdkwnqzqen.supabase.co',
+).replace(/\/$/, '')}/storage/v1/object/public/libertymd-assets`;
+
+const homepagePhoto = (id: string) => `${libertyMDAssetBase}/homepage/photos/${id}.jpg`;
 
 const phoneImages = {
-  doctor: unsplash('photo-1559839734-2b71ea197ec2', 900),
-  patientLeft: unsplash('photo-1500648767791-00dcc994a43e', 640),
-  patientRight: unsplash('photo-1494790108377-be9c29b29330', 640),
-  caller: unsplash('photo-1507003211169-0a1dd7228f2d', 360),
+  doctor: homepagePhoto('photo-1559839734-2b71ea197ec2'),
+  patientLeft: homepagePhoto('photo-1500648767791-00dcc994a43e'),
+  patientRight: homepagePhoto('photo-1494790108377-be9c29b29330'),
+  caller: homepagePhoto('photo-1507003211169-0a1dd7228f2d'),
 };
 
 const patientStories = [
@@ -41,7 +42,7 @@ const patientStories = [
     title: 'I arrived knowing what to explain.',
     quote: 'LibertyMD organized the timeline and warning signs, so my appointment started with the details that mattered.',
     name: 'Jordan, 34',
-    image: unsplash('photo-1534528741775-53994a69daeb', 1200),
+    image: homepagePhoto('photo-1534528741775-53994a69daeb'),
     format: 'portrait',
   },
   {
@@ -49,7 +50,7 @@ const patientStories = [
     title: 'The next step finally felt clear.',
     quote: 'The conversation separated what I could monitor at home from the symptoms that would need urgent care.',
     name: 'Marcus, 41',
-    image: unsplash('photo-1506794778202-cad84cf45f1d', 1200),
+    image: homepagePhoto('photo-1506794778202-cad84cf45f1d'),
     format: 'quote',
   },
   {
@@ -57,7 +58,7 @@ const patientStories = [
     title: 'I had better questions for my doctor.',
     quote: 'Instead of searching through dozens of pages, I left with a concise report and a focused list of questions.',
     name: 'Ana, 29',
-    image: unsplash('photo-1544005313-94ddf0286df2', 1200),
+    image: homepagePhoto('photo-1544005313-94ddf0286df2'),
     format: 'portrait',
   },
   {
@@ -65,7 +66,7 @@ const patientStories = [
     title: 'It made the warning signs easy to understand.',
     quote: 'The safety questions were calm and direct. I understood why same-day care mattered and what to tell the clinician.',
     name: 'Priya, 38',
-    image: unsplash('photo-1488426862026-3ee34a7d66df', 1200),
+    image: homepagePhoto('photo-1488426862026-3ee34a7d66df'),
     format: 'quote',
   },
   {
@@ -73,7 +74,7 @@ const patientStories = [
     title: 'I could pick up without starting over.',
     quote: 'My timeline, medications, and next steps stayed together, which made the follow-up conversation much less scattered.',
     name: 'Daniel, 46',
-    image: unsplash('photo-1519345182560-3f2917c472ef', 1200),
+    image: homepagePhoto('photo-1519345182560-3f2917c472ef'),
     format: 'portrait',
   },
   {
@@ -81,7 +82,7 @@ const patientStories = [
     title: 'I knew what to watch overnight.',
     quote: 'The plan gave me practical checkpoints for hydration, temperature, and the changes that would mean getting help.',
     name: 'Leah, 32',
-    image: unsplash('photo-1508214751196-bcfd4ca60f91', 1200),
+    image: homepagePhoto('photo-1508214751196-bcfd4ca60f91'),
     format: 'quote',
   },
   {
@@ -89,7 +90,7 @@ const patientStories = [
     title: 'The conversation made my options simpler.',
     quote: 'I could explain what I had already tried and understand which questions to take to my pharmacist and doctor.',
     name: 'Ethan, 52',
-    image: unsplash('photo-1519085360753-af0119f7cbe7', 1200),
+    image: homepagePhoto('photo-1519085360753-af0119f7cbe7'),
     format: 'portrait',
   },
   {
@@ -97,7 +98,7 @@ const patientStories = [
     title: 'I stopped guessing about the swelling.',
     quote: 'LibertyMD helped me describe the injury clearly and understand when an examination or imaging could be appropriate.',
     name: 'Noah, 27',
-    image: unsplash('photo-1527980965255-d3b416303d12', 1200),
+    image: homepagePhoto('photo-1527980965255-d3b416303d12'),
     format: 'quote',
   },
   {
@@ -105,7 +106,7 @@ const patientStories = [
     title: 'I felt calmer making the decision.',
     quote: 'The questions helped me organize what had changed and decide what kind of care my mother needed next.',
     name: 'Maya, 44',
-    image: unsplash('photo-1531123897727-8f129e1688ce', 1200),
+    image: homepagePhoto('photo-1531123897727-8f129e1688ce'),
     format: 'portrait',
   },
   {
@@ -113,7 +114,7 @@ const patientStories = [
     title: 'The pattern finally became visible.',
     quote: 'Seeing the timing and triggers together gave me a much better starting point for a longer-term conversation.',
     name: 'Sofia, 36',
-    image: unsplash('photo-1524504388940-b1c1722653e1', 1200),
+    image: homepagePhoto('photo-1524504388940-b1c1722653e1'),
     format: 'quote',
   },
   {
@@ -121,7 +122,7 @@ const patientStories = [
     title: 'I could think before choosing the next step.',
     quote: 'The summary gave me language for my concerns without making the situation feel more frightening than it was.',
     name: 'James, 58',
-    image: unsplash('photo-1501196354995-cbb51c65aaea', 1200),
+    image: homepagePhoto('photo-1501196354995-cbb51c65aaea'),
     format: 'portrait',
   },
   {
@@ -129,7 +130,7 @@ const patientStories = [
     title: 'Nothing important slipped through the cracks.',
     quote: 'I had one place for the symptom changes, questions, and next steps I wanted to cover at my follow-up.',
     name: 'Amir, 40',
-    image: unsplash('photo-1535713875002-d1d0cf377fde', 1200),
+    image: homepagePhoto('photo-1535713875002-d1d0cf377fde'),
     format: 'quote',
   },
 ];
@@ -139,19 +140,19 @@ const healthArticles = [
     category: 'Everyday care',
     title: 'When a fever needs more than rest',
     description: 'A practical guide to duration, hydration, warning signs, and when to seek an evaluation.',
-    image: unsplash('photo-1505751172876-fa1923c5c528', 1000),
+    image: homepagePhoto('photo-1505751172876-fa1923c5c528'),
   },
   {
     category: 'Heart health',
     title: 'Chest discomfort: the details that matter',
     description: 'Learn how timing, exertion, breathing, and associated symptoms change the urgency of care.',
-    image: unsplash('photo-1532938911079-1b06ac7ceec7', 1000),
+    image: homepagePhoto('photo-1532938911079-1b06ac7ceec7'),
   },
   {
     category: 'Preparing for care',
     title: 'How to build a useful symptom timeline',
     description: 'Turn scattered observations into a concise story that is easier for a clinician to assess.',
-    image: unsplash('photo-1576091160399-112ba8d25d1d', 1000),
+    image: homepagePhoto('photo-1576091160399-112ba8d25d1d'),
   },
 ];
 
@@ -160,6 +161,7 @@ interface MarketingSectionProps {
 }
 
 export function LibertyMDPhoneCareSection({ onStartChat }: MarketingSectionProps) {
+  const { t } = useI18n();
   const visualRef = useRef<HTMLDivElement | null>(null);
   const reduceMotion = useReducedMotion();
   const [isMobileVisual, setIsMobileVisual] = useState(
@@ -208,26 +210,26 @@ export function LibertyMDPhoneCareSection({ onStartChat }: MarketingSectionProps
     >
       <div className="libertymd-shell grid items-center gap-[var(--libertymd-layout-gap)] lg:min-h-[720px] lg:grid-cols-[minmax(17rem,0.72fr)_minmax(34rem,1.28fr)]">
         <div className="mx-auto max-w-xl text-center lg:mx-0 lg:text-left">
-          <p className="text-xs font-bold uppercase text-[#2563EB]">One continuous care story</p>
+          <p className="text-xs font-bold uppercase text-[#2563EB]">{t('marketing.care.kicker')}</p>
           <h2 className="mx-auto mt-3 max-w-2xl font-serif text-4xl font-semibold leading-tight text-[#111827] sm:text-5xl lg:mx-0">
-            Urgent and primary care, without starting over.
+            {t('marketing.care.title')}
           </h2>
           <p className="mt-7 text-lg font-bold leading-8 text-[#111827] sm:text-xl">
-            AI that is always available.<br />
-            <span className="text-[#2563EB]">Licensed doctors</span> when you need them.
+            {t('marketing.care.aiLine')}<br />
+            <span className="text-[#2563EB]">{t('marketing.care.doctorsHighlight')}</span> {t('marketing.care.doctorsRest')}
           </p>
           <p className="mx-auto mt-7 max-w-lg border-t border-dashed border-[#B9C9B5] pt-7 text-sm leading-7 text-[#5B6472] sm:text-base lg:mx-0">
-            Your complete intake moves with you, so a physician already has the symptom history and context. Less time repeating yourself. More time focused on care.
+            {t('marketing.care.body')}
           </p>
           <p className="mt-7 text-sm font-semibold text-[#475569] sm:text-base">
-            Video visits with licensed doctors for <span className="font-black text-[#2563EB]">$39 / visit</span>
+            {t('marketing.care.priceLead')} <span className="font-black text-[#2563EB]">{t('marketing.care.price')}</span>
           </p>
           <button
             type="button"
             onClick={onStartChat}
             className="mt-7 inline-flex items-center gap-2 rounded-full bg-[#2563EB] px-6 py-3 text-sm font-bold text-white shadow-[0_12px_28px_rgba(37,99,235,0.28)] transition hover:bg-[#1D4ED8]"
           >
-            Start a free chat <ArrowRight className="h-4 w-4" />
+            {t('marketing.care.cta')} <ArrowRight className="h-4 w-4" />
           </button>
         </div>
 
@@ -255,8 +257,8 @@ export function LibertyMDPhoneCareSection({ onStartChat }: MarketingSectionProps
                 <img src={phoneImages.doctor} alt="LibertyMD physician on a video visit" className="h-full w-full object-cover object-center" />
                 <div className="absolute left-1/2 top-3 h-6 w-20 -translate-x-1/2 rounded-full bg-[#050505] sm:h-7 sm:w-24" />
                 <div className="absolute inset-x-3 top-12 rounded-lg bg-[#111827]/70 px-3 py-2 text-left text-[10px] font-semibold text-white backdrop-blur-md sm:top-14 sm:text-xs">
-                  <span className="block">Dr. Maya Chen, MD</span>
-                  <span className="font-normal text-white/75">Reviewing your LibertyMD intake</span>
+                  <span className="block">{t('marketing.care.drName')}</span>
+                  <span className="font-normal text-white/75">{t('marketing.care.drRole')}</span>
                 </div>
                 <div className="absolute bottom-5 right-4 h-20 w-16 overflow-hidden rounded-lg border-2 border-white shadow-lg sm:h-24 sm:w-20">
                   <img src={phoneImages.caller} alt="Patient video preview" className="h-full w-full object-cover" />
@@ -293,6 +295,7 @@ export function LibertyMDPhoneCareSection({ onStartChat }: MarketingSectionProps
 }
 
 export function LibertyMDPricingSection({ onStartChat }: MarketingSectionProps) {
+  const { t } = useI18n();
   const reduceMotion = useReducedMotion();
   const pricingCardRef = useRef<HTMLDivElement | null>(null);
   const pricingCardActiveRef = useRef(false);
@@ -388,7 +391,7 @@ export function LibertyMDPricingSection({ onStartChat }: MarketingSectionProps) 
       ? 'none'
       : 'perspective(1100px) rotateX(var(--pricing-rotate-x)) rotateY(var(--pricing-rotate-y)) translateZ(0)',
     boxShadow:
-      'var(--pricing-shadow-x) var(--pricing-shadow-y) 54px -20px rgba(15,23,42,0.28), inset 0 1px 1px rgba(255,255,255,0.9), inset 0 -1px 1px rgba(15,23,42,0.06)',
+      'var(--pricing-shadow-x) var(--pricing-shadow-y) 54px -20px rgba(15,23,42,0.28), var(--pricing-separation-shadow, 0 0 0 0 transparent), inset 0 1px 1px rgba(255,255,255,0.9), inset 0 -1px 1px rgba(15,23,42,0.06)',
     transformStyle: 'preserve-3d',
     transition: 'transform 700ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 700ms cubic-bezier(0.23, 1, 0.32, 1)',
   } as CSSProperties;
@@ -397,19 +400,19 @@ export function LibertyMDPricingSection({ onStartChat }: MarketingSectionProps) 
     <section className="libertymd-page-gutter libertymd-section-spacing border-t border-[#E6EDE3] bg-[#FBFCF8] text-center">
       <div className="libertymd-content-shell grid items-center gap-[var(--libertymd-layout-gap)] lg:grid-cols-[minmax(19rem,0.74fr)_minmax(32rem,1.26fr)]">
         <div>
-          <p className="text-xs font-bold uppercase text-[#2563EB]">Simple pricing</p>
+          <p className="text-xs font-bold uppercase text-[#2563EB]">{t('marketing.pricing.kicker')}</p>
           <h2 className="mx-auto mt-3 max-w-lg font-serif text-4xl font-semibold leading-tight text-[#111827] sm:text-5xl">
-            Care that stays clear about cost.
+            {t('marketing.pricing.title')}
           </h2>
           <p className="mx-auto mt-5 max-w-md text-sm leading-7 text-[#5B6472] sm:text-base">
-            Start with a free private chat. Continue to a licensed online doctor only when you choose to.
+            {t('marketing.pricing.body')}
           </p>
           <div className="mt-7 flex flex-wrap justify-center gap-3 text-sm font-bold text-[#111827]">
             <span className="inline-flex items-center gap-2 rounded-full bg-[#E8EEF3] px-4 py-2">
-              <Globe2 className="h-4 w-4" /> Available nationwide
+              <Globe2 className="h-4 w-4" /> {t('marketing.pricing.nationwide')}
             </span>
             <span className="inline-flex items-center gap-2 rounded-full bg-[#E8EEF3] px-4 py-2">
-              <ShieldCheck className="h-4 w-4" /> Insurance supported
+              <ShieldCheck className="h-4 w-4" /> {t('marketing.pricing.insurance')}
             </span>
           </div>
           <button
@@ -417,7 +420,7 @@ export function LibertyMDPricingSection({ onStartChat }: MarketingSectionProps) 
             onClick={onStartChat}
             className="mt-8 inline-flex items-center gap-2 rounded-full bg-[#2563EB] px-7 py-3.5 text-sm font-bold text-white shadow-[0_12px_28px_rgba(37,99,235,0.28)] transition hover:bg-[#1D4ED8]"
           >
-            Start a free chat <ArrowRight className="h-4 w-4" />
+            {t('marketing.care.cta')} <ArrowRight className="h-4 w-4" />
           </button>
         </div>
 
@@ -437,7 +440,7 @@ export function LibertyMDPricingSection({ onStartChat }: MarketingSectionProps) 
             onTouchEnd={(event) => resetPricingCard(event.currentTarget)}
             onTouchCancel={(event) => resetPricingCard(event.currentTarget)}
             style={pricingCardStyle}
-            className="relative isolate touch-pan-y select-none overflow-hidden rounded-[28px] border border-white/90 bg-[#FDFDF7] p-4 text-center will-change-transform sm:rounded-[34px] sm:p-9"
+            className="libertymd-pricing-card relative isolate touch-pan-y select-none overflow-hidden rounded-[28px] border border-white/90 bg-[#FDFDF7] p-4 text-center will-change-transform sm:rounded-[34px] sm:p-9"
           >
             <div
               aria-hidden="true"
@@ -493,8 +496,14 @@ export function LibertyMDPricingSection({ onStartChat }: MarketingSectionProps) 
 }
 
 export function LibertyMDPatientStoriesSection() {
+  const { t } = useI18n();
+  const stories = patientStories.map((story, i) => ({
+    ...story,
+    category: t(`marketing.stories.items.${i}.category`),
+    title: t(`marketing.stories.items.${i}.title`),
+    quote: t(`marketing.stories.items.${i}.quote`),
+  }));
   const [activeStory, setActiveStory] = useState(0);
-  const [isUserPaused, setIsUserPaused] = useState(false);
   const [isInteracting, setIsInteracting] = useState(false);
   const railRef = useRef<HTMLDivElement | null>(null);
   const storyRefs = useRef<(HTMLElement | null)[]>([]);
@@ -537,12 +546,8 @@ export function LibertyMDPatientStoriesSection() {
     }
   };
 
-  const move = (direction: number) => {
-    goToStory(activeStory + direction);
-  };
-
   useEffect(() => {
-    if (isUserPaused || isInteracting || reduceMotion) return;
+    if (isInteracting || reduceMotion) return;
 
     const timer = window.setTimeout(() => {
       const wrapsToStart = activeStory === patientStories.length - 1;
@@ -550,52 +555,19 @@ export function LibertyMDPatientStoriesSection() {
     }, 2000);
 
     return () => window.clearTimeout(timer);
-  }, [activeStory, isInteracting, isUserPaused, reduceMotion]);
+  }, [activeStory, isInteracting, reduceMotion]);
 
   return (
     <section className="libertymd-section-spacing overflow-hidden border-t border-[#DCE8F4] bg-[#F5F9FD] text-center">
       <div className="libertymd-page-gutter libertymd-content-shell">
-        <div className="flex flex-col items-center justify-between gap-7 sm:flex-row sm:items-end sm:text-left">
-          <div className="max-w-3xl text-center sm:text-left">
-            <p className="text-xs font-bold uppercase text-[#2563EB]">LibertyMD stories</p>
-            <h2 className="mt-3 max-w-2xl font-serif text-4xl font-semibold leading-tight text-[#111827] sm:text-5xl">
-              A clearer conversation can change what happens next.
-            </h2>
-            <p className="mt-5 max-w-xl text-sm leading-7 text-[#5B6472] sm:text-base">
-              Sample patient stories showing how a structured health conversation can bring clarity before the next step.
-            </p>
-          </div>
-
-          <div className="flex shrink-0 items-center gap-3">
-            <span className="mr-1 text-xs font-bold tabular-nums text-[#64748B]">
-              {String(activeStory + 1).padStart(2, '0')} / {String(patientStories.length).padStart(2, '0')}
-            </span>
-            <button
-              type="button"
-              onClick={() => setIsUserPaused((current) => !current)}
-              aria-label={isUserPaused ? 'Play patient stories' : 'Pause patient stories'}
-              aria-pressed={isUserPaused}
-              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#B9CBE0] bg-white text-[#0B2E63] shadow-sm transition hover:border-[#2563EB] hover:text-[#2563EB] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563EB]"
-            >
-              {isUserPaused ? <Play className="h-4 w-4 fill-current" /> : <Pause className="h-4 w-4 fill-current" />}
-            </button>
-            <button
-              type="button"
-              onClick={() => move(-1)}
-              aria-label="Previous patient story"
-              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#B9CBE0] bg-white text-[#0B2E63] shadow-sm transition hover:border-[#2563EB] hover:text-[#2563EB] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563EB]"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => move(1)}
-              aria-label="Next patient story"
-              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#B9CBE0] bg-[#0B2E63] text-white shadow-[0_10px_24px_rgba(11,46,99,0.18)] transition hover:bg-[#2563EB] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563EB]"
-            >
-              <ChevronRight className="h-5 w-5" />
-            </button>
-          </div>
+        <div className="mx-auto max-w-3xl text-center">
+          <p className="text-xs font-bold uppercase text-[#2563EB]">{t('marketing.stories.kicker')}</p>
+          <h2 className="mx-auto mt-3 max-w-2xl font-serif text-4xl font-semibold leading-tight text-[#111827] sm:text-5xl">
+            {t('marketing.stories.title')}
+          </h2>
+          <p className="mx-auto mt-5 max-w-xl text-sm leading-7 text-[#5B6472] sm:text-base">
+            {t('marketing.stories.body')}
+          </p>
         </div>
       </div>
 
@@ -609,22 +581,18 @@ export function LibertyMDPatientStoriesSection() {
         onPointerDown={() => setIsInteracting(true)}
         onPointerUp={() => setIsInteracting(false)}
         onPointerCancel={() => setIsInteracting(false)}
-        className="libertymd-story-rail mt-10 flex snap-x snap-mandatory gap-4 overflow-x-auto px-[var(--libertymd-page-gutter)] pb-4 text-left sm:mt-12"
+        className="libertymd-story-rail mt-10 flex snap-x snap-proximity gap-4 overflow-x-auto px-[var(--libertymd-page-gutter)] pb-4 text-left sm:mt-12 sm:gap-5"
       >
-        {patientStories.map((story, index) => {
+        {stories.map((story, index) => {
           const isQuoteCard = story.format === 'quote';
 
           return (
-            <motion.article
+            <article
               key={story.name}
               ref={(node) => { storyRefs.current[index] = node; }}
               data-story-index={index}
               aria-label={`${story.name}: ${story.title}`}
-              initial={{ opacity: 0, y: 22 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.25 }}
-              transition={{ duration: 0.5, delay: Math.min(index * 0.06, 0.18) }}
-              className="relative aspect-[4/5] w-[82vw] max-w-[22rem] shrink-0 snap-center overflow-hidden rounded-2xl bg-[#0B2E63] shadow-[0_22px_55px_rgba(15,46,84,0.14)] sm:w-[22rem] lg:w-[calc((100%_-_2rem)/3)] lg:max-w-none"
+              className="relative aspect-[3/5] w-[76vw] max-w-[19rem] shrink-0 snap-center overflow-hidden rounded-xl bg-[#0B2E63] shadow-[0_22px_55px_rgba(15,46,84,0.14)] sm:w-[19rem]"
             >
               {isQuoteCard ? (
                 <>
@@ -671,7 +639,7 @@ export function LibertyMDPatientStoriesSection() {
                   </div>
                 </>
               )}
-            </motion.article>
+            </article>
           );
         })}
       </div>
@@ -684,20 +652,27 @@ export function LibertyMDPatientStoriesSection() {
 }
 
 export function LibertyMDHealthLibrarySection() {
+  const { t } = useI18n();
+  const articles = healthArticles.map((a, i) => ({
+    ...a,
+    category: t(`marketing.library.items.${i}.category`),
+    title: t(`marketing.library.items.${i}.title`),
+    description: t(`marketing.library.items.${i}.description`),
+  }));
   return (
     <section className="libertymd-page-gutter libertymd-section-spacing border-t border-[#E6EDE3] bg-white text-center">
       <div className="libertymd-content-shell flex flex-col items-center gap-5 border-b border-[#DDE7D8] pb-8">
         <div className="text-center">
-          <p className="text-xs font-bold uppercase text-[#2563EB]">LibertyMD health library</p>
-          <h2 className="mt-3 font-serif text-4xl font-semibold text-[#111827] sm:text-5xl">Understand your health.</h2>
+          <p className="text-xs font-bold uppercase text-[#2563EB]">{t('marketing.library.kicker')}</p>
+          <h2 className="mt-3 font-serif text-4xl font-semibold text-[#111827] sm:text-5xl">{t('marketing.library.title')}</h2>
         </div>
         <button type="button" className="inline-flex items-center gap-2 text-sm font-bold text-[#2563EB] hover:text-[#111827]">
-          Explore the library <BookOpen className="h-4 w-4" />
+          {t('marketing.library.explore')} <BookOpen className="h-4 w-4" />
         </button>
       </div>
 
       <div className="libertymd-content-shell mt-10 grid gap-[clamp(2rem,3.5vw,4rem)] md:grid-cols-3">
-        {healthArticles.map((article) => (
+        {articles.map((article) => (
           <article key={article.title} className="group text-center">
             <div className="aspect-[4/3] overflow-hidden rounded-lg bg-[#E8EEF3]">
               <img src={article.image} alt="" className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" />
@@ -706,7 +681,7 @@ export function LibertyMDHealthLibrarySection() {
             <h3 className="mt-3 text-xl font-black leading-snug text-[#111827]">{article.title}</h3>
             <p className="mt-3 text-sm leading-7 text-[#5B6472]">{article.description}</p>
             <button type="button" className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-[#2563EB] group-hover:text-[#111827]">
-              Read guide <ArrowRight className="h-4 w-4" />
+              {t('marketing.library.read')} <ArrowRight className="h-4 w-4" />
             </button>
           </article>
         ))}

@@ -1,0 +1,303 @@
+{
+  "_meta": {
+    "status": "approved",
+    "version": "1",
+    "source": "human"
+  },
+  "common": {
+    "startChat": "Start chat",
+    "send": "Send",
+    "back": "Back",
+    "retry": "Try again",
+    "loading": "Loading…",
+    "cancel": "Cancel",
+    "close": "Close",
+    "yes": "Yes",
+    "no": "No",
+    "notSure": "Not sure",
+    "preferToType": "Prefer to type",
+    "betaLanguage": "This language is in beta. Safety messages may appear in English."
+  },
+  "hero": {
+    "title": "Clinically informed guidance for your symptoms.",
+    "subtitle": "Free. Anonymous. Describe your symptoms and get a doctor-ready health report.",
+    "placeholder": "Describe your symptom, e.g. \"I've had a headache since yesterday\"",
+    "privacy": "No account needed to start. Your conversation is private.",
+    "whatBringsYouIn": "What brings you in?",
+    "taglineFree": "Free",
+    "taglineAnonymous": "Anonymous",
+    "taglineBuiltByDoctors": "Built by Doctors",
+    "placeholderShort": "Describe your symptoms",
+    "placeholderLong": "Describe symptom or ask any health questions",
+    "startChatOpening": "Opening chat"
+  },
+  "chat": {
+    "typing": "LibertyMD is thinking…",
+    "inputPlaceholder": "Type your answer…",
+    "newConsultation": "New consultation",
+    "redirect": "Let's stay focused on your health question so I can help you."
+  },
+  "demographics": {
+    "prompt": "To give you safe, relevant guidance, I need two details.",
+    "ageLabel": "Your age",
+    "sexLabel": "Sex at birth",
+    "sexFemale": "Female",
+    "sexMale": "Male",
+    "sexIntersex": "Intersex",
+    "sexPreferNot": "Prefer not to say",
+    "continue": "Continue"
+  },
+  "reportGate": {
+    "title": "Your report is ready",
+    "body": "Sign in with Google to save this report and your history, or continue as a guest.",
+    "google": "Continue with Google",
+    "skip": "View once as guest",
+    "skipNote": "Guest reports are available for 7 days and are not saved to an account."
+  },
+  "report": {
+    "title": "Your health report",
+    "likely": "Likely possibilities",
+    "evidence": "Supporting evidence",
+    "uncertainty": "What remains uncertain",
+    "warningSigns": "Warning signs to watch",
+    "selfCare": "Self-care",
+    "careSetting": "Recommended next step",
+    "download": "Download report",
+    "share": "Share with your doctor"
+  },
+  "safety": {
+    "emergencyTitle": "This may be an emergency",
+    "highRiskTitle": "Please read carefully",
+    "reviewTitle": "A clinician should review this",
+    "disclaimer": "LibertyMD is an informational service and not a substitute for professional medical advice, diagnosis, or treatment."
+  },
+  "menu": {
+    "profile": "Profile",
+    "history": "My consultations",
+    "signOut": "Sign out",
+    "signIn": "Sign in"
+  },
+  "errors": {
+    "generic": "Something went wrong. Your conversation is safe.",
+    "offline": "You appear to be offline. Reconnect to continue.",
+    "retryMessage": "Tap to retry your last message."
+  },
+  "app": {
+    "howItWorksKicker": "From symptom to next step",
+    "howItWorksTitle": "How LibertyMD works",
+    "howItWorksSubtitle": "Simple enough to use when you feel unwell.",
+    "trustedBy": "Trusted by 1,000,000+ users",
+    "trustedByShort": "1M+ users",
+    "hipaaShort": "HIPAA Private",
+    "hipaaLong": "HIPAA Compliant & Private",
+    "careAssistant": "LibertyMD care assistant",
+    "shareReport": "Share LibertyMD Report",
+    "clinicalConsiderations": "Clinical considerations",
+    "carePlan": "Care Plan",
+    "redFlags": "Red Flags",
+    "soapNote": "SOAP Note",
+    "handoffKicker": "Licensed handoff",
+    "handoffTitle": "Continue with a doctor when you need one.",
+    "availableIn": "Available in {wait}",
+    "doctorReview": "Can review the AI report and advise next steps for {price}.",
+    "humanCareKicker": "Human care",
+    "humanCareTitle": "A doctor's attention, built in.",
+    "humanCareSubtitle": "Every triage is designed to hand off cleanly to a licensed physician.",
+    "steps": [
+      {
+        "title": "Share your symptoms",
+        "eyebrow": "Start naturally",
+        "description": "Tell LibertyMD what you feel, when it began, and what worries you most. You do not need to know the medical words."
+      },
+      {
+        "title": "Focussed Follow-up",
+        "eyebrow": "Only what matters",
+        "description": "LibertyMD asks concise questions about timing, severity, history, and context, adapting each follow-up to your answers."
+      },
+      {
+        "title": "Safety Screen",
+        "eyebrow": "Urgency checked early",
+        "description": "Clinical guardrails look for warning signs throughout the conversation and clearly explain when urgent or emergency care is needed."
+      },
+      {
+        "title": "Doctor Ready Report",
+        "eyebrow": "Context ready to share",
+        "description": "Your answers become a structured summary with the symptom timeline, safety guidance, next steps, and a doctor-ready SOAP note."
+      }
+    ]
+  },
+  "marketing": {
+    "care": {
+      "kicker": "One continuous care story",
+      "title": "Urgent and primary care, without starting over.",
+      "aiLine": "AI that is always available.",
+      "doctorsHighlight": "Licensed doctors",
+      "doctorsRest": "when you need them.",
+      "body": "Your complete intake moves with you, so a physician already has the symptom history and context. Less time repeating yourself. More time focused on care.",
+      "priceLead": "Video visits with licensed doctors for",
+      "price": "$39 / visit",
+      "cta": "Start a free chat",
+      "drName": "Dr. Maya Chen, MD",
+      "drRole": "Reviewing your LibertyMD intake"
+    },
+    "pricing": {
+      "kicker": "Simple pricing",
+      "title": "Care that stays clear about cost.",
+      "body": "Start with a free private chat. Continue to a licensed online doctor only when you choose to.",
+      "nationwide": "Available nationwide",
+      "insurance": "Insurance supported",
+      "cta": "Start a free chat"
+    },
+    "stories": {
+      "kicker": "LibertyMD stories",
+      "title": "A clearer conversation can change what happens next.",
+      "body": "Sample patient stories showing how a structured health conversation can bring clarity before the next step.",
+      "play": "Play patient stories",
+      "pause": "Pause patient stories",
+      "prev": "Previous patient story",
+      "next": "Next patient story",
+      "items": [
+        {
+          "category": "Preparing for a visit",
+          "title": "I arrived knowing what to explain.",
+          "quote": "LibertyMD organized the timeline and warning signs, so my appointment started with the details that mattered."
+        },
+        {
+          "category": "Finding peace of mind",
+          "title": "The next step finally felt clear.",
+          "quote": "The conversation separated what I could monitor at home from the symptoms that would need urgent care."
+        },
+        {
+          "category": "Understanding symptoms",
+          "title": "I had better questions for my doctor.",
+          "quote": "Instead of searching through dozens of pages, I left with a concise report and a focused list of questions."
+        },
+        {
+          "category": "Recognizing urgency",
+          "title": "It made the warning signs easy to understand.",
+          "quote": "The safety questions were calm and direct. I understood why same-day care mattered and what to tell the clinician."
+        },
+        {
+          "category": "Following up",
+          "title": "I could pick up without starting over.",
+          "quote": "My timeline, medications, and next steps stayed together, which made the follow-up conversation much less scattered."
+        },
+        {
+          "category": "Managing a fever",
+          "title": "I knew what to watch overnight.",
+          "quote": "The plan gave me practical checkpoints for hydration, temperature, and the changes that would mean getting help."
+        },
+        {
+          "category": "Medication questions",
+          "title": "The conversation made my options simpler.",
+          "quote": "I could explain what I had already tried and understand which questions to take to my pharmacist and doctor."
+        },
+        {
+          "category": "After an injury",
+          "title": "I stopped guessing about the swelling.",
+          "quote": "LibertyMD helped me describe the injury clearly and understand when an examination or imaging could be appropriate."
+        },
+        {
+          "category": "Caring for family",
+          "title": "I felt calmer making the decision.",
+          "quote": "The questions helped me organize what had changed and decide what kind of care my mother needed next."
+        },
+        {
+          "category": "Recurring symptoms",
+          "title": "The pattern finally became visible.",
+          "quote": "Seeing the timing and triggers together gave me a much better starting point for a longer-term conversation."
+        },
+        {
+          "category": "Getting a second view",
+          "title": "I could think before choosing the next step.",
+          "quote": "The summary gave me language for my concerns without making the situation feel more frightening than it was."
+        },
+        {
+          "category": "Preparing for follow-up",
+          "title": "Nothing important slipped through the cracks.",
+          "quote": "I had one place for the symptom changes, questions, and next steps I wanted to cover at my follow-up."
+        }
+      ]
+    },
+    "library": {
+      "kicker": "LibertyMD health library",
+      "title": "Understand your health.",
+      "explore": "Explore the library",
+      "read": "Read guide",
+      "items": [
+        {
+          "category": "Everyday care",
+          "title": "When a fever needs more than rest",
+          "description": "A practical guide to duration, hydration, warning signs, and when to seek an evaluation."
+        },
+        {
+          "category": "Heart health",
+          "title": "Chest discomfort: the details that matter",
+          "description": "Learn how timing, exertion, breathing, and associated symptoms change the urgency of care."
+        },
+        {
+          "category": "Preparing for care",
+          "title": "How to build a useful symptom timeline",
+          "description": "Turn scattered observations into a concise story that is easier for a clinician to assess."
+        }
+      ]
+    }
+  },
+  "footer": {
+    "clinicalCare": "Clinical Care",
+    "symptomChecker": "Symptom Checker",
+    "urgentCare": "Urgent Care Specialist",
+    "primaryTelehealth": "Primary Telehealth",
+    "refills": "Prescription Refills",
+    "privacyGdpr": "GDPR Privacy Policy",
+    "hipaa": "HIPAA Compliance",
+    "company": "Company",
+    "about": "About LibertyMD",
+    "careers": "Careers",
+    "reviewers": "Medical Reviewers",
+    "conditions": "Conditions",
+    "respiratory": "Respiratory Care",
+    "cardiovascular": "Cardiovascular",
+    "allConditions": "All Conditions",
+    "research": "Research",
+    "blog": "Clinical Blog",
+    "partnerships": "Partnerships",
+    "becomePartner": "Become a Partner",
+    "euHealth": "EU Health Systems",
+    "helpPrivacy": "Help & Privacy",
+    "faqs": "FAQs",
+    "team": "Team",
+    "neurology": "Neurology & Migraine",
+    "usInsurance": "US Insurance Network"
+  },
+  "careControls": {
+    "agePlaceholder": "Age (18+)",
+    "sexLegend": "Sex assigned at birth",
+    "female": "Female",
+    "male": "Male",
+    "mergeNotice": "That Google account already has LibertyMD history. Sign in to merge this consultation safely.",
+    "signInMerge": "Sign in and merge",
+    "skipOnce": "Skip and view once",
+    "privateDefault": "Private by default. Guest reports expire after seven days.",
+    "yourLibertyMD": "Your LibertyMD",
+    "emptyHistory": "Your completed consultations will appear here.",
+    "privateGuest": "Private guest"
+  },
+  "chatx": {
+    "newChat": "New chat",
+    "privateConsult": "Private AI care consultation",
+    "emergencyNow": "Seek emergency care now",
+    "assessment": "Assessment and next steps",
+    "carePlan": "Care plan",
+    "redFlags": "Red flags",
+    "soap": "SOAP note",
+    "clinical": "Clinical considerations",
+    "phOpening": "Opening consultation...",
+    "phDemo": "Add age and sex above to continue",
+    "phReportGate": "Choose how to view your report",
+    "phReportReady": "Your report is ready above",
+    "phEnded": "This consultation has ended for safety",
+    "phAnswer": "Answer the follow-up question...",
+    "sendMessage": "Send message"
+  }
+}

@@ -108,7 +108,7 @@ The team responsible for safety review, prompt/version governance, incident inve
 2. Supabase creates or resumes an anonymous Auth user. This stable user ID owns all consultation rows.
 3. LibertyMD stores the first symptom and runs the safety screen.
 4. If no emergency is detected, the assistant acknowledges the symptom and asks for age and sex at birth using the embedded control.
-5. The profile is upserted against the anonymous user ID.
+5. Age and sex at birth are upserted into the account profile and self-patient record, and copied into the consultation's point-in-time patient snapshot.
 6. The interview asks one focused follow-up question and presents up to four answer options while still accepting free text.
 7. Every response passes through guardrail, relevance classification, explicit slot extraction, and evidence scoring.
 8. Diagnosis runs when the interview is ready and periodically after enough turns, but a report is accepted only if all deterministic quality gates pass.
@@ -117,9 +117,10 @@ The team responsible for safety review, prompt/version governance, incident inve
 
 1. A valid report is stored as `withheld`; report content is not returned to the anonymous client.
 2. LibertyMD shows a Google sign-in option and a skip option.
-3. Google linking upgrades the same anonymous identity, so consultations do not need ownership migration.
-4. After OAuth, LibertyMD synchronizes the Google name, email, avatar, and provider and releases the report as `saved`.
-5. Skip releases only the current report as `guest_released` with a seven-day retention deadline.
+3. Google linking normally upgrades the same anonymous identity. Before redirecting, LibertyMD creates a ten-minute transfer secret and stores only its hash.
+4. After same-ID OAuth, LibertyMD synchronizes the Google name, email, avatar, and provider and releases the report as `saved`.
+5. If Google already belongs to another LibertyMD identity, the user signs into that account and a service-role-only transaction moves LibertyMD records into it without deleting the shared-project Auth user.
+6. Skip releases only the current report as `guest_released` with a seven-day retention deadline.
 
 ### 9.3 Returning User
 
@@ -268,9 +269,13 @@ The policy controls report release. Model-generated confidence alone cannot bypa
 
 One row per Supabase Auth user with a unique `user_id`. Stores display name, email, avatar, age, sex at birth, provider, anonymous status, consent version, and timestamps. Profile creation uses upsert behavior.
 
+### `libertymd_patients`
+
+Separates the person receiving care from the account that owns access. Stores relationship, display label, age, sex at birth, gender identity, active state, and timestamps. The current release creates one self-patient per account and leaves room for dependents later.
+
 ### `libertymd_consultations`
 
-Stores state machine status, region, chief complaint, patient turn count, explicit filled/missing slots, target slot, intermediate differentials, safety state, report gate, workflow versions, non-clinical counters, evidence score, resolution reason, activity, completion, and retention timestamps.
+Stores the patient reference and immutable intake snapshot plus state machine status, region, chief complaint, patient turn count, explicit filled/missing slots, target slot, intermediate differentials, safety state, report gate, workflow versions, non-clinical counters, evidence score, resolution reason, activity, completion, and retention timestamps.
 
 ### `libertymd_messages`
 
@@ -282,14 +287,23 @@ Stores every guardrail result separately, including `high_risk_continue`, risk, 
 
 ### `libertymd_reports`
 
-Stores one report per consultation with report JSON, confidence, model metadata, access status, release time, retention deadline, and timestamps.
+Stores one report per consultation with report JSON, confidence, the selected diagnostic-run reference, model metadata, access status, release time, retention deadline, and timestamps.
+
+### `libertymd_diagnostic_runs`
+
+Append-only record of every diagnosis attempt, including input snapshot, clinical summary and reasoning, differential, confidence, evidence, validation result, and model/workflow metadata. An invalid attempt remains auditable and cannot become a report merely because the turn limit was reached.
+
+### Identity, consent, and product ledgers
+
+`libertymd_identity_events` records linking and merge lifecycle events. `libertymd_account_merges` stores hashed, expiring transfer tokens. `libertymd_consent_events` is append-only and versioned. `libertymd_product_events` accepts only allow-listed non-clinical events and must never contain symptoms, transcripts, diagnoses, reports, names, or email addresses.
 
 All updateable core tables use an `updated_at` trigger. Query-critical fields are typed; evolving clinical/report structures use JSONB.
 
 ## 15. Authentication And Authorization
 
 - New visitors use Supabase anonymous Auth, not a client-generated pseudo-ID.
-- Google uses manual identity linking to keep the same `auth.users.id`.
+- Google uses manual identity linking to keep the same `auth.users.id` whenever the Google identity is new.
+- Existing-Google-account recovery uses an expiring one-time token and a service-role-only transaction to transfer LibertyMD ownership to the existing ID.
 - The backend derives `user_id` from the authenticated request.
 - RLS permits a user to read their own profile, consultations, and messages.
 - Reports are readable only when `access_status` is `saved` or `guest_released`.
@@ -312,8 +326,8 @@ All updateable core tables use an `updated_at` trigger. Query-critical fields ar
 
 - Keep the Edge Function stateless; Postgres stores authoritative consultation state.
 - Use indexed owner/activity, status, message sequence, safety, retention, and resolution queries.
-- Use idempotency keys for message submission before supporting retries across unreliable networks.
-- Add optimistic concurrency or a consultation version to prevent two simultaneous messages from overwriting slots.
+- Every message submission uses a stable idempotency key for safe retries across unreliable networks.
+- Every client submission carries the last-read consultation version; a database lease and optimistic version check prevent simultaneous messages from overwriting slots.
 - Bound transcript context and rely on explicit slots plus summaries as conversations grow.
 - Add workflow timeout, circuit breaker, and safe fallback behavior for n8n/model outages.
 - Queue non-interactive work such as report enrichment, notifications, cleanup, and analytics.
@@ -371,7 +385,7 @@ No raw clinical text should enter the product analytics stream.
 - Off-topic answers do not populate slots.
 - Low-evidence or low-confidence turn-15 cases do not receive a report.
 - A valid report is stored withheld and cannot be read before release.
-- Google linking preserves the same user ID and releases saved history.
+- Google linking preserves the same user ID when possible; an existing-account conflict securely transfers LibertyMD history to the already-linked ID.
 - Skip releases only the current report with limited retention.
 - Returning linked users can load authorized history.
 - All workflows return schema-valid JSON and retain no execution payloads.
@@ -389,9 +403,9 @@ The loops validate orchestration and policy contracts, not clinical efficacy. Se
 
 ### Gate 0: Configuration
 
-- Explicitly approve and enable anonymous sign-ins in the linked Supabase project.
-- Configure Google OAuth and manual identity linking for the production domains.
-- Add n8n webhook secret, CAPTCHA, rate limits, and host-level execution pruning.
+- Anonymous sign-ins, Google OAuth, manual identity linking, and LibertyMD callback URLs are enabled.
+- Add CAPTCHA, monitored rate limits, and abuse alerts.
+- Verify n8n webhook secret, log redaction, and host-level execution pruning.
 
 ### Gate 1: Internal Alpha
 
@@ -410,9 +424,9 @@ The loops validate orchestration and policy contracts, not clinical efficacy. Se
 - Require clinical governance sign-off, privacy/legal review, accessibility review, load testing, and on-call ownership.
 - Publish limitations, emergency guidance, privacy terms, and report-retention behavior.
 
-## 23. Known Launch Blocker
+## 23. Remaining Launch Gates
 
-Anonymous sign-ins and manual identity linking are disabled on the linked Supabase project. Settings currently report `anonymous_users=false` and `security_manual_linking_enabled=false`. The repository, RLS, retention, and smoke runner are prepared, but both narrow Management API updates affect every application on this shared project and therefore require explicit project-wide approval.
+The anonymous-first engineering flow is enabled and live-smoke verified. Public clinical launch still requires a designated-account Google callback test for both new and existing Google identities, clinician-approved scenarios and thresholds, privacy/legal approval, CAPTCHA and abuse controls, scheduled retention cleanup, and n8n host-level retention verification.
 
 ## 24. Open Decisions
 
@@ -431,6 +445,7 @@ Anonymous sign-ins and manual identity linking are disabled on the linked Supaba
 - `supabase/functions/libertymd-care-proxy/`
 - `supabase/migrations/20260718080000_libertymd_care_schema.sql`
 - `supabase/migrations/20260718090000_libertymd_clinical_quality_gates.sql`
+- `supabase/migrations/20260719100000_libertymd_identity_and_diagnostic_tracking.sql`
 - `components/LibertyMD/LibertyMDCareControls.tsx`
 - `scripts/libertymd-flow-simulation.ts`
 - `scripts/libertymd-live-validation.ts`

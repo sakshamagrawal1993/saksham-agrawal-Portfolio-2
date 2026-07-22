@@ -1,20 +1,11 @@
 import { useEffect } from 'react';
 
 /**
- * SmoothScroll — Lenis smooth scroll (default), with a native-scroll escape hatch for A/B.
+ * SmoothScroll — the single Lenis scrolling experience used across the portfolio.
  *
- * Renders nothing. When the active mode is "lenis" it lazy-loads Lenis (installed package,
- * CDN fallback) and drives it with a requestAnimationFrame loop; when "native" it loads
- * NOTHING and the browser's own scroll is used.
- *
- * Pick the mode three ways (first match wins):
- *   1. prop:            <SmoothScroll mode="native" />
- *   2. URL query:       ?scroll=native   or   ?scroll=lenis      ← side-by-side comparison
- *   3. localStorage:    key "smoothScroll" = "lenis" | "native"  ← set by <DevScrollToggle/>
- * Default is "lenis".
+ * Renders nothing, lazy-loads Lenis, and drives it with a requestAnimationFrame loop.
+ * Reduced-motion preferences and load failures still fall back safely to browser scrolling.
  */
-
-export type ScrollMode = 'native' | 'lenis';
 
 // The slice of the Lenis instance API we actually use.
 type LenisInstance = { raf: (t: number) => void; destroy: () => void };
@@ -22,20 +13,6 @@ type LenisModule = { default: new (opts?: unknown) => LenisInstance };
 
 // Fallback only — used if the installed `lenis` package can't be imported for some reason.
 const CDN_LENIS = 'https://cdn.jsdelivr.net/npm/lenis@1/+esm';
-
-export function resolveScrollMode(propMode?: ScrollMode): ScrollMode {
-  if (propMode) return propMode;
-  if (typeof window === 'undefined') return 'lenis';
-  const q = new URLSearchParams(window.location.search).get('scroll');
-  if (q === 'lenis' || q === 'native') return q;
-  try {
-    const stored = window.localStorage.getItem('smoothScroll');
-    if (stored === 'lenis' || stored === 'native') return stored;
-  } catch {
-    /* localStorage blocked — fall through */
-  }
-  return 'lenis';
-}
 
 // Load Lenis from the installed package; fall back to CDN if resolution ever fails.
 async function loadLenis(): Promise<LenisModule> {
@@ -62,10 +39,8 @@ function injectLenisCss() {
   document.head.appendChild(style);
 }
 
-export function SmoothScroll({ mode }: { mode?: ScrollMode }) {
+export function SmoothScroll() {
   useEffect(() => {
-    if (resolveScrollMode(mode) !== 'lenis') return;
-
     // Respect reduced-motion: never force smoothing on users who opted out.
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
 
@@ -97,7 +72,7 @@ export function SmoothScroll({ mode }: { mode?: ScrollMode }) {
       lenis?.destroy();
       document.getElementById('lenis-css')?.remove();
     };
-  }, [mode]);
+  }, []);
 
   return null;
 }

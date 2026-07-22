@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useI18n } from '../../i18n';
+import LibertyMDLanguageSwitcher from './LibertyMDLanguageSwitcher';
 import { 
   ShieldCheck, 
   Globe, 
@@ -185,12 +188,19 @@ const howItWorksSteps = [
 ];
 
 function LibertyMDHowItWorksTabs() {
+  const { t, language } = useI18n();
+  const steps = howItWorksSteps.map((step, i) => ({
+    ...step,
+    title: t(`app.steps.${i}.title`),
+    eyebrow: t(`app.steps.${i}.eyebrow`),
+    description: t(`app.steps.${i}.description`),
+  }));
   const [activeStep, setActiveStep] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [cycleKey, setCycleKey] = useState(0);
   const tabRailRef = useRef<HTMLDivElement | null>(null);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  const currentStep = howItWorksSteps[activeStep];
+  const currentStep = steps[activeStep];
 
   useEffect(() => {
     if (isPaused || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -240,7 +250,7 @@ function LibertyMDHowItWorksTabs() {
         aria-label="How LibertyMD works"
         className="libertymd-how-tabs flex snap-x snap-mandatory gap-4 overflow-x-auto border-b border-[#CAD8D0] pb-0 lg:grid lg:grid-cols-4 lg:gap-7"
       >
-        {howItWorksSteps.map((step, index) => {
+        {steps.map((step, index) => {
           const Icon = step.icon;
           const isActive = index === activeStep;
 
@@ -308,6 +318,8 @@ function LibertyMDHowItWorksTabs() {
 }
 
 export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
+  const navigate = useNavigate();
+  const { t, language } = useI18n();
   const [region] = useState<'EU' | 'US'>('EU');
   const [input, setInput] = useState('');
   const [phase, setPhase] = useState<ChatPhase>('initial');
@@ -335,6 +347,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
   const [isTyping, setIsTyping] = useState(false);
   const [selectedTab, setSelectedTab] = useState<'chat' | 'doctors'>('chat');
   const [isFloatingComposerVisible, setIsFloatingComposerVisible] = useState(false);
+  const [isFloatingInputFocused, setIsFloatingInputFocused] = useState(false);
   const [isHeroInputFocused, setIsHeroInputFocused] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const chatPanelRef = useRef<HTMLDivElement | null>(null);
@@ -407,6 +420,10 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
       try {
         const params = new URLSearchParams(window.location.search);
         const oauthConsultation = params.get('consultation');
+        if (params.get('auth') === 'complete' && oauthConsultation) {
+          navigate(`/liberty-md/chat?consultationId=${encodeURIComponent(oauthConsultation)}&auth=complete&lang=${language}`, { replace: true });
+          return;
+        }
         const action = params.get('auth') === 'complete' ? 'sync_identity' : 'bootstrap';
         const data = await invokeCareProxy({ action, consultation_id: oauthConsultation || undefined });
         if (cancelled) return;
@@ -455,38 +472,25 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
     return () => { cancelled = true; };
   }, []);
 
-  const beginConsultation = async (symptom: string) => {
-    setIsTyping(true);
+  const beginConsultation = (symptom: string) => {
+    const cleanedSymptom = symptom.trim();
+    if (!cleanedSymptom) return;
+
     setError('');
     setSafetyNotice('');
-    try {
-      const data = await invokeCareProxy({ action: 'start_consultation', message: symptom });
-      if (!data?.consultation_id) throw new Error('Unable to start LibertyMD consultation.');
-      setSessionId(data.consultation_id);
-      if (data?.emergency) {
-        setPhase('emergency_end');
-        setMessages(prev => [...prev, {
-          id: `${Date.now()}-emergency`,
-          sender: 'ai',
-          kind: 'emergency',
-          text: data.message || 'These symptoms may be an emergency. Seek emergency care now.',
-        }]);
-        return;
-      }
-      setPhase('demographics_required');
-      if (data?.safety?.message) setSafetyNotice(String(data.safety.message));
-      setMessages(prev => [...prev, {
-        id: `${Date.now()}-demographics`,
-        sender: 'ai',
-        kind: 'system',
-        text: data.acknowledgement || 'I’m sorry you are dealing with that. First, what is the patient’s age and sex assigned at birth?',
-      }]);
-    } catch (startError) {
-      setError(startError instanceof Error ? startError.message : 'The LibertyMD workflow is temporarily unavailable.');
-      setPhase('error');
-    } finally {
-      setIsTyping(false);
-    }
+    const draftId = crypto.randomUUID();
+    navigate(`/liberty-md/chat?draftId=${encodeURIComponent(draftId)}`, {
+      state: {
+        libertyMDStartRequest: {
+          draftId,
+          symptom: cleanedSymptom,
+          profile,
+          isAnonymous,
+          history,
+          demographics,
+        },
+      },
+    });
   };
 
   const sendToWorkflow = async (text: string, activeSessionId?: string) => {
@@ -616,19 +620,9 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
 
   const handleSend = (textToSend?: string) => {
     const text = (textToSend || input).trim();
-    if (!text || isTyping || ['demographics_required', 'report_gate', 'report_ready', 'emergency_end', 'clinical_review_needed'].includes(phase)) return;
-
-    hasActiveConsultRef.current = true;
+    if (!text || isTyping) return;
     setInput('');
-    setReport(null);
-    setMessages(prev => [...prev, {
-      id: Date.now().toString(),
-      sender: 'user',
-      text
-    }]);
-    chatPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    if (!sessionId || phase === 'initial' || phase === 'error') void beginConsultation(text);
-    else void sendToWorkflow(text);
+    void beginConsultation(text);
   };
 
   const startGoogleLink = async () => {
@@ -665,34 +659,8 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
   };
 
   const loadConsultation = async (consultationId: string) => {
-    setIsAccountLoading(true);
-    try {
-      const data = await invokeCareProxy({ action: 'get_consultation', consultation_id: consultationId });
-      setSessionId(consultationId);
-      setMessages((data.messages || []).map((item: any, index: number) => ({
-        id: `${consultationId}-${index}`,
-        sender: item.role === 'user' ? 'user' : 'ai',
-        text: item.content,
-        options: Array.isArray(item.options) ? item.options : [],
-        kind: item.message_type === 'safety' ? 'emergency' : item.message_type === 'report_gate' ? 'report' : 'normal',
-      })));
-      if (data.report) {
-        setReport(normalizeReport(data.report));
-        setPhase('report_ready');
-      } else {
-        const status = data.consultation?.status;
-        const nextPhase = status === 'awaiting_demographics' ? 'demographics_required' : status === 'report_pending_auth' ? 'report_gate' : status === 'emergency_stopped' ? 'emergency_end' : 'intake';
-        setPhase(nextPhase);
-        setIsReportGateOpen(nextPhase === 'report_gate');
-      }
-      hasActiveConsultRef.current = true;
-      setIsMenuOpen(false);
-      chatPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    } catch (historyError) {
-      setError(historyError instanceof Error ? historyError.message : 'Unable to load the consultation.');
-    } finally {
-      setIsAccountLoading(false);
-    }
+    setIsMenuOpen(false);
+    navigate(`/liberty-md/chat?consultationId=${encodeURIComponent(consultationId)}&lang=${language}`);
   };
 
   const resetConsult = () => {
@@ -747,6 +715,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
 
             <div className="flex items-center gap-3 text-sm font-semibold text-[#334155] sm:gap-5">
               {!isAnonymous && greetingName && <span className="hidden sm:inline">Hi, {greetingName}</span>}
+              <LibertyMDLanguageSwitcher />
               <button
                 type="button"
                 aria-label="Open profile and consultation history"
@@ -888,13 +857,13 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
               </h1>
             </div>
             <p className="libertymd-hero-value mt-3 text-base font-semibold leading-6 text-[#334155] sm:text-lg">
-              Clinically verified guidance for your symptoms.
+              {t('hero.title')}
             </p>
             <p
               className="libertymd-hero-tagline mt-2 flex min-h-6 flex-wrap items-center justify-center gap-x-2 text-sm font-bold text-[#17325F] sm:gap-x-3 sm:text-base"
               aria-label="Free, Anonymous, Built by Doctors"
             >
-              {['Free', 'Anonymous', 'Built by Doctors'].map((phrase, index) => (
+              {[t('hero.taglineFree'), t('hero.taglineAnonymous'), t('hero.taglineBuiltByDoctors')].map((phrase, index) => (
                 <span
                   key={phrase}
                   className="libertymd-tagline-word inline-flex items-center gap-2 sm:gap-3"
@@ -933,7 +902,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                   htmlFor="libertymd-hero-symptoms"
                   className="absolute -top-4 left-5 rounded-full bg-[#E5FFB8] px-4 py-2 text-sm font-black text-[#111827] shadow-[0_4px_12px_rgba(91,125,44,0.08)] sm:left-8 sm:px-5 sm:text-base [@media(max-height:700px)]:left-5 [@media(max-height:700px)]:px-4 [@media(max-height:700px)]:py-2 [@media(max-height:700px)]:text-xs"
                 >
-                  What brings you in?
+                  {t('hero.whatBringsYouIn')}
                 </label>
                 <div className="libertymd-hero-composer-field relative w-full">
                   {!input && !isHeroInputFocused && (
@@ -941,8 +910,8 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                       aria-hidden="true"
                       className="pointer-events-none absolute inset-x-0 top-0 px-4 py-2 !text-left text-base leading-7 text-[#64748B] sm:px-5 sm:py-4 sm:text-xl [@media(max-height:700px)]:px-3 [@media(max-height:700px)]:py-1 [@media(max-height:700px)]:text-xs [@media(max-height:700px)]:leading-5"
                     >
-                      <span className="sm:hidden">Describe your symptoms</span>
-                      <span className="hidden sm:inline">Describe symptom or ask any health questions</span>
+                      <span className="sm:hidden">{t('hero.placeholderShort')}</span>
+                      <span className="hidden sm:inline">{t('hero.placeholderLong')}</span>
                       <span className="ml-0.5 inline-flex" aria-hidden="true">
                         {[0, 1, 2].map((dot) => (
                           <span
@@ -963,6 +932,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                     rows={3}
                     value={input}
                     onChange={(event) => setInput(event.target.value)}
+                    disabled={isTyping}
                     onFocus={() => setIsHeroInputFocused(true)}
                     onBlur={() => setIsHeroInputFocused(false)}
                     onKeyDown={(event) => {
@@ -977,30 +947,29 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                 <button
                   type="submit"
                   aria-label={input.trim() ? 'Start LibertyMD chat' : 'Start by describing your symptoms'}
+                  disabled={isTyping}
                   className={`libertymd-start-chat-cta ${!input.trim() ? 'libertymd-start-chat-cta--waiting' : ''} absolute bottom-5 left-5 right-5 isolate inline-flex h-[52px] cursor-pointer items-center justify-center gap-3 overflow-hidden rounded-full bg-[#2563EB] px-8 text-base font-bold text-white ring-1 ring-white/60 transition-[background-color,box-shadow,transform] duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#93C5FD] sm:bottom-5 sm:left-auto sm:right-5 sm:h-14 sm:w-64 [@media(max-height:700px)]:bottom-4 [@media(max-height:700px)]:left-4 [@media(max-height:700px)]:right-4 [@media(max-height:700px)]:h-12 [@media(max-height:700px)]:w-auto`}
                 >
-                  <span className="relative z-10">Start chat</span>
-                  <ArrowRight className="libertymd-start-chat-arrow relative z-10 h-5 w-5" />
+                  {isTyping ? <Loader2 className="relative z-10 h-5 w-5 animate-spin" /> : null}
+                  <span className="relative z-10">{isTyping ? t('hero.startChatOpening') : t('common.startChat')}</span>
+                  {!isTyping && <ArrowRight className="libertymd-start-chat-arrow relative z-10 h-5 w-5" />}
                 </button>
               </form>
 
               <div className="libertymd-hero-trust-row mt-2 flex flex-row items-center justify-between gap-2 text-xs font-medium text-[#626262] sm:text-sm [@media(max-height:700px)]:mt-0 [@media(max-height:700px)]:gap-1">
                 <div className="flex flex-nowrap items-center justify-start gap-2 [@media(max-height:700px)]:gap-1">
-                  <span>4.5</span>
-                  <span className="inline-flex h-4 w-4 items-center justify-center bg-[#169B52] sm:hidden" aria-hidden="true">
-                    <Star className="h-3 w-3 fill-white text-white" />
-                  </span>
-                  <span className="hidden gap-0.5 sm:inline-flex" aria-label="4.5 out of 5 rating">
+                  <span className="hidden sm:inline">4.5</span>
+                  <span className="inline-flex gap-0.5" aria-label="4.5 out of 5 rating">
                     {[0, 1, 2, 3, 4].map((item) => (
                       <span
                         key={item}
-                        className={`inline-flex h-5 w-5 items-center justify-center [@media(max-height:700px)]:h-4 [@media(max-height:700px)]:w-4 ${
+                        className={`inline-flex h-5 w-5 items-center justify-center ${
                           item === 4
                             ? 'bg-[linear-gradient(90deg,#169B52_0%,#169B52_50%,#D4D4D4_50%,#D4D4D4_100%)]'
                             : 'bg-[#169B52]'
                         }`}
                       >
-                        <Star className="h-3.5 w-3.5 fill-white text-white [@media(max-height:700px)]:h-3 [@media(max-height:700px)]:w-3" />
+                        <Star className="h-3.5 w-3.5 fill-white text-white" />
                       </span>
                     ))}
                   </span>
@@ -1010,15 +979,20 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                   aria-label="Trusted by more than 1,000,000 users"
                 >
                   <UsersRound className="h-4 w-4 shrink-0 text-[#17325F] sm:h-5 sm:w-5" aria-hidden="true" />
-                  <span className="sm:hidden">1M+ users</span>
-                  <span className="hidden sm:inline">Trusted by 1,000,000+ users</span>
+                  <span className="sm:hidden">{t('app.trustedByShort')}</span>
+                  <span className="hidden sm:inline">{t('app.trustedBy')}</span>
                 </span>
                 <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[#17325F] sm:gap-2">
                   <ShieldCheck className="h-4 w-4 text-[#17325F] sm:h-5 sm:w-5" />
-                  <span className="sm:hidden">HIPAA Private</span>
-                  <span className="hidden sm:inline">HIPAA Compliant &amp; Private</span>
+                  <span className="sm:hidden">{t('app.hipaaShort')}</span>
+                  <span className="hidden sm:inline">{t('app.hipaaLong')}</span>
                 </span>
               </div>
+              {error && phase === 'initial' && (
+                <p role="alert" className="mt-2 text-center text-xs font-semibold text-amber-800">
+                  {error}
+                </p>
+              )}
             </div>
           </div>
 
@@ -1027,12 +1001,12 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
 
         <section ref={chatPanelRef} className="libertymd-page-gutter relative z-0 bg-[linear-gradient(180deg,rgba(245,250,243,0.96),rgba(237,247,241,0.98))] pb-16 pt-[300px] sm:pt-[340px]">
           <div className="mx-auto max-w-3xl text-center">
-            <p className="text-xs font-bold uppercase tracking-normal text-[#2563EB]">From symptom to next step</p>
+            <p className="text-xs font-bold uppercase tracking-normal text-[#2563EB]">{t('app.howItWorksKicker')}</p>
             <h2 ref={logoDockHeadlineRef} className="mt-3 text-4xl font-black leading-tight tracking-normal text-[#111827] sm:text-5xl">
-              How LibertyMD works
+              {t('app.howItWorksTitle')}
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-base font-bold leading-7 text-[#17325F] sm:text-lg">
-              Simple enough to use when you feel unwell.
+              {t('app.howItWorksSubtitle')}
             </p>
           </div>
 
@@ -1044,7 +1018,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
               <div className="mb-4 flex items-center justify-between border-b border-[#DDE7D8] pb-3">
                 <div className="flex items-center gap-2.5">
                   <span className="h-2.5 w-2.5 rounded-full bg-[#16A34A]" />
-                  <span className="text-sm font-bold text-[#111827]">LibertyMD care assistant</span>
+                  <span className="text-sm font-bold text-[#111827]">{t('app.careAssistant')}</span>
                   <span className="hidden text-xs text-[#64748B] sm:inline">Private session · {region}</span>
                 </div>
                 <button onClick={resetConsult} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#64748B] hover:text-[#2563EB]">
@@ -1117,7 +1091,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                   <div className="border-t border-[#DDE7D8] pt-7">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                       <div>
-                        <p className="text-xs font-bold uppercase tracking-normal text-[#2563EB]">Share LibertyMD Report</p>
+                        <p className="text-xs font-bold uppercase tracking-normal text-[#2563EB]">{t('app.shareReport')}</p>
                         <h3 className="mt-2 text-3xl font-black tracking-normal text-[#111827]">Assessment & Plan</h3>
                       </div>
                       <button
@@ -1133,7 +1107,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
 
                     {report.differentials.length > 0 && (
                       <div className="mt-8 space-y-5 border-t border-[#DDE7D8] pt-6">
-                        <p className="text-xs font-bold uppercase tracking-normal text-[#64748B]">Clinical considerations</p>
+                        <p className="text-xs font-bold uppercase tracking-normal text-[#64748B]">{t('app.clinicalConsiderations')}</p>
                         {report.differentials.map((item, index) => (
                           <div key={`${item.name}-${index}`} className="border-b border-[#DDE7D8] pb-5">
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -1151,7 +1125,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
 
                     <div className="mt-8 grid gap-8 md:grid-cols-2">
                       <div>
-                        <h4 className="text-sm font-black text-[#166534]">Care Plan</h4>
+                        <h4 className="text-sm font-black text-[#166534]">{t('app.carePlan')}</h4>
                         <ul className="mt-3 space-y-2 text-sm leading-7 text-[#334155]">
                           {(report.plan.length ? report.plan : ['Monitor symptoms, rest, hydrate, and follow up if symptoms worsen.']).map((item, index) => (
                             <li key={index}>- {item}</li>
@@ -1159,7 +1133,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                         </ul>
                       </div>
                       <div>
-                        <h4 className="text-sm font-black text-[#991B1B]">Red Flags</h4>
+                        <h4 className="text-sm font-black text-[#991B1B]">{t('app.redFlags')}</h4>
                         <ul className="mt-3 space-y-2 text-sm leading-7 text-[#334155]">
                           {(report.redFlags.length ? report.redFlags : ['Seek urgent care for chest pain, trouble breathing, confusion, fainting, severe worsening pain, or symptoms that feel dangerous.']).map((item, index) => (
                             <li key={index}>- {item}</li>
@@ -1169,7 +1143,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                     </div>
 
                     <div className="mt-8 border-t border-[#DDE7D8] pt-6">
-                      <h4 className="font-black text-[#111827]">SOAP Note</h4>
+                      <h4 className="font-black text-[#111827]">{t('app.soapNote')}</h4>
                       <div className="mt-4 grid gap-x-8 gap-y-5 md:grid-cols-2">
                         {[
                           ['Subjective', report.soap.subjective],
@@ -1252,9 +1226,9 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
         {selectedTab === 'doctors' && (
           <section className="libertymd-page-gutter libertymd-section-spacing border-t border-[#E6EDE3] bg-[linear-gradient(180deg,rgba(251,252,248,0.98),rgba(239,246,255,0.72))]">
             <div className="libertymd-content-shell">
-              <p className="text-xs font-bold uppercase tracking-normal text-[#2563EB]">Licensed handoff</p>
+              <p className="text-xs font-bold uppercase tracking-normal text-[#2563EB]">{t('app.handoffKicker')}</p>
               <h2 className="mx-auto mt-3 max-w-xl text-3xl font-black tracking-normal text-[#111827] sm:text-4xl">
-                Continue with a doctor when you need one.
+                {t('app.handoffTitle')}
               </h2>
               <div className="mt-10 grid gap-8 md:grid-cols-3">
                 {[
@@ -1263,11 +1237,11 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                   ['Dr. Barry Pevner, MD', 'Family Medicine', '18 mins']
                 ].map(([name, specialty, wait]) => (
                   <div key={name} className="border-t border-[#DDE7D8] pt-5">
-                    <p className="text-xs font-bold uppercase tracking-normal text-[#64748B]">Available in {wait}</p>
+                    <p className="text-xs font-bold uppercase tracking-normal text-[#64748B]">{t('app.availableIn', { wait: String(wait) })}</p>
                     <h3 className="mt-3 text-lg font-black text-[#111827]">{name}</h3>
                     <p className="mt-1 text-sm font-semibold text-[#2563EB]">{specialty}</p>
                     <p className="mt-3 text-sm leading-7 text-[#5B6472]">
-                      Can review the AI report and advise next steps for {region === 'EU' ? '€39' : '$39'}.
+                      {t('app.doctorReview', { price: region === 'EU' ? '€39' : '$39' })}
                     </p>
                     <button className="mt-4 rounded-full bg-[#5661F6] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#4651E6]">
                       Start visit
@@ -1290,12 +1264,12 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
             glow sits behind so it melts into the surrounding sections instead of reading as a hard rectangle. */}
         <section className="libertymd-page-gutter libertymd-section-spacing relative overflow-hidden border-t border-[#E6EDE3] bg-[linear-gradient(180deg,rgba(245,250,243,0.96)_0%,rgba(248,250,247,0.97)_100%)]">
           <div className="mx-auto max-w-3xl text-center">
-            <p className="text-xs font-bold uppercase tracking-normal text-[#2563EB]">Human care</p>
+            <p className="text-xs font-bold uppercase tracking-normal text-[#2563EB]">{t('app.humanCareKicker')}</p>
             <h2 className="mx-auto mt-3 max-w-xl text-3xl font-black tracking-normal text-[#111827] sm:text-4xl">
-              A doctor&rsquo;s attention, built in.
+              {t('app.humanCareTitle')}
             </h2>
             <p className="mx-auto mt-4 max-w-lg text-sm leading-7 text-[#5B6472]">
-              Every triage is designed to hand off cleanly to a licensed physician.
+              {t('app.humanCareSubtitle')}
             </p>
           </div>
           <div className="relative mx-auto mt-10 w-full max-w-[80rem]">
@@ -1385,18 +1359,20 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
             type="text"
             value={input}
             onChange={(event) => setInput(event.target.value)}
+            onFocus={() => setIsFloatingInputFocused(true)}
+            onBlur={() => setIsFloatingInputFocused(false)}
             disabled={isComposerLocked}
-            placeholder="Ask about your health..."
+            placeholder={isFloatingInputFocused ? '' : 'Ask about your health...'}
             aria-label="Ask LibertyMD about your health"
             tabIndex={shouldShowFloatingComposer ? 0 : -1}
-            className="min-w-0 flex-1 bg-transparent px-1 text-center text-sm font-medium text-[#0F172A] outline-none placeholder:text-[#64748B] sm:text-lg"
+            className="min-w-0 flex-1 bg-transparent px-1 !text-left text-sm font-medium text-[#0F172A] outline-none placeholder:text-[#64748B] sm:text-lg"
           />
           <button
             type="submit"
             aria-label="Send health question"
             tabIndex={shouldShowFloatingComposer ? 0 : -1}
-            disabled={isComposerLocked}
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#2563EB] text-white shadow-[0_10px_24px_rgba(37,99,235,0.38)] transition-[background-color,box-shadow,transform] hover:bg-[#1D4ED8] hover:shadow-[0_13px_30px_rgba(37,99,235,0.45)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 sm:h-16 sm:w-16"
+            disabled={isComposerLocked || !input.trim()}
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#2563EB] text-white shadow-[0_10px_24px_rgba(37,99,235,0.38)] transition-[background-color,box-shadow,opacity,transform] hover:bg-[#1D4ED8] hover:shadow-[0_13px_30px_rgba(37,99,235,0.45)] active:scale-95 disabled:cursor-not-allowed disabled:bg-[#A7B3C5] disabled:opacity-70 disabled:shadow-none sm:h-16 sm:w-16"
           >
             <Send className="h-5 w-5 sm:h-6 sm:w-6" />
           </button>
@@ -1414,54 +1390,54 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
             {/* Left Columns */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-8 text-xs font-medium text-[#334155]">
               <div className="space-y-4">
-                <p className="font-semibold text-sm text-[#0F172A]">Clinical Care</p>
+                <p className="font-semibold text-sm text-[#0F172A]">{t('footer.clinicalCare')}</p>
                 <ul className="space-y-2.5">
-                  <li className="hover:text-[#2563EB] cursor-pointer">Symptom Checker</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">Urgent Care Specialist</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">Primary Telehealth</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">Prescription Refills</li>
+                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.symptomChecker')}</li>
+                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.urgentCare')}</li>
+                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.primaryTelehealth')}</li>
+                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.refills')}</li>
                 </ul>
 
-                <p className="font-semibold text-sm text-[#0F172A] pt-4">Help & Privacy</p>
+                <p className="font-semibold text-sm text-[#0F172A] pt-4">{t('footer.helpPrivacy')}</p>
                 <ul className="space-y-2.5">
-                  <li className="hover:text-[#2563EB] cursor-pointer">FAQs</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">GDPR Privacy Policy</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">HIPAA Compliance</li>
-                </ul>
-              </div>
-
-              <div className="space-y-4">
-                <p className="font-semibold text-sm text-[#0F172A]">Company</p>
-                <ul className="space-y-2.5">
-                  <li className="hover:text-[#2563EB] cursor-pointer">About LibertyMD</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">Careers</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">Medical Reviewers</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">Team</li>
+                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.faqs')}</li>
+                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.privacyGdpr')}</li>
+                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.hipaa')}</li>
                 </ul>
               </div>
 
               <div className="space-y-4">
-                <p className="font-semibold text-sm text-[#0F172A]">Conditions</p>
+                <p className="font-semibold text-sm text-[#0F172A]">{t('footer.company')}</p>
                 <ul className="space-y-2.5">
-                  <li className="hover:text-[#2563EB] cursor-pointer">Respiratory Care</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">Cardiovascular</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">Neurology & Migraine</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">All Conditions</li>
+                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.about')}</li>
+                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.careers')}</li>
+                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.reviewers')}</li>
+                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.team')}</li>
+                </ul>
+              </div>
+
+              <div className="space-y-4">
+                <p className="font-semibold text-sm text-[#0F172A]">{t('footer.conditions')}</p>
+                <ul className="space-y-2.5">
+                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.respiratory')}</li>
+                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.cardiovascular')}</li>
+                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.neurology')}</li>
+                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.allConditions')}</li>
                 </ul>
 
-                <p className="font-semibold text-sm text-[#0F172A] pt-4">Research</p>
+                <p className="font-semibold text-sm text-[#0F172A] pt-4">{t('footer.research')}</p>
                 <ul className="space-y-2.5">
-                  <li className="hover:text-[#2563EB] cursor-pointer">Clinical Blog</li>
+                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.blog')}</li>
                   <li className="hover:text-[#2563EB] cursor-pointer">Peer-Reviewed RAG</li>
                 </ul>
               </div>
 
               <div className="space-y-4">
-                <p className="font-semibold text-sm text-[#0F172A]">Partnerships</p>
+                <p className="font-semibold text-sm text-[#0F172A]">{t('footer.partnerships')}</p>
                 <ul className="space-y-2.5">
-                  <li className="hover:text-[#2563EB] cursor-pointer">Become a Partner</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">EU Health Systems</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">US Insurance Network</li>
+                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.becomePartner')}</li>
+                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.euHealth')}</li>
+                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.usInsurance')}</li>
                 </ul>
               </div>
             </div>
@@ -1495,9 +1471,8 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
           </div>
 
           <p className="libertymd-type-footer-oath mx-auto mt-10 max-w-4xl text-balance font-medium text-[#0F172A] sm:mt-12">
-            I{' '}
             <strong className="font-extrabold">
-              will first do no harm. Every response, every recommendation, and every action taken by LibertyMD will be measured against one question: does this serve the patient’s wellbeing?
+              I will first do no harm. Every response, every recommendation, and every action taken by LibertyMD will be measured against one question: does this serve the patient’s wellbeing?
             </strong>
           </p>
         </div>
@@ -1508,6 +1483,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
           <p>Privacy-first AI triage • EU GDPR Article 9 & US HIPAA Safe Harbor</p>
         </div>
       </footer>
+
     </div>
   );
 }

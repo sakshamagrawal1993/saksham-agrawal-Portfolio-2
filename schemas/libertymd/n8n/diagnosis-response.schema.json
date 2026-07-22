@@ -18,6 +18,18 @@
     "ui_state": { "type": "string", "enum": ["report_ready", "report_invalid"] },
     "headline": { "type": "string" },
     "patient_summary": { "type": "string" },
+    "clinical_context": {
+      "type": "object",
+      "properties": {
+        "incremental_summary": { "type": "object" },
+        "clinical_reasoning_state": { "type": "object" }
+      },
+      "additionalProperties": true
+    },
+    "model_metadata": {
+      "type": "object",
+      "additionalProperties": true
+    },
     "differential_diagnosis": {
       "type": "array",
       "maxItems": 5,

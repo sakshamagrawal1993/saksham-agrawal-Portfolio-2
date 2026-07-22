@@ -249,7 +249,9 @@ export default function LibertyMDPremiumLogo({
           <div className="pointer-events-none absolute inset-1 rounded-full bg-[radial-gradient(circle_at_45%_35%,rgba(255,255,255,0.82),rgba(219,234,254,0.3)_38%,rgba(29,78,216,0.08)_64%,transparent_78%)] opacity-55 blur-xl" />
 
           {/* Center 3D Medical Cross Logo */}
-          <div className="absolute inset-[14px] sm:inset-[18px]">
+          {/* flex centring lets the cross size its width from its 1:1 aspect-ratio
+              (a block-level width:auto would stretch and squash it instead) */}
+          <div className="absolute inset-[14px] flex items-center justify-center sm:inset-[18px]">
             <LibertyMDMedicalCrossLogo
               size={300}
               colorTheme="blue"
@@ -259,7 +261,7 @@ export default function LibertyMDPremiumLogo({
 
           {/* Left Orbiting Patient Portrait */}
           <div
-            className={`${portraitClass} left-[22px] top-[40px] h-[74px] w-[74px] sm:left-[26px] sm:top-[48px] sm:h-[92px] sm:w-[92px]`}
+            className={`${portraitClass} left-[8.5%] top-[16.5%] aspect-square w-[29%]`}
           >
             <img
               src={`${libertyMDPortraitBase}/patient-portrait.jpg`}
@@ -271,7 +273,7 @@ export default function LibertyMDPremiumLogo({
 
           {/* Right Orbiting Doctor Portrait */}
           <div
-            className={`${portraitClass} bottom-[50px] right-[20px] h-[58px] w-[58px] sm:bottom-[58px] sm:right-[24px] sm:h-[72px] sm:w-[72px]`}
+            className={`${portraitClass} bottom-[12%] right-[20%] aspect-square w-[23%]`}
           >
             <img
               src={`${libertyMDPortraitBase}/doctor-portrait.jpg`}

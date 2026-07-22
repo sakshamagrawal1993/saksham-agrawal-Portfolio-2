@@ -70,14 +70,21 @@ assert(emergency.data.emergency === true, 'heart attack symptoms must stop the c
 assert(emergency.data.safety?.force_end === true, 'emergency response must force_end')
 checks.push('deterministic emergency stop')
 
+const normalStartAt = performance.now()
 const started = await invoke(primary.session, {
   action: 'start_consultation',
-  message: 'I have had a low fever and mild tiredness.',
+  message: 'Hi, I have fever',
 })
+const normalStartMs = Math.round(performance.now() - normalStartAt)
 const consultationId = started.data.consultation_id
 assert(consultationId && started.data.state === 'awaiting_demographics', 'normal intake must request demographics')
-assert(/age/i.test(started.data.acknowledgement) && /sex/i.test(started.data.acknowledgement), 'first reply must acknowledge and request age and sex')
+assert(
+  started.data.acknowledgement === "Thank you for reaching out. I'm here to help you feel better and address your fever as thoroughly as possible.\n\nTo give you the most accurate advice and ensure your care is personalized, could you please tell me your age and biological sex? This information helps me consider the best recommendations for your specific situation. Rest assured, anything you share will remain private and confidential.",
+  'first reply must empathetically acknowledge the fever and request age and biological sex',
+)
+assert(normalStartMs < 3000, `normal consultation start must stay under 3 seconds; measured ${normalStartMs} ms`)
 checks.push('acknowledgement and demographics gate')
+checks.push('normal consultation starts under 3 seconds')
 
 const demographics = await invoke(primary.session, {
   action: 'save_demographics',
@@ -121,12 +128,14 @@ const concurrentBodies = [
     consultation_id: consultationId,
     client_message_id: crypto.randomUUID(),
     message: 'I also have a mild dry cough.',
+    expected_version: afterReplay.data.consultation.version,
   },
   {
     action: 'send_message',
     consultation_id: consultationId,
     client_message_id: crypto.randomUUID(),
     message: 'I do not have shortness of breath.',
+    expected_version: afterReplay.data.consultation.version,
   },
 ]
 const concurrent = await Promise.all(concurrentBodies.map((body) => invoke(primary.session, body, [200, 409])))
@@ -145,5 +154,9 @@ checks.push('cross-user consultation isolation')
 console.log(JSON.stringify({
   passed: true,
   checks,
+  timings: {
+    normal_start_ms: normalStartMs,
+    server_start: started.data.timings || null,
+  },
   note: 'The smoke uses synthetic health data and creates short-lived anonymous test records.',
 }, null, 2))

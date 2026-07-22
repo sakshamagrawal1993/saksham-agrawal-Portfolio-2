@@ -18,7 +18,6 @@ import Assistant from './components/Assistant';
 import Footer from './components/Footer';
 import ProductDetail from './components/ProductDetail';
 import SmoothScroll from './components/SmoothScroll';
-import DevScrollToggle from './components/DevScrollToggle';
 import GrainOverlay from './components/GrainOverlay';
 import { PROJECTS } from './constants';
 import { useProjectMetadata } from './hooks/useProjectMetadata';
@@ -54,6 +53,7 @@ const AICareProfile = lazy(() => import('./components/AICare/AICareProfile').the
 const AICareChat = lazy(() => import('./components/AICare/AICareChat').then(m => ({ default: m.AICareChat })));
 const AICareObservations = lazy(() => import('./components/AICare/AICareObservations').then(m => ({ default: m.AICareObservations })));
 const LibertyMDApp = lazy(() => import('./components/LibertyMD/LibertyMDApp'));
+const LibertyMDChat = lazy(() => import('./components/LibertyMD/LibertyMDChat'));
 
 const LoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-[#F5F2EB] font-serif italic text-[#2C2A26]/50">
@@ -188,9 +188,8 @@ function App() {
 
   return (
     <AuthProvider>
-      {/* Lenis smooth scroll (default). Compare against native via ?scroll=native or the dev control. */}
+      {/* Lenis is the single scrolling experience across the portfolio. */}
       <SmoothScroll />
-      {import.meta.env.DEV && <DevScrollToggle />}
       {/* Subtle film-grain texture over the whole UI for a premium feel. Tune opacity/blend here. */}
       <GrainOverlay />
       <div className="min-h-screen bg-[#F5F2EB] font-sans text-[#2C2A26] selection:bg-[#D6D1C7] selection:text-[#2C2A26]">
@@ -203,6 +202,11 @@ function App() {
             <Route path="/liberty-md" element={
               <Suspense fallback={<LoadingFallback />}>
                 <LibertyMDApp onBack={() => navigate('/#work')} />
+              </Suspense>
+            } />
+            <Route path="/liberty-md/chat" element={
+              <Suspense fallback={<LoadingFallback />}>
+                <LibertyMDChat />
               </Suspense>
             } />
             <Route path="/portfolio" element={
