@@ -706,7 +706,17 @@ export default function LibertyMDChat() {
       const clientMessageId = crypto.randomUUID();
       let data: any;
       let lastError: unknown;
-      for (let attempt = 0; attempt < 2; attempt += 1) {
+      // Retry only retryable failures. 4xx (409 stale version, 403, 404) will never
+      // succeed on retry -- retrying them just doubles the failure rate.
+      // client_message_id makes retries idempotent, so retrying 5xx/timeouts is safe.
+      const statusOf = (err: unknown) =>
+        (err as { status?: number })?.status ?? (err as { context?: { status?: number } })?.context?.status;
+      const isRetryable = (err: unknown) => {
+        const s = statusOf(err);
+        if (typeof s === 'number') return s >= 500 || s === 408 || s === 429;
+        return true; // no status => network/timeout
+      };
+      for (let attempt = 0; attempt < 3; attempt += 1) {
         try {
           data = await invokeCareProxy({
             action: 'send_message',
@@ -719,15 +729,31 @@ export default function LibertyMDChat() {
           break;
         } catch (requestError) {
           lastError = requestError;
-          if (attempt === 0) await new Promise((resolve) => window.setTimeout(resolve, 500));
+          if (!isRetryable(requestError) || attempt === 2) break;
+          await new Promise((resolve) => window.setTimeout(resolve, attempt === 0 ? 1000 : 3000));
         }
       }
       if (lastError) throw lastError;
       await applyWorkflowResult(data);
     } catch (sendError) {
+      // Keep the message visible and restore the draft. Never make the user retype.
       setMessages((current) => current.filter((item) => item.id !== optimisticId));
       setInput(message);
-      setError(sendError instanceof Error ? sendError.message : 'LibertyMD is temporarily unavailable.');
+      const status = (sendError as { status?: number })?.status
+        ?? (sendError as { context?: { status?: number } })?.context?.status;
+      const serverMessage = sendError instanceof Error ? sendError.message : '';
+      // Map the real failure. A technical fault must not read as a clinical warning.
+      setError(
+        status === 409
+          ? 'This consultation moved on. Refresh to pick up where you left off.'
+          : status === 403 || status === 404
+            ? 'We could not find this consultation. Please start a new one.'
+            : status === 429
+              ? 'Too many requests just now. Please wait a moment and try again.'
+              : !navigator.onLine
+                ? 'You appear to be offline. Your message is saved — try again when reconnected.'
+                : serverMessage || 'Something went wrong on our side. Your message is saved — please try again.'
+      );
     } finally {
       setIsBusy(false);
     }

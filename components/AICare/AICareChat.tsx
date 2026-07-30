@@ -8,6 +8,8 @@ interface ChatMessage {
     role: 'user' | 'assistant' | 'system';
     content: string;
     options?: string[];
+    /** Set when a send failed. The message stays visible rather than being deleted. */
+    failed?: boolean;
 }
 
 const STATUS_COPY: Record<string, string> = {
@@ -32,6 +34,8 @@ export const AICareChat: React.FC = () => {
     const [initializing, setInitializing] = useState(true);
     const [emergencyAlert, setEmergencyAlert] = useState<string | null>(null);
     const [resumePrompt, setResumePrompt] = useState(false);
+    /** Inline, non-blocking send failure. Replaces the previous native alert(). */
+    const [sendError, setSendError] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const initKeyRef = useRef<string | null>(null);
 
@@ -320,19 +324,68 @@ export const AICareChat: React.FC = () => {
         setLoading(true);
         setStreamingText('');
         setStatusText('Sending...');
+        setSendError(null);
 
+        // Retry only what is worth retrying. A 409 means the session is closed --
+        // retrying it just doubles the error rate (observed: paired 409s ~1s apart
+        // in the edge-function logs).
+        const isRetryable = (err: unknown) => {
+            const status = (err as { status?: number; context?: { status?: number } })?.status
+                ?? (err as { context?: { status?: number } })?.context?.status;
+            if (typeof status === 'number') return status >= 500 || status === 408 || status === 429;
+            return true; // network/timeout with no status -- worth one retry
+        };
+
+        let lastError: unknown = null;
         try {
-            const data = await invokeProxyStream({
-                action: 'send_message',
-                session_id: sessionId,
-                message: text,
-            });
-            setStreamingText('');
-            applyProxyResult(data);
+            for (let attempt = 0; attempt < 3; attempt += 1) {
+                try {
+                    const data = await invokeProxyStream({
+                        action: 'send_message',
+                        session_id: sessionId,
+                        message: text,
+                    });
+                    setStreamingText('');
+                    applyProxyResult(data);
+                    return;
+                } catch (err) {
+                    lastError = err;
+                    if (!isRetryable(err) || attempt === 2) break;
+                    setStatusText('Still thinking...');
+                    await new Promise((resolve) => window.setTimeout(resolve, attempt === 0 ? 1000 : 3000));
+                }
+            }
+            throw lastError;
         } catch (error) {
             console.error('Failed to send message', error);
-            setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id));
-            alert('Dr. Jivi is temporarily unavailable. Please try again in a moment.');
+
+            // The user's message stays in the transcript and their text is restored
+            // to the composer. Never make someone retype what we already hold.
+            setMessages((prev) => prev.map((m) => (
+                m.id === optimisticMsg.id ? { ...m, failed: true } : m
+            )));
+            setInputValue(text);
+
+            // Map the actual failure instead of blaming the service for everything.
+            const status = (error as { status?: number; context?: { status?: number } })?.status
+                ?? (error as { context?: { status?: number } })?.context?.status;
+            const serverMessage = (error as { message?: string })?.message;
+            let userMessage: string;
+            if (status === 409) {
+                userMessage = 'This evaluation was closed. Start a new chat to continue.';
+            } else if (status === 403 || status === 404) {
+                userMessage = 'We could not find this evaluation. Please start a new chat.';
+            } else if (status === 429) {
+                userMessage = 'Too many requests just now. Please wait a moment and try again.';
+            } else if (!navigator.onLine) {
+                userMessage = 'You appear to be offline. Your message is saved -- try again when reconnected.';
+            } else {
+                userMessage = serverMessage && !/^\s*$/.test(serverMessage)
+                    ? serverMessage
+                    : 'Something went wrong on our side. Your message is saved -- please try again.';
+            }
+            // Inline, non-blocking. No native alert().
+            setSendError(userMessage);
         } finally {
             setLoading(false);
             setStatusText(null);
@@ -376,6 +429,28 @@ export const AICareChat: React.FC = () => {
                             <p className="text-red-700 text-sm">{emergencyAlert}</p>
                             <p className="text-red-700 text-sm font-bold mt-2">Please seek immediate medical attention or call emergency services.</p>
                         </div>
+                    </div>
+                )}
+
+                {/*
+                  Technical failure state -- deliberately neutral grey, NOT the amber/red
+                  used for clinical caution. A server error must never look like a warning
+                  about the user's health.
+                */}
+                {sendError && (
+                    <div
+                        role="status"
+                        className="bg-[#F5F4F1] border border-[#DDD9D0] p-3 rounded-lg text-sm text-[#57534E] flex items-start gap-3"
+                    >
+                        <span className="flex-1">{sendError}</span>
+                        <button
+                            type="button"
+                            onClick={() => setSendError(null)}
+                            className="text-[#A8A29E] hover:text-[#57534E] shrink-0"
+                            aria-label="Dismiss"
+                        >
+                            ✕
+                        </button>
                     </div>
                 )}
 

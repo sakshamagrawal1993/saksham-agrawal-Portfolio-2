@@ -42,8 +42,48 @@ for (const file of fixtureFiles) {
   })
 }
 
+// L0-1 (2026-07-30): this previously resolved to null whenever the flag was absent,
+// so the npm script validated ZERO workflows and exited 0 -- a green light wired to
+// nothing, which hid a real assertion failure. Resolution order is now
+// flag -> env -> conventional sibling path, and an unresolvable path is a HARD FAIL.
 const definitionsArg = process.argv.find((arg) => arg.startsWith('--definitions-dir='))
-const definitionsDir = definitionsArg ? path.resolve(definitionsArg.split('=')[1]) : null
+const definitionsDir = path.resolve(
+  definitionsArg?.split('=')[1]
+  ?? process.env.LIBERTYMD_N8N_DEFINITIONS_DIR
+  ?? path.join(root, '..', 'n8n-workflows', 'definitions'),
+)
+const allowMissingDefinitions = process.argv.includes('--allow-missing-definitions')
+
+try {
+  await fs.access(definitionsDir)
+} catch {
+  const message = `n8n definitions directory not found: ${definitionsDir}\n`
+    + 'Pass --definitions-dir=<path>, set LIBERTYMD_N8N_DEFINITIONS_DIR, or place the\n'
+    + 'n8n-workflows repo beside this one. Use --allow-missing-definitions only if you\n'
+    + 'genuinely intend to skip workflow validation.'
+  if (!allowMissingDefinitions) {
+    console.error(`FAIL: ${message}`)
+    process.exit(1)
+  }
+  console.warn(`WARN: skipping workflow validation. ${message}`)
+}
+
+const MIN_MODEL = { major: 3, minor: 1, variant: 'flash-lite' }
+
+// L0-2 (2026-07-30): was an exact match on 'models/gemini-3.1-flash-lite'. The
+// workflows run 3.5-flash-lite, so this asserted FALSE on all three -- a stale
+// assertion, not a model defect. A floor accepts newer models and still catches
+// downgrades or a switch to an unapproved variant.
+function modelMeetsFloor(model) {
+  const parsed = /^models\/gemini-(\d+)\.(\d+)-(.+)$/.exec(String(model))
+  if (!parsed) return false
+  const [, major, minor, variant] = parsed
+  if (variant !== MIN_MODEL.variant) return false
+  const maj = Number(major)
+  const min = Number(minor)
+  return maj > MIN_MODEL.major || (maj === MIN_MODEL.major && min >= MIN_MODEL.minor)
+}
+
 const workflowResults = []
 
 const clinicalScenarioSchema = JSON.parse(await fs.readFile(
@@ -72,7 +112,8 @@ if (definitionsDir) {
     workflowResults.push({
       workflow: name,
       active: workflow.active === true,
-      correctModel: models.length > 0 && models.every((model) => model === 'models/gemini-3.1-flash-lite'),
+      models,
+      correctModel: models.length > 0 && models.every(modelMeetsFloor),
       noPayloadRetention: settings.saveDataErrorExecution === 'none'
         && settings.saveDataSuccessExecution === 'none'
         && settings.saveManualExecutions === false
