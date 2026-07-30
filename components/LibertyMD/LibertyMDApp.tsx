@@ -42,6 +42,7 @@ import {
   LibertyMDPhoneCareSection,
   LibertyMDPricingSection,
 } from './LibertyMDMarketingSections';
+import { LibertyMDScrollFilmSection } from './LibertyMDScrollFilmSection';
 import {
   LibertyMDAccountDrawer,
   LibertyMDDemographicsPrompt,
@@ -155,6 +156,14 @@ const normalizeReport = (raw: any): LibertyReport => {
 };
 
 const HOW_IT_WORKS_ROTATION_MS = 5600;
+/** Below this width the pin is dropped and the rail is tapped through, as freehand.ai does. */
+const HOW_IT_WORKS_PIN_QUERY = '(min-width: 1024px)';
+/**
+ * Total pinned height in viewports. One viewport is the pinned pane itself, so the steps
+ * advance over (value - 1) viewports of travel. 3.95 mirrors freehand.ai's own pin-spacer
+ * ratio (3480px against an 880px viewport), which lands each of the 4 steps at ~0.74vh.
+ */
+const HOW_IT_WORKS_PIN_VIEWPORTS = 3.95;
 
 const howItWorksSteps = [
   {
@@ -200,10 +209,78 @@ function LibertyMDHowItWorksTabs() {
   const [cycleKey, setCycleKey] = useState(0);
   const tabRailRef = useRef<HTMLDivElement | null>(null);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const pinRef = useRef<HTMLDivElement | null>(null);
+  const fillRef = useRef<HTMLSpanElement | null>(null);
+  const rafRef = useRef<number | null>(null);
   const currentStep = steps[activeStep];
 
+  // Desktop pins the block and advances the steps on scroll; below `lg` the rail stays a
+  // normal horizontally-scrollable strip the reader taps through. freehand.ai does exactly
+  // this — it drops its pin on mobile rather than hijacking touch scrolling.
+  const [isScrollDriven, setIsScrollDriven] = useState(false);
+
   useEffect(() => {
-    if (isPaused || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const query = window.matchMedia(HOW_IT_WORKS_PIN_QUERY);
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const update = () => setIsScrollDriven(query.matches && !reduce.matches);
+    update();
+    query.addEventListener('change', update);
+    reduce.addEventListener('change', update);
+    // Belt and braces: some environments (and device emulation) resize without firing the
+    // media-query change event, which would otherwise leave the pin on at mobile widths.
+    window.addEventListener('resize', update);
+    return () => {
+      query.removeEventListener('change', update);
+      reduce.removeEventListener('change', update);
+      window.removeEventListener('resize', update);
+    };
+  }, []);
+
+  // Scroll → step index + fill. The index goes through React (it changes 4 times), but the
+  // fill width is written straight to the DOM node: re-rendering this subtree every frame is
+  // what made the hero logo stutter before it moved to imperative writes.
+  useEffect(() => {
+    if (!isScrollDriven) return;
+    const pin = pinRef.current;
+    if (!pin) return;
+
+    const read = () => {
+      const range = pin.offsetHeight - window.innerHeight;
+      if (range <= 0) return 0;
+      return Math.min(1, Math.max(0, -pin.getBoundingClientRect().top / range));
+    };
+
+    const tick = () => {
+      rafRef.current = null;
+      const spread = read() * howItWorksSteps.length;
+      const index = Math.min(howItWorksSteps.length - 1, Math.floor(spread));
+      setActiveStep((current) => (current === index ? current : index));
+      if (fillRef.current) {
+        fillRef.current.style.transform = `scaleX(${Math.min(1, spread - index)})`;
+      }
+    };
+
+    const wake = () => {
+      if (rafRef.current !== null) return;
+      rafRef.current = window.requestAnimationFrame(tick);
+    };
+
+    tick();
+    window.addEventListener('scroll', wake, { passive: true });
+    window.addEventListener('resize', wake);
+    return () => {
+      window.removeEventListener('scroll', wake);
+      window.removeEventListener('resize', wake);
+      if (rafRef.current !== null) {
+        window.cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    };
+  }, [isScrollDriven]);
+
+  useEffect(() => {
+    // Scroll position owns the active step when pinned, so the rotation timer would fight it.
+    if (isScrollDriven || isPaused || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
     const timer = window.setTimeout(() => {
       setActiveStep((current) => (current + 1) % howItWorksSteps.length);
@@ -211,7 +288,7 @@ function LibertyMDHowItWorksTabs() {
     }, HOW_IT_WORKS_ROTATION_MS);
 
     return () => window.clearTimeout(timer);
-  }, [activeStep, cycleKey, isPaused]);
+  }, [activeStep, cycleKey, isPaused, isScrollDriven]);
 
   useEffect(() => {
     const rail = tabRailRef.current;
@@ -238,11 +315,19 @@ function LibertyMDHowItWorksTabs() {
 
   return (
     <div
-      className="libertymd-content-shell mx-auto mt-12"
-      onMouseEnter={() => setIsPaused(true)}
-      onMouseLeave={resumeRotation}
-      onFocusCapture={() => setIsPaused(true)}
-      onBlurCapture={resumeRotation}
+      ref={pinRef}
+      style={isScrollDriven ? { height: `${HOW_IT_WORKS_PIN_VIEWPORTS * 100}vh` } : undefined}
+      className={isScrollDriven ? 'relative' : undefined}
+    >
+    <div
+      className={`libertymd-content-shell mx-auto ${
+        isScrollDriven ? 'sticky top-0 flex h-screen flex-col justify-center' : 'mt-12'
+      }`}
+      // Hover-pause only matters for the rotation timer; scroll owns the step when pinned.
+      onMouseEnter={isScrollDriven ? undefined : () => setIsPaused(true)}
+      onMouseLeave={isScrollDriven ? undefined : resumeRotation}
+      onFocusCapture={isScrollDriven ? undefined : () => setIsPaused(true)}
+      onBlurCapture={isScrollDriven ? undefined : resumeRotation}
     >
       <div
         ref={tabRailRef}
@@ -274,14 +359,23 @@ function LibertyMDHowItWorksTabs() {
               <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[3px] overflow-hidden bg-[#D8E2DC]">
                 {index < activeStep && <span className="block h-full w-full bg-[#8AAEEB]" />}
                 {isActive && (
-                  <span
-                    key={`${activeStep}-${cycleKey}`}
-                    className="libertymd-how-progress block h-full w-full bg-[#2563EB]"
-                    style={{
-                      animationDuration: `${HOW_IT_WORKS_ROTATION_MS}ms`,
-                      animationPlayState: isPaused ? 'paused' : 'running',
-                    }}
-                  />
+                  isScrollDriven ? (
+                    // Scroll drives this fill imperatively; scaleX avoids a layout pass per frame.
+                    <span
+                      ref={fillRef}
+                      className="block h-full w-full origin-left bg-libertymd-blue-600"
+                      style={{ transform: 'scaleX(0)' }}
+                    />
+                  ) : (
+                    <span
+                      key={`${activeStep}-${cycleKey}`}
+                      className="libertymd-how-progress block h-full w-full bg-libertymd-blue-600"
+                      style={{
+                        animationDuration: `${HOW_IT_WORKS_ROTATION_MS}ms`,
+                        animationPlayState: isPaused ? 'paused' : 'running',
+                      }}
+                    />
+                  )
                 )}
               </span>
             </button>
@@ -313,6 +407,7 @@ function LibertyMDHowItWorksTabs() {
           </div>
         </div>
       </div>
+    </div>
     </div>
   );
 }
@@ -1260,49 +1355,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
           }}
         />
 
-        {/* Ambient Clinical Care Film — calm full-width band. Video edges are feathered and a soft
-            glow sits behind so it melts into the surrounding sections instead of reading as a hard rectangle. */}
-        <section className="libertymd-page-gutter libertymd-section-spacing relative overflow-hidden border-t border-[#E6EDE3] bg-[linear-gradient(180deg,rgba(245,250,243,0.96)_0%,rgba(248,250,247,0.97)_100%)]">
-          <div className="mx-auto max-w-3xl text-center">
-            <p className="text-xs font-bold uppercase tracking-normal text-[#2563EB]">{t('app.humanCareKicker')}</p>
-            <h2 className="mx-auto mt-3 max-w-xl text-3xl font-black tracking-normal text-[#111827] sm:text-4xl">
-              {t('app.humanCareTitle')}
-            </h2>
-            <p className="mx-auto mt-4 max-w-lg text-sm leading-7 text-[#5B6472]">
-              {t('app.humanCareSubtitle')}
-            </p>
-          </div>
-          <div className="relative mx-auto mt-10 w-full max-w-[80rem]">
-            {/* Soft blue/peach glow matching the film's palette so the seams disappear */}
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute -inset-x-6 -inset-y-8 -z-0 bg-[radial-gradient(60%_60%_at_50%_50%,rgba(191,219,254,0.45),rgba(254,226,226,0.22)_55%,transparent_80%)] blur-2xl"
-            />
-            <div className="relative overflow-hidden rounded-3xl">
-              <video
-                className="w-full aspect-video object-cover [mask-image:linear-gradient(180deg,transparent_0%,#000_14%,#000_86%,transparent_100%)] [-webkit-mask-image:linear-gradient(180deg,transparent_0%,#000_14%,#000_86%,transparent_100%)]"
-                autoPlay
-                loop
-                muted
-                playsInline
-                preload="metadata"
-                poster="https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/libertymd-assets/video/doctor-consult-poster.jpg"
-                aria-label="Ambient LibertyMD film: a doctor gently examining a patient with a stethoscope in a soft, glowing style"
-              >
-                <source
-                  src="https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/libertymd-assets/video/doctor-consult-loop.webm"
-                  type="video/webm"
-                />
-                <source
-                  src="https://ralhkmpbslsdkwnqzqen.supabase.co/storage/v1/object/public/libertymd-assets/video/doctor-consult-loop.mp4"
-                  type="video/mp4"
-                />
-              </video>
-              {/* Left/right feather so the film blends into the page gutters on wide screens */}
-              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(247,250,245,0.6)_0%,transparent_11%,transparent_89%,rgba(247,250,245,0.6)_100%)]" />
-            </div>
-          </div>
-        </section>
+        <LibertyMDScrollFilmSection />
 
         <LibertyMDPatientStoriesSection />
 
