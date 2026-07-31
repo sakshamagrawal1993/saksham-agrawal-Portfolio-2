@@ -42,3 +42,6 @@ dist-ssr
 scratch/aicare_e2e_suite_out/
 scratch/aicare_fe_e2e_out/
 scratch/test_fundamentals_after_fix.json
+
+# loop.sh per-ticket worktrees
+.worktrees/
