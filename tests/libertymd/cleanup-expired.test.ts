@@ -60,7 +60,7 @@ Deno.test('P1-23 AC2 · dry-run path zero mutations', () => {
   assertTrue(migration.includes('cleanup_expired_libertymd_data_dry_run'), 'twin function')
   assertTrue(/zero mutations|SELECT-only|select-only/i.test(migration), 'dry-run zero mutations comment')
   const dryFn = migration.match(
-    /create\s+or\s+replace\s+function\s+public\.cleanup_expired_libertymd_data_dry_run\(\)([\s\S]*?)comment\s+on\s+function\s+public\.cleanup_expired_libertymd_data_dry_run/i,
+    /create(?:\s+or\s+replace)?\s+function\s+public\.cleanup_expired_libertymd_data_dry_run\(\)([\s\S]*?)comment\s+on\s+function\s+public\.cleanup_expired_libertymd_data_dry_run/i,
   )
   assertTrue(dryFn, 'dry-run function body extractable')
   const dryBody = stripSqlComments(dryFn?.[1] || '')
@@ -103,7 +103,7 @@ Deno.test('P1-23 AC4 · landing Q2B orphan predicate; P2-12 care_interest covere
   assertTrue(/create\s+table[\s\S]*libertymd_care_interest/i.test(p212), 'P2-12 creates care_interest')
   assertTrue(/retention_expires_at/i.test(p212), 'retention_expires_at column')
   const p212Destructive = p212.match(
-    /create\s+or\s+replace\s+function\s+public\.cleanup_expired_libertymd_data\(\)([\s\S]*?)comment\s+on\s+function\s+public\.cleanup_expired_libertymd_data\(/i,
+    /create(?:\s+or\s+replace)?\s+function\s+public\.cleanup_expired_libertymd_data\(\)([\s\S]*?)comment\s+on\s+function\s+public\.cleanup_expired_libertymd_data\(/i,
   )
   assertTrue(p212Destructive, 'P2-12 destructive cleanup extractable')
   const destructiveBody = stripSqlComments(p212Destructive?.[1] || '')
@@ -113,7 +113,7 @@ Deno.test('P1-23 AC4 · landing Q2B orphan predicate; P2-12 care_interest covere
   )
   assertTrue(/deleted_care_interest\s+bigint/i.test(p212), 'RETURNS deleted_care_interest')
   const p212Dry = p212.match(
-    /create\s+or\s+replace\s+function\s+public\.cleanup_expired_libertymd_data_dry_run\(\)([\s\S]*?)comment\s+on\s+function\s+public\.cleanup_expired_libertymd_data_dry_run/i,
+    /create(?:\s+or\s+replace)?\s+function\s+public\.cleanup_expired_libertymd_data_dry_run\(\)([\s\S]*?)comment\s+on\s+function\s+public\.cleanup_expired_libertymd_data_dry_run/i,
   )
   assertTrue(p212Dry, 'P2-12 dry-run extractable')
   const dryBody = stripSqlComments(p212Dry?.[1] || '')
@@ -151,7 +151,7 @@ Deno.test('P1-23 AC6 · RLS fixtures: orphan removed; referenced survives; linke
 Deno.test('P1-23 AC6 · destructive path deletes consults before landings', () => {
   const migration = Deno.readTextFileSync(MIGRATION_P1_23)
   const fn = migration.match(
-    /create\s+or\s+replace\s+function\s+public\.cleanup_expired_libertymd_data\(\)([\s\S]*?)comment\s+on\s+function\s+public\.cleanup_expired_libertymd_data\(/i,
+    /create(?:\s+or\s+replace)?\s+function\s+public\.cleanup_expired_libertymd_data\(\)([\s\S]*?)comment\s+on\s+function\s+public\.cleanup_expired_libertymd_data\(/i,
   )
   assertTrue(fn, 'destructive function extractable')
   const body = fn?.[1] || ''
@@ -278,7 +278,7 @@ Deno.test('P1-24 R1 · Postgres cleanup order / P1-23 body unchanged for Storage
   const p123 = Deno.readTextFileSync(MIGRATION_P1_23)
   assertTrue(p123.includes('No Storage deletes (P1-24)') || /No Storage/i.test(p123), 'P1-23 no-Storage comment kept')
   const fn = p123.match(
-    /create\s+or\s+replace\s+function\s+public\.cleanup_expired_libertymd_data\(\)([\s\S]*?)comment\s+on\s+function\s+public\.cleanup_expired_libertymd_data\(/i,
+    /create(?:\s+or\s+replace)?\s+function\s+public\.cleanup_expired_libertymd_data\(\)([\s\S]*?)comment\s+on\s+function\s+public\.cleanup_expired_libertymd_data\(/i,
   )
   const body = stripSqlComments(fn?.[1] || '')
   assertEquals(/storage\.objects/i.test(body), false, 'destructive Postgres still no storage.objects')
