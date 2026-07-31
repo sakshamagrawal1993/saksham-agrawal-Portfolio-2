@@ -253,7 +253,7 @@ Deno.test('P0-16 · a genuine high_risk_continue is still caution', () => {
 })
 
 Deno.test('P0-14f AC3/AC4 · a failing guardrail is technical to the user and cautious internally', () => {
-  for (const failure of ['timeout', 'transport'] as GuardrailFailureKind[]) {
+  for (const failure of ['timeout', 'transport', 'malformed_payload'] as GuardrailFailureKind[]) {
     const verdict = guardrailTransportFailureResult(failure)
 
     // Rendered severity: technical.

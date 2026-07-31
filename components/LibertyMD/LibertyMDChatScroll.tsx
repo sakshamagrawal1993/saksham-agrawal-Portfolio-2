@@ -2,7 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowDown } from 'lucide-react';
 
 /**
- * LibertyMDChatScroll — P0-19, P0-20, P0-23.
+ * LibertyMDChatScroll — P0-19, P0-20, P0-23 (consume-only for P0-24).
+ *
+ * ## Why an internal scroller (P0-24 DoD+)
+ *
+ * Chat and App consult shells are full-bleed `svh` columns with a shrink-0 sibling footer
+ * (composer / continuation / emergency bar). Document scroll cannot host that topology
+ * without covering the composer or fighting site-wide Lenis — hence
+ * `data-libertymd-consult-scroller` + `data-lenis-prevent`. Browser document scroll-restore
+ * after Chat soft leave (P0-24) is unaffected; overlay restore is P0-22 lock `release()`.
  *
  * ## P0-19 · anchor after layout, not on state set
  *
@@ -68,8 +76,22 @@ export const TRANSCRIPT_BOTTOM_CLEARANCE_CLASS = 'pb-10 sm:pb-12';
 const prefersReducedMotion = () =>
   typeof window !== 'undefined' && Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
 
-const distanceFromBottom = (element: HTMLElement) =>
-  element.scrollHeight - element.scrollTop - element.clientHeight;
+/** Pure geometry helper — distance from the scrollport bottom in CSS px. */
+export function distanceFromBottom(element: {
+  scrollHeight: number;
+  scrollTop: number;
+  clientHeight: number;
+}): number {
+  return element.scrollHeight - element.scrollTop - element.clientHeight;
+}
+
+/** Near-bottom band used to gate automatic re-anchor (P0-19 AC6 / P0-20). */
+export function isNearBottom(
+  element: { scrollHeight: number; scrollTop: number; clientHeight: number },
+  tolerancePx: number = NEAR_BOTTOM_TOLERANCE_PX,
+): boolean {
+  return distanceFromBottom(element) <= tolerancePx;
+}
 
 interface ChatScrollOptions {
   /**
@@ -86,9 +108,20 @@ interface ChatScrollOptions {
   messageRevision: number;
   /** P0-20 AC5 — emergency takes the viewport regardless of scroll position. */
   force: boolean;
+  /**
+   * When the scroller mounts after the hook (App defers the consult shell until
+   * `phase !== 'initial'`), change this so scroll / intent / ResizeObserver effects
+   * re-bind once `scrollRef.current` exists. Chat can omit — scroller is always mounted.
+   */
+  scrollerKey?: string | number | boolean;
 }
 
-export function useLibertyMDChatScroll({ revision, messageRevision, force }: ChatScrollOptions) {
+export function useLibertyMDChatScroll({
+  revision,
+  messageRevision,
+  force,
+  scrollerKey,
+}: ChatScrollOptions) {
   /** The scrolling transcript container. */
   const scrollRef = useRef<HTMLElement | null>(null);
   /** The content inside the scroller, observed for late growth. */
@@ -130,13 +163,44 @@ export function useLibertyMDChatScroll({ revision, messageRevision, force }: Cha
     });
   }, []);
 
+  /**
+   * P1-12 Q3B — after transcript (+ pending) paints: near-bottom → pin + stick;
+   * else exact scrollTop + unpin so ResizeObserver re-anchor does not yank.
+   */
+  const restoreScrollPosition = useCallback((opts: {
+    scrollTop: number;
+    wasNearBottom: boolean;
+  }) => {
+    const element = scrollRef.current;
+    if (!element) return;
+    if (opts.wasNearBottom) {
+      pinnedRef.current = true;
+      setShowJumpToLatest(false);
+      hasAnchoredOnceRef.current = true;
+      anchorToBottom('instant');
+      return;
+    }
+    pinnedRef.current = false;
+    setShowJumpToLatest(false);
+    hasAnchoredOnceRef.current = true;
+    const top = Math.max(0, Number(opts.scrollTop) || 0);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const current = scrollRef.current;
+        if (!current) return;
+        current.scrollTop = top;
+      });
+    });
+  }, [anchorToBottom]);
+
   const jumpToLatest = useCallback(() => {
     pinnedRef.current = true;
     setShowJumpToLatest(false);
     anchorToBottom('smooth');
   }, [anchorToBottom]);
 
-  // Position + intent tracking.
+  // Position + intent tracking. Re-runs when `scrollerKey` changes so App can attach after
+  // the consult shell mounts (scroller is null on the first mount while phase === 'initial').
   useEffect(() => {
     const element = scrollRef.current;
     if (!element) return undefined;
@@ -171,7 +235,7 @@ export function useLibertyMDChatScroll({ revision, messageRevision, force }: Cha
       element.removeEventListener('pointerdown', markIntent);
       window.removeEventListener('keydown', markIntent);
     };
-  }, []);
+  }, [scrollerKey]);
 
   // Any transcript change: anchor if we still hold the bottom, or if an emergency overrides.
   useEffect(() => {
@@ -194,6 +258,9 @@ export function useLibertyMDChatScroll({ revision, messageRevision, force }: Cha
   }, [messageRevision, force]);
 
   // Late layout growth: progressive text, late chips, images, an action bar appearing.
+  // Present-state clearance for the P0-21 continuation slot is this footer observation
+  // (Q4A): do not grow TRANSCRIPT_BOTTOM_CLEARANCE_CLASS unless clip evidence appears.
+  // `scrollerKey` re-binds when App's deferred consult shell appears with footer/content.
   useEffect(() => {
     const element = scrollRef.current;
     if (!element || typeof ResizeObserver === 'undefined') return undefined;
@@ -204,7 +271,7 @@ export function useLibertyMDChatScroll({ revision, messageRevision, force }: Cha
     if (contentRef.current) observer.observe(contentRef.current);
     if (footerRef.current) observer.observe(footerRef.current);
     return () => observer.disconnect();
-  }, [anchorToBottom]);
+  }, [anchorToBottom, scrollerKey]);
 
   // Keyboard open/close and iOS Safari's dynamic toolbar (P0-19 AC3).
   useEffect(() => {
@@ -223,7 +290,7 @@ export function useLibertyMDChatScroll({ revision, messageRevision, force }: Cha
     if (frameRef.current) cancelAnimationFrame(frameRef.current);
   }, []);
 
-  return { scrollRef, contentRef, footerRef, showJumpToLatest, jumpToLatest };
+  return { scrollRef, contentRef, footerRef, showJumpToLatest, jumpToLatest, restoreScrollPosition };
 }
 
 /**

@@ -9,10 +9,12 @@
  */
 import { getOwnedConsultation } from '../lib/consultations.ts'
 import { jsonResponse } from '../lib/errors.ts'
+import { generatePartialOutcome } from '../lib/partial-outcome.ts'
 import {
   isLibertyMDResumableStatus,
   resolveLibertyMDResumeStatus,
 } from '../session-recovery.ts'
+import { addProductEvent } from '../lib/telemetry.ts'
 import type { ProxyContext } from '../lib/context.ts'
 import type { RequestPayload } from '../lib/types.ts'
 
@@ -33,6 +35,7 @@ export async function handleAbandonConsultation(ctx: ProxyContext, payload: Requ
     return jsonResponse({ error: 'Please wait for the current response before starting over' }, 409)
   }
 
+  const priorStatus = consultation.status
   const now = new Date().toISOString()
   const { data: abandoned, error: abandonError } = await ctx.db
     .from('libertymd_consultations')
@@ -53,7 +56,26 @@ export async function handleAbandonConsultation(ctx: ProxyContext, payload: Requ
   if (abandonError) throw abandonError
   if (!abandoned) return jsonResponse({ error: 'Consultation state changed. Please refresh and try again.' }, 409)
 
-  return jsonResponse({ consultation_id: abandoned.id, state: abandoned.status, version: abandoned.version })
+  // P1-09 Q5A — partial_outcome_shown iff eligible payload attached (not intermediate_diagnoses).
+  // Vanish-without-API residual remains (P1-15). Soft leave never reaches this emit.
+  const partialOutcome = generatePartialOutcome({
+    turn_count: Number(consultation.turn_count) || 0,
+    status: priorStatus,
+    filled_slots: consultation.filled_slots,
+  })
+  await addProductEvent(ctx, 'consult_abandoned', consultation.id, {
+    abandoned_from_status: priorStatus,
+    last_status: priorStatus,
+    turn_index: Number(consultation.turn_count) || 0,
+    partial_outcome_shown: partialOutcome !== null,
+  })
+
+  return jsonResponse({
+    consultation_id: abandoned.id,
+    state: abandoned.status,
+    version: abandoned.version,
+    partial_outcome: partialOutcome,
+  })
 }
 
 export async function handleResumeConsultation(ctx: ProxyContext, payload: RequestPayload) {

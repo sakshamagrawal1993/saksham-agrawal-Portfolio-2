@@ -1,0 +1,106 @@
+/**
+ * `save_demographics` — age, sex at birth, consent, then the first interview turn.
+ *
+ * Moved verbatim from index.ts in L0-5 (pure structural refactor).
+ *
+ * This is the 35% wall (BASELINE / journey work). Lane F owns this module.
+ * Adults-only is enforced here deterministically (18–120), not by prompt.
+ */
+import { addMessage, getHistory, getOwnedConsultation } from '../lib/consultations.ts'
+import { jsonResponse } from '../lib/errors.ts'
+import { runInterview } from '../lib/n8n-client.ts'
+import { calculateMissingSlots } from '../lib/slots.ts'
+import { addProductEvent } from '../lib/telemetry.ts'
+import { patientPayload } from '../lib/utils.ts'
+import { CONSENT_VERSION } from '../lib/config.ts'
+import { assessClinicalEvidence } from '../clinical-policy.ts'
+import type { ProxyContext } from '../lib/context.ts'
+import type { PatientRow, RequestPayload } from '../lib/types.ts'
+
+export async function handleSaveDemographics(ctx: ProxyContext, payload: RequestPayload) {
+  const { db, user } = ctx
+  if (!payload.consultation_id) return jsonResponse({ error: 'Missing consultation id' }, 400)
+  const consultation = await getOwnedConsultation(ctx, payload.consultation_id)
+  if (consultation.status !== 'awaiting_demographics') return jsonResponse({ error: 'Demographics were already submitted' }, 409)
+  const age = Number(payload.age)
+  const sex = String(payload.sex_at_birth || '')
+  if (!Number.isInteger(age) || age < 18 || age > 120) return jsonResponse({ error: 'Enter an age from 18 to 120' }, 400)
+  if (!['female', 'male', 'intersex', 'prefer_not_to_say'].includes(sex)) return jsonResponse({ error: 'Choose a valid sex option' }, 400)
+
+  const now = new Date().toISOString()
+  const { data: profile, error: profileError } = await db
+    .from('libertymd_profiles')
+    .update({ age, sex_at_birth: sex, consent_version: CONSENT_VERSION, consented_at: now })
+    .eq('user_id', user.id)
+    .select('*')
+    .single()
+  if (profileError) throw profileError
+
+  const { data: patient, error: patientError } = await db
+    .from('libertymd_patients')
+    .update({ age, sex_at_birth: sex })
+    .eq('id', consultation.patient_id)
+    .eq('owner_user_id', user.id)
+    .select('*')
+    .single()
+  if (patientError) throw patientError
+
+  const consentRows = ['terms_of_service', 'privacy_policy', 'ai_care_disclosure'].map((consentType) => ({
+    user_id: user.id,
+    patient_id: consultation.patient_id,
+    consultation_id: consultation.id,
+    consent_type: consentType,
+    consent_version: CONSENT_VERSION,
+    decision: 'accepted',
+    source: 'demographics_submit',
+  }))
+  const { error: consentError } = await db.from('libertymd_consent_events').insert(consentRows)
+  if (consentError) throw consentError
+
+  const slots = { ...(consultation.filled_slots || {}), age, sex_at_birth: sex }
+  await addMessage(ctx, consultation.id, 'user', `Age ${age}; sex assigned at birth: ${sex.replaceAll('_', ' ')}`, {
+    message_type: 'demographics',
+    slot_updates: { age, sex_at_birth: sex },
+  })
+  const history = await getHistory(ctx, consultation.id)
+  const interview = await runInterview(history, patientPayload(patient as PatientRow), slots, consultation.missing_slots, consultation.target_slot, consultation.turn_count)
+  const mergedSlots = { ...slots, ...interview.slot_updates }
+  const missingSlots = interview.missing_slots.length ? interview.missing_slots : calculateMissingSlots(mergedSlots)
+  const evidence = assessClinicalEvidence(mergedSlots)
+  const nextStatus = consultation.safety_state?.status === 'high_risk_continue' ? 'high_risk' : 'interviewing'
+
+  await addMessage(ctx, consultation.id, 'assistant', interview.next_question, {
+    options: interview.options,
+    target_slot: interview.target_slot,
+    slot_updates: interview.slot_updates,
+    metadata: { workflow_source: interview.source },
+  })
+  await db.from('libertymd_consultations').update({
+    status: nextStatus,
+    filled_slots: mergedSlots,
+    missing_slots: missingSlots,
+    target_slot: interview.target_slot,
+    patient_snapshot: {
+      patient_id: consultation.patient_id,
+      relationship: patient.relationship,
+      age,
+      sex_at_birth: sex,
+    },
+    clinical_evidence_score: evidence.score,
+    last_activity_at: now,
+  }).eq('id', consultation.id)
+  await addProductEvent(ctx, 'demographics_saved', consultation.id, {
+    patient_relationship: patient.relationship,
+    consent_version: CONSENT_VERSION,
+  })
+
+  return jsonResponse({
+    consultation_id: consultation.id,
+    state: nextStatus,
+    next_question: interview.next_question,
+    options: interview.options,
+    target_slot: interview.target_slot,
+    missing_slots: missingSlots,
+    evidence_score: evidence.score,
+  })
+}

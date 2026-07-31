@@ -429,3 +429,15 @@ entrypoint = "./functions/submit-score/index.ts"
 enabled = true
 verify_jwt = true
 entrypoint = "./functions/libertymd-care-proxy/index.ts"
+
+# P1-24 Storage orphan reconcile — auth is service_role Bearer inside the function
+[functions.libertymd-cleanup-storage]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/libertymd-cleanup-storage/index.ts"
+
+# P4-01 72h feeling check-in sweeper — auth is service_role Bearer inside the function
+[functions.libertymd-followup-checkin]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/libertymd-followup-checkin/index.ts"

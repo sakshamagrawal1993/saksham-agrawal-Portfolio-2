@@ -33,11 +33,53 @@ export type ProxyAction =
   | 'complete_account_merge'
   | 'get_history'
   | 'get_consultation'
+  | 'get_partial_outcome'
+  | 'create_patient'
+  | 'update_patient'
+  | 'delete_patient'
+  | 'list_owned_patients'
+  | 'request_report_email'
+  | 'redeem_report_link'
+  | 'submit_report_feedback'
+  | 'record_care_interest'
+  | 'respond_followup_checkin'
+  | 'unsubscribe_followup_checkin'
+  | 'upload_photo'
+  | 'upload_lab'
 
-export interface RequestPayload {
+/** P4-05 — cross-account merge attribution path (HTTP + identity_event metadata). Not Lexicon merge_outcome. */
+export type CollisionPath = 'matched_self' | 'distinct_profile'
+
+/**
+ * P1-19 — sanitized landing attribution (allow-listed only).
+ * Never include raw `q` / `query` / free-text search. Server re-sanitizes.
+ */
+export interface LandingAttributionFields {
+  anon_session_key?: string
+  landing_session_id?: string
+  utm_source?: string
+  utm_medium?: string
+  utm_campaign?: string
+  utm_content?: string
+  keyword_id?: string
+  matched_topic_slug?: string
+  /** Client may send `topic` as alias for matched_topic_slug — proxy maps it. */
+  topic?: string
+  locale?: string
+  device_class?: string
+  landing_path?: string
+}
+
+export interface RequestPayload extends LandingAttributionFields {
   action: ProxyAction
   consultation_id?: string
   message?: string
+  /**
+   * P3-07 — explicit clinical journey language on `start_consultation` only.
+   * Proxy `journey-locale` normalizer is SoT (allow-list → en|es → AC6 gate).
+   * Distinct from P1-19 attribution `locale` (chrome/landing analytics).
+   */
+  language?: string
   age?: number | string
   sex_at_birth?: string
   region?: 'US' | 'EU'
@@ -46,6 +88,54 @@ export interface RequestPayload {
   expected_version?: number
   identity_event?: 'google_link_started' | 'google_link_cancelled' | 'google_link_conflict'
   transfer_token?: string
+  /** P1-04 create_patient — relationship for dependent/other profiles. */
+  relationship?: 'self' | 'dependent' | 'other' | string
+  /** P1-04 create_patient — non-PHI display label. */
+  display_label?: string
+  /** P1-03 — explicit bind when activeOwnedCount > 1. */
+  patient_id?: string
+  /**
+   * P1-03 telemetry only — how the explicit patient was chosen.
+   * Ignored when patient_id is omitted (sole-active auto-bind).
+   */
+  selection_source?: 'picker' | 'someone_else_create'
+  /**
+   * P3-05 — how the consult opened. Server coerces to `chip` | `freetext` only.
+   * Never put chip label / message / chief_complaint on product events.
+   */
+  entry_type?: 'chip' | 'freetext' | string
+  /** P3-05 — opaque allow-listed chip id when entry_type is chip. */
+  chip_id?: string
+  /**
+   * P2-08 delivery contact (`request_report_email`) and P2-12 optional waitlist
+   * contact (`record_care_interest`). Different write paths/tables. Null/omit on
+   * waitlist = demand without contact. Never merged to profiles.email; not marketing consent.
+   */
+  contact_email?: string
+  /** P2-08 — raw bearer token for redeem_report_link (hash looked up service-role). */
+  delivery_token?: string
+  /** P4-01 — raw bearer token for respond_followup_checkin / unsubscribe_followup_checkin. */
+  followup_token?: string
+  /** P4-01 — categorical feeling answer (better | same | worse). */
+  followup_answer?: string
+  /** P4-02 — categorical doctor-visit answer (yes | no | not_yet). One-shot while null. */
+  followup_saw_doctor?: string
+  /** P4-02 — optional product-feedback match (yes | no | unsure); omit when skipped. */
+  followup_report_match?: string
+  /** P2-10 — was this report helpful (required for submit_report_feedback). */
+  helpful?: boolean
+  /** P2-10 — optional free-text “what was missing?” (≤500; clinical DB only). */
+  comment?: string
+  /**
+   * P4-06 — photo ingest (base64 bytes). Proxy strips EXIF then service_role
+   * stores under libertymd-care. Never trust client path / filename / user id.
+   * P4-07 — lab also accepts PDF under `file_base64` (preferred) or `image_base64`
+   * alias; CARE documents one transport SoT. Never trust client path / filename.
+   */
+  content_type?: string
+  image_base64?: string
+  /** P4-07 — preferred lab base64 field (PDF + images); image_base64 is alias. */
+  file_base64?: string
 }
 
 export interface ConsultationRow {
@@ -72,6 +162,30 @@ export interface ConsultationRow {
   workflow_versions: JsonObject
   abandoned_from_status: ConsultationStatus | null
   abandoned_at: string | null
+  /** US | EU — care region (AC2 numbers via region_config). */
+  region?: string
+  /** P3-07 journey-wide clinical language (`en` | `es`). Immutable after create. */
+  language?: string
+}
+
+/**
+ * P4-03 — enriched `get_history` / identity / bootstrap history row.
+ * Scalars only — never embed `report_data`. Withheld / expired rows omitted upstream.
+ */
+export interface HistorySummaryItem {
+  id: string
+  status: string
+  chief_complaint: string | null
+  turn_count: number | null
+  report_gate: string | null
+  created_at: string
+  updated_at: string | null
+  completed_at: string | null
+  patient_id: string | null
+  patient_display_label: string | null
+  headline: string | null
+  triage_tier: string | null
+  retention_expires_at: string | null
 }
 
 export interface PatientRow {
@@ -82,6 +196,30 @@ export interface PatientRow {
   age: number | null
   sex_at_birth: string | null
   gender_identity: string | null
+  /** Soft-active flag; list / skip / picker use is_active = true only (P1-03). */
+  is_active?: boolean
+}
+
+/** Non-PHI picker row for bootstrap / multi-start reject (P1-03 Q8A). */
+export interface PatientListItem {
+  id: string
+  relationship: 'self' | 'dependent' | 'other' | string
+  display_label: string | null
+  has_age: boolean
+  has_sex: boolean
+  is_complete: boolean
+}
+
+/**
+ * P4-04 Q3A — linked-only management list row (AccountDrawer CRUD).
+ * Includes age/sex for the JWT owner. Never used for intake picker.
+ */
+export interface ManagedPatientListItem {
+  id: string
+  relationship: 'self' | 'dependent' | 'other' | string
+  display_label: string | null
+  age: number | null
+  sex_at_birth: string | null
 }
 
 /**
@@ -181,6 +319,60 @@ export function severityForSafetySignal(signal: SafetySignal | null | undefined)
   return 'info'
 }
 
+/**
+ * P0-14c — server-only audit provenance for an `edge_deterministic` force-end.
+ *
+ * Persisted under `libertymd_safety_events.raw_result.match` only. Must never
+ * appear in HTTP `safety` payloads, `consultations.safety_state`, logs, or
+ * telemetry (CONTEXT.md §3.5).
+ */
+export interface GuardrailMatchAudit {
+  rule_id: string
+  span: string
+  span_start: number
+  span_end: number
+  pattern_set_version: string
+  lane: 'edge'
+}
+
+/**
+ * P0-15a — PHI-free observational LLM shadow under `raw_result.shadow_llm`.
+ * Never on HTTP `safety`, `safety_state`, telemetry, or console.
+ */
+export type ShadowLlmOutcome = 'completed' | 'timeout' | 'transport' | 'error'
+
+export type ShadowLlmStatus =
+  | 'agreed_force_end'
+  | 'disagreed'
+  | 'pending'
+  | 'timeout'
+  | 'disabled'
+  | 'error'
+
+export interface ShadowLlmPayload {
+  status: string
+  force_end: boolean
+  crisis_type: string
+  care_setting: string
+  outcome: ShadowLlmOutcome
+  shadow_llm_status: ShadowLlmStatus
+}
+
+/** Screening inputs needed to re-call the guardrail webhook for a shadow. */
+export interface GuardrailScreenContext {
+  message: string
+  history: unknown[]
+  patient: JsonObject
+}
+
+/** P3-08 · Resolved patient-facing emergency strings (force_end + reopen). */
+export interface EmergencyCopyWire {
+  heading: string
+  standingInstruction: string
+  detail: string
+  crisis_type: string
+}
+
 export interface GuardrailResult {
   status: 'pass' | 'high_risk_continue' | 'force_end'
   risk_level: 'low' | 'medium' | 'high' | 'emergency'
@@ -198,7 +390,21 @@ export interface GuardrailResult {
    * than trusting it, so a server bug cannot reach emergency chrome.
    */
   severity: CareSeverity
+  /**
+   * Client-safe verdict blob for `safety_state` / response `raw`. Never carries
+   * `match`, `shadow_llm`, or transcript fields (`message_text` / `history` / `patient`).
+   */
   raw: JsonObject
+  /**
+   * P0-14c — optional internal audit field. Read only by `saveSafetyEvent`.
+   * Strip with `toClientSafety` before every HTTP `safety:` response.
+   */
+  match?: GuardrailMatchAudit
+  /**
+   * P3-08 — resolved heading / standing / detail from catalog + region_config
+   * (fixture fail-open). Present on force_end; client displays these strings only.
+   */
+  emergency_copy?: EmergencyCopyWire
 }
 
 export interface InterviewResult {

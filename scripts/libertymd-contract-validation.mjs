@@ -69,7 +69,7 @@ try {
 }
 
 /**
- * Approved models for the LibertyMD clinical inference path.
+ * Per-workflow approved models for the LibertyMD clinical inference path.
  *
  * History of this assertion, because it has now been wrong twice:
  *  - Originally an exact match on 'models/gemini-3.1-flash-lite'. Workflows ran
@@ -84,13 +84,25 @@ try {
  * explicit allow-list rather than a pattern. A pattern silently stops matching
  * when the schema moves; an allow-list plus a "found nothing" failure does not.
  *
- * Seeded with what is actually deployed. Changing the clinical model is a
- * deliberate decision -- add it here in the same change.
+ * BO 2026-07-31 (n8n model routing): interview/QA and guardrails may use
+ * Gemini `models/gemini-3.1-flash-lite` for speed; diagnosis must stay on
+ * OpenAI `gpt-5.6-luna`. Allow-lists are therefore per-workflow.
  */
-const APPROVED_MODELS = new Set([
-  'gpt-5.6-luna',                  // deployed 2026-07-30, all three workflows
-  'models/gemini-3.5-flash-lite',  // previous; retained so a rollback still passes
-])
+const WORKFLOW_APPROVED_MODELS = {
+  guardrail: new Set([
+    'models/gemini-3.1-flash-lite', // BO 2026-07-31 — live / allowed
+    'gpt-5.6-luna',                 // rollback still accepted
+    'models/gemini-3.5-flash-lite', // prior Gemini rollback
+  ]),
+  interview: new Set([
+    'models/gemini-3.1-flash-lite', // BO 2026-07-31 — speed
+    'gpt-5.6-luna',                 // transitional / rollback
+    'models/gemini-3.5-flash-lite',
+  ]),
+  diagnosis: new Set([
+    'gpt-5.6-luna', // BO 2026-07-31 — quality; Gemini not allowed
+  ]),
+}
 
 /** Reads the model id across every node shape n8n has used for LLM nodes. */
 function extractModel(node) {
@@ -132,6 +144,7 @@ if (definitionsDir) {
       .filter((node) => !extractModel(node))
       .map((node) => ({ name: node.name, type: node.type, typeVersion: node.typeVersion }))
     const settings = workflow.settings || {}
+    const approved = WORKFLOW_APPROVED_MODELS[name] ?? new Set()
     workflowResults.push({
       workflow: name,
       active: workflow.active === true,
@@ -141,12 +154,21 @@ if (definitionsDir) {
       correctModel: llmNodes.length > 0
         && unreadableModelNodes.length === 0
         && models.length > 0
-        && models.every((model) => APPROVED_MODELS.has(model)),
+        && models.every((model) => approved.has(model)),
       noPayloadRetention: settings.saveDataErrorExecution === 'none'
         && settings.saveDataSuccessExecution === 'none'
         && settings.saveManualExecutions === false
         && settings.saveExecutionProgress === false,
       timeout: settings.executionTimeout,
+      // P3-07 AC2 — Interview + Diagnosis must bind body.language / body.locale.
+      // Guardrail locale IO is out of scope.
+      localeIo: name === 'guardrail'
+        ? { required: false, present: true }
+        : (() => {
+          const blob = JSON.stringify(workflow)
+          const present = blob.includes('body.language') || blob.includes('body.locale')
+          return { required: true, present }
+        })(),
     })
   }
 }
@@ -155,7 +177,8 @@ const fixtureFailures = results.filter((result) => result.actualValid !== result
 const workflowFailures = workflowResults.filter((result) => !result.active
   || !result.correctModel
   || !result.noPayloadRetention
-  || result.timeout !== 60)
+  || result.timeout !== 60
+  || (result.localeIo?.required && !result.localeIo?.present))
 
 console.log(JSON.stringify({
   schemas: Object.keys(validators).length,

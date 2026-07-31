@@ -4,6 +4,7 @@
  *
  * See support/proxy-doubles.mts for why this is a Deno `.mts` test.
  */
+import './get-consultation-classification.mts'
 import {
   addMessage,
   assertTurnWithinCap,

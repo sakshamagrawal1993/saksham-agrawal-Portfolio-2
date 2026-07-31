@@ -4,34 +4,36 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 // All other locales are lazy-loaded on demand so they add ZERO weight to the
 // initial bundle — a visitor who never switches language never downloads them.
 import en from './locales/en.json';
+import registry from './registry.json';
 
-export type Language = 'en' | 'es' | 'es-ES' | 'pt' | 'hi' | 'fr' | 'de';
+/** Locale code derived from `i18n/registry.json` — add a locale without editing a TS allowlist. */
+export type Language = string;
 export type Region = 'US' | 'MX' | 'BR' | 'IN' | 'FR' | 'DE' | 'GB' | 'ES' | 'PT' | 'EU';
 
-export const SUPPORTED_LANGUAGES: { code: Language; label: string; nativeLabel: string; flag: string }[] = [
-  { code: 'en', label: 'English', nativeLabel: 'English', flag: '🇺🇸' },
-  { code: 'es', label: 'Spanish (Latin America)', nativeLabel: 'Español (Latinoamérica)', flag: '🇲🇽' },
-  { code: 'es-ES', label: 'Spanish (Spain)', nativeLabel: 'Español (España)', flag: '🇪🇸' },
-  { code: 'pt', label: 'Portuguese', nativeLabel: 'Português', flag: '🇧🇷' },
-  { code: 'hi', label: 'Hindi', nativeLabel: 'हिन्दी', flag: '🇮🇳' },
-  { code: 'fr', label: 'French', nativeLabel: 'Français', flag: '🇫🇷' },
-  { code: 'de', label: 'German', nativeLabel: 'Deutsch', flag: '🇩🇪' },
-];
+export type LocaleRegistryEntry = {
+  code: string;
+  label: string;
+  nativeLabel: string;
+  flag: string;
+};
+
+/** Data-driven chrome locale list (AC6). Editing this file + dropping a locale JSON adds a language. */
+export const SUPPORTED_LANGUAGES: LocaleRegistryEntry[] = (registry as { locales: LocaleRegistryEntry[] }).locales;
 
 type Bundle = Record<string, unknown> & { _meta?: { status?: string; version?: string } };
 
 // Vite turns each locale into its own tiny async chunk.
 const localeLoaders = (import.meta as any).glob('./locales/*.json') as Record<string, () => Promise<{ default: Bundle }>>;
-const loadedBundles: Partial<Record<Language, Bundle>> = { en };
+const loadedBundles: Partial<Record<string, Bundle>> = { en };
 
-const isSupported = (code: string | null | undefined): code is Language =>
+const isSupported = (code: string | null | undefined): boolean =>
   !!code && SUPPORTED_LANGUAGES.some(l => l.code === code);
 
 /** Read ?lang= from the URL. Deep links like /liberty-md?lang=es win over everything. */
 function langFromQuery(): Language | null {
   if (typeof window === 'undefined') return null;
   const q = new URLSearchParams(window.location.search).get('lang');
-  return isSupported(q) ? q : null;
+  return isSupported(q) && q ? q : null;
 }
 
 /** Write ?lang= into the URL without adding history entries, preserving other params. */
@@ -45,19 +47,32 @@ function writeLangToQuery(lang: Language) {
 /** 'es-ES' -> 'es'; 'es' -> null (no parent). */
 const baseOf = (lang: Language): Language | null => {
   const base = lang.split('-')[0];
-  return base !== lang && isSupported(base) ? (base as Language) : null;
+  return base !== lang && isSupported(base) ? base : null;
 };
+
+/** P3-07 — preferred chrome after exiting a clinically locked surface. */
+const STORAGE_PREFERRED_LANDING_KEY = 'libertymd.lang.preferred';
 
 export function detectLanguage(): Language {
   const fromQuery = langFromQuery();
   if (fromQuery) return fromQuery;
+  const preferred = typeof localStorage !== 'undefined'
+    ? localStorage.getItem(STORAGE_PREFERRED_LANDING_KEY)
+    : null;
+  if (isSupported(preferred) && preferred) return preferred;
   const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('libertymd.lang') : null;
-  if (isSupported(saved)) return saved;
+  if (isSupported(saved) && saved) return saved;
   const nav = (typeof navigator !== 'undefined' ? navigator.language : 'en');
   // Exact variant match first (es-ES), then base language (es-MX/es-AR/... -> es)
   if (isSupported(nav)) return nav;
   const base = nav.toLowerCase().split('-')[0];
   return isSupported(base) ? base : 'en';
+}
+
+/** Map clinical DB language (`en` | `es`) onto a chrome registry code. */
+export function chromeCodeForClinicalLanguage(clinical: string | null | undefined): Language {
+  const code = String(clinical || 'en').trim().toLowerCase() === 'es' ? 'es' : 'en';
+  return isSupported(code) ? code : 'en';
 }
 
 export function detectRegion(): Region {
@@ -86,7 +101,15 @@ interface I18nContextValue {
   region: Region;
   setLanguage: (lang: Language) => void;
   setRegion: (region: Region) => void;
-  /** Translate a key with {placeholder} interpolation. Fallback chain: language → English → key itself. */
+  /**
+   * P3-07 — store post-exit landing chrome preference without changing active
+   * clinical chrome (used when clinicalLock is on).
+   */
+  setPreferredLandingLanguage: (lang: Language) => void;
+  /**
+   * Translate a key with {placeholder} interpolation.
+   * Fallback: language → base → English → safe empty (never raw key — AC5).
+   */
   t: (key: string, vars?: Record<string, string | number>) => string;
   /** True when the active language bundle is machine-translated and not yet human-approved. */
   isBeta: boolean;
@@ -142,14 +165,23 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     const baseBundle = base ? loadedBundles[base] : undefined;
     const t = (key: string, vars?: Record<string, string | number>) => {
       const hit = lookup(bundle, key) ?? lookup(baseBundle, key) ?? lookup(loadedBundles.en, key);
-      if (hit === undefined && (import.meta as any).env?.DEV) console.warn(`[i18n] missing key: ${key}`);
-      return interpolate(hit ?? key, vars);
+      if (hit === undefined) {
+        if ((import.meta as any).env?.DEV) console.warn(`[i18n] missing key: ${key}`);
+        // AC5: never render raw keys to the user.
+        return '';
+      }
+      return interpolate(hit, vars);
+    };
+    const setPreferredLandingLanguage = (lang: Language) => {
+      if (!isSupported(lang)) return;
+      try { localStorage.setItem(STORAGE_PREFERRED_LANDING_KEY, lang); } catch { /* private mode */ }
     };
     return {
       language,
       region,
       setLanguage: setLanguageState,
       setRegion: setRegionState,
+      setPreferredLandingLanguage,
       t,
       isBeta: (bundle ?? baseBundle) ? (bundle ?? baseBundle)!._meta?.status !== 'approved' : false,
       isLoadingLocale: needsLoad,

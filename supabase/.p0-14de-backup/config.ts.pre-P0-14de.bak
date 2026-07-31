@@ -1,0 +1,18 @@
+/**
+ * Environment + fixed configuration for the LibertyMD care proxy.
+ *
+ * Moved verbatim from index.ts in L0-5 (pure structural refactor).
+ *
+ * Separability rule (scripts/libertymd-separability-check.mjs): every webhook
+ * env var read anywhere in this function must be LIBERTYMD_-prefixed, and no
+ * hardcoded non-libertymd webhook URL may appear.
+ */
+const N8N_BASE = 'https://n8n.saksham-experiments.com/webhook'
+
+export const GUARDRAIL_WEBHOOK = Deno.env.get('LIBERTYMD_GUARDRAIL_WEBHOOK') || `${N8N_BASE}/libertymd-guardrail`
+export const INTERVIEW_WEBHOOK = Deno.env.get('LIBERTYMD_INTERVIEW_WEBHOOK') || `${N8N_BASE}/libertymd-interview`
+export const DIAGNOSIS_WEBHOOK = Deno.env.get('LIBERTYMD_DIAGNOSIS_WEBHOOK') || `${N8N_BASE}/libertymd-diagnosis`
+export const WEBHOOK_SECRET = Deno.env.get('LIBERTYMD_N8N_WEBHOOK_SECRET') || ''
+
+export const CONSENT_VERSION = 'libertymd-ai-care-v1'
+export const MAX_TURNS = 15

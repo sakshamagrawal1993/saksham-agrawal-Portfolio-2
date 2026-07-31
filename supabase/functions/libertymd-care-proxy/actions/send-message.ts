@@ -38,10 +38,12 @@
  *      goes through `updateOwnedConsultation` / the row form of `addMessage`.
  */
 import { assessClinicalEvidence, classifyResponseRelevance, decideReportOutcome } from '../clinical-policy.ts'
-import { MAX_TURNS } from '../lib/config.ts'
+import { isSpeculativeDiagnosisEnabled, MAX_TURNS } from '../lib/config.ts'
 import {
   addMessage,
   assertTurnWithinCap,
+  diagnosisResultFromDiagnosticRun,
+  findLatestSpeculativeDiagnosticRun,
   getHistory,
   getOwnedConsultation,
   replayCompletedTurn,
@@ -49,8 +51,10 @@ import {
   updateOwnedConsultation,
 } from '../lib/consultations.ts'
 import { jsonResponse } from '../lib/errors.ts'
+import { scheduleDetached } from '../lib/mixpanel.ts'
 import {
   INFERENCE_ALLOWED_STATUSES,
+  isInterviewHoldingSource,
   n8nBreakerSnapshot,
   normalizeObject,
   runDiagnosis,
@@ -59,12 +63,52 @@ import {
   type N8nStage,
 } from '../lib/n8n-client.ts'
 import { ensureProfile, getOwnedPatient } from '../lib/profiles.ts'
-import { runGuardrail, saveSafetyEvent } from '../lib/safety.ts'
+import { runGuardrail, saveSafetyEvent, toClientSafety } from '../lib/safety.ts'
+import {
+  buildComprehensionCheckPayload,
+  COMPREHENSION_BRIDGE_MESSAGE,
+  CONTINUE_EMPTY_QUESTION_FALLBACK,
+  isComprehensionCompleted,
+  readComprehensionFlags,
+  withComprehensionCompleted,
+  withComprehensionPending,
+} from '../lib/comprehension-check.ts'
 import { calculateMissingSlots } from '../lib/slots.ts'
-import { addProductEvent } from '../lib/telemetry.ts'
+import {
+  computeShouldRunDiagnosis,
+  isOneTurnFromDiagnosisGate,
+  isSpeculativeRunServeEligible,
+} from '../lib/speculative-diagnosis.ts'
+import { addProductEvent, emitInferenceFailed, scoreBucket, type InferenceErrorClass } from '../lib/telemetry.ts'
+import {
+  composeWarmMidPathRedirect,
+  OFF_TOPIC_STOP_BODY,
+  selectLastClinicalAsk,
+} from '../lib/off-topic-recovery.ts'
+import {
+  ensureReportInserted,
+  finalizeFromExistingReport,
+  findOwnedReport,
+  hasReportGateMessage,
+  isServeEligibleStoredReport,
+} from '../lib/report-persistence.ts'
 import { addDays, cleanMessage, limitConsultationMessage, patientPayload } from '../lib/utils.ts'
 import type { ProxyContext } from '../lib/context.ts'
-import type { ConsultationRow, JsonObject, RequestPayload } from '../lib/types.ts'
+import type { ConsultationRow, GuardrailResult, JsonObject, RequestPayload } from '../lib/types.ts'
+
+function guardrailInferenceErrorClass(guardrail: GuardrailResult): InferenceErrorClass | null {
+  if (guardrail.source !== 'error_fail_cautious') return null
+  const failure = guardrail.raw?.failure
+  if (failure === 'timeout') return 'timeout'
+  if (failure === 'malformed_payload') return 'malformed_payload'
+  return 'http_error'
+}
+
+function interviewInferenceErrorClass(source: string): InferenceErrorClass | null {
+  if (source === 'breaker_open') return 'breaker_open'
+  if (source === 'unavailable') return 'unavailable'
+  return null
+}
 
 /**
  * P0-11 AC3 — the calm holding state.
@@ -87,7 +131,12 @@ import type { ConsultationRow, JsonObject, RequestPayload } from '../lib/types.t
  * `next_question`. The rendering half of AC3 lives in the chat tree, which is
  * outside this ticket's manifest — see the implementation notes.
  */
-function holdingState(consultation: ConsultationRow, stage: N8nStage, currentVersion: number) {
+function holdingState(
+  consultation: ConsultationRow,
+  stage: N8nStage,
+  currentVersion: number,
+  clientMessageId: string,
+) {
   const snapshot = n8nBreakerSnapshot().find((entry) => entry.stage === stage)
   console.warn('LibertyMD returning holding state for a degraded inference stage', {
     stage,
@@ -106,6 +155,8 @@ function holdingState(consultation: ConsultationRow, stage: N8nStage, currentVer
     next_question: null,
     message: 'We have paused for a moment because the care service is not responding. Nothing you typed is lost, and this will pick up exactly where it left off.',
     version: currentVersion,
+    // P0-07 D1 — echo turn UUID so holding joins client → proxy logs → n8n header.
+    client_message_id: clientMessageId,
   }, 503)
 }
 
@@ -142,23 +193,20 @@ async function closeAtTurnCap(
     status: consultation.status,
   })
 
-  const { data: existingReport, error: reportLookupError } = await ctx.db
-    .from('libertymd_reports')
-    .select('access_status,confidence_score')
-    .eq('consultation_id', consultation.id)
-    .eq('user_id', ctx.user.id)
-    .maybeSingle()
-  if (reportLookupError) throw reportLookupError
-  const reportIsValid = Boolean(existingReport) && Number(existingReport?.confidence_score || 0) > 0
+  // P2-07 — turn-cap path is read-only on clinical body (no re-insert / upsert).
+  const existingReport = await findOwnedReport(ctx, consultation.id)
+  const reportIsValid = isServeEligibleStoredReport(existingReport)
 
   const now = new Date().toISOString()
-  if (reportIsValid) {
+  if (reportIsValid && existingReport) {
     const status = ctx.isAnonymous ? 'report_pending_auth' : 'completed'
-    await addMessage(ctx, consultation, 'assistant', ctx.isAnonymous
-      ? 'We have reached the end of this consultation. Your LibertyMD report is ready — link Google to save it, or continue without saving.'
-      : 'We have reached the end of this consultation. Your LibertyMD report is ready and saved to your history.', {
-      message_type: 'report_gate',
-    })
+    if (!(await hasReportGateMessage(ctx, consultation.id))) {
+      await addMessage(ctx, consultation, 'assistant', ctx.isAnonymous
+        ? 'We have reached the end of this consultation. Your LibertyMD report is ready — link Google to save it, or continue without saving.'
+        : 'We have reached the end of this consultation. Your LibertyMD report is ready and saved to your history.', {
+        message_type: 'report_gate',
+      })
+    }
     await updateOwnedConsultation(ctx, consultation, {
       status,
       turn_count: MAX_TURNS,
@@ -172,7 +220,10 @@ async function closeAtTurnCap(
       report_ready: true,
       auth_required: ctx.isAnonymous,
       turn_limit_reached: true,
-      confidence_score: Number(existingReport?.confidence_score || 0),
+      confidence_score: Number(existingReport.confidence_score || 0),
+      report: existingReport.report_data,
+      retention_expires_at: existingReport.retention_expires_at ?? null,
+      report_omitted_reason: null,
       version: currentVersion,
     })
   }
@@ -206,6 +257,9 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
   const message = cleanMessage(payload.message)
   if (!message) return jsonResponse({ error: 'Message cannot be empty' }, 400)
   const consultation = await getOwnedConsultation(ctx, payload.consultation_id)
+  // P3-07 — Mixpanel locale super + n8n IO from stored clinical language (immutable).
+  const clinicalLanguage = String(consultation.language || 'en').trim().toLowerCase() === 'es' ? 'es' : 'en'
+  ctx.clinicalLocale = clinicalLanguage
   // P0-13 AC2. `send_message` accepts a narrower set than
   // INFERENCE_ALLOWED_STATUSES (which also admits the demographics turn), so the
   // list stays explicit here; the shared allow-list is asserted again inside
@@ -228,6 +282,8 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)) {
     return jsonResponse({ error: 'Invalid client message id' }, 400)
   }
+  const { comprehensionAck, comprehensionCorrection } = readComprehensionFlags(payload)
+  const completingComprehension = comprehensionAck || comprehensionCorrection
   const expectedVersion = Number.isInteger(payload.expected_version) ? Number(payload.expected_version) : null
   const { data: claims, error: claimError } = await db.rpc('libertymd_claim_consultation_request', {
     p_consultation_id: consultation.id,
@@ -239,10 +295,22 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
   const claim = Array.isArray(claims) ? claims[0] : claims
   if (!claim?.accepted) {
     if (claim?.replayed) return jsonResponse(await replayCompletedTurn(ctx, await getOwnedConsultation(ctx, consultation.id)))
+    // P0-12: distinguish lease vs version without a SQL migration. Prefer
+    // version_mismatch when the client's expected version differs from the
+    // claim's current_version (silent rehydrate is safer than ignoring stale).
+    const currentVersion = Number(claim?.current_version || consultation.version)
+    const claimRejection =
+      expectedVersion !== null && currentVersion !== expectedVersion
+        ? 'version_mismatch'
+        : 'lease_conflict'
     return jsonResponse({
-      error: 'Another answer is already being processed',
+      error: 'This consultation could not accept that answer just now.',
       retryable: true,
-      current_version: claim?.current_version || consultation.version,
+      current_version: currentVersion,
+      claim_rejection: claimRejection,
+      severity: 'technical',
+      // P0-07 D1 — structured failure JSON echoes the turn UUID (no client parse required).
+      client_message_id: requestId,
     }, 409)
   }
   const currentVersion = Number(claim.current_version || consultation.version)
@@ -270,14 +338,39 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
       await addMessage(ctx, consultation, 'user', message, {
         target_slot: consultation.target_slot,
         client_message_id: requestId,
+        // P1-14 — tag correction / proceed ack (existing message_type; no schema widen).
+        ...(comprehensionCorrection
+          ? { metadata: { source: 'comprehension_correction' } }
+          : comprehensionAck
+            ? { metadata: { source: 'comprehension_ack' } }
+            : {}),
+      })
+      const answeredSlot = String(consultation.target_slot || '').trim() || 'none'
+      // P1-15 S3 — user answer persistence that advances the turn.
+      await addProductEvent(ctx, 'turn_completed', consultation.id, {
+        turn_index: turnCount,
+        target_slot: answeredSlot,
       })
     }
+
     const history = await getHistory(ctx, consultation.id)
     // The guardrail runs on every turn including the capped one. Skipping the
     // screen because the interview is over would mean an emergency described in
     // the 16th message goes unread — safety asymmetry, CONTEXT.md §4.
     const [guardrail, interview] = await Promise.all([
-      runGuardrail(message, history, patientPayload(patient), consultation.filled_slots),
+      runGuardrail(
+        message,
+        history,
+        patientPayload(patient),
+        consultation.filled_slots,
+        undefined,
+        requestId,
+        {
+          db: ctx.db,
+          region: consultation.region ?? 'US',
+          language: consultation.language ?? 'en',
+        },
+      ),
       atCap ? Promise.resolve(null) : runInterview(
         history,
         patientPayload(patient),
@@ -287,9 +380,32 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
         turnCount,
         consultation.status,
         consultation.id,
+        requestId,
+        clinicalLanguage,
       ),
     ])
-    await saveSafetyEvent(ctx, consultation, guardrail, turnCount)
+    await saveSafetyEvent(ctx, consultation, guardrail, turnCount, {
+      message,
+      history,
+      patient: patientPayload(patient),
+    }, requestId)
+
+    await addProductEvent(ctx, 'guardrail_evaluated', consultation.id, {
+      status: guardrail.status,
+      risk_level: guardrail.risk_level,
+      source: guardrail.source,
+      turn_index: turnCount,
+      shadow_llm_status: 'disabled',
+    })
+
+    const guardrailErrorClass = guardrailInferenceErrorClass(guardrail)
+    if (guardrailErrorClass) {
+      await emitInferenceFailed(ctx, consultation.id, {
+        stage: 'guardrail',
+        error_class: guardrailErrorClass,
+        outcome: 'fail_cautious',
+      })
+    }
 
     if (guardrail.force_end) {
       await addMessage(ctx, consultation, 'assistant', guardrail.message, { message_type: 'safety' })
@@ -300,16 +416,49 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
         last_activity_at: new Date().toISOString(),
       })
       await addProductEvent(ctx, 'emergency_stopped', consultation.id, { turn_count: turnCount, source: guardrail.source })
-      return jsonResponse({ consultation_id: consultation.id, emergency: true, safety: guardrail, message: guardrail.message, version: currentVersion })
+      return jsonResponse({
+        consultation_id: consultation.id,
+        emergency: true,
+        safety: toClientSafety(guardrail),
+        message: guardrail.message,
+        emergency_copy: guardrail.emergency_copy ?? null,
+        turn_count: turnCount,
+        diagnosis_ran: false,
+        version: currentVersion,
+      })
     }
 
     // P0-13 AC1 — the deterministic transition at the cap. Report if one is
     // already valid, otherwise clinical review. No inference was issued.
     if (atCap || !interview) return await closeAtTurnCap(ctx, consultation, turnCount, currentVersion)
 
-    // P0-11 AC3 — the interview stage is down. One calm holding state; the turn
-    // is not consumed and no fabricated question reaches the transcript.
-    if (interview.source === 'breaker_open') return holdingState(consultation, 'interview', currentVersion)
+    // P2-07 — orphan / idempotent recovery: report row exists while status is
+    // still interviewing|high_risk (insert succeeded, status update failed).
+    // Prefer completing from the stored row — no Diagnosis, no second report_ready,
+    // no clinical rewrite. Residual: brief desync window until this path runs.
+    {
+      const orphanReport = await findOwnedReport(ctx, consultation.id)
+      if (isServeEligibleStoredReport(orphanReport) && orphanReport) {
+        return await finalizeFromExistingReport(ctx, consultation, orphanReport, {
+          turnCount,
+          currentVersion,
+          evidenceScore: consultation.clinical_evidence_score,
+          diagnosisRan: false,
+        })
+      }
+    }
+
+    // P0-11 AC3 / P0-08 Q2 — interview stage down or malformed. One calm holding
+    // state; the turn is not consumed and no fabricated question reaches the transcript.
+    const interviewErrorClass = interviewInferenceErrorClass(interview.source)
+    if (interviewErrorClass) {
+      await emitInferenceFailed(ctx, consultation.id, {
+        stage: 'interview',
+        error_class: interviewErrorClass,
+        outcome: 'holding',
+      })
+    }
+    if (isInterviewHoldingSource(interview.source)) return holdingState(consultation, 'interview', currentVersion, requestId)
 
     const deterministicRelevance = classifyResponseRelevance(message)
     const isNonClinical = deterministicRelevance === 'off_topic' || interview.input_relevance === 'off_topic'
@@ -319,14 +468,14 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
       : 0
 
     if (isNonClinical) {
-      const previousPrompt = [...history].reverse().find((item) => {
-        const row = item as JsonObject
-        return row.role === 'assistant' && row.message_type !== 'safety'
-      }) as JsonObject | undefined
+      // P1-10 Q6A: last non-off-topic clinical ask (skip prior redirects), not nested warm copy.
+      const clinicalAsk = selectLastClinicalAsk(history, interview.next_question)
+      const replayOptions = Array.isArray(clinicalAsk.options) ? clinicalAsk.options : interview.options
       const shouldStop = turnCount >= MAX_TURNS || consecutiveNonClinicalResponseCount >= 3 || nonClinicalResponseCount >= 5
+      // P1-10: warm mid-path / plain terminal stop (off-topic branch only). Thresholds unchanged.
       const messageText = limitConsultationMessage(shouldStop
-        ? 'I do not have enough relevant health information to produce a responsible differential diagnosis. Please restart with the symptom details or continue with a licensed clinician.'
-        : `I need a health-related answer to continue safely. ${cleanMessage(previousPrompt?.content) || interview.next_question}`)
+        ? OFF_TOPIC_STOP_BODY
+        : composeWarmMidPathRedirect(clinicalAsk.content || cleanMessage(interview.next_question)))
 
       await addMessage(ctx, consultation, 'assistant', messageText, {
         // P0-13 AC3: this was `'question'`, which is not one of the six values
@@ -335,7 +484,7 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
         // reject. `'normal'` is what the other interview questions in this file
         // and in save_demographics already use (via the column default).
         message_type: shouldStop ? 'safety' : 'normal',
-        options: shouldStop ? [] : (Array.isArray(previousPrompt?.options) ? previousPrompt.options : interview.options),
+        options: shouldStop ? [] : replayOptions,
         target_slot: consultation.target_slot,
         metadata: {
           response_relevance: 'off_topic',
@@ -366,7 +515,9 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
         non_clinical_response: true,
         message: messageText,
         next_question: shouldStop ? null : messageText,
-        options: shouldStop ? [] : (Array.isArray(previousPrompt?.options) ? previousPrompt.options : interview.options),
+        options: shouldStop ? [] : replayOptions,
+        turn_count: turnCount,
+        diagnosis_ran: false,
         version: currentVersion,
       })
     }
@@ -374,22 +525,147 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
     const slots = { ...consultation.filled_slots, ...interview.slot_updates }
     const missingSlots = interview.missing_slots.length ? interview.missing_slots : calculateMissingSlots(slots)
     const evidence = assessClinicalEvidence(slots)
-    const shouldRunDiagnosis = evidence.score >= 50 && turnCount >= 6 && (turnCount % 2 === 0 || interview.ready_for_report || turnCount >= MAX_TURNS)
+    const gateOpen = computeShouldRunDiagnosis({
+      evidenceScore: evidence.score,
+      turnCount,
+      readyForReport: interview.ready_for_report,
+    })
+    const comprehensionDone = isComprehensionCompleted(consultation.workflow_versions)
+
+    // P1-14 — Diagnosis-gate short-circuit: slots summary OverlaySheet before Diagnosis.
+    // Once-completed via workflow_versions (no new column). Dismiss ≠ proceed (client-only).
+    if (gateOpen && !comprehensionDone && !completingComprehension) {
+      const comprehension = buildComprehensionCheckPayload(slots)
+      const nextStatus = guardrail.status === 'high_risk_continue' ? 'high_risk' : 'interviewing'
+      const bridge = limitConsultationMessage(COMPREHENSION_BRIDGE_MESSAGE)
+      await addMessage(ctx, consultation, 'assistant', bridge, {
+        options: [],
+        target_slot: interview.target_slot,
+        slot_updates: interview.slot_updates,
+        metadata: {
+          workflow_source: interview.source,
+          safety_status: guardrail.status,
+          comprehension_pending: true,
+        },
+      })
+      await updateOwnedConsultation(ctx, consultation, {
+        status: nextStatus,
+        turn_count: turnCount,
+        filled_slots: slots,
+        missing_slots: missingSlots,
+        target_slot: interview.target_slot,
+        safety_state: { ...guardrail.raw, status: guardrail.status, risk_level: guardrail.risk_level },
+        non_clinical_response_count: nonClinicalResponseCount,
+        consecutive_non_clinical_response_count: 0,
+        clinical_evidence_score: evidence.score,
+        resolution_reason: null,
+        workflow_versions: withComprehensionPending(consultation.workflow_versions),
+        last_activity_at: new Date().toISOString(),
+      })
+      return jsonResponse({
+        consultation_id: consultation.id,
+        state: nextStatus,
+        next_question: bridge,
+        options: [],
+        target_slot: interview.target_slot,
+        missing_slots: missingSlots,
+        evidence_score: evidence.score,
+        turn_count: turnCount,
+        diagnosis_ran: false,
+        comprehension_check: comprehension,
+        safety: guardrail.status === 'high_risk_continue' ? toClientSafety(guardrail) : null,
+        version: currentVersion,
+      })
+    }
+
+    // Proceed / correct: mark once-completed, then force Diagnosis continuum.
+    let workflowVersions = consultation.workflow_versions
+    if (completingComprehension) {
+      workflowVersions = withComprehensionCompleted(consultation.workflow_versions)
+      // Persist before Diagnosis so a holding/unavailable path cannot re-open the sheet forever.
+      await updateOwnedConsultation(ctx, consultation, {
+        workflow_versions: workflowVersions,
+        last_activity_at: new Date().toISOString(),
+      })
+    }
+
+    // Ack / correction after a pending sheet must reach Diagnosis even on an odd turn.
+    const shouldRunDiagnosis = gateOpen || completingComprehension
     let diagnosis: DiagnosisResult | null = null
     let diagnosticRunId: string | null = null
+    let servedFromSpeculativeCache = false
 
     if (shouldRunDiagnosis) {
       const diagnosisInput = { ...consultation, turn_count: turnCount }
-      diagnosis = await runDiagnosis(history, patientPayload(patient), diagnosisInput, slots)
-      diagnosticRunId = await saveDiagnosticRun(
-        ctx,
-        diagnosisInput,
-        diagnosis,
-        slots,
-        missingSlots,
-        evidence.score,
-        turnCount,
-      )
+      const speculationEnabled = isSpeculativeDiagnosisEnabled()
+      const currentMaterial = {
+        filled_slots: slots,
+        patient: consultation.patient_snapshot || {},
+        target_slot: consultation.target_slot,
+      }
+
+      if (speculationEnabled) {
+        try {
+          const speculativeRow = await findLatestSpeculativeDiagnosticRun(ctx, consultation)
+          if (isSpeculativeRunServeEligible({
+            enabled: true,
+            run: speculativeRow,
+            current: currentMaterial,
+          }) && speculativeRow) {
+            diagnosis = diagnosisResultFromDiagnosticRun(speculativeRow)
+            diagnosticRunId = speculativeRow.id
+            servedFromSpeculativeCache = true
+          }
+        } catch (error) {
+          console.warn('LibertyMD speculative cache lookup soft-fail', {
+            class: error instanceof Error ? error.name : 'unknown',
+          })
+        }
+      }
+
+      if (!servedFromSpeculativeCache) {
+        diagnosis = await runDiagnosis(history, patientPayload(patient), diagnosisInput, slots, requestId)
+      }
+
+      await addProductEvent(ctx, 'diagnosis_attempted', consultation.id, {
+        turn_index: turnCount,
+        evidence_bucket: scoreBucket(evidence.score),
+        outcome: diagnosis.failure
+          ? (diagnosis.unavailable ? 'unavailable' : 'invalid')
+          : (diagnosis.valid ? 'valid' : 'invalid'),
+        was_speculative: servedFromSpeculativeCache,
+        ...(servedFromSpeculativeCache ? { served_from_cache: true } : { served_from_cache: false }),
+      })
+
+      if (!servedFromSpeculativeCache && diagnosis.failure) {
+        const errorClass: InferenceErrorClass = diagnosis.failure === 'malformed_payload'
+          ? 'malformed_payload'
+          : diagnosis.failure === 'timeout'
+            ? 'timeout'
+            : diagnosis.failure === 'http_error'
+              ? 'http_error'
+              : diagnosis.failure === 'breaker_open'
+                ? 'breaker_open'
+                : 'unavailable'
+        await emitInferenceFailed(ctx, consultation.id, {
+          stage: 'diagnosis',
+          error_class: errorClass,
+          outcome: diagnosis.unavailable ? 'holding_candidate' : 'invalid',
+        })
+      }
+
+      if (!servedFromSpeculativeCache) {
+        diagnosticRunId = await saveDiagnosticRun(
+          ctx,
+          diagnosisInput,
+          diagnosis,
+          slots,
+          missingSlots,
+          evidence.score,
+          turnCount,
+          { isSpeculative: false },
+        )
+      }
     }
 
     const reportDecision = decideReportOutcome({
@@ -411,28 +687,39 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
       && reportDecision.reason === 'low_diagnostic_confidence'
       && diagnosis?.unavailable
     ) {
-      return holdingState(consultation, 'diagnosis', currentVersion)
+      return holdingState(consultation, 'diagnosis', currentVersion, requestId)
     }
 
     if (reportDecision.outcome === 'complete' && diagnosis) {
       const now = new Date().toISOString()
       const accessStatus = isAnonymous ? 'withheld' : 'saved'
-      const { error: reportError } = await db.from('libertymd_reports').upsert({
-        consultation_id: consultation.id,
-        user_id: user.id,
-        report_data: diagnosis.raw,
-        confidence_score: diagnosis.confidence,
-        final_diagnostic_run_id: diagnosticRunId,
-        access_status: accessStatus,
-        released_at: isAnonymous ? null : now,
-        retention_expires_at: isAnonymous ? addDays(30) : null,
-        model_metadata: {
+      // P2-07 — insert-once clinical body (current-turn diagnosis only; no historical
+      // non-spec scan). Unique conflict → existing row wins; never upsert/clobber.
+      const { report: storedReport, inserted: reportInserted } = await ensureReportInserted(ctx, {
+        consultationId: consultation.id,
+        userId: user.id,
+        reportData: diagnosis.raw,
+        confidenceScore: diagnosis.confidence,
+        finalDiagnosticRunId: diagnosticRunId,
+        accessStatus,
+        releasedAt: isAnonymous ? null : now,
+        retentionExpiresAt: isAnonymous ? addDays(30) : null,
+        modelMetadata: {
           ...normalizeObject(diagnosis.raw.model_metadata),
           source: 'libertymd-diagnosis',
           turn_count: turnCount,
         },
-      }, { onConflict: 'consultation_id' })
-      if (reportError) throw reportError
+      })
+
+      if (!reportInserted) {
+        // Race / retry after first insert: soft-gate from stored; no second telemetry.
+        return await finalizeFromExistingReport(ctx, consultation, storedReport, {
+          turnCount,
+          currentVersion,
+          evidenceScore: evidence.score,
+          diagnosisRan: true,
+        })
+      }
 
       await addMessage(ctx, consultation, 'assistant', isAnonymous
         ? 'Your LibertyMD report is ready. Link Google to save it and revisit this consult, or continue without saving.'
@@ -453,21 +740,35 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
         resolution_reason: reportDecision.reason,
         completed_at: isAnonymous ? null : now,
         last_activity_at: now,
+        ...(completingComprehension ? { workflow_versions: workflowVersions } : {}),
       })
       await addProductEvent(ctx, 'report_gate_reached', consultation.id, {
-        confidence_score: diagnosis.confidence,
-        evidence_score: evidence.score,
+        confidence_bucket: scoreBucket(diagnosis.confidence),
+        evidence_bucket: scoreBucket(evidence.score),
+        is_anonymous: isAnonymous,
+      })
+      await addProductEvent(ctx, 'report_ready', consultation.id, {
+        turn_index: turnCount,
+        confidence_bucket: scoreBucket(diagnosis.confidence),
+        evidence_bucket: scoreBucket(evidence.score),
         is_anonymous: isAnonymous,
       })
 
+      // P2-02 Q3 soft gate: return report_data for anonymous complete — never withhold
+      // content. access_status stays `withheld` until release; P2-06 owns gate chrome.
       return jsonResponse({
         consultation_id: consultation.id,
         state: isAnonymous ? 'report_pending_auth' : 'completed',
         report_ready: true,
         auth_required: isAnonymous,
-        report: isAnonymous ? undefined : diagnosis.raw,
-        confidence_score: diagnosis.confidence,
+        report: storedReport.report_data,
+        confidence_score: Number(storedReport.confidence_score || diagnosis.confidence),
         evidence_score: evidence.score,
+        turn_count: turnCount,
+        diagnosis_ran: true,
+        // P2-13 L6 — retention ISO for client pre-lapse warning (no body invent).
+        retention_expires_at: storedReport.retention_expires_at ?? null,
+        report_omitted_reason: null,
         version: currentVersion,
       })
     }
@@ -489,6 +790,7 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
         clinical_evidence_score: evidence.score,
         resolution_reason: reportDecision.reason,
         last_activity_at: new Date().toISOString(),
+        ...(completingComprehension ? { workflow_versions: workflowVersions } : {}),
       })
       await addProductEvent(ctx, 'clinical_review_needed', consultation.id, {
         reason: reportDecision.reason,
@@ -501,12 +803,14 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
         reason: reportDecision.reason,
         evidence_score: evidence.score,
         message: messageText,
+        turn_count: turnCount,
+        diagnosis_ran: Boolean(shouldRunDiagnosis),
         version: currentVersion,
       })
     }
 
     const nextQuestion = limitConsultationMessage(
-      interview.next_question || 'Before I prepare the report, is there anything else about the symptom or your medical history that may be important?',
+      interview.next_question || CONTINUE_EMPTY_QUESTION_FALLBACK,
     )
     const nextStatus = guardrail.status === 'high_risk_continue' ? 'high_risk' : 'interviewing'
     await addMessage(ctx, consultation, 'assistant', nextQuestion, {
@@ -528,7 +832,86 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
       clinical_evidence_score: evidence.score,
       resolution_reason: null,
       last_activity_at: new Date().toISOString(),
+      ...(completingComprehension ? { workflow_versions: workflowVersions } : {}),
     })
+
+    const nextSlot = String(interview.target_slot || '').trim() || 'none'
+    const nextOptions = Array.isArray(interview.options) ? interview.options : []
+    await addProductEvent(ctx, 'question_served', consultation.id, {
+      turn_index: turnCount,
+      target_slot: nextSlot,
+      had_options: nextOptions.length > 0,
+      was_repeat: false,
+      evidence_bucket: scoreBucket(evidence.score),
+    })
+
+    // P1-08 — detached speculative Diagnosis one gate-step ahead (Q1 A+S1).
+    // After persist so the snapshot matches committed slots. Never blocks
+    // next_question. Never sets diagnosis_ran. Never writes intermediate_diagnoses.
+    if (
+      !shouldRunDiagnosis
+      && isSpeculativeDiagnosisEnabled()
+      && isOneTurnFromDiagnosisGate({ evidenceScore: evidence.score, turnCount })
+      && ['interviewing', 'high_risk'].includes(nextStatus)
+    ) {
+      const speculativeTurn = turnCount
+      const speculativeSlots = { ...slots }
+      const speculativeMissing = [...missingSlots]
+      const speculativeTarget = interview.target_slot
+      const speculativePatient = patientPayload(patient)
+      const speculativeHistory = history
+      const speculativeConsultation = {
+        ...consultation,
+        turn_count: speculativeTurn,
+        filled_slots: speculativeSlots,
+        missing_slots: speculativeMissing,
+        target_slot: speculativeTarget,
+        status: nextStatus as ConsultationRow['status'],
+      }
+      const evidenceScoreForEvent = evidence.score
+      scheduleDetached((async () => {
+        try {
+          const speculativeDiagnosis = await runDiagnosis(
+            speculativeHistory,
+            speculativePatient,
+            speculativeConsultation,
+            speculativeSlots,
+            requestId,
+            { speculative: true },
+          )
+          await addProductEvent(ctx, 'diagnosis_attempted', consultation.id, {
+            turn_index: speculativeTurn,
+            evidence_bucket: scoreBucket(evidenceScoreForEvent),
+            outcome: speculativeDiagnosis.failure
+              ? (speculativeDiagnosis.unavailable ? 'unavailable' : 'invalid')
+              : (speculativeDiagnosis.valid ? 'valid' : 'invalid'),
+            was_speculative: true,
+            served_from_cache: false,
+          })
+          // Soft-fail still persists the row when a result shape exists (S1).
+          // Do not emit inference_failed — avoids reliability-dashboard pollution.
+          await saveDiagnosticRun(
+            ctx,
+            speculativeConsultation,
+            speculativeDiagnosis,
+            speculativeSlots,
+            speculativeMissing,
+            evidenceScoreForEvent,
+            speculativeTurn,
+            { isSpeculative: true, targetSlot: speculativeTarget },
+          )
+          console.log('LibertyMD speculative diagnosis completed', {
+            consultation_id: consultation.id,
+            turn_index: speculativeTurn,
+            outcome: speculativeDiagnosis.valid ? 'valid' : 'invalid',
+          })
+        } catch (error) {
+          console.warn('LibertyMD speculative diagnosis soft-fail', {
+            class: error instanceof Error ? error.name : 'unknown',
+          })
+        }
+      })())
+    }
 
     return jsonResponse({
       consultation_id: consultation.id,
@@ -538,7 +921,9 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
       target_slot: interview.target_slot,
       missing_slots: missingSlots,
       evidence_score: evidence.score,
-      safety: guardrail.status === 'high_risk_continue' ? guardrail : null,
+      turn_count: turnCount,
+      diagnosis_ran: Boolean(shouldRunDiagnosis),
+      safety: guardrail.status === 'high_risk_continue' ? toClientSafety(guardrail) : null,
       version: currentVersion,
     })
   } finally {

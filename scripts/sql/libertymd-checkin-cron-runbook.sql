@@ -1,0 +1,46 @@
+-- P4-01 · Follow-up check-in cron runbook (Edge)
+--
+-- Dedicated product-mail sweeper — NEVER fold into P1-23/24 cleanup deletes.
+-- Auth: service_role Bearer (same pattern as libertymd-cleanup-storage).
+-- NEVER commit service-role keys to git.
+--
+-- Dual-path schedule:
+--   A) Supabase Dashboard → Edge Functions → Schedules (or platform cron)
+--      invoke libertymd-followup-checkin hourly or daily.
+--   B) External scheduler (GitHub Actions / Cloud Scheduler) POST/GET with
+--      Authorization: Bearer <SERVICE_ROLE_KEY>
+--
+-- ---------------------------------------------------------------------------
+-- Cadence — Edge check-in
+-- ---------------------------------------------------------------------------
+-- Expression: 0 * * * *   (hourly UTC) OR 15 8 * * * (daily off-peak)
+-- Job name:   libertymd-followup-checkin
+-- Function:   libertymd-followup-checkin
+-- Invoke:     GET/POST …/functions/v1/libertymd-followup-checkin
+--             Authorization: Bearer <SERVICE_ROLE_KEY>
+-- Dry-run:    …/libertymd-followup-checkin?dry_run=1
+--
+-- Eligibility (CARE / clarified):
+--   status ∈ {completed, report_pending_auth}; never emergency_stopped
+--   due_at = coalesce(completed_at, report.created_at, consultation.updated_at) + 72h
+--   send window [due_at, due_at + 7d]; no P2-08 sent address → no send
+--   caps: ≤1/consult + 1/email(+user_id)/rolling 7d; honour unsub immediately
+--
+-- ---------------------------------------------------------------------------
+-- Dashboard / external install
+-- ---------------------------------------------------------------------------
+-- 1. Deploy Edge Function libertymd-followup-checkin (verify_jwt=false in config.toml).
+-- 2. Confirm LIBERTYMD_RESEND_API_KEY + LIBERTYMD_RESEND_FROM + LIBERTYMD_PUBLIC_APP_ORIGIN.
+-- 3. Dry-run once; log line: libertymd followup checkin: sent=N …
+-- 4. Enable schedule (hourly preferred so open-tail sends land promptly).
+-- 5. Ops: if no successful log line in ~36h after enable, investigate.
+--
+-- Live cron fire / live Resend = DoD+ / CANNOT RUN without secrets + schedule.
+--
+-- ---------------------------------------------------------------------------
+-- Out of scope
+-- ---------------------------------------------------------------------------
+-- libertymd-cleanup-expired / libertymd-cleanup-storage destructive deletes
+-- Overloading libertymd_report_delivery_tokens as check-in state machine
+-- Push / SMS / marketing_consent invent
+-- P4-02 doctor question UX

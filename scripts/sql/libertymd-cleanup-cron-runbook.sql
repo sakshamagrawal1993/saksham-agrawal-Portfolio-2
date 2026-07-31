@@ -1,0 +1,80 @@
+-- P1-23 / P1-24 · Cleanup cron runbook (Postgres + Storage)
+--
+-- Dual-path Postgres schedule (P1-23 Q1):
+--   A) Migration schedules cron.job 'libertymd-cleanup-expired' at 0 7 * * * UTC
+--      ONLY when the pg_cron extension is already present.
+--   B) If pg_cron is absent (migration NOTICE / no-op), install an equivalent
+--      job via Supabase Dashboard → Database → Cron Jobs (or external scheduler)
+--      that invokes the cleanup as service_role.
+--
+-- Storage reconcile (P1-24): Postgres-first, then Edge Storage API orphan purge.
+--   Schedule same UTC family as Postgres (+5 minutes OK):
+--     prefer 0 7 * * * after Postgres, or 5 7 * * * UTC.
+--   Function: libertymd-cleanup-storage (service_role Bearer).
+--   Dry-run: GET/POST …/libertymd-cleanup-storage?dry_run=1
+--   NEVER SQL DELETE FROM storage.objects as retention.
+--   NEVER target libertymd-assets (marketing). Only libertymd-care.
+--
+-- NEVER commit service-role keys to git.
+-- NEVER enable the destructive job in production until dry-run counts are recorded
+--   (scripts/sql/libertymd-cleanup-dry-run.sql or cleanup_expired_libertymd_data_dry_run()
+--    + Storage would_delete_storage_objects / Edge dry_run=1).
+--
+-- ---------------------------------------------------------------------------
+-- Cadence — Postgres
+-- ---------------------------------------------------------------------------
+-- Expression: 0 7 * * *   (daily 07:00 UTC — off-peak)
+-- Job name:   libertymd-cleanup-expired
+-- Command:    select public.cleanup_expired_libertymd_data();
+--
+-- ---------------------------------------------------------------------------
+-- Cadence — Storage (P1-24 Edge)
+-- ---------------------------------------------------------------------------
+-- Expression: 0 7 * * * or 5 7 * * * UTC (same family; +5m OK)
+-- Job name:   libertymd-cleanup-storage
+-- Invoke:     Edge Function libertymd-cleanup-storage with
+--             Authorization: Bearer <SERVICE_ROLE_KEY>
+--             Prefer dry_run=1 first; then destructive POST without dry_run.
+-- Orphan SQL: scripts/sql/libertymd-storage-orphan-detect.sql
+--             (expect orphan_storage_objects = 0 after successful run)
+--
+-- ---------------------------------------------------------------------------
+-- Dashboard Cron (path B — Postgres)
+-- ---------------------------------------------------------------------------
+-- 1. Run dry-run and record counts-by-table including would_delete_storage_objects
+--    (no PHI).
+-- 2. Dashboard → Database → Cron Jobs → create:
+--      name: libertymd-cleanup-expired
+--      schedule: 0 7 * * *
+--      SQL: select public.cleanup_expired_libertymd_data();
+-- 3. Confirm the role is privileged (service_role / postgres) — EXECUTE is
+--    revoked from anon/authenticated.
+-- 4. Schedule Edge Storage reconcile (Dashboard Edge cron / external) at the
+--    same UTC family AFTER Postgres has run. Do not enable destructive Storage
+--    purge until dry-run Storage counts are recorded.
+--
+-- ---------------------------------------------------------------------------
+-- Failure alert (AC5) — not silent
+-- ---------------------------------------------------------------------------
+-- Primary: Supabase platform cron failure notification (Dashboard project
+--   email / Slack if configured for Database Cron / pg_cron / Edge job failures).
+-- Secondary: Postgres / Edge log search for:
+--   - 'libertymd cleanup:' (successful Postgres run NOTICE/LOG with counts)
+--   - 'libertymd storage cleanup:' (successful Edge run; deleted_storage_objects=N)
+--   - 'P1-23: pg_cron' / cron job error lines
+-- Ops: if no successful 'libertymd cleanup:' line in ~36h after the Postgres job
+--   is enabled, treat as missed run and investigate. Same for Storage log line
+--   after Storage schedule is enabled.
+-- Live pager proof = DoD+ / CANNOT RUN for engineering QA.
+--
+-- ---------------------------------------------------------------------------
+-- Out of scope
+-- ---------------------------------------------------------------------------
+-- libertymd_care_interest → covered (P2-12): expired rows deleted by
+--   retention_expires_at in cleanup_expired_libertymd_data(); CASCADE also
+--   clears interest when parent consult is purged
+-- Mixpanel / product_events cleanup event names → forbidden
+-- auth.users deletes → forbidden (shared multi-product Auth)
+-- libertymd-assets → marketing only; never cleanup target
+-- P4-06/07 upload UI → blocked until Storage cleanup verified
+-- SQL DELETE FROM storage.objects → forbidden as retention (use Edge API)

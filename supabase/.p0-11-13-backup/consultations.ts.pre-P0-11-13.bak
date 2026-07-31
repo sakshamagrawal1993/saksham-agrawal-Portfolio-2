@@ -1,0 +1,170 @@
+/**
+ * Consultation, message and diagnostic-run persistence.
+ *
+ * Moved verbatim from the index.ts request closure in L0-5 (pure structural
+ * refactor).
+ *
+ * The proxy is the sole clinical writer (CONTEXT.md §3.2). Every read here is
+ * scoped to `ctx.user.id`; every write is service-role and decided here, not by
+ * n8n and not by the client.
+ */
+import { normalizeObject, type DiagnosisResult } from './n8n-client.ts'
+import { cleanMessage, limitConsultationMessage } from './utils.ts'
+import type { ProxyContext } from './context.ts'
+import type { ConsultationRow, JsonObject } from './types.ts'
+
+export async function getOwnedConsultation(ctx: ProxyContext, id: string) {
+  const { data, error } = await ctx.db
+    .from('libertymd_consultations')
+    .select('*')
+    .eq('id', id)
+    .eq('user_id', ctx.user.id)
+    .maybeSingle()
+  if (error) throw error
+  if (!data) throw new Error('Consultation not found')
+  return data as ConsultationRow
+}
+
+export async function getHistory(ctx: ProxyContext, consultationId: string) {
+  const { data, error } = await ctx.db
+    .from('libertymd_messages')
+    .select('role,content,message_type,options,target_slot,created_at')
+    .eq('consultation_id', consultationId)
+    .order('sequence', { ascending: true })
+  if (error) throw error
+  return data || []
+}
+
+export async function addMessage(
+  ctx: ProxyContext,
+  consultationId: string,
+  role: 'user' | 'assistant' | 'system',
+  content: string,
+  extras: JsonObject = {},
+) {
+  const { error } = await ctx.db.from('libertymd_messages').insert({
+    consultation_id: consultationId,
+    role,
+    content: role === 'assistant' ? limitConsultationMessage(content) : content,
+    ...extras,
+  })
+  if (error) throw error
+}
+
+/**
+ * Idempotent replay of the last completed turn, used when the request-lease RPC
+ * reports the client is retrying an already-processed message.
+ */
+export async function replayCompletedTurn(ctx: ProxyContext, consultation: ConsultationRow) {
+  const { db, user } = ctx
+  const { data: latestMessage, error: messageError } = await db
+    .from('libertymd_messages')
+    .select('content,message_type,options,target_slot')
+    .eq('consultation_id', consultation.id)
+    .in('role', ['assistant', 'system'])
+    .order('sequence', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (messageError) throw messageError
+
+  const reportReady = ['report_pending_auth', 'completed'].includes(consultation.status)
+  let report = null
+  if (consultation.status === 'completed') {
+    const { data, error } = await db
+      .from('libertymd_reports')
+      .select('report_data,confidence_score,access_status')
+      .eq('consultation_id', consultation.id)
+      .eq('user_id', user.id)
+      .in('access_status', ['saved', 'guest_released'])
+      .maybeSingle()
+    if (error) throw error
+    report = data
+  }
+
+  return {
+    consultation_id: consultation.id,
+    state: consultation.status,
+    replayed: true,
+    emergency: consultation.status === 'emergency_stopped',
+    clinical_review_needed: consultation.status === 'clinical_review_needed',
+    report_ready: reportReady,
+    auth_required: consultation.status === 'report_pending_auth',
+    message: latestMessage?.content || null,
+    next_question: ['interviewing', 'high_risk'].includes(consultation.status) ? latestMessage?.content || null : null,
+    options: Array.isArray(latestMessage?.options) ? latestMessage.options : [],
+    target_slot: latestMessage?.target_slot || consultation.target_slot,
+    report: report?.report_data || undefined,
+    confidence_score: report?.confidence_score || undefined,
+    version: consultation.version,
+  }
+}
+
+export async function saveDiagnosticRun(
+  ctx: ProxyContext,
+  consultation: ConsultationRow,
+  diagnosis: DiagnosisResult,
+  slots: JsonObject,
+  missingSlots: string[],
+  evidenceScore: number,
+  turnCount: number,
+) {
+  const clinicalContext = normalizeObject(diagnosis.raw.clinical_context)
+  const summary = normalizeObject(clinicalContext.incremental_summary)
+  const reasoning = normalizeObject(clinicalContext.clinical_reasoning_state)
+  const rationale = diagnosis.differentials.map((item) => {
+    const row = normalizeObject(item)
+    return {
+      rank: row.rank,
+      diagnosis: row.full_name || row.common_name,
+      reason: row.reason,
+      supporting_evidence: row.supporting_evidence,
+      conflicting_evidence: row.conflicting_evidence,
+    }
+  })
+  const validationReason = cleanMessage(
+    diagnosis.raw.validation_reason || diagnosis.raw.error || (diagnosis.valid ? 'validated' : 'workflow_invalid'),
+  )
+  const workflowMetadata = {
+    ...normalizeObject(diagnosis.raw.model_metadata),
+    workflow_versions: consultation.workflow_versions || {},
+    source: 'libertymd-diagnosis',
+  }
+  const { data, error } = await ctx.db.from('libertymd_diagnostic_runs').insert({
+    consultation_id: consultation.id,
+    user_id: ctx.user.id,
+    patient_id: consultation.patient_id,
+    turn_count: turnCount,
+    run_status: diagnosis.valid ? 'validated' : diagnosis.raw.error ? 'error' : 'withheld',
+    clinical_summary: Object.keys(summary).length
+      ? summary
+      : { patient_summary: diagnosis.raw.patient_summary || null },
+    clinical_reasoning: Object.keys(reasoning).length
+      ? reasoning
+      : { differential_rationale: rationale },
+    differential_diagnosis: diagnosis.differentials,
+    input_snapshot: {
+      patient: consultation.patient_snapshot || {},
+      filled_slots: slots,
+      missing_slots: missingSlots,
+      target_slot: consultation.target_slot,
+    },
+    confidence_score: diagnosis.confidence,
+    evidence_score: evidenceScore,
+    validation_reason: validationReason || null,
+    workflow_metadata: workflowMetadata,
+  }).select('id').single()
+  if (error) throw error
+  return String(data.id)
+}
+
+export async function historySummary(ctx: ProxyContext) {
+  if (ctx.isAnonymous) return []
+  const { data, error } = await ctx.db
+    .from('libertymd_consultations')
+    .select('id,status,chief_complaint,turn_count,report_gate,created_at,updated_at,completed_at')
+    .eq('user_id', ctx.user.id)
+    .order('last_activity_at', { ascending: false })
+    .limit(50)
+  if (error) throw error
+  return data || []
+}

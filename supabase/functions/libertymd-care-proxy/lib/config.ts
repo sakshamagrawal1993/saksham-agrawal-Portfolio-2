@@ -56,6 +56,17 @@ function envInt(name: string, fallback: number, min: number, max: number): numbe
   return clamped
 }
 
+/**
+ * Boolean env. P0-15a — only the literal strings `true` / `1` enable.
+ * Everything else (including unset) is false. Read at call time so a secret
+ * flip + isolate refresh disables without an app-code redeploy, and so tests
+ * can toggle without re-importing this module.
+ */
+function envBool(name: string, fallback = false): boolean {
+  const raw = envOr(fallback ? 'true' : 'false', () => Deno.env.get(name)).trim().toLowerCase()
+  return raw === 'true' || raw === '1'
+}
+
 export const GUARDRAIL_WEBHOOK = envOr(`${N8N_BASE}/libertymd-guardrail`, () => Deno.env.get('LIBERTYMD_GUARDRAIL_WEBHOOK'))
 export const INTERVIEW_WEBHOOK = envOr(`${N8N_BASE}/libertymd-interview`, () => Deno.env.get('LIBERTYMD_INTERVIEW_WEBHOOK'))
 export const DIAGNOSIS_WEBHOOK = envOr(`${N8N_BASE}/libertymd-diagnosis`, () => Deno.env.get('LIBERTYMD_DIAGNOSIS_WEBHOOK'))
@@ -63,6 +74,15 @@ export const WEBHOOK_SECRET = envOr('', () => Deno.env.get('LIBERTYMD_N8N_WEBHOO
 
 export const CONSENT_VERSION = 'libertymd-ai-care-v1'
 export const MAX_TURNS = 15
+
+/**
+ * P1-16 — Mixpanel super-prop `app_version`. Opaque build label until a real
+ * version is wired; never invent a marketing version string.
+ */
+export const LIBERTYMD_APP_VERSION = 'unknown'
+
+/** P1-16 — Mixpanel HTTP hard-cap (2–3 s). Soft-fail on timeout. */
+export const MIXPANEL_FETCH_TIMEOUT_MS = 2_500
 
 /**
  * n8n inference timeout budgets, in milliseconds. P0-14e.
@@ -75,10 +95,13 @@ export const MAX_TURNS = 15
  *
  * Before P0-14e, `start_consultation` gave the guardrail **2 000 ms** while
  * `send_message` gave it **10 000 ms**. The tightest budget therefore sat on
- * turn 1 — the turn most likely to carry an untriaged emergency, and the only
- * turn where the deterministic edge screen is the sole backstop. A 2 s abort
- * did not fail loudly: it fell through to `error_fail_cautious`, i.e. a
- * `high_risk_continue` verdict that never actually screened the message.
+ * turn 1 — the turn most likely to carry an untriaged emergency. Historically
+ * that was also where a 2 s abort mattered most as an n8n backstop; the
+ * deterministic **edge** screen itself is **not** turn-gated — it runs on every
+ * free-text ingest path (start, demographics-with-text, every `send_message`
+ * including at cap). A 2 s abort did not fail loudly: it fell through to
+ * `error_fail_cautious`, i.e. a `high_risk_continue` verdict that never
+ * actually screened the message via n8n.
  *
  * There is deliberately **no per-turn difference** (P0-14e AC1: turn 1's budget
  * must be >= every later turn's; equal satisfies it with nothing left to
@@ -142,3 +165,80 @@ export const N8N_BREAKER = {
   rollingWindowMs: envInt('LIBERTYMD_N8N_BREAKER_WINDOW_MS', 120_000, 1_000, 3_600_000),
   cooldownMs: envInt('LIBERTYMD_N8N_BREAKER_COOLDOWN_MS', 60_000, 1_000, 3_600_000),
 } as const
+
+/**
+ * P0-15a — observational LLM shadow after an edge_deterministic force_end.
+ *
+ * Default **off**. When on, `saveSafetyEvent` fire-and-forgets a same-webhook
+ * call with `shadow_llm` / `skip_deterministic` so n8n reaches Crisis Screening
+ * Agent; the acted-on path never awaits it. Disable by clearing the secret and
+ * refreshing the isolate — no app redeploy.
+ */
+export function isGuardrailShadowLlmEnabled(): boolean {
+  return envBool('LIBERTYMD_GUARDRAIL_SHADOW_LLM', false)
+}
+
+/** Shadow transport budget. Never awaited on the request critical path. */
+export const GUARDRAIL_SHADOW_TIMEOUT_MS = envInt(
+  'LIBERTYMD_GUARDRAIL_SHADOW_TIMEOUT_MS',
+  10_000,
+  1_000,
+  60_000,
+)
+
+/**
+ * P1-08 — speculative Diagnosis pre-warm (one gate-step ahead).
+ *
+ * Default **off**. When off: zero speculative webhook calls, no cache serve,
+ * gate path always runs fresh Diagnosis (behavior matches today except latency).
+ * Read at call time so a secret flip + isolate refresh disables without redeploy.
+ */
+export function isSpeculativeDiagnosisEnabled(): boolean {
+  return envBool('LIBERTYMD_SPECULATIVE_DIAGNOSIS', false)
+}
+
+/**
+ * P2-14 — Diagnosis eligibility knobs (acted-upon gate + one-turn predictor).
+ *
+ * Defaults match the post–even-turn-removal gate: turn floor **6**, evidence
+ * eligibility floor **50**, even-turn parity **off**. Set
+ * `LIBERTYMD_DIAGNOSIS_EVEN_TURN_REQUIRED=true` (+ floors) to restore legacy
+ * `(even ∨ ready ∨ atCap)` without a code change. Read at call time so a
+ * secret flip + isolate refresh rolls back without an app-code redeploy.
+ *
+ * Client Vite mirror lives in `components/LibertyMD/libertymd-waiting.ts`
+ * (compile-time defaults; Vite cannot import this Deno module). Dual-surface
+ * rollback is documented in CARE-ARCHITECTURE.
+ */
+export function getDiagnosisTurnFloor(): number {
+  return envInt('LIBERTYMD_DIAGNOSIS_TURN_FLOOR', 6, 1, MAX_TURNS)
+}
+
+export function getDiagnosisEvidenceFloor(): number {
+  return envInt('LIBERTYMD_DIAGNOSIS_EVIDENCE_FLOOR', 50, 1, 100)
+}
+
+export function isDiagnosisEvenTurnRequired(): boolean {
+  return envBool('LIBERTYMD_DIAGNOSIS_EVEN_TURN_REQUIRED', false)
+}
+
+/**
+ * P4-06 — photo signed-URL TTL and product size/MIME gates.
+ * Re-exported from lib/photo-upload.ts so config remains the discoverable home;
+ * unit tests import the pure module directly (no Deno.env).
+ */
+export {
+  PHOTO_ALLOWED_MIME,
+  PHOTO_MAX_BYTES,
+  PHOTO_SIGNED_URL_TTL_SECONDS,
+} from './photo-upload.ts'
+
+/**
+ * P4-07 — lab signed-URL TTL and product size/MIME gates.
+ * Pure module: lib/lab-upload.ts (no Deno.env).
+ */
+export {
+  LAB_ALLOWED_MIME,
+  LAB_MAX_BYTES,
+  LAB_SIGNED_URL_TTL_SECONDS,
+} from './lab-upload.ts'

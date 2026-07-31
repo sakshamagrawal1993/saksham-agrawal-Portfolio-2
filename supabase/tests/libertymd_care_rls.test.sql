@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(63);
+select plan(99);
 
 select has_table('public', 'libertymd_profiles', 'profiles table exists');
 select has_table('public', 'libertymd_consultations', 'consultations table exists');
@@ -80,11 +80,19 @@ select throws_ok(
   'profiles enforce one row per user'
 );
 
-insert into public.libertymd_consultations (id, user_id, status, chief_complaint, retention_expires_at) values
-  ('a0000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000001', 'interviewing', 'low fever', null),
-  ('a0000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000001', 'completed', 'headache', null),
-  ('a0000000-0000-4000-8000-000000000003', '20000000-0000-4000-8000-000000000002', 'completed', 'sore throat', null),
-  ('a0000000-0000-4000-8000-000000000004', '30000000-0000-4000-8000-000000000003', 'completed', 'expired guest consult', now() - interval '1 day');
+-- P1-23 landing fixtures (expired orphan; referenced+expired under linked; referenced under expired anon)
+insert into public.libertymd_landing_sessions (
+  id, anon_session_key, utm_campaign, retention_expires_at
+) values
+  ('d0000000-0000-4000-8000-000000000001', 'p1-23-orphan-expired', 'orphan', now() - interval '1 day'),
+  ('d0000000-0000-4000-8000-000000000002', 'p1-23-linked-expired', 'linked', now() - interval '1 day'),
+  ('d0000000-0000-4000-8000-000000000003', 'p1-23-anon-expired', 'anon-purge', now() - interval '1 day');
+
+insert into public.libertymd_consultations (id, user_id, status, chief_complaint, retention_expires_at, landing_session_id) values
+  ('a0000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000001', 'interviewing', 'low fever', null, 'd0000000-0000-4000-8000-000000000002'),
+  ('a0000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000001', 'completed', 'headache', null, null),
+  ('a0000000-0000-4000-8000-000000000003', '20000000-0000-4000-8000-000000000002', 'completed', 'sore throat', null, null),
+  ('a0000000-0000-4000-8000-000000000004', '30000000-0000-4000-8000-000000000003', 'completed', 'expired guest consult', now() - interval '1 day', 'd0000000-0000-4000-8000-000000000003');
 
 select results_eq(
   $$select accepted from public.libertymd_claim_consultation_request(
@@ -329,6 +337,76 @@ insert into public.libertymd_product_events (
   'report_gate_reached'
 );
 
+-- P1-25 AC5: abort fixtures prove no clinical movement; do not claim durable expired/failed.
+select throws_ok(
+  $$select * from public.libertymd_complete_account_merge(
+    'not-a-real-transfer-hash',
+    '20000000-0000-4000-8000-000000000002'
+  )$$,
+  'P0001',
+  'Account transfer is not available',
+  'P1-25 bad transfer hash aborts merge'
+);
+select is(
+  (select count(*) from public.libertymd_consultations where user_id = '10000000-0000-4000-8000-000000000001'),
+  2::bigint,
+  'P1-25 bad-hash abort: source consultations unchanged'
+);
+select is(
+  (select count(*) from public.libertymd_reports where user_id = '10000000-0000-4000-8000-000000000001'),
+  2::bigint,
+  'P1-25 bad-hash abort: source reports unchanged'
+);
+
+insert into public.libertymd_account_merges (
+  source_user_id, consultation_id, transfer_token_hash, expires_at, status
+) values (
+  '10000000-0000-4000-8000-000000000001',
+  'a0000000-0000-4000-8000-000000000002',
+  'expired-transfer-token-hash',
+  now() - interval '1 minute',
+  'prepared'
+);
+
+select throws_ok(
+  $$select * from public.libertymd_complete_account_merge(
+    'expired-transfer-token-hash',
+    '20000000-0000-4000-8000-000000000002'
+  )$$,
+  'P0001',
+  'Account transfer expired',
+  'P1-25 expired transfer aborts merge'
+);
+select is(
+  (select status from public.libertymd_account_merges where transfer_token_hash = 'expired-transfer-token-hash'),
+  'prepared',
+  'P1-25 expired abort: merge row stays prepared (expired UPDATE rolls back with RAISE)'
+);
+select is(
+  (select count(*) from public.libertymd_consultations where user_id = '10000000-0000-4000-8000-000000000001'),
+  2::bigint,
+  'P1-25 expired abort: no clinical consultation movement'
+);
+select is(
+  (select count(*) from public.libertymd_diagnostic_runs where user_id = '10000000-0000-4000-8000-000000000001'),
+  1::bigint,
+  'P1-25 expired abort: diagnostic runs unchanged'
+);
+
+-- P4-05 Path 1: matching age+sex → re-parent onto retained target self (no age/sex coalesce).
+update public.libertymd_patients
+set age = 34, sex_at_birth = 'female'
+where owner_user_id in (
+  '10000000-0000-4000-8000-000000000001',
+  '20000000-0000-4000-8000-000000000002'
+) and relationship = 'self';
+update public.libertymd_profiles
+set age = 34, sex_at_birth = 'female'
+where user_id in (
+  '10000000-0000-4000-8000-000000000001',
+  '20000000-0000-4000-8000-000000000002'
+);
+
 insert into public.libertymd_account_merges (
   source_user_id, consultation_id, transfer_token_hash, expires_at
 ) values (
@@ -343,12 +421,17 @@ select lives_ok(
     'test-transfer-token-hash',
     '20000000-0000-4000-8000-000000000002'
   )$$,
-  'an existing Google account can receive an anonymous LibertyMD consultation'
+  'P4-05 Path 1: matching demographics merge onto retained target self'
 );
 select is(
   (select status from public.libertymd_account_merges where transfer_token_hash = 'test-transfer-token-hash'),
   'completed',
   'account merge is marked completed'
+);
+select is(
+  (select metadata->>'collision_path' from public.libertymd_account_merges where transfer_token_hash = 'test-transfer-token-hash'),
+  'matched_self',
+  'P4-05 Path 1: collision_path matched_self on merge metadata'
 );
 select is(
   (select count(*) from public.libertymd_consultations where user_id = '10000000-0000-4000-8000-000000000001'),
@@ -410,9 +493,218 @@ select is(
       'a0000000-0000-4000-8000-000000000002'
     )
       and patient.owner_user_id = '20000000-0000-4000-8000-000000000002'
+      and patient.relationship = 'self'
   ),
   2::bigint,
-  'transferred consultations reference the target self-patient record'
+  'P4-05 Path 1: transferred consultations reference the target self-patient'
+);
+select is(
+  (select count(*) from public.libertymd_patients where owner_user_id = '20000000-0000-4000-8000-000000000002' and relationship = 'self'),
+  1::bigint,
+  'P4-05 Path 1: unique self retained on target'
+);
+select is(
+  (select age::int from public.libertymd_patients where owner_user_id = '20000000-0000-4000-8000-000000000002' and relationship = 'self'),
+  34,
+  'P4-05 Path 1: target self age unchanged (no coalesce)'
+);
+select is(
+  (select sex_at_birth from public.libertymd_patients where owner_user_id = '20000000-0000-4000-8000-000000000002' and relationship = 'self'),
+  'female',
+  'P4-05 Path 1: target self sex unchanged (no coalesce)'
+);
+
+-- ---------------------------------------------------------------------------
+-- P4-05 Path 2 mismatch (createable) + fail-closed illegal create
+-- ---------------------------------------------------------------------------
+insert into auth.users (
+  id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+) values
+  ('40000000-0000-4000-8000-000000000004', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'libertymd-guest-mismatch@example.test', '', now(), '{}', '{}', now(), now()),
+  ('50000000-0000-4000-8000-000000000005', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'libertymd-target-mismatch@example.test', '', now(), '{}', '{}', now(), now()),
+  ('60000000-0000-4000-8000-000000000006', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'libertymd-guest-illegal@example.test', '', now(), '{}', '{}', now(), now()),
+  ('70000000-0000-4000-8000-000000000007', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'libertymd-target-illegal@example.test', '', now(), '{}', '{}', now(), now());
+
+insert into public.libertymd_profiles (user_id, email, is_anonymous, age, sex_at_birth, updated_at) values
+  ('40000000-0000-4000-8000-000000000004', 'libertymd-guest-mismatch@example.test', true, 28, 'male', now()),
+  ('50000000-0000-4000-8000-000000000005', 'libertymd-target-mismatch@example.test', false, 45, 'female', now()),
+  ('60000000-0000-4000-8000-000000000006', 'libertymd-guest-illegal@example.test', true, 30, 'prefer_not_to_say', now()),
+  ('70000000-0000-4000-8000-000000000007', 'libertymd-target-illegal@example.test', false, 40, 'female', now());
+
+insert into public.libertymd_patients (owner_user_id, relationship, display_label, age, sex_at_birth) values
+  ('40000000-0000-4000-8000-000000000004', 'self', 'Me', 28, 'male'),
+  ('50000000-0000-4000-8000-000000000005', 'self', 'Me', 45, 'female'),
+  ('60000000-0000-4000-8000-000000000006', 'self', 'Me', 30, 'prefer_not_to_say'),
+  ('70000000-0000-4000-8000-000000000007', 'self', 'Me', 40, 'female');
+
+insert into public.libertymd_consultations (id, user_id, status, chief_complaint, retention_expires_at) values
+  ('a0000000-0000-4000-8000-000000000010', '40000000-0000-4000-8000-000000000004', 'completed', 'guest mismatch consult', null),
+  ('a0000000-0000-4000-8000-000000000011', '50000000-0000-4000-8000-000000000005', 'completed', 'target prior consult', null),
+  ('a0000000-0000-4000-8000-000000000012', '60000000-0000-4000-8000-000000000006', 'completed', 'guest illegal sex consult', null);
+
+insert into public.libertymd_account_merges (
+  source_user_id, consultation_id, transfer_token_hash, expires_at
+) values (
+  '40000000-0000-4000-8000-000000000004',
+  'a0000000-0000-4000-8000-000000000010',
+  'p4-05-mismatch-token-hash',
+  now() + interval '10 minutes'
+);
+
+select lives_ok(
+  $$select * from public.libertymd_complete_account_merge(
+    'p4-05-mismatch-token-hash',
+    '50000000-0000-4000-8000-000000000005'
+  )$$,
+  'P4-05 Path 2: mismatch creates distinct other profile'
+);
+select is(
+  (select metadata->>'collision_path' from public.libertymd_account_merges where transfer_token_hash = 'p4-05-mismatch-token-hash'),
+  'distinct_profile',
+  'P4-05 Path 2: collision_path distinct_profile'
+);
+select is(
+  (
+    select patient.relationship
+    from public.libertymd_consultations consultation
+    join public.libertymd_patients patient on patient.id = consultation.patient_id
+    where consultation.id = 'a0000000-0000-4000-8000-000000000010'
+  ),
+  'other',
+  'P4-05 Path 2: mismatch consult attributed to non-self other'
+);
+select is(
+  (
+    select patient.display_label
+    from public.libertymd_consultations consultation
+    join public.libertymd_patients patient on patient.id = consultation.patient_id
+    where consultation.id = 'a0000000-0000-4000-8000-000000000010'
+  ),
+  'Saved from guest visit',
+  'P4-05 Path 2: system display_label Saved from guest visit'
+);
+select is(
+  (select age::int from public.libertymd_patients where owner_user_id = '50000000-0000-4000-8000-000000000005' and relationship = 'self'),
+  45,
+  'P4-05 Path 2: target self age untouched'
+);
+select is(
+  (select sex_at_birth from public.libertymd_patients where owner_user_id = '50000000-0000-4000-8000-000000000005' and relationship = 'self'),
+  'female',
+  'P4-05 Path 2: target self sex untouched'
+);
+select is(
+  (select age::int from public.libertymd_profiles where user_id = '50000000-0000-4000-8000-000000000005'),
+  45,
+  'P4-05 Path 2: target profile age untouched (Q1A)'
+);
+select is(
+  (select sex_at_birth from public.libertymd_profiles where user_id = '50000000-0000-4000-8000-000000000005'),
+  'female',
+  'P4-05 Path 2: target profile sex untouched (Q1A)'
+);
+select is(
+  (select count(*) from public.libertymd_patients where owner_user_id = '50000000-0000-4000-8000-000000000005' and relationship = 'self'),
+  1::bigint,
+  'P4-05 Path 2: still exactly one self on target'
+);
+select is(
+  (
+    select count(*)
+    from public.libertymd_consultations consultation
+    where consultation.id = 'a0000000-0000-4000-8000-000000000010'
+      and consultation.patient_id = (
+        select id from public.libertymd_patients
+        where owner_user_id = '50000000-0000-4000-8000-000000000005' and relationship = 'self'
+      )
+  ),
+  0::bigint,
+  'P4-05 Path 2: mismatch never attributes guest consult to target self'
+);
+
+insert into public.libertymd_account_merges (
+  source_user_id, consultation_id, transfer_token_hash, expires_at
+) values (
+  '60000000-0000-4000-8000-000000000006',
+  'a0000000-0000-4000-8000-000000000012',
+  'p4-05-illegal-create-token-hash',
+  now() + interval '10 minutes'
+);
+
+select throws_ok(
+  $$select * from public.libertymd_complete_account_merge(
+    'p4-05-illegal-create-token-hash',
+    '70000000-0000-4000-8000-000000000007'
+  )$$,
+  'P0001',
+  'Account transfer could not save this visit safely',
+  'P4-05 fail-closed: prefer_not_to_say cannot create other under createPatient parity'
+);
+select is(
+  (select count(*) from public.libertymd_consultations where user_id = '60000000-0000-4000-8000-000000000006'),
+  1::bigint,
+  'P4-05 fail-closed: source consults unchanged'
+);
+select is(
+  (select count(*) from public.libertymd_patients where owner_user_id = '60000000-0000-4000-8000-000000000006'),
+  1::bigint,
+  'P4-05 fail-closed: source patient retained'
+);
+select is(
+  (select count(*) from public.libertymd_patients where owner_user_id = '70000000-0000-4000-8000-000000000007'),
+  1::bigint,
+  'P4-05 fail-closed: target still only self (no other inserted)'
+);
+select is(
+  (select status from public.libertymd_account_merges where transfer_token_hash = 'p4-05-illegal-create-token-hash'),
+  'prepared',
+  'P4-05 fail-closed: merge row stays prepared after raise rollback'
+);
+
+-- ---------------------------------------------------------------------------
+-- P1-24 Storage fixtures (metadata-only; byte delete is Edge Storage API)
+-- Insert BEFORE Postgres cleanup so expired-consult paths become orphans after.
+-- Path: {consultation_id}/{kind}/{object_uuid}
+-- Bucket: libertymd-care only. Never libertymd-assets.
+-- ---------------------------------------------------------------------------
+insert into storage.buckets (id, name, public)
+values ('libertymd-care', 'libertymd-care', false)
+on conflict (id) do update set public = false;
+
+insert into storage.objects (id, bucket_id, name, owner, metadata)
+values (
+  'f0000000-0000-4000-8000-000000000001',
+  'libertymd-care',
+  'a0000000-0000-4000-8000-000000000004/photo/e0000000-0000-4000-8000-000000000001',
+  '30000000-0000-4000-8000-000000000003',
+  '{}'::jsonb
+)
+on conflict (bucket_id, name) do nothing;
+
+insert into storage.objects (id, bucket_id, name, owner, metadata)
+values (
+  'f0000000-0000-4000-8000-000000000002',
+  'libertymd-care',
+  'a0000000-0000-4000-8000-000000000001/lab/e0000000-0000-4000-8000-000000000002',
+  '20000000-0000-4000-8000-000000000002',
+  '{}'::jsonb
+)
+on conflict (bucket_id, name) do nothing;
+
+select lives_ok(
+  $$select * from public.cleanup_expired_libertymd_data_dry_run()$$,
+  'P1-23 dry-run twin executes without error'
+);
+select is(
+  (select count(*) from public.libertymd_consultations where user_id = '30000000-0000-4000-8000-000000000003'),
+  1::bigint,
+  'P1-23 dry-run does not delete expired anonymous consultation'
+);
+select is(
+  (select count(*) from public.libertymd_landing_sessions where id = 'd0000000-0000-4000-8000-000000000001'),
+  1::bigint,
+  'P1-23 dry-run does not delete expired orphan landing'
 );
 
 select lives_ok(
@@ -429,6 +721,55 @@ select is(
   0::bigint,
   'expired anonymous profile without consultations is deleted'
 );
+select is(
+  (select count(*) from public.libertymd_consultations where retention_expires_at is null),
+  6::bigint,
+  'P1-23 linked / NULL-retention consultations survive cleanup'
+);
+select is(
+  (select count(*) from public.libertymd_landing_sessions where id = 'd0000000-0000-4000-8000-000000000001'),
+  0::bigint,
+  'P1-23 expired orphan landing is deleted'
+);
+select is(
+  (select count(*) from public.libertymd_landing_sessions where id = 'd0000000-0000-4000-8000-000000000002'),
+  1::bigint,
+  'P1-23 referenced expired landing under linked consult survives'
+);
+select is(
+  (select count(*) from public.libertymd_landing_sessions where id = 'd0000000-0000-4000-8000-000000000003'),
+  0::bigint,
+  'P1-23 landing orphaned by expired anon consult delete is removed'
+);
+select is(
+  (select count(*) from auth.users where id = '30000000-0000-4000-8000-000000000003'),
+  1::bigint,
+  'P1-23 cleanup never deletes auth.users'
+);
+
+-- After Postgres cleanup, expired consult path is orphan; linked path survives.
+select is(
+  (
+    select count(*)::bigint
+    from public.list_libertymd_care_storage_orphans()
+    where object_path = 'a0000000-0000-4000-8000-000000000004/photo/e0000000-0000-4000-8000-000000000001'
+  ),
+  1::bigint,
+  'P1-24 orphan detect finds object under purged consult path'
+);
+
+select is(
+  (
+    select count(*)::bigint
+    from public.list_libertymd_care_storage_orphans()
+    where object_path = 'a0000000-0000-4000-8000-000000000001/lab/e0000000-0000-4000-8000-000000000002'
+  ),
+  0::bigint,
+  'P1-24 survivor under live linked consult is not an orphan'
+);
+
+-- Honesty: SQL must NOT be used as retention delete. Edge API owns byte removal
+-- (DoD+ / CANNOT RUN for live Storage API in :ci).
 
 select * from finish();
 rollback;

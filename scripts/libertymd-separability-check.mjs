@@ -139,6 +139,31 @@ results.push({
   found: foreignWebhooks,
 })
 
+
+// --------------------------------------- check 4: LibertyMD UI does not import AICare / components/ui
+const libertyUiFiles = await walk(path.join(root, 'components', 'LibertyMD'))
+const uiCoupling = []
+for (const file of libertyUiFiles) {
+  // Skip backup trees and PDF helper is .ts under same dir — still ban UI/AICare imports.
+  const src = await fs.readFile(file, 'utf8')
+  const hits = [...src.matchAll(/(?:from|import)\s*\(?\s*['"]([^'"]+)['"]/g)].map((m) => m[1])
+  const bad = hits.filter((spec) =>
+    /(?:^|[\\/])components[\\/]ui(?:[\\/]|$)/.test(spec)
+    || /(?:^|[\\/])components[\\/]AICare(?:[\\/]|$)/.test(spec)
+    || /(^|[\\/])\.\.\/ui\//.test(spec)
+    || /(^|[\\/])\.\.\/AICare\//.test(spec)
+  )
+  if (bad.length) uiCoupling.push({ file: path.relative(root, file), imports: bad })
+}
+if (uiCoupling.length) {
+  failures.push(`LibertyMD UI imports AICare or components/ui: ${uiCoupling.map((c) => c.file).join(', ')}`)
+}
+results.push({
+  check: 'no_libertymd_ui_or_aicare_imports',
+  status: uiCoupling.length === 0 ? 'PASS' : 'FAIL',
+  found: uiCoupling,
+})
+
 // ------------------------------------------------------------------------ report
 const checksRun = results.filter((r) => r.status !== 'SKIPPED').length
 console.log(JSON.stringify({ results, checksRun, failures, passed: failures.length === 0 }, null, 2))

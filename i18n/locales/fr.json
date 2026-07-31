@@ -29,6 +29,7 @@
     "taglineFree": "Gratuit",
     "taglineAnonymous": "Anonyme",
     "taglineBuiltByDoctors": "Conçu par des médecins",
+    "timePromise": "About {count} questions — roughly {minutes} minutes",
     "placeholderShort": "Décrivez vos symptômes",
     "placeholderLong": "Décrivez un symptôme ou posez toute question de santé",
     "startChatOpening": "Ouverture du chat"
@@ -51,10 +52,14 @@
   },
   "reportGate": {
     "title": "Votre rapport est prêt",
-    "body": "Connectez-vous avec Google pour enregistrer ce rapport et votre historique, ou continuez en tant qu'invité.",
+    "headline": "Ne perdez pas cette consultation",
+    "body": "Connectez-vous avec Google pour conserver ce rapport au-delà de sept jours, revoir votre historique et ajouter des profils familiaux.",
     "google": "Continuer avec Google",
-    "skip": "Voir une fois en tant qu'invité",
-    "skipNote": "Les rapports invités sont disponibles pendant 7 jours et ne sont pas enregistrés sur un compte."
+    "skip": "Continuer en tant qu'invité",
+    "skipNote": "Les rapports invités sont disponibles pendant 7 jours et ne sont pas enregistrés sur un compte.",
+    "benefitKeep": "Conserver au-delà de 7 jours",
+    "benefitHistory": "Accéder à votre historique",
+    "benefitFamily": "Ajouter des profils familiaux"
   },
   "report": {
     "title": "Votre rapport de santé",
@@ -65,7 +70,144 @@
     "selfCare": "Autosoins",
     "careSetting": "Prochaine étape recommandée",
     "download": "Télécharger le rapport",
-    "share": "Partager avec votre médecin"
+    "share": "Partager avec votre médecin",
+    "eyebrow": "Doctor-ready report",
+    "aiFraming": "AI-generated guidance — not reviewed by a clinician. This is not a diagnosis.",
+    "savedNote": "Saved privately to your LibertyMD history.",
+    "guestNote": "Guest access expires after seven days.",
+    "pdf": {
+      "patientTitle": "Résumé patient",
+      "soapTitle": "Note SOAP médecin",
+      "summaryHeading": "Résumé",
+      "aiGenerated": "Généré par IA — ce n’est pas un diagnostic.",
+      "noClinicianReview": "Aucun clinicien agréé n’a examiné ce document.",
+      "generatedLabel": "Généré",
+      "plan": "Plan",
+      "chooserLabel": "Choisissez le rapport à télécharger",
+      "choicePatient": "Résumé patient",
+      "choiceSoap": "SOAP médecin",
+      "choiceBoth": "Les deux documents",
+      "bothHint": "Les deux télécharge d’abord le résumé patient. Touchez à nouveau pour le SOAP — les navigateurs mobiles bloquent les doubles téléchargements silencieux.",
+      "generating": "Préparation du PDF…",
+      "error": "Impossible de préparer le PDF. Problème technique — votre rapport reste à l’écran. Réessayez.",
+      "retry": "Réessayer",
+      "downloadSoapReady": "Télécharger le SOAP médecin",
+      "readyPatient": "PDF résumé patient prêt",
+      "readySoap": "PDF SOAP médecin prêt"
+    },
+    "sections": {
+      "triage": "Recommended care setting",
+      "nextStep": "What to do now",
+      "differential": "Possible causes",
+      "assessmentAndPlan": "Assessment and plan",
+      "redFlags": "Red flags to watch",
+      "soap": "SOAP note"
+    },
+    "triage": {
+      "home": "Home care",
+      "telehealth": "Telehealth",
+      "urgent_care": "Urgent care",
+      "emergency_department": "Emergency room",
+      "call_911": "Call emergency services",
+      "crisis_line": "Crisis support line",
+      "unknown": "Care setting unavailable"
+    },
+    "viewTitle": "Assessment and next steps",
+    "card": {
+      "ordinal": {
+        "most_likely": "Le plus probable",
+        "possible": "Possible",
+        "less_likely": "Moins probable",
+        "most_likely_serious": "Le plus probable · Grave"
+      },
+      "serious": "Grave",
+      "furtherInvestigations": "Examens complémentaires",
+      "symptomaticTreatment": "Soulagement des symptômes",
+      "supportiveTreatment": "Soins de soutien",
+      "treatmentGuidance": "Conseils généraux — pas une ordonnance.",
+      "doctorCta": "Prévenez-moi quand des médecins seront disponibles",
+      "showDetail": "Afficher les détails",
+      "hideDetail": "Masquer les détails"
+    },
+    "teasers": {
+      "differential": "{count} pistes",
+      "assessmentAndPlanItems": "{count} éléments du plan",
+      "assessmentChip": "Évaluation",
+      "redFlags": "{count} signaux",
+      "soapSubjective": "Subjectif",
+      "soapObjective": "Objectif",
+      "soapAssessment": "Évaluation",
+      "soapPlan": "Plan"
+    },
+    "emailDelivery": {
+      "cta": "Email me my report",
+      "title": "Email your report",
+      "description": "We'll send a private link that opens this report for 24 hours. Your report stays visible here.",
+      "emailLabel": "Email address",
+      "emailPlaceholder": "you@example.com",
+      "submit": "Send link",
+      "sending": "Sending…",
+      "success": "Check your inbox for a private link to this report.",
+      "failure": "We couldn't send the email right now. Your report is still here — try again.",
+      "invalidEmail": "Enter a valid email address.",
+      "close": "Close",
+      "expiredTitle": "This link has expired",
+      "expiredBody": "Report links expire after 24 hours. If you still have this consultation open, you can request a new email from the report.",
+      "unavailableTitle": "This report is no longer available",
+      "unavailableBody": "Guest reports are removed after their retention window. Starting a new consultation is the way forward — signing in cannot restore a deleted guest report.",
+      "startNew": "Start a new consultation",
+      "redeeming": "Opening your report…",
+      "redeemError": "We couldn't open this report link right now. Try again in a moment."
+    },
+    "feedback": {
+      "prompt": "Cela vous a-t-il été utile ?",
+      "yes": "Oui",
+      "no": "Non",
+      "commentOptional": "Que manquait-il ? (facultatif)",
+      "thanks": "Merci pour votre retour.",
+      "error": "Impossible d’enregistrer votre retour. Votre rapport reste disponible — réessayez.",
+      "retry": "Réessayer"
+    },
+    "doctor": {
+      "ctaWaitlist": "Prévenez-moi quand des médecins seront disponibles",
+      "ctaBooking": "Continuer avec un médecin agréé",
+      "networkComing": "Un réseau de médecins agréés arrive sur LibertyMD. Ce rapport reste prêt pour la transmission.",
+      "notifyInvite": "Rejoignez la liste d’attente — nous vous préviendrons quand les consultations ouvriront. Aucune promesse de prix ou de disponibilité d’ici là.",
+      "bookingTitle": "Continuer avec un médecin agréé",
+      "bookingBody": "Quand la réservation sera live, vous pourrez transmettre ce rapport à un médecin LibertyMD depuis ici.",
+      "emailOptional": "E-mail pour notification (facultatif)",
+      "emailPlaceholder": "vous@exemple.com",
+      "join": "Me prévenir",
+      "joinAck": "Vous êtes sur la liste. Nous vous contacterons quand des médecins seront disponibles.",
+      "joinError": "Nous n’avons pas pu enregistrer votre demande pour le moment. Votre rapport est toujours là — réessayez.",
+      "retry": "Réessayer",
+      "claimPrice": "Prix de la visite : {price}",
+      "claimAvailability": "Disponibilité : {availability}",
+      "claimRefund": "Politique de remboursement : {refund}"
+    },
+    "lifecycle": {
+      "partialLabel": "Incomplete",
+      "partialTitle": "This report is incomplete",
+      "partialBody": "We could not produce a complete doctor-ready report from this consultation. No diagnosis list or confidence claim is shown. You can start a fresh consultation anytime.",
+      "partialA11yNoDx": "No differential diagnosis or confidence is included.",
+      "partialStartFresh": "Start a fresh consultation",
+      "failedTitle": "We could not generate your report",
+      "failedBody": "Something went wrong on our side while preparing your report. This is a technical issue — not a finding about your health. Nothing you typed is lost. Try again.",
+      "failedRetry": "Try again",
+      "expiredTitle": "This guest report is no longer available",
+      "expiredBody": "Guest reports are removed after their retention window. Starting a new consultation is the way forward — signing in cannot restore a deleted guest report.",
+      "expiredSignIn": "Sign in for future reports",
+      "notYetEligible": "Report not ready yet — keep answering a few more questions",
+      "retentionWarning": "Guest access to this report ends in {remaining}. Sign in to keep future reports in your history."
+    }
+  },
+  "sampleReport": {
+    "entry": "See a sample report",
+    "title": "Sample doctor-ready report",
+    "badge": "Example — not your report",
+    "subtitle": "Synthetic example for illustration. Not a real patient case and not clinician-reviewed.",
+    "cta": "Start with a sore throat consult",
+    "ctaOwnSymptoms": "Start with your own symptoms"
   },
   "safety": {
     "emergencyTitle": "Il peut s'agir d'une urgence",
@@ -88,18 +230,18 @@
     "howItWorksKicker": "Du symptôme à l'étape suivante",
     "howItWorksTitle": "Comment fonctionne LibertyMD",
     "howItWorksSubtitle": "Assez simple pour être utilisé quand on ne se sent pas bien.",
-    "trustedBy": "Plus de 1 000 000 d'utilisateurs nous font confiance",
-    "trustedByShort": "+1M d'utilisateurs",
-    "hipaaShort": "Confidentialité HIPAA",
-    "hipaaLong": "Conforme HIPAA et privé",
+    "trustedBy": "Free doctor-ready report",
+    "trustedByShort": "Free report",
+    "hipaaShort": "Private AI chat",
+    "hipaaLong": "Private AI symptom chat",
     "careAssistant": "Assistant de santé LibertyMD",
     "shareReport": "Partager le rapport LibertyMD",
     "clinicalConsiderations": "Considérations cliniques",
     "carePlan": "Plan de soins",
     "redFlags": "Signes d'alerte",
     "soapNote": "Note SOAP",
-    "handoffKicker": "Relais médical agréé",
-    "handoffTitle": "Poursuivez avec un médecin quand vous en avez besoin.",
+    "handoffKicker": "Réseau de médecins",
+    "handoffTitle": "Soyez prévenu quand des médecins agréés seront disponibles.",
     "availableIn": "Disponible dans {wait}",
     "doctorReview": "Peut examiner le rapport de l'IA et conseiller la suite pour {price}.",
     "humanCareKicker": "Soin humain",
@@ -126,7 +268,11 @@
         "eyebrow": "Contexte prêt à partager",
         "description": "Vos réponses deviennent un résumé structuré avec chronologie, consignes de sécurité, prochaines étapes et une note SOAP prête pour le médecin."
       }
-    ]
+    ],
+    "heroTrustReport": "Free doctor-ready report",
+    "heroTrustReportShort": "Free report",
+    "heroTrustAi": "AI symptom chat — not a clinician",
+    "heroTrustAiShort": "AI — not a clinician"
   },
   "marketing": {
     "care": {
@@ -136,11 +282,15 @@
       "doctorsHighlight": "Des médecins agréés",
       "doctorsRest": "quand vous en avez besoin.",
       "body": "Votre bilan complet vous suit : le médecin connaît déjà l'historique et le contexte de vos symptômes. Moins de répétitions. Plus de temps pour les soins.",
-      "priceLead": "Consultations vidéo avec des médecins agréés pour",
-      "price": "39 $ / visite",
+      "priceLead": "Start free. A licensed doctor handoff is planned when the network is live — not a bookable visit yet.",
+      "price": "",
       "cta": "Démarrer un chat gratuit",
-      "drName": "Dr Maya Chen, MD",
-      "drRole": "Examine votre bilan LibertyMD"
+      "drName": "Physician review preview",
+      "drRole": "Examine votre bilan LibertyMD",
+      "previewLabel": "Physician review preview",
+      "pillSchedule": "Structured intake for your visit",
+      "pillContext": "Your report carries the context",
+      "pillAvailability": "AI chat available anytime"
     },
     "pricing": {
       "kicker": "Tarifs simples",
@@ -274,6 +424,7 @@
   },
   "careControls": {
     "agePlaceholder": "Âge (18+)",
+    "adultsOnlyNotice": "LibertyMD est destiné aux adultes (18+). Pour une personne de moins de 18 ans, veuillez consulter un clinicien ou un service qui prend en charge les enfants et les adolescents.",
     "sexLegend": "Sexe assigné à la naissance",
     "female": "Féminin",
     "male": "Masculin",
@@ -282,8 +433,57 @@
     "skipOnce": "Ignorer et voir une fois",
     "privateDefault": "Privé par défaut. Les rapports invités expirent après sept jours.",
     "yourLibertyMD": "Votre LibertyMD",
+    "historyHeading": "Historique des consultations",
+    "historyLoading": "Chargement de l’historique…",
+    "historyGroupHeading": "{{label}}",
+    "historyRetentionRemaining": "La copie invité expire dans {{remaining}}",
     "emptyHistory": "Vos consultations terminées apparaîtront ici.",
-    "privateGuest": "Invité privé"
+    "historySingleHint": "Touchez pour rouvrir cette visite.",
+    "privateGuest": "Invité privé",
+    "careForSomeoneElse": "Prendre soin de quelqu'un d'autre",
+    "profileOfferEyebrow": "Profils familiaux",
+    "profileOfferTitle": "Prenez soin de quelqu'un d'autre après la liaison",
+    "profileOfferBody": "Liez Google pour ajouter des profils des personnes dont vous vous occupez et garder chaque consultation dans le bon historique. Vous pouvez continuer cette consultation en invité.",
+    "profileOfferGoogle": "Continuer avec Google",
+    "profileOfferDismiss": "Pas maintenant",
+    "whoIsThisFor": "Who is this for?",
+    "someoneElse": "Someone else",
+    "someoneElseTitle": "Add someone else",
+    "someoneElseBody": "Enter a short label, age (18+), and sex assigned at birth.",
+    "displayLabel": "Name or label",
+    "someoneElseCancel": "Back",
+    "someoneElseContinue": "Continue",
+    "mergeOutcomeMatchedSelf": "Cette visite a été enregistrée sur votre profil existant.",
+    "mergeOutcomeDistinctProfile": "Cette visite invité a été enregistrée comme un profil distinct (« Saved from guest visit »).",
+    "mergeOutcomeFailed": "Impossible de terminer la liaison de cette visite. Rien de clinique n’a été déplacé — réessayez.",
+    "mergeOutcomeAcknowledge": "Compris",
+    "intersex": "Intersex",
+    "preferNotToSay": "Prefer not to say",
+    "profilesHeading": "Profiles",
+    "profilesLoading": "Loading profiles…",
+    "profilesEmpty": "No active profiles yet.",
+    "profileAdd": "Add",
+    "profileAddTitle": "Add a profile",
+    "profileEditTitle": "Edit profile",
+    "profileEdit": "Edit profile",
+    "profileRemove": "Remove profile",
+    "profileSelfFallback": "Me",
+    "profileRelationshipSelf": "You",
+    "profileRelationshipOther": "Someone else",
+    "profileAge": "Age {age}",
+    "profileFormCancel": "Cancel",
+    "profileFormSave": "Save",
+    "profileLoadError": "Unable to load profiles. Please try again.",
+    "profileSaveError": "Unable to save this profile. Please try again.",
+    "profileDeleteError": "Unable to remove this profile. Please try again.",
+    "profileDeleteTitle": "Remove this profile?",
+    "profileDeleteBody": "“{label}” will no longer be offered for new consultations. Past consultation history is kept.",
+    "profileDeleteConfirm": "Remove profile",
+    "profileDeleteCancel": "Keep profile",
+    "historyLoadingEscape": "Fermer et continuer",
+    "emptyHistoryCta": "Continuer la consultation",
+    "profileAtLimit": "Vous avez déjà le nombre maximum de profils actifs. Supprimez-en un avant d’en ajouter un autre.",
+    "profileAtLimitHint": "Supprimez un profil pour en ajouter un autre."
   },
   "chatx": {
     "newChat": "Nouvelle discussion",
@@ -300,6 +500,133 @@
     "phReportReady": "Votre rapport est prêt ci-dessus",
     "phEnded": "Cette consultation est terminée par sécurité",
     "phAnswer": "Répondez à la question de suivi...",
-    "sendMessage": "Envoyer le message"
+    "sendMessage": "Envoyer le message",
+    "waitingReviewing": "Je passe en revue tout ce que vous m’avez dit…",
+    "partialOutcomeEyebrow": "Before you go",
+    "partialOutcomeTitle": "A few incomplete tips from what you shared",
+    "partialOutcomeSeeToday": "Seek care today if you notice",
+    "partialOutcomeGotIt": "Got it",
+    "startNewConsult": "Commencer une nouvelle consultation",
+    "clinicalReviewNeeded": "Cette consultation nécessite un examen clinique",
+    "comprehensionEyebrow": "Before your report",
+    "comprehensionTitle": "Here's what I've understood",
+    "comprehensionConfirm": "Anything wrong or missing?",
+    "comprehensionProceed": "Looks good — continue",
+    "comprehensionProceedAck": "Looks good",
+    "comprehensionCorrect": "Something's wrong or missing",
+    "comprehensionCorrectionLabel": "What should we correct?",
+    "comprehensionCorrectionPlaceholder": "Tell us what is wrong or missing",
+    "comprehensionCorrectionSubmit": "Apply and continue",
+    "comprehensionCorrectionCancel": "Back",
+    "attachPhoto": "Photo",
+    "attachLab": "Lab report",
+    "attachLabComingSoon": "Coming soon",
+    "photoChip": "Photo attached",
+    "photoAttachedLabel": "Attached photos",
+    "photoRemove": "Remove photo",
+    "photoNoticeDismiss": "Dismiss",
+    "viewConversation": "Voir la conversation",
+    "attachLabSignIn": "Connectez-vous pour téléverser un rapport de laboratoire",
+    "labChip": "Rapport de laboratoire joint",
+    "labAttachedLabel": "Rapports de laboratoire joints",
+    "labRemove": "Retirer le rapport de laboratoire",
+    "labUnreviewed": "En attente de revue clinique",
+    "labAttributionTitle": "À qui est destiné ce rapport de laboratoire ?",
+    "labAttributionBody": "Choisissez le profil auquel ce rapport appartient. Cela ne change pas pour qui est la consultation.",
+    "labAttributionConfirm": "Continuer",
+    "labAttributionCancel": "Annuler",
+    "labAttributionEmpty": "Aucun profil actif. Ajoutez un profil depuis votre compte, puis réessayez.",
+    "labAttributionSelf": "Moi",
+    "labAttributionProfile": "Profil"
+  },
+  "followup": {
+    "checkin": {
+      "home": "Home",
+      "loading": "Recording your check-in…",
+      "thanksTitle": "Thanks for checking in",
+      "thanksBody": "We're glad you let us know. Take care of yourself.",
+      "worseTitle": "Let's continue your care",
+      "worseBody": "We'll pick up from what you already shared — no need to retype it.",
+      "worseCta": "Continue consultation",
+      "expiredTitle": "This check-in link has expired",
+      "expiredBody": "You can still start a new consultation anytime from LibertyMD.",
+      "unavailableTitle": "This check-in is no longer available",
+      "unavailableBody": "We could not restart from an earlier consultation. Starting fresh is the way forward.",
+      "startNew": "Start a new consultation",
+      "error": "We could not record your check-in right now. Try again in a moment.",
+      "doctorQuestion": "Did you see a doctor?",
+      "doctorYes": "Yes",
+      "doctorNo": "No",
+      "doctorNotYet": "Not yet",
+      "doctorSkip": "Skip",
+      "matchQuestion": "Did the doctor's assessment broadly match your LibertyMD report?",
+      "matchHint": "Optional product feedback — helps us improve LibertyMD. Not a clinical claim.",
+      "matchYes": "Yes",
+      "matchNo": "No",
+      "matchUnsure": "Unsure",
+      "matchSkip": "Skip"
+    },
+    "unsubscribe": {
+      "home": "Home",
+      "loading": "Updating your preference…",
+      "title": "You're unsubscribed",
+      "body": "You will not receive future LibertyMD check-in emails.",
+      "expiredTitle": "This unsubscribe link has expired",
+      "expiredBody": "If you still receive check-in emails, open a newer unsubscribe link from a recent message.",
+      "error": "We could not update your preference right now. Try again in a moment."
+    }
+  },
+  "trust": {
+    "kicker": "What LibertyMD is",
+    "title": "Honest guidance before you start",
+    "aiNotClinicianTitle": "AI — not a clinician",
+    "aiNotClinicianBody": "LibertyMD is an AI symptom-assessment tool that prepares a doctor-ready report. It is not a licensed physician and not a substitute for diagnosis or treatment.",
+    "emergencyTitle": "Emergencies need emergency care",
+    "emergencyBody": "If your symptoms may be an emergency, call 911 or go to the ER now. Do not wait on an AI consult.",
+    "processProof": "Free doctor-ready report — see a sample from the hero above",
+    "certHonesty": "We do not claim HIPAA or LegitScript certification on this page.",
+    "adultsNote": "LibertyMD is for adults 18+."
+  },
+  "keywordLanding": {
+    "sore-throat": {
+      "title": "Guidance for a sore throat.",
+      "subtitle": "Describe what you're feeling and get a free doctor-ready report."
+    },
+    "cough": {
+      "title": "Guidance for a cough concern.",
+      "subtitle": "Describe what you're feeling and get a free doctor-ready report."
+    },
+    "fever": {
+      "title": "Guidance for a fever concern.",
+      "subtitle": "Describe what you're feeling and get a free doctor-ready report."
+    },
+    "headache": {
+      "title": "Guidance for a headache concern.",
+      "subtitle": "Describe what you're feeling and get a free doctor-ready report."
+    },
+    "stomach-pain": {
+      "title": "Guidance for stomach pain.",
+      "subtitle": "Describe what you're feeling and get a free doctor-ready report."
+    },
+    "rash": {
+      "title": "Guidance for a rash or skin concern.",
+      "subtitle": "Describe what you're feeling and get a free doctor-ready report."
+    },
+    "sinus-congestion": {
+      "title": "Guidance for sinus congestion.",
+      "subtitle": "Describe what you're feeling and get a free doctor-ready report."
+    },
+    "back-pain": {
+      "title": "Guidance for back pain.",
+      "subtitle": "Describe what you're feeling and get a free doctor-ready report."
+    },
+    "allergy-itch": {
+      "title": "Guidance for allergy or itch concerns.",
+      "subtitle": "Describe what you're feeling and get a free doctor-ready report."
+    },
+    "urinary-discomfort": {
+      "title": "Guidance for urinary discomfort.",
+      "subtitle": "Describe what you're feeling and get a free doctor-ready report."
+    }
   }
 }

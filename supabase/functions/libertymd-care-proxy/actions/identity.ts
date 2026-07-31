@@ -42,14 +42,24 @@ export async function handleCompleteAccountMerge(ctx: ProxyContext, payload: Req
   if (isAnonymous) return jsonResponse({ error: 'Sign in with Google before completing the transfer' }, 401)
   await ensureProfile(ctx)
   const transferTokenHash = await sha256(payload.transfer_token)
-  const { error: mergeError } = await db.rpc('libertymd_complete_account_merge', {
+  const { data: mergeRows, error: mergeError } = await db.rpc('libertymd_complete_account_merge', {
     p_transfer_token_hash: transferTokenHash,
     p_target_user_id: user.id,
   })
   if (mergeError) {
+    // Non-PHI categorical reason only — never surface raw SQL / PHI.
     await addIdentityEvent(ctx, 'account_merge_failed', null, { reason: cleanMessage(mergeError.message) })
     throw mergeError
   }
+  // P4-05: Path discriminator for client copy. Leave Lexicon merge_outcome:'success' alone.
+  const mergeRow = Array.isArray(mergeRows) ? mergeRows[0] : mergeRows
+  const collisionPathRaw = mergeRow && typeof mergeRow === 'object'
+    ? (mergeRow as { collision_path?: unknown }).collision_path
+    : null
+  const collision_path =
+    collisionPathRaw === 'matched_self' || collisionPathRaw === 'distinct_profile'
+      ? collisionPathRaw
+      : undefined
   const consultation = await getOwnedConsultation(ctx, payload.consultation_id)
   const profile = await ensureProfile(ctx)
   const patient = await getOwnedPatient(ctx, consultation.patient_id)
@@ -64,6 +74,7 @@ export async function handleCompleteAccountMerge(ctx: ProxyContext, payload: Req
     history: await historySummary(ctx),
     report: report.report_data,
     confidence_score: report.confidence_score,
+    ...(collision_path ? { collision_path } : {}),
   })
 }
 

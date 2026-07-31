@@ -1,0 +1,871 @@
+diff --git a/docs/libertymd/CARE-ARCHITECTURE.md b/docs/libertymd/CARE-ARCHITECTURE.md
+index a716443..9f3660f 100644
+--- a/docs/libertymd/CARE-ARCHITECTURE.md
++++ b/docs/libertymd/CARE-ARCHITECTURE.md
+@@ -55,6 +55,8 @@ At and after turn six, diagnosis runs every second turn and whenever the intervi
+ - Placeholder values such as "unknown", "uncertain", and contradictory answers do not count as evidence.
+ - Off-topic responses cannot update clinical slots. Three consecutive or five total non-clinical responses trigger a safe review state.
+ - A deterministic emergency screen runs before n8n, and the n8n guardrail runs before every interview turn.
++- The versioned pattern source is `supabase/functions/libertymd-care-proxy/emergency-patterns.ts`. The edge screen imports it directly; the n8n `Deterministic Prefilter` is generated from it with `npm run sync:libertymd:patterns`. `npm run test:libertymd:pattern-parity` fails if the checked-in workflow or the two runtimes drift.
++- Deterministic `suicidal_ideation` force-ends with `care_setting: crisis_line` and 988 guidance. It must not inherit medical 911/ER copy.
+ - High-confidence output can complete at 80 or above. Workflow-ready output can complete at 60 or above only when evidence is sufficient. At the turn limit, confidence must be at least 65.
+ - `high_risk_continue`, `force_end`, red flags, care setting, source, and raw guardrail output are persisted as separate safety events.
+ 
+diff --git a/schemas/libertymd/clinical-scenario-suite.schema.json b/schemas/libertymd/clinical-scenario-suite.schema.json
+index f672653..40fdcca 100644
+--- a/schemas/libertymd/clinical-scenario-suite.schema.json
++++ b/schemas/libertymd/clinical-scenario-suite.schema.json
+@@ -48,6 +48,18 @@
+             "required": ["emergency_action", "input_relevance"],
+             "properties": {
+               "emergency_action": { "type": "string", "enum": ["force_end", "continue"] },
++              "crisis_type": {
++                "type": "string",
++                "enum": [
++                  "acs_chest_pain",
++                  "thunderclap_headache",
++                  "anaphylaxis",
++                  "respiratory_distress",
++                  "surgical_abdomen",
++                  "stroke_fast",
++                  "suicidal_ideation"
++                ]
++              },
+               "input_relevance": { "type": "string", "enum": ["clinical", "unclear", "off_topic"] },
+               "report_outcome": { "type": "string", "enum": ["continue", "complete", "review"] }
+             }
+diff --git a/schemas/libertymd/n8n/guardrail-response.schema.json b/schemas/libertymd/n8n/guardrail-response.schema.json
+index d47f612..722faa3 100644
+--- a/schemas/libertymd/n8n/guardrail-response.schema.json
++++ b/schemas/libertymd/n8n/guardrail-response.schema.json
+@@ -27,7 +27,7 @@
+     "is_emergency": { "type": "boolean" },
+     "care_setting": {
+       "type": "string",
+-      "enum": ["home", "telehealth", "urgent_care", "emergency_department", "call_911"]
++      "enum": ["home", "telehealth", "urgent_care", "emergency_department", "call_911", "crisis_line"]
+     },
+     "message": { "type": "string", "minLength": 1, "maxLength": 2000 },
+     "red_flags": {
+@@ -44,7 +44,7 @@
+         "properties": {
+           "force_end": { "const": true },
+           "risk_level": { "const": "emergency" },
+-          "care_setting": { "enum": ["emergency_department", "call_911"] }
++          "care_setting": { "enum": ["emergency_department", "call_911", "crisis_line"] }
+         }
+       }
+     },
+diff --git a/scripts/libertymd-clinical-evaluation.ts b/scripts/libertymd-clinical-evaluation.ts
+index 7c32e99..03f9ffa 100644
+--- a/scripts/libertymd-clinical-evaluation.ts
++++ b/scripts/libertymd-clinical-evaluation.ts
+@@ -21,6 +21,7 @@ type Scenario = {
+   }
+   expected: {
+     emergency_action: 'force_end' | 'continue'
++    crisis_type?: string
+     input_relevance: 'clinical' | 'unclear' | 'off_topic'
+     report_outcome?: 'continue' | 'complete' | 'review'
+   }
+@@ -51,7 +52,8 @@ let falseNegative = 0
+ const failures: Array<Record<string, unknown>> = []
+ 
+ for (const scenario of suite.scenarios) {
+-  const emergencyActual = detectDeterministicEmergency(scenario.message) ? 'force_end' : 'continue'
++  const emergencyResult = detectDeterministicEmergency(scenario.message)
++  const emergencyActual = emergencyResult ? 'force_end' : 'continue'
+   const relevanceActual = classifyResponseRelevance(scenario.message)
+   if (scenario.expected.emergency_action === 'force_end') {
+     if (emergencyActual === 'force_end') truePositive += 1
+@@ -62,6 +64,18 @@ for (const scenario of suite.scenarios) {
+   if (emergencyActual !== scenario.expected.emergency_action) {
+     failures.push({ id: scenario.id, dimension: 'emergency_action', expected: scenario.expected.emergency_action, actual: emergencyActual })
+   }
++  if (scenario.expected.emergency_action === 'force_end') {
++    if (!scenario.expected.crisis_type) {
++      failures.push({ id: scenario.id, dimension: 'crisis_type', expected: 'declared crisis_type', actual: null })
++    } else if (emergencyResult?.crisisType !== scenario.expected.crisis_type) {
++      failures.push({
++        id: scenario.id,
++        dimension: 'crisis_type',
++        expected: scenario.expected.crisis_type,
++        actual: emergencyResult?.crisisType ?? null,
++      })
++    }
++  }
+   if (relevanceActual !== scenario.expected.input_relevance) {
+     failures.push({ id: scenario.id, dimension: 'input_relevance', expected: scenario.expected.input_relevance, actual: relevanceActual })
+   }
+diff --git a/scripts/libertymd-emergency-pattern-sync.mjs b/scripts/libertymd-emergency-pattern-sync.mjs
+new file mode 100644
+index 0000000..b1a8bab
+--- /dev/null
++++ b/scripts/libertymd-emergency-pattern-sync.mjs
+@@ -0,0 +1,178 @@
++import fs from 'node:fs/promises'
++import path from 'node:path'
++import process from 'node:process'
++import { fileURLToPath } from 'node:url'
++import {
++  EMERGENCY_PATTERNS,
++  EMERGENCY_PATTERN_SET_VERSION,
++} from '../supabase/functions/libertymd-care-proxy/emergency-patterns.ts'
++import { detectDeterministicEmergency } from '../supabase/functions/libertymd-care-proxy/clinical-policy.ts'
++import CASES from '../tests/libertymd/emergency-pattern-cases.json' with { type: 'json' }
++
++const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
++const definitionsArg = process.argv.find((arg) => arg.startsWith('--definitions-dir='))
++const definitionsDir = path.resolve(
++  definitionsArg?.split('=')[1]
++  ?? process.env.LIBERTYMD_N8N_DEFINITIONS_DIR
++  ?? path.join(root, '..', 'n8n-workflows', 'definitions'),
++)
++const workflowPath = path.join(definitionsDir, 'libertymd-guardrail-workflow__9qeE6tUcEY74OYV8.json')
++
++const generatedRules = EMERGENCY_PATTERNS.map((pattern) => ({
++  id: pattern.id,
++  crisis_type: pattern.crisisType,
++  care_setting: pattern.careSetting,
++  message: pattern.message,
++  source: pattern.matcher.source,
++  flags: pattern.matcher.flags,
++}))
++
++function renderPrefilter() {
++  return `
++// GENERATED by scripts/libertymd-emergency-pattern-sync.mjs.
++// Source of truth: supabase/functions/libertymd-care-proxy/emergency-patterns.ts
++const PATTERN_SET_VERSION = ${JSON.stringify(EMERGENCY_PATTERN_SET_VERSION)};
++const rules = ${JSON.stringify(generatedRules, null, 2)};
++
++const body = $('Webhook').first().json.body || $('Webhook').first().json || {};
++const message = String(body.message || body.text || '').trim();
++const history = Array.isArray(body.history) ? body.history : [];
++const patient = body.patient && typeof body.patient === 'object' ? body.patient : {};
++const msg = message.toLowerCase();
++
++function firstUnnegatedMatch(rule) {
++  const flags = rule.flags.includes('g') ? rule.flags : rule.flags + 'g';
++  const matcher = new RegExp(rule.source, flags);
++  let match;
++  while ((match = matcher.exec(msg)) !== null) {
++    const before = msg.slice(Math.max(0, match.index - 40), match.index);
++    // Commas do not end a clause: "no lip swelling, tongue swelling, or X"
++    // is one negated list. Adversatives do end a clause, preserving
++    // "no chest pain but crushing chest pressure".
++    const segment = before.split(/[;.!?]|\\bbut\\b|\\bhowever\\b|\\balthough\\b|\\bthough\\b/i).pop() || '';
++    const negated = /\\b(no|not|without|denies|denied|never|don'?t have|doesn'?t have)\\b/.test(segment);
++    const thirdPartyHistory =
++      /\\b(my|his|her|their)\\s+\\w*\\s*(father|mother|dad|mum|mom|brother|sister|friend|husband|wife|son|daughter|uncle|aunt)\\s+(had|has had|used to have)\\b/.test(before)
++      || /\\b(family history|history of|hx of)\\b/.test(before);
++    if (!negated && !thirdPartyHistory) return match[0];
++    if (match.index === matcher.lastIndex) matcher.lastIndex += 1;
++  }
++  return null;
++}
++
++let hit = null;
++for (const rule of rules) {
++  const matchedSpan = firstUnnegatedMatch(rule);
++  if (matchedSpan !== null) {
++    hit = rule;
++    break;
++  }
++}
++
++if (hit) {
++  return [{
++    json: {
++      route: 'force_end',
++      status: 'force_end',
++      risk_level: 'emergency',
++      crisis_type: hit.crisis_type,
++      force_end: true,
++      is_emergency: true,
++      care_setting: hit.care_setting,
++      message: hit.message,
++      red_flags: [hit.crisis_type],
++      source: 'deterministic',
++      pattern_id: hit.id,
++      pattern_set_version: PATTERN_SET_VERSION,
++      message_text: message,
++      history,
++      patient,
++    }
++  }];
++}
++
++return [{
++  json: {
++    route: 'llm',
++    status: 'needs_llm',
++    force_end: false,
++    is_emergency: false,
++    message_text: message,
++    history,
++    patient,
++  }
++}];
++`
++}
++
++function runPrefilter(jsCode, message) {
++  const webhook = { first: () => ({ json: { body: { message } } }) }
++  const result = Function('$', jsCode)(() => webhook)
++  return result[0].json
++}
++
++let workflow
++try {
++  workflow = JSON.parse(await fs.readFile(workflowPath, 'utf8'))
++} catch (error) {
++  console.error(`FAIL: unable to read guardrail workflow at ${workflowPath}`)
++  console.error(error instanceof Error ? error.message : String(error))
++  process.exit(1)
++}
++
++const prefilter = workflow.nodes.find((node) => node.name === 'Deterministic Prefilter')
++if (!prefilter || typeof prefilter.parameters?.jsCode !== 'string') {
++  console.error('FAIL: Deterministic Prefilter node with jsCode was not found')
++  process.exit(1)
++}
++
++const rendered = renderPrefilter()
++if (process.argv.includes('--write')) {
++  prefilter.parameters.jsCode = rendered
++  await fs.writeFile(workflowPath, `${JSON.stringify(workflow, null, 2)}\n`)
++  console.log(`Updated ${workflowPath}`)
++} else if (prefilter.parameters.jsCode !== rendered) {
++  console.error('FAIL: n8n Deterministic Prefilter has drifted from emergency-patterns.ts')
++  console.error('Run npm run sync:libertymd:patterns to regenerate it.')
++  process.exit(1)
++}
++
++const parityFailures = []
++for (const testCase of [...CASES.positives, ...CASES.negatives]) {
++  const edge = detectDeterministicEmergency(testCase.message)
++  const edgeCrisisType = edge?.crisisType ?? null
++  const n8n = runPrefilter(rendered, testCase.message)
++  const expectedCrisisType = 'crisis_type' in testCase ? testCase.crisis_type : null
++  const n8nCrisisType = n8n.route === 'force_end' ? n8n.crisis_type : null
++  if (
++    edgeCrisisType !== expectedCrisisType
++    || n8nCrisisType !== expectedCrisisType
++    || edgeCrisisType !== n8nCrisisType
++    || (expectedCrisisType && edge?.careSetting !== n8n.care_setting)
++  ) {
++    parityFailures.push({
++      id: testCase.id,
++      expected: expectedCrisisType,
++      edge: edgeCrisisType,
++      n8n: n8nCrisisType,
++    })
++  }
++}
++
++if (CASES.pattern_set_version !== EMERGENCY_PATTERN_SET_VERSION) {
++  parityFailures.push({
++    id: 'pattern_set_version',
++    expected: EMERGENCY_PATTERN_SET_VERSION,
++    actual: CASES.pattern_set_version,
++  })
++}
++
++console.log(JSON.stringify({
++  patternSetVersion: EMERGENCY_PATTERN_SET_VERSION,
++  presentations: EMERGENCY_PATTERNS.length,
++  cases: CASES.positives.length + CASES.negatives.length,
++  disagreements: parityFailures,
++  passed: parityFailures.length === 0,
++}, null, 2))
++
++if (parityFailures.length > 0) process.exit(1)
+diff --git a/supabase/functions/libertymd-care-proxy/clinical-policy.ts b/supabase/functions/libertymd-care-proxy/clinical-policy.ts
+index 0da09eb..11e8bee 100644
+--- a/supabase/functions/libertymd-care-proxy/clinical-policy.ts
++++ b/supabase/functions/libertymd-care-proxy/clinical-policy.ts
+@@ -1,3 +1,9 @@
++import {
++  EMERGENCY_PATTERNS,
++  EMERGENCY_PATTERN_SET_VERSION,
++  type EmergencyCareSetting,
++} from './emergency-patterns.ts'
++
+ export type ClinicalSlots = Record<string, unknown>
+ 
+ export type ResponseRelevance = 'clinical' | 'unclear' | 'off_topic'
+@@ -25,7 +31,11 @@ export type ReportDecision =
+ 
+ export interface DeterministicEmergency {
+   crisisType: string
++  careSetting: EmergencyCareSetting
+   message: string
++  patternId: string
++  matchedSpan: string
++  patternSetVersion: string
+ }
+ 
+ const SLOT_WEIGHTS: Record<string, number> = {
+@@ -51,36 +61,8 @@ const hasValue = (value: unknown) => {
+ 
+ export function detectDeterministicEmergency(message: string): DeterministicEmergency | null {
+   const text = message.toLowerCase()
+-  const rules = [
+-    {
+-      pattern: /chest (pain|pressure|tightness)|crushing (chest|pressure)|pain radiating to (left )?arm|jaw pain.{0,30}(sweat|sweating|nausea)/i,
+-      crisisType: 'acs_chest_pain',
+-      message: 'These symptoms can be a medical emergency. Call emergency services or go to the ER now. Do not drive yourself.',
+-    },
+-    {
+-      pattern: /worst headache of (my|his|her) life|thunderclap|sudden severe headache/i,
+-      crisisType: 'thunderclap_headache',
+-      message: 'A sudden worst-of-life headache can be an emergency. Call emergency services or go to the ER now.',
+-    },
+-    {
+-      pattern: /throat (is )?tight|lip swelling|tongue swelling|anaphylaxis|cannot breathe after/i,
+-      crisisType: 'anaphylaxis',
+-      message: 'This may be anaphylaxis. Use epinephrine if available and call emergency services immediately.',
+-    },
+-    {
+-      pattern: /cannot breathe|can't breathe|blue lips|gasping for air|oxygen (sat|saturation).{0,12}(8\d|9[0-2])\b/i,
+-      crisisType: 'respiratory_distress',
+-      message: 'Severe breathing problems need emergency care. Call emergency services or go to the ER now.',
+-    },
+-    {
+-      pattern: /sudden severe (abdominal|belly|stomach) pain|severe (right lower|lower right|lower) (abdominal|belly|stomach) pain|rigid abdomen|pain (is )?so bad i (can't|cannot) walk/i,
+-      crisisType: 'surgical_abdomen',
+-      message: 'Severe abdominal pain with these features can be a surgical emergency. Seek ER care now.',
+-    },
+-  ]
+-
+-  for (const rule of rules) {
+-    const globalPattern = new RegExp(rule.pattern.source, rule.pattern.flags.includes('g') ? rule.pattern.flags : `${rule.pattern.flags}g`)
++  for (const rule of EMERGENCY_PATTERNS) {
++    const globalPattern = new RegExp(rule.matcher.source, rule.matcher.flags.includes('g') ? rule.matcher.flags : `${rule.matcher.flags}g`)
+     let match: RegExpExecArray | null
+     while ((match = globalPattern.exec(text)) !== null) {
+       if (match.index === undefined) continue
+@@ -97,7 +79,14 @@ export function detectDeterministicEmergency(message: string): DeterministicEmer
+         /\b(my|his|her|their)\s+\w*\s*(father|mother|dad|mum|mom|brother|sister|friend|husband|wife|son|daughter|uncle|aunt)\s+(had|has had|used to have)\b/.test(before)
+         || /\b(family history|history of|hx of)\b/.test(before)
+       ) continue
+-      return { crisisType: rule.crisisType, message: rule.message }
++      return {
++        crisisType: rule.crisisType,
++        careSetting: rule.careSetting,
++        message: rule.message,
++        patternId: rule.id,
++        matchedSpan: match[0],
++        patternSetVersion: EMERGENCY_PATTERN_SET_VERSION,
++      }
+     }
+   }
+   return null
+diff --git a/supabase/functions/libertymd-care-proxy/emergency-patterns.ts b/supabase/functions/libertymd-care-proxy/emergency-patterns.ts
+new file mode 100644
+index 0000000..fa60f22
+--- /dev/null
++++ b/supabase/functions/libertymd-care-proxy/emergency-patterns.ts
+@@ -0,0 +1,88 @@
++/**
++ * Canonical deterministic emergency patterns for LibertyMD.
++ *
++ * REQUIRES EXPERT REVIEW: the pattern set and all patient-facing emergency
++ * copy are engineering safety fixtures pending clinician approval.
++ */
++export const EMERGENCY_PATTERN_SET_VERSION = '1.0.0'
++
++export type EmergencyCareSetting = 'call_911' | 'crisis_line'
++
++export interface EmergencyPattern {
++  id: string
++  crisisType: string
++  careSetting: EmergencyCareSetting
++  message: string
++  matcher: RegExp
++  clinicianReview: {
++    status: 'pending'
++    note: string
++  }
++}
++
++const PENDING_REVIEW = {
++  status: 'pending',
++  note: 'REQUIRES EXPERT REVIEW before clinical release.',
++} as const
++
++export const EMERGENCY_PATTERNS: readonly EmergencyPattern[] = [
++  {
++    id: 'acs_chest_pain',
++    crisisType: 'acs_chest_pain',
++    careSetting: 'call_911',
++    message: 'These symptoms can be a medical emergency. Call 911 or go to the ER now. Do not drive yourself.',
++    matcher: /chest (pain|pressure|tightness)|crushing (chest|pressure)|elephant (on|sitting)|pain radiating to (left )?arm|jaw pain.{0,30}(sweat|sweating|nausea)/i,
++    clinicianReview: PENDING_REVIEW,
++  },
++  {
++    id: 'thunderclap_headache',
++    crisisType: 'thunderclap_headache',
++    careSetting: 'call_911',
++    message: 'A sudden worst-of-life headache can be an emergency. Call 911 or go to the ER now.',
++    matcher: /worst headache of (my|his|her) life|thunderclap|sudden(ly)? (severe|worst|excruciating|blinding|intense) headache|headache.{0,25}(came on|hit me|started).{0,15}(suddenly|instantly|out of nowhere)|headache with (neck stiffness|confusion|weakness|vision loss)/i,
++    clinicianReview: PENDING_REVIEW,
++  },
++  {
++    id: 'anaphylaxis',
++    crisisType: 'anaphylaxis',
++    careSetting: 'call_911',
++    message: 'This may be anaphylaxis. Use epinephrine if available and call 911 immediately.',
++    matcher: /throat (is )?tight|lip swelling|tongue swelling|anaphylaxis|cannot breathe after|wheezing after (a )?(peanut|shellfish|bee|sting)/i,
++    clinicianReview: PENDING_REVIEW,
++  },
++  {
++    id: 'respiratory_distress',
++    crisisType: 'respiratory_distress',
++    careSetting: 'call_911',
++    message: 'Severe breathing problems need emergency care. Call 911 or go to the ER now.',
++    matcher: /cannot breathe|can't breathe|blue lips|gasping for air|oxygen (sat|saturation).{0,12}(8\d|9[0-2])\b/i,
++    clinicianReview: PENDING_REVIEW,
++  },
++  {
++    id: 'surgical_abdomen',
++    crisisType: 'surgical_abdomen',
++    careSetting: 'call_911',
++    message: 'Severe abdominal pain with these features can be a surgical emergency. Seek ER care now.',
++    matcher: /sudden severe (abdominal|belly|stomach) pain|severe (right lower|lower right|lower) (abdominal|belly|stomach) pain|rigid abdomen|pain (is )?so bad i (can't|cannot) walk/i,
++    clinicianReview: PENDING_REVIEW,
++  },
++  {
++    id: 'stroke_fast',
++    crisisType: 'stroke_fast',
++    careSetting: 'call_911',
++    message: 'These symptoms may be a stroke. Call 911 now. Note when they started, and do not drive yourself.',
++    matcher: /face (is )?(drooping|droopy)|one side of (my|the) (body|face).{0,30}(weak|numb)|arm (is )?(weak|numb).{0,30}(speech|speak)|speech (is )?(slurred|garbled)|cannot speak properly|can't speak properly/i,
++    clinicianReview: PENDING_REVIEW,
++  },
++  {
++    id: 'suicidal_ideation',
++    crisisType: 'suicidal_ideation',
++    careSetting: 'crisis_line',
++    message: 'Please call or text 988 now to reach the Suicide & Crisis Lifeline. Stay with a trusted person while you connect.',
++    matcher: /\b(i want to kill myself|i (am|'m) going to kill myself|i (want|plan) to end my life|i plan to kill myself|i (have|'ve) been thinking about (ending my life|killing myself|suicide)|i am thinking about suicide|i (am|'m) suicidal)\b/i,
++    clinicianReview: {
++      status: 'pending',
++      note: 'REQUIRES EXPERT REVIEW: highest-uncertainty matcher and crisis-line copy.',
++    },
++  },
++]
+diff --git a/supabase/functions/libertymd-care-proxy/lib/safety.ts b/supabase/functions/libertymd-care-proxy/lib/safety.ts
+index fed4710..a90c248 100644
+--- a/supabase/functions/libertymd-care-proxy/lib/safety.ts
++++ b/supabase/functions/libertymd-care-proxy/lib/safety.ts
+@@ -90,7 +90,7 @@ export async function runGuardrail(
+       crisis_type: local.crisisType,
+       force_end: true,
+       is_emergency: true,
+-      care_setting: 'call_911',
++      care_setting: local.careSetting,
+       message: local.message,
+       red_flags: [local.crisisType],
+       source: 'edge_deterministic',
+diff --git a/tests/libertymd/clinical-policy.test.ts b/tests/libertymd/clinical-policy.test.ts
+index 31eca85..a609dba 100644
+--- a/tests/libertymd/clinical-policy.test.ts
++++ b/tests/libertymd/clinical-policy.test.ts
+@@ -6,6 +6,7 @@
+ // rides along here rather than adding a script. See the header of the imported
+ // file for the clean follow-up if a named gate is preferred.
+ import './severity-mapping.test.ts'
++import './emergency-patterns.test.ts'
+ 
+ import {
+   assessClinicalEvidence,
+diff --git a/tests/libertymd/clinical-scenarios.v0.1.json b/tests/libertymd/clinical-scenarios.v0.1.json
+index f06d897..54f62f3 100644
+--- a/tests/libertymd/clinical-scenarios.v0.1.json
++++ b/tests/libertymd/clinical-scenarios.v0.1.json
+@@ -8,7 +8,7 @@
+       "category": "emergency",
+       "patient": { "age": 58, "sex": "male" },
+       "message": "I have crushing chest pressure spreading to my left arm with sweating and nausea.",
+-      "expected": { "emergency_action": "force_end", "input_relevance": "clinical" },
++      "expected": { "emergency_action": "force_end", "crisis_type": "acs_chest_pain", "input_relevance": "clinical" },
+       "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
+     },
+     {
+@@ -17,7 +17,7 @@
+       "category": "emergency",
+       "patient": { "age": 64, "sex": "female" },
+       "message": "I have jaw pain with sweating and nausea and feel suddenly very unwell.",
+-      "expected": { "emergency_action": "force_end", "input_relevance": "clinical" },
++      "expected": { "emergency_action": "force_end", "crisis_type": "acs_chest_pain", "input_relevance": "clinical" },
+       "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
+     },
+     {
+@@ -26,7 +26,7 @@
+       "category": "emergency",
+       "patient": { "age": 45, "sex": "female" },
+       "message": "This is the worst headache of my life and it started suddenly.",
+-      "expected": { "emergency_action": "force_end", "input_relevance": "clinical" },
++      "expected": { "emergency_action": "force_end", "crisis_type": "thunderclap_headache", "input_relevance": "clinical" },
+       "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
+     },
+     {
+@@ -35,7 +35,7 @@
+       "category": "emergency",
+       "patient": { "age": 31, "sex": "male" },
+       "message": "My tongue is swelling and my throat is tight after eating peanuts.",
+-      "expected": { "emergency_action": "force_end", "input_relevance": "clinical" },
++      "expected": { "emergency_action": "force_end", "crisis_type": "anaphylaxis", "input_relevance": "clinical" },
+       "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
+     },
+     {
+@@ -44,7 +44,7 @@
+       "category": "emergency",
+       "patient": { "age": 70, "sex": "female" },
+       "message": "I cannot breathe and my lips look blue.",
+-      "expected": { "emergency_action": "force_end", "input_relevance": "clinical" },
++      "expected": { "emergency_action": "force_end", "crisis_type": "respiratory_distress", "input_relevance": "clinical" },
+       "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
+     },
+     {
+@@ -53,7 +53,7 @@
+       "category": "emergency",
+       "patient": { "age": 67, "sex": "male" },
+       "message": "My oxygen saturation is 89 and I am gasping for air.",
+-      "expected": { "emergency_action": "force_end", "input_relevance": "clinical" },
++      "expected": { "emergency_action": "force_end", "crisis_type": "respiratory_distress", "input_relevance": "clinical" },
+       "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
+     },
+     {
+@@ -62,7 +62,7 @@
+       "category": "emergency",
+       "patient": { "age": 42, "sex": "female" },
+       "message": "I have sudden severe abdominal pain with vomiting.",
+-      "expected": { "emergency_action": "force_end", "input_relevance": "clinical" },
++      "expected": { "emergency_action": "force_end", "crisis_type": "surgical_abdomen", "input_relevance": "clinical" },
+       "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
+     },
+     {
+@@ -71,7 +71,7 @@
+       "category": "emergency",
+       "patient": { "age": 27, "sex": "male" },
+       "message": "I have severe right lower abdominal pain and vomiting, and the pain is so bad I cannot walk.",
+-      "expected": { "emergency_action": "force_end", "input_relevance": "clinical" },
++      "expected": { "emergency_action": "force_end", "crisis_type": "surgical_abdomen", "input_relevance": "clinical" },
+       "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
+     },
+     {
+@@ -218,7 +218,7 @@
+       "category": "emergency",
+       "patient": { "age": 54, "sex": "male" },
+       "message": "I am 54, male, and the chest pain is getting worse since I sent that.",
+-      "expected": { "emergency_action": "force_end", "input_relevance": "clinical" },
++      "expected": { "emergency_action": "force_end", "crisis_type": "acs_chest_pain", "input_relevance": "clinical" },
+       "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "P0-14d AC4. Free text volunteered on the save_demographics turn must force-end. Before P0-14d that turn ran no screen at all. Draft engineering fixture; clinician review required." }
+     },
+     {
+@@ -229,6 +229,78 @@
+       "message": "I am 41, female, and I have no chest pain, just a mild cough.",
+       "expected": { "emergency_action": "continue", "input_relevance": "clinical" },
+       "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "P0-14d negative control. Screening the demographics turn must not make it a false-positive source. Draft engineering fixture; clinician review required." }
++    },
++    {
++      "id": "stroke_fast_face_arm_speech",
++      "title": "FAST stroke presentation",
++      "category": "emergency",
++      "patient": { "age": 66, "sex": "female" },
++      "message": "My face is drooping and my arm is weak and my speech is slurred.",
++      "expected": { "emergency_action": "force_end", "crisis_type": "stroke_fast", "input_relevance": "clinical" },
++      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "P0-14a stroke fixture. REQUIRES EXPERT REVIEW." }
++    },
++    {
++      "id": "stroke_one_sided_numbness",
++      "title": "One-sided numbness with speech difficulty",
++      "category": "emergency",
++      "patient": { "age": 59, "sex": "male" },
++      "message": "I woke up and one side of my body went numb, I cannot speak properly.",
++      "expected": { "emergency_action": "force_end", "crisis_type": "stroke_fast", "input_relevance": "clinical" },
++      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "P0-14a stroke fixture. REQUIRES EXPERT REVIEW." }
++    },
++    {
++      "id": "suicidal_ideation_explicit",
++      "title": "Explicit suicidal ideation",
++      "category": "emergency",
++      "patient": { "age": 28, "sex": "female" },
++      "message": "I have been thinking about ending my life.",
++      "expected": { "emergency_action": "force_end", "crisis_type": "suicidal_ideation", "input_relevance": "clinical" },
++      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "P0-14a crisis-line fixture. REQUIRES EXPERT REVIEW." }
++    },
++    {
++      "id": "acs_negated_then_positive",
++      "title": "Negated earlier chest symptom followed by current ACS symptom",
++      "category": "emergency",
++      "patient": { "age": 61, "sex": "male" },
++      "message": "I had no chest pain earlier but now I have crushing chest pressure.",
++      "expected": { "emergency_action": "force_end", "crisis_type": "acs_chest_pain", "input_relevance": "clinical" },
++      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "P0-14a all-match clause-boundary regression fixture. REQUIRES EXPERT REVIEW." }
++    },
++    {
++      "id": "stroke_leg_fell_asleep_negative",
++      "title": "Transient positional leg numbness",
++      "category": "non_emergency",
++      "patient": { "age": 35, "sex": "male" },
++      "message": "My leg fell asleep and is numb.",
++      "expected": { "emergency_action": "continue", "input_relevance": "clinical" },
++      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "P0-14a stroke false-positive control. REQUIRES EXPERT REVIEW." }
++    },
++    {
++      "id": "suicidal_ideation_negated",
++      "title": "Low mood without self-harm thoughts",
++      "category": "non_emergency",
++      "patient": { "age": 44, "sex": "female" },
++      "message": "I have been feeling low but I have no thoughts of harming myself.",
++      "expected": { "emergency_action": "continue", "input_relevance": "clinical" },
++      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "P0-14a suicidal-ideation false-positive control. REQUIRES EXPERT REVIEW." }
++    },
++    {
++      "id": "family_history_chest_pain",
++      "title": "Past family chest-pain history",
++      "category": "non_emergency",
++      "patient": { "age": 39, "sex": "female" },
++      "message": "My father had chest pain last year; I have a mild cough.",
++      "expected": { "emergency_action": "continue", "input_relevance": "clinical" },
++      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "P0-14a past-tense family-history regression fixture. REQUIRES EXPERT REVIEW." }
++    },
++    {
++      "id": "enumerated_swelling_negation",
++      "title": "Enumerated swelling denial",
++      "category": "non_emergency",
++      "patient": { "age": 38, "sex": "female" },
++      "message": "My lips are dry and cracked, but there is no lip swelling, tongue swelling, or breathing trouble.",
++      "expected": { "emergency_action": "continue", "input_relevance": "clinical" },
++      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "P0-14a enumerated-negation regression fixture. REQUIRES EXPERT REVIEW." }
+     }
+   ]
+ }
+diff --git a/tests/libertymd/contracts/guardrail-crisis-line.valid.json b/tests/libertymd/contracts/guardrail-crisis-line.valid.json
+new file mode 100644
+index 0000000..000463f
+--- /dev/null
++++ b/tests/libertymd/contracts/guardrail-crisis-line.valid.json
+@@ -0,0 +1,11 @@
++{
++  "status": "force_end",
++  "risk_level": "emergency",
++  "crisis_type": "suicidal_ideation",
++  "force_end": true,
++  "is_emergency": true,
++  "care_setting": "crisis_line",
++  "message": "Please call or text 988 now to reach the Suicide & Crisis Lifeline.",
++  "red_flags": ["suicidal_ideation"],
++  "source": "deterministic"
++}
+diff --git a/tests/libertymd/emergency-pattern-cases.json b/tests/libertymd/emergency-pattern-cases.json
+new file mode 100644
+index 0000000..e61c357
+--- /dev/null
++++ b/tests/libertymd/emergency-pattern-cases.json
+@@ -0,0 +1,97 @@
++{
++  "pattern_set_version": "1.0.0",
++  "positives": [
++    {
++      "id": "acs_clause_boundary",
++      "message": "I had no chest pain earlier but now I have crushing chest pressure.",
++      "crisis_type": "acs_chest_pain",
++      "care_setting": "call_911"
++    },
++    {
++      "id": "acs_elephant",
++      "message": "It feels like an elephant sitting on my chest.",
++      "crisis_type": "acs_chest_pain",
++      "care_setting": "call_911"
++    },
++    {
++      "id": "thunderclap_out_of_nowhere",
++      "message": "My headache came on suddenly and hit me out of nowhere.",
++      "crisis_type": "thunderclap_headache",
++      "care_setting": "call_911"
++    },
++    {
++      "id": "anaphylaxis_bee_sting",
++      "message": "I started wheezing after a bee sting.",
++      "crisis_type": "anaphylaxis",
++      "care_setting": "call_911"
++    },
++    {
++      "id": "respiratory_gasping",
++      "message": "I am gasping for air and cannot breathe.",
++      "crisis_type": "respiratory_distress",
++      "care_setting": "call_911"
++    },
++    {
++      "id": "surgical_lower_right",
++      "message": "I have severe lower right abdominal pain.",
++      "crisis_type": "surgical_abdomen",
++      "care_setting": "call_911"
++    },
++    {
++      "id": "stroke_fast",
++      "message": "My face is drooping and my arm is weak and my speech is slurred.",
++      "crisis_type": "stroke_fast",
++      "care_setting": "call_911"
++    },
++    {
++      "id": "stroke_one_sided",
++      "message": "I woke up and one side of my body went numb, I cannot speak properly.",
++      "crisis_type": "stroke_fast",
++      "care_setting": "call_911"
++    },
++    {
++      "id": "suicidal_kill_myself",
++      "message": "I want to kill myself.",
++      "crisis_type": "suicidal_ideation",
++      "care_setting": "crisis_line"
++    },
++    {
++      "id": "suicidal_end_life",
++      "message": "I have been thinking about ending my life.",
++      "crisis_type": "suicidal_ideation",
++      "care_setting": "crisis_line"
++    }
++  ],
++  "negatives": [
++    { "id": "negated_chest", "message": "I have a low fever and fatigue, with no chest pain and no trouble breathing." },
++    { "id": "enumerated_swelling_negation", "message": "My lips are dry and cracked, but there is no lip swelling, tongue swelling, or breathing trouble." },
++    { "id": "family_chest_history", "message": "My father had chest pain last year; I have a mild cough." },
++    { "id": "simple_chest_negation", "message": "I don't have chest pain." },
++    { "id": "family_history", "message": "There is a family history of chest pain but I feel fine." },
++    { "id": "leg_fell_asleep", "message": "My leg fell asleep and is numb." },
++    { "id": "si_explicit_negation", "message": "I have been feeling low but I have no thoughts of harming myself." },
++    { "id": "killing_headache_idiom", "message": "This headache is killing me." },
++    { "id": "allergy_negation", "message": "My eyes are itchy and I am sneezing, but there is no throat tightness or swelling." },
++    { "id": "dry_lips", "message": "My lips are dry because of the weather." },
++    { "id": "gradual_headache", "message": "A mild headache gradually built up after work." },
++    { "id": "usual_migraine", "message": "My usual migraine is back and feels the same as always." },
++    { "id": "mild_cramps", "message": "I have mild stomach cramps after a heavy meal." },
++    { "id": "normal_oxygen", "message": "My oxygen saturation is 98 and I am breathing normally." },
++    { "id": "blue_shirt", "message": "I am wearing a blue shirt and feel well." },
++    { "id": "speech_clear", "message": "My speech is clear and I have no facial droop or arm weakness." },
++    { "id": "arm_sore", "message": "My arm is sore after lifting weights." },
++    { "id": "face_skin", "message": "One side of my face has dry skin." },
++    { "id": "sad_no_self_harm", "message": "I feel sad, but I do not want to harm myself." },
++    { "id": "figurative_dying", "message": "I am dying of embarrassment." },
++    { "id": "third_party_threat", "message": "I could kill him for taking my parking space." },
++    { "id": "movie_quote", "message": "The character said he wanted to end his life." },
++    { "id": "prevention_topic", "message": "I am writing an article about suicide prevention." },
++    { "id": "crisis_line_information", "message": "What is the number for a crisis line?" },
++    { "id": "no_anaphylaxis", "message": "The doctor said this is not anaphylaxis." },
++    { "id": "past_resolved_breathing", "message": "Yesterday I worried about breathing, but today I feel normal." },
++    { "id": "abdominal_mild", "message": "My lower abdomen feels mildly tender before my period." },
++    { "id": "jaw_dental", "message": "My jaw aches near a broken tooth without sweating or nausea." },
++    { "id": "headache_metaphor", "message": "This paperwork is a headache." },
++    { "id": "healthy_checkin", "message": "I feel fine and have no urgent symptoms." }
++  ]
++}
+diff --git a/tests/libertymd/emergency-patterns.test.ts b/tests/libertymd/emergency-patterns.test.ts
+new file mode 100644
+index 0000000..551015c
+--- /dev/null
++++ b/tests/libertymd/emergency-patterns.test.ts
+@@ -0,0 +1,76 @@
++import {
++  EMERGENCY_PATTERNS,
++  EMERGENCY_PATTERN_SET_VERSION,
++} from '../../supabase/functions/libertymd-care-proxy/emergency-patterns.ts'
++import { detectDeterministicEmergency } from '../../supabase/functions/libertymd-care-proxy/clinical-policy.ts'
++import CASES from './emergency-pattern-cases.json' with { type: 'json' }
++
++declare const Deno: { test: (name: string, fn: () => unknown | Promise<unknown>) => void }
++
++function assert(condition: unknown, message: string): asserts condition {
++  if (!condition) throw new Error(message)
++}
++
++function assertEquals<T>(actual: T, expected: T, message: string) {
++  assert(Object.is(actual, expected), `${message}: expected ${String(expected)}, got ${String(actual)}`)
++}
++
++Deno.test('P0-14a pattern set is versioned and contains the exact seven presentations', () => {
++  assert(/^\d+\.\d+\.\d+$/.test(EMERGENCY_PATTERN_SET_VERSION), 'Pattern-set version must be semver')
++  assertEquals(CASES.pattern_set_version, EMERGENCY_PATTERN_SET_VERSION, 'Case corpus version')
++  const expected = [
++    'acs_chest_pain',
++    'anaphylaxis',
++    'respiratory_distress',
++    'stroke_fast',
++    'suicidal_ideation',
++    'surgical_abdomen',
++    'thunderclap_headache',
++  ]
++  const actual = [...new Set(EMERGENCY_PATTERNS.map((pattern) => pattern.crisisType))].sort()
++  assertEquals(actual.length, 7, 'Distinct crisis type count')
++  assertEquals(JSON.stringify(actual), JSON.stringify(expected), 'Exact crisis type set')
++  for (const pattern of EMERGENCY_PATTERNS) {
++    assert(pattern.id && pattern.careSetting && pattern.message && pattern.matcher.source, `${pattern.id} must be complete`)
++    assertEquals(pattern.clinicianReview.status, 'pending', `${pattern.id} clinician review`)
++  }
++})
++
++Deno.test('P0-14a suicidal ideation uses terminal crisis-line copy without medical-emergency framing', () => {
++  const pattern = EMERGENCY_PATTERNS.find((candidate) => candidate.crisisType === 'suicidal_ideation')
++  assert(pattern, 'Suicidal-ideation pattern must exist')
++  assertEquals(pattern.careSetting, 'crisis_line', 'Suicidal-ideation care setting')
++  assert(/\b988\b/.test(pattern.message), 'Crisis-line message must contain 988')
++  assert(!/\b911\b|\bER\b|emergency room|ambulance/i.test(pattern.message), 'Crisis-line message must not use medical-emergency framing')
++  for (const medical of EMERGENCY_PATTERNS.filter((candidate) => candidate.crisisType !== 'suicidal_ideation')) {
++    assert(/\b911\b|\bER\b|emergency services/i.test(medical.message), `${medical.id} must direct the user to emergency services`)
++  }
++})
++
++Deno.test('P0-14a positive emergency corpus returns structured matches', () => {
++  for (const testCase of CASES.positives) {
++    const result = detectDeterministicEmergency(testCase.message)
++    assert(result, `Expected a match for ${testCase.id}`)
++    assertEquals(result.crisisType, testCase.crisis_type, `${testCase.id} crisis type`)
++    assertEquals(result.careSetting, testCase.care_setting, `${testCase.id} care setting`)
++    assertEquals(result.patternId, testCase.crisis_type, `${testCase.id} pattern id`)
++    assertEquals(result.patternSetVersion, EMERGENCY_PATTERN_SET_VERSION, `${testCase.id} pattern version`)
++    assert(result.matchedSpan.length > 0 && result.matchedSpan.length <= 64, `${testCase.id} matched span must be bounded`)
++  }
++})
++
++Deno.test('P0-14a negative corpus is at least three times the positive corpus and stays clear', () => {
++  assert(CASES.negatives.length >= 15, 'At least 15 negative cases are required')
++  assert(CASES.negatives.length >= 3 * CASES.positives.length, 'Negatives must be at least three times positives')
++  for (const testCase of CASES.negatives) {
++    assertEquals(detectDeterministicEmergency(testCase.message), null, `Expected no match for ${testCase.id}`)
++  }
++})
++
++Deno.test('P0-14a deterministic matcher remains bounded on adversarial input', () => {
++  const input = 'chest chest chest '.repeat(625)
++  const startedAt = performance.now()
++  detectDeterministicEmergency(input)
++  const elapsedMs = performance.now() - startedAt
++  assert(elapsedMs < 50, `10,000-character input took ${elapsedMs.toFixed(2)} ms`)
++})
+diff --git a/definitions/libertymd-guardrail-workflow__9qeE6tUcEY74OYV8.json b/definitions/libertymd-guardrail-workflow__9qeE6tUcEY74OYV8.json
+index 5c69fe3..7976d5d 100644
+--- a/definitions/libertymd-guardrail-workflow__9qeE6tUcEY74OYV8.json
++++ b/definitions/libertymd-guardrail-workflow__9qeE6tUcEY74OYV8.json
+@@ -22,7 +22,7 @@
+     },
+     {
+       "parameters": {
+-        "jsCode": "\nconst body = $('Webhook').first().json.body || $('Webhook').first().json || {};\nconst message = String(body.message || body.text || '').trim();\nconst history = Array.isArray(body.history) ? body.history : [];\nconst patient = body.patient && typeof body.patient === 'object' ? body.patient : {};\nconst msg = message.toLowerCase();\n\n// FIX 2026-07-30 (safety: false-negative risk).\n// negated() used msg.match(re), which returns only the FIRST match. In\n// \"no chest pain but crushing chest pressure\" the first match is negated, so\n// the genuine emergency was suppressed. Now every match is checked and the\n// rule fires if ANY occurrence is un-negated. A missed MI costs far more than\n// an interrupted conversation, so this errs toward firing.\nfunction hasUnnegatedMatch(re) {\n  const g = new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g');\n  let m;\n  while ((m = g.exec(msg)) !== null) {\n    const before = msg.slice(Math.max(0, m.index - 40), m.index);\n    // FIX 2026-07-30: a negation does not carry across a clause boundary.\n    // \"no chest pain BUT crushing chest pressure\" was being suppressed because\n    // the lookbehind window still contained the earlier \"no\". Only the nearest\n    // clause counts.\n    const seg = before.split(/[,;.!?]|\\bbut\\b|\\bhowever\\b|\\balthough\\b|\\bthough\\b/i).pop() || '';\n    const negator = /\\b(no|not|without|denies|denied|never|don'?t have|doesn'?t have)\\b/.test(seg);\n    // Third-person suppression is deliberately narrow: only PAST-TENSE family\n    // history is suppressed. \"my father HAD chest pain last year\" is history;\n    // \"my father IS HAVING chest pain\" is an emergency and must still fire.\n    const thirdPartyHistory =\n      /\\b(my|his|her|their)\\s+\\w*\\s*(father|mother|dad|mum|mom|brother|sister|friend|husband|wife|son|daughter|uncle|aunt)\\s+(had|has had|used to have)\\b/.test(seg)\n      || /\\b(family history|history of|hx of)\\b/.test(seg);\n    if (!negator && !thirdPartyHistory) return true;\n    if (m.index === g.lastIndex) g.lastIndex++;\n  }\n  return false;\n}\n\nconst rules = [\n  {\n    re: /chest (pain|pressure|tightness)|crushing (chest|pressure)|elephant (on|sitting)|pain radiating to (left )?arm|jaw pain.{0,30}(sweat|sweating|nausea)/i,\n    crisis_type: 'acs_chest_pain',\n    message: 'These symptoms can be a medical emergency. Call 911 or go to the ER now. Do not drive yourself.',\n  },\n  {\n    re: /worst headache of (my|his|her) life|thunderclap|sudden(ly)? (severe|worst|excruciating|blinding|intense) headache|headache.{0,25}(came on|hit me|started).{0,15}(suddenly|instantly|out of nowhere)|headache with (neck stiffness|confusion|weakness|vision loss)/i,\n    crisis_type: 'thunderclap_headache',\n    message: 'A sudden worst-of-life headache can be an emergency. Call 911 or go to the ER now.',\n  },\n  {\n    re: /(throat (is )?tight|lip swelling|tongue swelling|anaphylaxis|cannot breathe after|wheezing after (peanut|shellfish|bee|sting))/i,\n    crisis_type: 'anaphylaxis',\n    message: 'This may be anaphylaxis. Use epinephrine if available and call 911 immediately.',\n  },\n  {\n    re: /(cannot breathe|can't breathe|blue lips|gasping for air|oxygen (sat|saturation).{0,12}(8\\d|9[0-2])\\b)/i,\n    crisis_type: 'respiratory_distress',\n    message: 'Severe breathing problems need emergency care. Call 911 or go to the ER now.',\n  },\n  {\n    re: /(severe (lower|right lower) (abdominal|belly|stomach) pain|rigid abdomen|pain so bad I (can'?t|cannot) walk).{0,40}(fever|vomiting)?|(sudden severe abdominal pain)/i,\n    crisis_type: 'surgical_abdomen',\n    message: 'Severe abdominal pain with these features can be a surgical emergency. Seek ER care now.',\n  },\n];\n\nlet hit = null;\nfor (const rule of rules) {\n  if (hasUnnegatedMatch(rule.re)) {\n    hit = rule;\n    break;\n  }\n}\n\nif (hit) {\n  return [{\n    json: {\n      route: 'force_end',\n      status: 'force_end',\n      risk_level: 'emergency',\n      crisis_type: hit.crisis_type,\n      force_end: true,\n      is_emergency: true,\n      care_setting: 'call_911',\n      message: hit.message,\n      red_flags: [hit.crisis_type],\n      source: 'deterministic',\n      message_text: message,\n      history,\n      patient,\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    route: 'llm',\n    status: 'needs_llm',\n    force_end: false,\n    is_emergency: false,\n    message_text: message,\n    history,\n    patient,\n  }\n}];\n"
++        "jsCode": "\n// GENERATED by scripts/libertymd-emergency-pattern-sync.mjs.\n// Source of truth: supabase/functions/libertymd-care-proxy/emergency-patterns.ts\nconst PATTERN_SET_VERSION = \"1.0.0\";\nconst rules = [\n  {\n    \"id\": \"acs_chest_pain\",\n    \"crisis_type\": \"acs_chest_pain\",\n    \"care_setting\": \"call_911\",\n    \"message\": \"These symptoms can be a medical emergency. Call 911 or go to the ER now. Do not drive yourself.\",\n    \"source\": \"chest (pain|pressure|tightness)|crushing (chest|pressure)|elephant (on|sitting)|pain radiating to (left )?arm|jaw pain.{0,30}(sweat|sweating|nausea)\",\n    \"flags\": \"i\"\n  },\n  {\n    \"id\": \"thunderclap_headache\",\n    \"crisis_type\": \"thunderclap_headache\",\n    \"care_setting\": \"call_911\",\n    \"message\": \"A sudden worst-of-life headache can be an emergency. Call 911 or go to the ER now.\",\n    \"source\": \"worst headache of (my|his|her) life|thunderclap|sudden(ly)? (severe|worst|excruciating|blinding|intense) headache|headache.{0,25}(came on|hit me|started).{0,15}(suddenly|instantly|out of nowhere)|headache with (neck stiffness|confusion|weakness|vision loss)\",\n    \"flags\": \"i\"\n  },\n  {\n    \"id\": \"anaphylaxis\",\n    \"crisis_type\": \"anaphylaxis\",\n    \"care_setting\": \"call_911\",\n    \"message\": \"This may be anaphylaxis. Use epinephrine if available and call 911 immediately.\",\n    \"source\": \"throat (is )?tight|lip swelling|tongue swelling|anaphylaxis|cannot breathe after|wheezing after (a )?(peanut|shellfish|bee|sting)\",\n    \"flags\": \"i\"\n  },\n  {\n    \"id\": \"respiratory_distress\",\n    \"crisis_type\": \"respiratory_distress\",\n    \"care_setting\": \"call_911\",\n    \"message\": \"Severe breathing problems need emergency care. Call 911 or go to the ER now.\",\n    \"source\": \"cannot breathe|can't breathe|blue lips|gasping for air|oxygen (sat|saturation).{0,12}(8\\\\d|9[0-2])\\\\b\",\n    \"flags\": \"i\"\n  },\n  {\n    \"id\": \"surgical_abdomen\",\n    \"crisis_type\": \"surgical_abdomen\",\n    \"care_setting\": \"call_911\",\n    \"message\": \"Severe abdominal pain with these features can be a surgical emergency. Seek ER care now.\",\n    \"source\": \"sudden severe (abdominal|belly|stomach) pain|severe (right lower|lower right|lower) (abdominal|belly|stomach) pain|rigid abdomen|pain (is )?so bad i (can't|cannot) walk\",\n    \"flags\": \"i\"\n  },\n  {\n    \"id\": \"stroke_fast\",\n    \"crisis_type\": \"stroke_fast\",\n    \"care_setting\": \"call_911\",\n    \"message\": \"These symptoms may be a stroke. Call 911 now. Note when they started, and do not drive yourself.\",\n    \"source\": \"face (is )?(drooping|droopy)|one side of (my|the) (body|face).{0,30}(weak|numb)|arm (is )?(weak|numb).{0,30}(speech|speak)|speech (is )?(slurred|garbled)|cannot speak properly|can't speak properly\",\n    \"flags\": \"i\"\n  },\n  {\n    \"id\": \"suicidal_ideation\",\n    \"crisis_type\": \"suicidal_ideation\",\n    \"care_setting\": \"crisis_line\",\n    \"message\": \"Please call or text 988 now to reach the Suicide & Crisis Lifeline. Stay with a trusted person while you connect.\",\n    \"source\": \"\\\\b(i want to kill myself|i (am|'m) going to kill myself|i (want|plan) to end my life|i plan to kill myself|i (have|'ve) been thinking about (ending my life|killing myself|suicide)|i am thinking about suicide|i (am|'m) suicidal)\\\\b\",\n    \"flags\": \"i\"\n  }\n];\n\nconst body = $('Webhook').first().json.body || $('Webhook').first().json || {};\nconst message = String(body.message || body.text || '').trim();\nconst history = Array.isArray(body.history) ? body.history : [];\nconst patient = body.patient && typeof body.patient === 'object' ? body.patient : {};\nconst msg = message.toLowerCase();\n\nfunction firstUnnegatedMatch(rule) {\n  const flags = rule.flags.includes('g') ? rule.flags : rule.flags + 'g';\n  const matcher = new RegExp(rule.source, flags);\n  let match;\n  while ((match = matcher.exec(msg)) !== null) {\n    const before = msg.slice(Math.max(0, match.index - 40), match.index);\n    // Commas do not end a clause: \"no lip swelling, tongue swelling, or X\"\n    // is one negated list. Adversatives do end a clause, preserving\n    // \"no chest pain but crushing chest pressure\".\n    const segment = before.split(/[;.!?]|\\bbut\\b|\\bhowever\\b|\\balthough\\b|\\bthough\\b/i).pop() || '';\n    const negated = /\\b(no|not|without|denies|denied|never|don'?t have|doesn'?t have)\\b/.test(segment);\n    const thirdPartyHistory =\n      /\\b(my|his|her|their)\\s+\\w*\\s*(father|mother|dad|mum|mom|brother|sister|friend|husband|wife|son|daughter|uncle|aunt)\\s+(had|has had|used to have)\\b/.test(before)\n      || /\\b(family history|history of|hx of)\\b/.test(before);\n    if (!negated && !thirdPartyHistory) return match[0];\n    if (match.index === matcher.lastIndex) matcher.lastIndex += 1;\n  }\n  return null;\n}\n\nlet hit = null;\nfor (const rule of rules) {\n  const matchedSpan = firstUnnegatedMatch(rule);\n  if (matchedSpan !== null) {\n    hit = rule;\n    break;\n  }\n}\n\nif (hit) {\n  return [{\n    json: {\n      route: 'force_end',\n      status: 'force_end',\n      risk_level: 'emergency',\n      crisis_type: hit.crisis_type,\n      force_end: true,\n      is_emergency: true,\n      care_setting: hit.care_setting,\n      message: hit.message,\n      red_flags: [hit.crisis_type],\n      source: 'deterministic',\n      pattern_id: hit.id,\n      pattern_set_version: PATTERN_SET_VERSION,\n      message_text: message,\n      history,\n      patient,\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    route: 'llm',\n    status: 'needs_llm',\n    force_end: false,\n    is_emergency: false,\n    message_text: message,\n    history,\n    patient,\n  }\n}];\n"
+       },
+       "id": "deterministic-prefilter",
+       "name": "Deterministic Prefilter",
+@@ -61,7 +61,7 @@
+         "text": "=Latest message: {{ $json.message_text }}\n\nPatient: {{ JSON.stringify($json.patient || {}) }}\n\nHistory: {{ JSON.stringify($json.history || []) }}\n\nClassify emergency risk for this turn.",
+         "hasOutputParser": true,
+         "options": {
+-          "systemMessage": "You are a medical emergency triage guardrail for an AI primary-care chat.\n\nClassify the LATEST patient message in context of history. Be negation-aware:\n- \"no chest pain\", \"denies shortness of breath\" are NOT emergencies.\n- Mild MSK pain, URI, tension headache, seasonal allergy, mild fever → pass / home.\n- Classic emergencies → force_end / call_911.\n\nstatus must be one of: pass | high_risk_continue | force_end\nrisk_level: low | medium | high | emergency\ncrisis_type: none | acs_chest_pain | thunderclap_headache | anaphylaxis | surgical_abdomen | respiratory_distress | other_emergency\ncare_setting: home | telehealth | urgent_care | emergency_department | call_911\n\nOnly force_end for true emergencies needing 911/ER now.\nUse high_risk_continue when concerning but interview can continue with caution.\nReturn JSON matching the schema only."
++          "systemMessage": "You are an emergency triage guardrail for an AI primary-care chat.\n\nClassify the LATEST patient message in context of history. Be negation-aware:\n- \"no chest pain\", \"denies shortness of breath\" are NOT emergencies.\n- Mild MSK pain, URI, tension headache, seasonal allergy, mild fever → pass / home.\n- Classic medical emergencies, including FAST stroke signs → force_end / call_911.\n- Explicit suicidal ideation → force_end / crisis_line with 988 guidance, never ER/911 framing.\n\nstatus must be one of: pass | high_risk_continue | force_end\nrisk_level: low | medium | high | emergency\ncrisis_type: none | acs_chest_pain | thunderclap_headache | anaphylaxis | surgical_abdomen | respiratory_distress | stroke_fast | suicidal_ideation | other_emergency\ncare_setting: home | telehealth | urgent_care | emergency_department | call_911 | crisis_line\n\nOnly force_end for a true medical emergency needing 911/ER now or explicit suicidal ideation needing crisis-line support.\nUse high_risk_continue when concerning but interview can continue with caution.\nReturn JSON matching the schema only."
+         }
+       },
+       "id": "crisis-agent",

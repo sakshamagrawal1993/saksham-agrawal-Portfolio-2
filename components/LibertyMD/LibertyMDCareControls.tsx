@@ -1,10 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useI18n } from '../../i18n';
 import {
   AlertTriangle,
-  Brain,
   Check,
-  ClipboardPlus,
   Clock3,
   FileClock,
   Info,
@@ -15,6 +13,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   UserRound,
+  Users,
   Wrench,
   X,
 } from 'lucide-react';
@@ -27,13 +26,18 @@ import {
   type LibertyMDSafetySignal,
   type LibertyMDSeverity,
 } from './libertymd-severity';
+import { LibertyMDOverlaySheet } from './LibertyMDOverlaySheet';
+import { formatInterviewTimePromise } from './libertymd-interview-expectations';
+import {
+  LibertyMDProfileManagementPanel,
+  type ProfileManagementHandlers,
+} from './LibertyMDProfileManagementPanel';
+import {
+  LibertyMDHistoryList,
+  type LibertyMDHistoryItem,
+} from './LibertyMDHistoryList';
 
-export interface LibertyMDHistoryItem {
-  id: string;
-  status: string;
-  chief_complaint: string | null;
-  created_at: string;
-}
+export type { LibertyMDHistoryItem };
 
 // ---------------------------------------------------------------------------
 // P0-16 · four-severity presentation
@@ -135,13 +139,50 @@ export function LibertyMDSafetyNotice({ signal, message, className }: SafetyNoti
  * A failed request to the proxy — network error, timeout, 4xx, 5xx. Always the
  * technical tier. Replaces the amber `{error && ...}` boxes in the chat trees,
  * which currently make an app failure indistinguishable from a clinical caution.
+ *
+ * P0-12: optional Try again (technical severity only) for exhausted upstream
+ * classes that can safely resend the held `client_message_id`.
  */
-export function LibertyMDRequestErrorNotice({ message, className }: { message: string; className?: string }) {
+export function LibertyMDRequestErrorNotice({
+  message,
+  className,
+  onRetry,
+}: {
+  message: string;
+  className?: string;
+  onRetry?: () => void;
+}) {
+  return (
+    <div className={className}>
+      <LibertyMDSeverityNotice
+        severity={libertyMDSeverityForRequestFailure()}
+        message={message}
+      />
+      {onRetry ? (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-libertymd-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-libertymd-slate-700 transition hover:bg-libertymd-slate-200"
+        >
+          <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+          Try again
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * P0-12 — persistent offline banner (technical severity). Sibling of
+ * `LibertyMDRequestErrorNotice`; no Try again (auto-sends on `online`).
+ */
+export function LibertyMDOfflineBanner({ message, className }: { message: string; className?: string }) {
   return (
     <LibertyMDSeverityNotice
       severity={libertyMDSeverityForRequestFailure()}
       message={message}
       className={className}
+      label="Offline"
     />
   );
 }
@@ -173,27 +214,96 @@ export function LibertyMDRequestErrorNotice({ message, className }: { message: s
 export { libertyMDSafetyNoticeFromResponse };
 export type { LibertyMDSafetyNoticeContent, LibertyMDSafetySignal, LibertyMDSeverity };
 
+/** Presentational profile row for the unified entry picker (P1-01 Q2A). */
+export interface LibertyMDEntryProfile {
+  id: string;
+  label: string;
+}
+
+/** Map bootstrap patients[] into entry picker rows (P1-03). */
+export function entryProfilesFromPatients(
+  patients: Array<{ id: string; display_label?: string | null; relationship?: string }>,
+): LibertyMDEntryProfile[] {
+  return patients.map((patient) => ({
+    id: patient.id,
+    label: String(patient.display_label || '').trim()
+      || (patient.relationship === 'self' ? 'Me' : 'Profile'),
+  }));
+}
+
 interface DemographicsPromptProps {
   age: string;
   sex: string;
   loading: boolean;
   error?: string;
+  /** First clinical question — visual hero (P1-01). */
+  question?: string;
+  /** Optional answer chips under the question (not intake composer chips). */
+  options?: string[];
+  /** Free-text / chip-selected clinical answer (required non-empty to submit). */
+  answer?: string;
+  /** Consent checkbox — pre-checked by default (DECISIONS). */
+  consentChecked?: boolean;
+  /** Presentational only; picker renders only when length > 1 (Q2A). */
+  profiles?: LibertyMDEntryProfile[];
+  selectedProfileId?: string;
+  /** P1-04: when true, show secondary “Care for someone else” → same offer path. */
+  isAnonymous?: boolean;
   onAgeChange: (value: string) => void;
   onSexChange: (value: string) => void;
+  onAnswerChange?: (value: string) => void;
+  onConsentChange?: (checked: boolean) => void;
+  onProfileChange?: (profileId: string) => void;
+  /** P1-04 Q2C secondary — anonymous add-profile attempt (does not gate submit). */
+  onCareForSomeoneElse?: () => void;
   onSubmit: () => void;
 }
+
+/**
+ * P1-01 unified entry control: question hero + options, optional profile slot,
+ * compact age/sex, pre-ticked consent. Submit requires age, sex, consent, and a
+ * non-empty trimmed clinical answer.
+ *
+ * Client age floor mirrors server `LIBERTYMD_MIN_PATIENT_AGE` in profiles.ts
+ * (numeric 18 here — no Vite-shared module this ticket). Server remains authority.
+ */
+const LIBERTYMD_MIN_PATIENT_AGE_CLIENT = 18
 
 export function LibertyMDDemographicsPrompt({
   age,
   sex,
   loading,
   error,
+  question,
+  options = [],
+  answer = '',
+  consentChecked = true,
+  profiles = [],
+  selectedProfileId,
+  isAnonymous = false,
   onAgeChange,
   onSexChange,
+  onAnswerChange,
+  onConsentChange,
+  onProfileChange,
+  onCareForSomeoneElse,
   onSubmit,
 }: DemographicsPromptProps) {
   const { t } = useI18n();
-  const canSubmit = Number(age) >= 18 && Number(age) <= 120 && Boolean(sex) && !loading;
+  const answerReady = Boolean(String(answer || '').trim());
+  const ageNum = Number(age);
+  // P1-05 Q1A/Q2 — show care pointer only when parsed age is an integer < floor.
+  const ageUnderFloor = Boolean(String(age).trim())
+    && Number.isInteger(ageNum)
+    && ageNum < LIBERTYMD_MIN_PATIENT_AGE_CLIENT;
+  const canSubmit = ageNum >= LIBERTYMD_MIN_PATIENT_AGE_CLIENT
+    && ageNum <= 120
+    && Boolean(sex)
+    && consentChecked
+    && answerReady
+    && !loading;
+  const showProfilePick = Array.isArray(profiles) && profiles.length > 1;
+  const heroQuestion = String(question || '').trim() || 'When did this symptom begin?';
 
   return (
     <form
@@ -202,8 +312,90 @@ export function LibertyMDDemographicsPrompt({
         if (canSubmit) onSubmit();
       }}
       className="mx-auto w-full max-w-2xl border-t border-libertymd-green-sage pt-libertymd-lg"
+      data-libertymd-unified-entry="true"
     >
-      <div className="grid gap-libertymd-md sm:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)]">
+      <div className="space-y-libertymd-md">
+        <p
+          className="text-sm font-medium leading-5 text-libertymd-slate-500"
+          data-libertymd-time-promise="true"
+        >
+          {formatInterviewTimePromise(t)}
+        </p>
+        <h2
+          id="libertymd-entry-question"
+          className="font-serif text-xl font-semibold leading-snug text-libertymd-ink sm:text-2xl"
+        >
+          {heroQuestion}
+        </h2>
+
+        {options.length > 0 && (
+          <div className="flex flex-wrap gap-2" role="group" aria-labelledby="libertymd-entry-question">
+            {options.map((option) => {
+              const active = answer === option;
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  aria-pressed={active}
+                  disabled={loading}
+                  onClick={() => onAnswerChange?.(option)}
+                  className={`rounded-md border px-3 py-2 text-left text-sm font-semibold transition ${
+                    active
+                      ? 'border-libertymd-blue-600 bg-libertymd-blue-50 text-libertymd-ink'
+                      : 'border-libertymd-slate-300 bg-white text-libertymd-slate-700 hover:border-libertymd-blue-600 hover:text-libertymd-ink'
+                  }`}
+                >
+                  {option}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        <label className="sr-only" htmlFor="libertymd-entry-answer">Your answer</label>
+        <input
+          id="libertymd-entry-answer"
+          type="text"
+          autoComplete="off"
+          value={answer}
+          disabled={loading}
+          onChange={(event) => onAnswerChange?.(event.target.value)}
+          placeholder="Type your answer"
+          className="h-12 w-full rounded-lg border border-libertymd-slate-300 bg-white px-libertymd-lg text-left text-base text-libertymd-ink outline-none transition focus:border-libertymd-blue-600 focus:ring-4 focus:ring-libertymd-blue-50"
+        />
+      </div>
+
+      {showProfilePick && (
+        <fieldset className="mt-libertymd-md">
+          <legend className="mb-2 text-xs font-bold uppercase tracking-wide text-libertymd-slate-500">
+            Who is this for?
+          </legend>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {profiles.map((profile) => {
+              const active = selectedProfileId === profile.id;
+              return (
+                <button
+                  key={profile.id}
+                  type="button"
+                  aria-pressed={active}
+                  disabled={loading}
+                  onClick={() => onProfileChange?.(profile.id)}
+                  className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-sm font-semibold transition ${
+                    active
+                      ? 'border-libertymd-blue-600 bg-libertymd-blue-50 text-libertymd-ink'
+                      : 'border-libertymd-slate-300 bg-white text-libertymd-slate-700'
+                  }`}
+                >
+                  <UserRound className="h-4 w-4 shrink-0 text-libertymd-blue-600" />
+                  {profile.label}
+                </button>
+              );
+            })}
+          </div>
+        </fieldset>
+      )}
+
+      <div className="mt-libertymd-md grid gap-libertymd-sm sm:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)]">
         <label className="sr-only" htmlFor="libertymd-age">Age</label>
         <input
           id="libertymd-age"
@@ -214,10 +406,10 @@ export function LibertyMDDemographicsPrompt({
           value={age}
           onChange={(event) => onAgeChange(event.target.value.replace(/\D/g, '').slice(0, 3))}
           placeholder={t('careControls.agePlaceholder')}
-          className="h-14 rounded-lg border border-libertymd-slate-300 bg-white px-libertymd-lg text-left text-base font-semibold text-libertymd-ink outline-none transition focus:border-libertymd-blue-600 focus:ring-4 focus:ring-libertymd-blue-50"
+          className="h-12 rounded-lg border border-libertymd-slate-300 bg-white px-libertymd-lg text-left text-base font-semibold text-libertymd-ink outline-none transition focus:border-libertymd-blue-600 focus:ring-4 focus:ring-libertymd-blue-50"
         />
 
-        <fieldset className="grid h-14 grid-cols-2 rounded-lg bg-libertymd-blue-50 p-1">
+        <fieldset className="grid h-12 grid-cols-2 rounded-lg bg-libertymd-blue-50 p-1">
           <legend className="sr-only">{t('careControls.sexLegend')}</legend>
           {[
             ['female', t('careControls.female')],
@@ -244,80 +436,362 @@ export function LibertyMDDemographicsPrompt({
         </fieldset>
       </div>
 
+      {ageUnderFloor && (
+        <p
+          data-libertymd-adults-only="unified-entry"
+          role="status"
+          className="mt-libertymd-sm text-left text-sm leading-5 text-libertymd-slate-500"
+        >
+          {t('careControls.adultsOnlyNotice')}
+        </p>
+      )}
+
+      <label className="mt-libertymd-md flex items-start gap-2 text-left text-xs leading-5 text-libertymd-slate-500">
+        <input
+          type="checkbox"
+          checked={consentChecked}
+          disabled={loading}
+          onChange={(event) => onConsentChange?.(event.target.checked)}
+          className="mt-0.5 h-4 w-4 shrink-0 rounded border-libertymd-slate-300 text-libertymd-blue-600 focus:ring-libertymd-blue-600"
+        />
+        <span>
+          I agree to the LibertyMD Terms of Service and Privacy Policy. This is AI guidance, not emergency care.
+        </span>
+      </label>
+
       <button
         type="submit"
         disabled={!canSubmit}
         className="mt-libertymd-md inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-libertymd-blue-600 text-sm font-bold text-white shadow-lg shadow-libertymd-blue-600/20 transition hover:bg-libertymd-blue-700 disabled:cursor-not-allowed disabled:bg-libertymd-slate-300 disabled:shadow-none"
       >
         {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-        Submit
+        Continue
       </button>
 
-      <p className="mt-libertymd-sm text-center text-xs leading-5 text-libertymd-slate-500">
-        By submitting, you agree to the LibertyMD Terms of Service and Privacy Policy. This is AI guidance, not emergency care.
-      </p>
+      {isAnonymous && onCareForSomeoneElse && (
+        <button
+          type="button"
+          data-libertymd-add-profile="unified-entry"
+          disabled={loading}
+          onClick={onCareForSomeoneElse}
+          className="mt-libertymd-sm inline-flex w-full items-center justify-center gap-2 text-sm font-semibold text-libertymd-blue-600 transition hover:text-libertymd-blue-700 disabled:opacity-50"
+        >
+          <Plus className="h-4 w-4" />
+          {t('careControls.careForSomeoneElse')}
+        </button>
+      )}
+
       {error && <p className="mt-libertymd-sm text-center text-sm font-semibold text-red-700">{error}</p>}
     </form>
   );
 }
 
+interface PreStartProfilePickerProps {
+  profiles: LibertyMDEntryProfile[];
+  loading?: boolean;
+  error?: string;
+  /** Linked only — opens thin create sheet. Anonymous uses onSomeoneElseAnonymous. */
+  showSomeoneElse?: boolean;
+  onSelect: (profileId: string) => void;
+  onSomeoneElse: () => void;
+}
+
+/**
+ * P1-03 — picker-first before `start_consultation` when activeOwnedCount > 1.
+ * Never silent-defaults a selection.
+ */
+export function LibertyMDPreStartProfilePicker({
+  profiles,
+  loading = false,
+  error,
+  showSomeoneElse = true,
+  onSelect,
+  onSomeoneElse,
+}: PreStartProfilePickerProps) {
+  const { t } = useI18n();
+  return (
+    <div
+      className="mx-auto w-full max-w-2xl border-t border-libertymd-green-sage pt-libertymd-lg"
+      data-libertymd-profile-picker="true"
+    >
+      <fieldset>
+        <legend className="mb-2 text-xs font-bold uppercase tracking-wide text-libertymd-slate-500">
+          {t('careControls.whoIsThisFor')}
+        </legend>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {profiles.map((profile) => (
+            <button
+              key={profile.id}
+              type="button"
+              disabled={loading}
+              onClick={() => onSelect(profile.id)}
+              className="inline-flex items-center gap-2 rounded-lg border border-libertymd-slate-300 bg-white px-3 py-2.5 text-left text-sm font-semibold text-libertymd-slate-700 transition hover:border-libertymd-blue-600 hover:text-libertymd-ink disabled:opacity-50"
+            >
+              <UserRound className="h-4 w-4 shrink-0 text-libertymd-blue-600" />
+              {profile.label}
+            </button>
+          ))}
+          {showSomeoneElse && (
+            <button
+              type="button"
+              disabled={loading}
+              data-libertymd-someone-else="true"
+              onClick={onSomeoneElse}
+              className="inline-flex items-center gap-2 rounded-lg border border-dashed border-libertymd-slate-300 bg-white px-3 py-2.5 text-left text-sm font-semibold text-libertymd-blue-600 transition hover:border-libertymd-blue-600 disabled:opacity-50"
+            >
+              <Plus className="h-4 w-4 shrink-0" />
+              {t('careControls.someoneElse')}
+            </button>
+          )}
+        </div>
+      </fieldset>
+      {error && <p className="mt-libertymd-sm text-center text-sm font-semibold text-red-700">{error}</p>}
+    </div>
+  );
+}
+
+interface SomeoneElseCreateSheetProps {
+  loading?: boolean;
+  error?: string;
+  onCancel: () => void;
+  onSubmit: (input: { display_label: string; age: number; sex_at_birth: 'female' | 'male' }) => void;
+}
+
+/**
+ * P1-03 Q4A — thin linked create (label + age + sex) before start with new patient_id.
+ */
+export function LibertyMDSomeoneElseCreateSheet({
+  loading = false,
+  error,
+  onCancel,
+  onSubmit,
+}: SomeoneElseCreateSheetProps) {
+  const { t } = useI18n();
+  const [label, setLabel] = useState('');
+  const [age, setAge] = useState('');
+  const [sex, setSex] = useState<'female' | 'male' | ''>('');
+  const ageNum = Number(age);
+  // Client floor mirrors server LIBERTYMD_MIN_PATIENT_AGE (profiles.ts).
+  const ageUnderFloor = Boolean(String(age).trim())
+    && Number.isInteger(ageNum)
+    && ageNum < LIBERTYMD_MIN_PATIENT_AGE_CLIENT;
+  const canSubmit = Boolean(String(label).trim())
+    && Number.isInteger(ageNum)
+    && ageNum >= LIBERTYMD_MIN_PATIENT_AGE_CLIENT
+    && ageNum <= 120
+    && (sex === 'female' || sex === 'male')
+    && !loading;
+
+  return (
+    <form
+      data-libertymd-someone-else-create="true"
+      className="mx-auto w-full max-w-2xl space-y-libertymd-md border-t border-libertymd-green-sage pt-libertymd-lg"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!canSubmit || (sex !== 'female' && sex !== 'male')) return;
+        onSubmit({
+          display_label: String(label).trim().slice(0, 80),
+          age: ageNum,
+          sex_at_birth: sex,
+        });
+      }}
+    >
+      <h2 className="font-serif text-xl font-semibold text-libertymd-ink">
+        {t('careControls.someoneElseTitle')}
+      </h2>
+      <p className="text-sm text-libertymd-slate-500">{t('careControls.someoneElseBody')}</p>
+      <label className="block text-left text-xs font-bold uppercase tracking-wide text-libertymd-slate-500">
+        {t('careControls.displayLabel')}
+        <input
+          type="text"
+          value={label}
+          disabled={loading}
+          maxLength={80}
+          onChange={(event) => setLabel(event.target.value)}
+          className="mt-1 h-12 w-full rounded-lg border border-libertymd-slate-300 bg-white px-libertymd-lg text-base font-semibold text-libertymd-ink outline-none focus:border-libertymd-blue-600 focus:ring-4 focus:ring-libertymd-blue-50"
+        />
+      </label>
+      <div className="grid gap-libertymd-sm sm:grid-cols-2">
+        <input
+          inputMode="numeric"
+          value={age}
+          disabled={loading}
+          placeholder={t('careControls.agePlaceholder')}
+          onChange={(event) => setAge(event.target.value.replace(/\D/g, '').slice(0, 3))}
+          className="h-12 rounded-lg border border-libertymd-slate-300 bg-white px-libertymd-lg text-base font-semibold text-libertymd-ink outline-none focus:border-libertymd-blue-600 focus:ring-4 focus:ring-libertymd-blue-50"
+        />
+        <fieldset className="grid h-12 grid-cols-2 rounded-lg bg-libertymd-blue-50 p-1">
+          <legend className="sr-only">{t('careControls.sexLegend')}</legend>
+          {(['female', 'male'] as const).map((value) => {
+            const active = sex === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={active}
+                disabled={loading}
+                onClick={() => setSex(value)}
+                className={`inline-flex items-center justify-center rounded-md text-sm font-bold transition ${
+                  active ? 'bg-white text-libertymd-ink shadow-sm' : 'text-libertymd-slate-500'
+                }`}
+              >
+                {value === 'female' ? t('careControls.female') : t('careControls.male')}
+              </button>
+            );
+          })}
+        </fieldset>
+      </div>
+      {ageUnderFloor && (
+        <p
+          data-libertymd-adults-only="someone-else"
+          role="status"
+          className="text-left text-sm leading-5 text-libertymd-slate-500"
+        >
+          {t('careControls.adultsOnlyNotice')}
+        </p>
+      )}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          disabled={loading}
+          onClick={onCancel}
+          className="inline-flex h-12 flex-1 items-center justify-center rounded-full border border-libertymd-slate-300 text-sm font-bold text-libertymd-slate-700"
+        >
+          {t('careControls.someoneElseCancel')}
+        </button>
+        <button
+          type="submit"
+          disabled={!canSubmit}
+          className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-libertymd-blue-600 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-libertymd-slate-300"
+        >
+          {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+          {t('careControls.someoneElseContinue')}
+        </button>
+      </div>
+      {error && <p className="text-center text-sm font-semibold text-red-700">{error}</p>}
+    </form>
+  );
+}
+
+/** P1-13 — truncate prior chief complaint for resume invitation body (~100, word boundary). */
+export const RESUME_COMPLAINT_MAX_CHARS = 100;
+
+/**
+ * P1-13 — resolve display complaint from consultation column, then filled_slots fallback.
+ * Never invents a complaint when both are empty.
+ */
+export function resolveResumeChiefComplaint(consultation: {
+  chief_complaint?: string | null;
+  filled_slots?: Record<string, unknown> | null;
+} | null | undefined): string | null {
+  const fromColumn = String(consultation?.chief_complaint ?? '').trim();
+  if (fromColumn) return fromColumn;
+  const slots = consultation?.filled_slots;
+  if (slots && typeof slots === 'object' && !Array.isArray(slots)) {
+    const fromSlots = String(slots.chief_complaint ?? '').trim();
+    if (fromSlots) return fromSlots;
+  }
+  return null;
+}
+
+/** P1-13 — truncate for invitation body; word-boundary cut + ellipsis when over max. */
+export function truncateResumeChiefComplaint(
+  raw: string,
+  maxChars: number = RESUME_COMPLAINT_MAX_CHARS,
+): string {
+  const text = String(raw || '').trim().replace(/\s+/g, ' ');
+  if (!text) return '';
+  if (text.length <= maxChars) return text;
+  const slice = text.slice(0, maxChars);
+  const lastSpace = slice.lastIndexOf(' ');
+  const cut = lastSpace > Math.floor(maxChars * 0.6) ? slice.slice(0, lastSpace) : slice;
+  return `${cut.trimEnd()}…`;
+}
+
+/**
+ * P1-13 Q3B drive-by — humanize history status so raw "abandoned" is not patient-visible.
+ * Ids / DB status values unchanged.
+ */
+export function formatLibertyMdHistoryStatus(status: string): string {
+  if (status === 'abandoned') return 'Incomplete';
+  return String(status || '').replaceAll('_', ' ');
+}
+
+/**
+ * P1-13 invitation body.
+ * REQUIRES EXPERT REVIEW — interpolates user chief_complaint (echo-only; no advice).
+ */
+export function buildResumeInvitationBody(chiefComplaint: string | null | undefined): string {
+  const trimmed = String(chiefComplaint ?? '').trim();
+  if (trimmed) {
+    const echo = truncateResumeChiefComplaint(trimmed);
+    return `You were sharing about “${echo}”. Your previous answers are still private and available.`;
+  }
+  return 'Your previous answers are still private and available. Continue when you\'re ready, or start fresh with a new concern.';
+}
+
 interface AbandonedRecoveryPromptProps {
   loading: boolean;
   error?: string;
+  /** Prior chief complaint for invitation body echo (P1-13). Never sent to telemetry. */
+  chiefComplaint?: string | null;
   onResume: () => void;
   onStartOver: () => void;
 }
 
+/**
+ * P0-21 · bar-hosted resume prompt (footer continuation slot).
+ * P1-13 · invitation copy + optional chief-complaint echo (export/aria ids unchanged).
+ * Center `fixed inset-0` / `aria-modal` presentation retired — no focus trap.
+ * Hosted by `LibertyMDContinuationActionBar`; not a sole full-screen path.
+ */
 export function LibertyMDAbandonedRecoveryPrompt({
   loading,
   error,
+  chiefComplaint = null,
   onResume,
   onStartOver,
 }: AbandonedRecoveryPromptProps) {
+  const description = buildResumeInvitationBody(chiefComplaint);
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-libertymd-slate-900/35 p-libertymd-md backdrop-blur-sm">
-      <section
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="libertymd-recovery-title"
-        aria-describedby="libertymd-recovery-description"
-        className="w-full max-w-lg rounded-lg border border-white/80 bg-white p-libertymd-xl text-left shadow-2xl sm:p-libertymd-2xl"
-      >
-        <p className="text-xs font-bold uppercase text-libertymd-blue-600">Consultation paused</p>
-        <h2 id="libertymd-recovery-title" className="mt-libertymd-sm font-serif text-3xl font-semibold leading-tight text-libertymd-ink">
-          Continue where you left off?
-        </h2>
-        <p id="libertymd-recovery-description" className="mt-libertymd-md text-base leading-7 text-libertymd-slate-700">
-          Your previous answers are still private and available. Resume this consultation, or leave it closed and start over with a new concern.
+    <div
+      aria-labelledby="libertymd-recovery-title"
+      aria-describedby="libertymd-recovery-description"
+      className="w-full rounded-lg border border-libertymd-blue-200/80 bg-white p-libertymd-md text-left shadow-sm sm:p-libertymd-lg"
+    >
+      <h2 id="libertymd-recovery-title" className="font-serif text-xl font-semibold leading-tight text-libertymd-ink sm:text-2xl">
+        Pick up where you left off?
+      </h2>
+      <p id="libertymd-recovery-description" className="mt-libertymd-sm text-sm leading-6 text-libertymd-slate-700">
+        {description}
+      </p>
+
+      {error && (
+        <p className="mt-libertymd-sm rounded-md border border-amber-200 bg-amber-50 px-libertymd-md py-libertymd-sm text-sm font-semibold text-amber-900">
+          {error}
         </p>
+      )}
 
-        {error && (
-          <p className="mt-libertymd-md rounded-md border border-amber-200 bg-amber-50 px-libertymd-md py-libertymd-sm text-sm font-semibold text-amber-900">
-            {error}
-          </p>
-        )}
-
-        <div className="mt-libertymd-xl grid gap-libertymd-sm sm:grid-cols-2">
-          <button
-            type="button"
-            disabled={loading}
-            onClick={onResume}
-            className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-libertymd-blue-600 px-5 text-sm font-bold text-white shadow-lg shadow-libertymd-blue-600/20 transition hover:bg-libertymd-blue-700 disabled:opacity-50"
-          >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
-            Resume consultation
-          </button>
-          <button
-            type="button"
-            disabled={loading}
-            onClick={onStartOver}
-            className="inline-flex h-12 items-center justify-center gap-2 rounded-full border border-libertymd-blue-200 bg-white px-5 text-sm font-bold text-libertymd-slate-700 transition hover:border-libertymd-blue-600 hover:text-libertymd-blue-700 disabled:opacity-50"
-          >
-            <Plus className="h-4 w-4" />
-            Start over
-          </button>
-        </div>
-      </section>
+      <div className="mt-libertymd-md grid gap-libertymd-sm sm:grid-cols-2">
+        <button
+          type="button"
+          disabled={loading}
+          onClick={onResume}
+          className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-libertymd-blue-600 px-5 text-sm font-bold text-white shadow-lg shadow-libertymd-blue-600/20 transition hover:bg-libertymd-blue-700 disabled:opacity-50"
+        >
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+          Continue
+        </button>
+        <button
+          type="button"
+          disabled={loading}
+          onClick={onStartOver}
+          className="inline-flex h-12 items-center justify-center gap-2 rounded-full border border-libertymd-blue-200 bg-white px-5 text-sm font-bold text-libertymd-slate-700 transition hover:border-libertymd-blue-600 hover:text-libertymd-blue-700 disabled:opacity-50"
+        >
+          <Plus className="h-4 w-4" />
+          Start fresh
+        </button>
+      </div>
     </div>
   );
 }
@@ -325,6 +799,9 @@ export function LibertyMDAbandonedRecoveryPrompt({
 interface ReportGateProps {
   loading: boolean;
   identityConflict?: boolean;
+  /** P4-05 — post-merge attribution outcome (ReportGate / post-complete only). */
+  collisionPath?: 'matched_self' | 'distinct_profile' | null;
+  onDismissCollisionOutcome?: () => void;
   onGoogle: () => void;
   onExistingGoogle?: () => void;
   onSkip: () => void;
@@ -334,20 +811,35 @@ interface ReportGateProps {
 export function LibertyMDReportGate({
   loading,
   identityConflict = false,
+  collisionPath = null,
+  onDismissCollisionOutcome,
   onGoogle,
   onExistingGoogle,
   onSkip,
   onClose,
 }: ReportGateProps) {
   const { t } = useI18n();
+  // Soft report gate (DECISIONS 2026-07-30 / P2-06): dismissible persuasion — portal /
+  // trap / lock / sheet chrome live in LibertyMDOverlaySheet (P0-22). Benefits +
+  // equal-prominence Continue-as-guest (h-14 outline). Never blocks report body.
+  const benefitChips: Array<[typeof Clock3, string]> = [
+    [Clock3, t('reportGate.benefitKeep')],
+    [FileClock, t('reportGate.benefitHistory')],
+    [Users, t('reportGate.benefitFamily')],
+  ];
+  const collisionCopy =
+    collisionPath === 'matched_self'
+      ? t('careControls.mergeOutcomeMatchedSelf')
+      : collisionPath === 'distinct_profile'
+        ? t('careControls.mergeOutcomeDistinctProfile')
+        : null;
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-libertymd-slate-900/35 p-libertymd-md backdrop-blur-sm">
-      <section
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="libertymd-report-gate-title"
-        className="relative w-full max-w-4xl rounded-lg border border-white/80 bg-white p-libertymd-xl text-left shadow-2xl sm:p-libertymd-2xl"
-      >
+    <LibertyMDOverlaySheet
+      onClose={onClose}
+      titleId="libertymd-report-gate-title"
+      panelClassName="relative"
+    >
+      <div className="relative p-libertymd-lg sm:p-libertymd-xl md:p-libertymd-2xl" data-libertymd-soft-gate-chrome="">
         <button
           type="button"
           onClick={onClose}
@@ -358,27 +850,38 @@ export function LibertyMDReportGate({
         </button>
 
         <p className="text-xs font-bold uppercase text-libertymd-blue-600">{t('reportGate.title')}</p>
-        <h2 id="libertymd-report-gate-title" className="mt-libertymd-sm max-w-2xl font-serif text-4xl font-semibold leading-tight text-libertymd-ink sm:text-5xl">
-          Don&apos;t lose this consult
+        <h2 id="libertymd-report-gate-title" className="mt-libertymd-sm max-w-2xl font-serif text-3xl font-semibold leading-tight text-libertymd-ink sm:text-4xl md:text-5xl">
+          {t('reportGate.headline')}
         </h2>
         <p className="mt-libertymd-md text-base text-libertymd-slate-700 sm:text-lg">
-          Link Google to save this report and revisit your consultation history.
+          {t('reportGate.body')}
         </p>
 
-        <div className="mt-libertymd-xl grid gap-libertymd-sm sm:grid-cols-3">
-          {[
-            [Clock3, 'Free 24/7 care'],
-            [Brain, 'Guidance that knows you'],
-            [ClipboardPlus, 'One health history'],
-          ].map(([Icon, label]) => {
-            const BenefitIcon = Icon as typeof Clock3;
-            return (
-              <div key={label as string} className="flex items-center gap-3 rounded-full bg-libertymd-blue-50 px-4 py-3 text-sm font-bold text-libertymd-ink">
-                <BenefitIcon className="h-5 w-5 shrink-0" />
-                {label as string}
-              </div>
-            );
-          })}
+        {collisionCopy ? (
+          <div
+            className="mt-libertymd-md rounded-lg border border-libertymd-blue-200 bg-libertymd-blue-50 p-libertymd-md"
+            data-libertymd-merge-collision-outcome={collisionPath || undefined}
+          >
+            <p className="text-sm font-semibold text-libertymd-slate-700">{collisionCopy}</p>
+            {onDismissCollisionOutcome ? (
+              <button
+                type="button"
+                onClick={onDismissCollisionOutcome}
+                className="mt-libertymd-sm text-sm font-bold text-libertymd-blue-700 underline-offset-2 hover:underline"
+              >
+                {t('careControls.mergeOutcomeAcknowledge')}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+
+        <div className="mt-libertymd-xl grid gap-libertymd-sm sm:grid-cols-3" data-libertymd-soft-gate-benefits="">
+          {benefitChips.map(([Icon, label]) => (
+            <div key={label} className="flex items-center gap-3 rounded-full bg-libertymd-blue-50 px-4 py-3 text-sm font-bold text-libertymd-ink">
+              <Icon className="h-5 w-5 shrink-0" />
+              {label}
+            </div>
+          ))}
         </div>
 
         <button
@@ -412,16 +915,48 @@ export function LibertyMDReportGate({
           type="button"
           disabled={loading}
           onClick={onSkip}
-          className="mt-libertymd-sm h-11 w-full text-sm font-bold text-libertymd-slate-500 transition hover:text-libertymd-blue-600 disabled:opacity-50"
+          data-libertymd-soft-gate-continue-guest=""
+          className="mt-libertymd-sm inline-flex h-14 w-full items-center justify-center rounded-full border border-libertymd-blue-600 bg-white px-6 text-base font-bold text-libertymd-blue-700 transition hover:bg-libertymd-blue-50 disabled:opacity-50"
         >
-          {t('careControls.skipOnce')}
+          {t('reportGate.skip')}
         </button>
 
         <div className="mt-libertymd-lg flex items-center justify-center gap-2 text-xs text-libertymd-slate-500">
           <ShieldCheck className="h-4 w-4" />
           {t('careControls.privateDefault')}
         </div>
-      </section>
+      </div>
+    </LibertyMDOverlaySheet>
+  );
+}
+
+/** P4-05 — dismissible post-merge outcome on report_ready (P1-25 allowed surface). */
+export function LibertyMDMergeCollisionOutcome({
+  collisionPath,
+  onDismiss,
+}: {
+  collisionPath: 'matched_self' | 'distinct_profile';
+  onDismiss: () => void;
+}) {
+  const { t } = useI18n();
+  const copy =
+    collisionPath === 'matched_self'
+      ? t('careControls.mergeOutcomeMatchedSelf')
+      : t('careControls.mergeOutcomeDistinctProfile');
+  return (
+    <div
+      className="ml-10 rounded-lg border border-libertymd-blue-200 bg-libertymd-blue-50 p-libertymd-md"
+      data-libertymd-merge-collision-outcome={collisionPath}
+      role="status"
+    >
+      <p className="text-sm font-semibold text-libertymd-slate-700">{copy}</p>
+      <button
+        type="button"
+        onClick={onDismiss}
+        className="mt-libertymd-sm text-sm font-bold text-libertymd-blue-700 underline-offset-2 hover:underline"
+      >
+        {t('careControls.mergeOutcomeAcknowledge')}
+      </button>
     </div>
   );
 }
@@ -438,6 +973,10 @@ interface AccountDrawerProps {
   loading: boolean;
   onClose: () => void;
   onSelectConsultation: (id: string) => void;
+  /** P1-04 Q2C primary — anonymous add-profile → capability offer path. */
+  onCareForSomeoneElse?: () => void;
+  /** P4-04 — linked-only profile CRUD handlers. Omit for anonymous. */
+  profileManagement?: ProfileManagementHandlers | null;
 }
 
 export function LibertyMDAccountDrawer({
@@ -452,6 +991,8 @@ export function LibertyMDAccountDrawer({
   loading,
   onClose,
   onSelectConsultation,
+  onCareForSomeoneElse,
+  profileManagement = null,
 }: AccountDrawerProps) {
   const { t } = useI18n();
   if (!open) return null;
@@ -494,39 +1035,111 @@ export function LibertyMDAccountDrawer({
         </div>
 
         {isAnonymous ? (
-          <div className="mt-libertymd-xl">
+          <div className="mt-libertymd-xl space-y-libertymd-md">
             <p className="text-sm leading-6 text-libertymd-slate-700">
               Your private session is active. Complete a consultation to link Google, save the report, and revisit it on any device.
             </p>
+            {onCareForSomeoneElse && (
+              <button
+                type="button"
+                data-libertymd-add-profile="drawer"
+                onClick={onCareForSomeoneElse}
+                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full border border-libertymd-blue-600 bg-white px-4 text-sm font-bold text-libertymd-blue-700 transition hover:bg-libertymd-blue-50"
+              >
+                <Plus className="h-4 w-4" />
+                {t('careControls.careForSomeoneElse')}
+              </button>
+            )}
           </div>
         ) : (
           <div className="mt-libertymd-xl min-h-0 flex-1 overflow-y-auto">
-            <div className="flex items-center gap-2 text-xs font-bold uppercase text-libertymd-slate-500">
-              <FileClock className="h-4 w-4" />
-              Consultation history
-            </div>
-            {loading ? (
-              <div className="mt-libertymd-lg flex items-center gap-2 text-sm text-libertymd-slate-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading history...</div>
-            ) : history.length ? (
-              <div className="mt-libertymd-md divide-y divide-libertymd-slate-200">
-                {history.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => onSelectConsultation(item.id)}
-                    className="w-full py-4 text-left transition hover:text-libertymd-blue-600"
-                  >
-                    <p className="line-clamp-2 text-sm font-bold">{item.chief_complaint || 'LibertyMD consultation'}</p>
-                    <p className="mt-1 text-xs text-libertymd-slate-500">{new Date(item.created_at).toLocaleDateString()} · {item.status.replaceAll('_', ' ')}</p>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-libertymd-lg text-sm text-libertymd-slate-500">{t('careControls.emptyHistory')}</p>
+            {profileManagement && (
+              <LibertyMDProfileManagementPanel handlers={profileManagement} />
             )}
+            <div className={`flex items-center gap-2 text-xs font-bold uppercase text-libertymd-slate-500 ${profileManagement ? 'mt-libertymd-xl' : ''}`}>
+              <FileClock className="h-4 w-4" />
+              {t('careControls.historyHeading')}
+            </div>
+            <LibertyMDHistoryList
+              history={history}
+              loading={loading}
+              onSelectConsultation={onSelectConsultation}
+              onContinue={onClose}
+            />
           </div>
         )}
       </aside>
     </div>
+  );
+}
+
+interface ProfileCapabilityOfferProps {
+  open: boolean;
+  loading?: boolean;
+  onGoogle: () => void;
+  onClose: () => void;
+}
+
+/**
+ * P1-04 — capability unlock offer (multi-profile / family care).
+ * Soft-gate: never blocks consult/report. Same sheet for drawer + unified entry.
+ */
+export function LibertyMDProfileCapabilityOffer({
+  open,
+  loading = false,
+  onGoogle,
+  onClose,
+}: ProfileCapabilityOfferProps) {
+  const { t } = useI18n();
+  if (!open) return null;
+
+  return (
+    <LibertyMDOverlaySheet
+      onClose={onClose}
+      titleId="libertymd-profile-capability-title"
+      ariaDescribedBy="libertymd-profile-capability-body"
+      panelClassName="relative"
+    >
+      <div className="relative p-libertymd-lg sm:p-libertymd-xl" data-libertymd-profile-capability-offer="true">
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full text-libertymd-slate-700 transition hover:bg-libertymd-blue-50"
+        >
+          <X className="h-5 w-5" />
+        </button>
+
+        <p className="text-xs font-bold uppercase text-libertymd-blue-600">{t('careControls.profileOfferEyebrow')}</p>
+        <h2
+          id="libertymd-profile-capability-title"
+          className="mt-libertymd-sm max-w-2xl font-serif text-3xl font-semibold leading-tight text-libertymd-ink sm:text-4xl"
+        >
+          {t('careControls.profileOfferTitle')}
+        </h2>
+        <p id="libertymd-profile-capability-body" className="mt-libertymd-md text-base text-libertymd-slate-700 sm:text-lg">
+          {t('careControls.profileOfferBody')}
+        </p>
+
+        <button
+          type="button"
+          disabled={loading}
+          onClick={onGoogle}
+          className="mt-libertymd-xl inline-flex h-14 w-full items-center justify-center gap-3 rounded-full bg-libertymd-blue-600 px-6 text-base font-bold text-white shadow-xl shadow-libertymd-blue-600/20 transition hover:bg-libertymd-blue-700 disabled:opacity-50"
+        >
+          {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <LogIn className="h-5 w-5" />}
+          {t('careControls.profileOfferGoogle')}
+        </button>
+
+        <button
+          type="button"
+          disabled={loading}
+          onClick={onClose}
+          className="mt-libertymd-md inline-flex h-11 w-full items-center justify-center text-sm font-semibold text-libertymd-slate-600 transition hover:text-libertymd-ink disabled:opacity-50"
+        >
+          {t('careControls.profileOfferDismiss')}
+        </button>
+      </div>
+    </LibertyMDOverlaySheet>
   );
 }

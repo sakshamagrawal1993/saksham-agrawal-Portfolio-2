@@ -1,0 +1,23 @@
+/**
+ * Response construction + the proxy failure taxonomy.
+ *
+ * Moved verbatim from index.ts in L0-5 (pure structural refactor).
+ * Lane C owns this module — the failure-taxonomy work (P0-12) lands here.
+ */
+import { corsHeaders } from '../../_shared/cors.ts'
+
+export const jsonResponse = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
+  status,
+  headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+})
+
+/**
+ * The single top-level catch mapping. Behaviour preserved exactly: the thrown
+ * message is echoed, 'Consultation not found' becomes 404, everything else 500.
+ */
+export function errorResponse(error: unknown) {
+  console.error('LibertyMD care proxy error', error)
+  const message = error instanceof Error ? error.message : String(error)
+  const status = message === 'Consultation not found' ? 404 : 500
+  return jsonResponse({ error: message }, status)
+}

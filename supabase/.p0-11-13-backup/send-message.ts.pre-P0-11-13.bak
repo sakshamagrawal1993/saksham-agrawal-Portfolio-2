@@ -1,0 +1,333 @@
+/**
+ * `send_message` — one interview turn.
+ *
+ * Moved verbatim from index.ts in L0-5 (pure structural refactor). Only the
+ * indentation of the lease try/finally block changed.
+ *
+ * Lane A owns this module.
+ *
+ * The order of operations here is load-bearing:
+ *   1. Claim the request lease (idempotency + optimistic version check).
+ *   2. Run guardrail and interview concurrently — separate failure domains.
+ *   3. Persist the safety verdict FIRST, before any interview or diagnosis
+ *      decision. A diagnosis failure must never lose a safety verdict.
+ *   4. force_end short-circuits: no inference is acted on after an emergency.
+ *   5. The proxy — not n8n — decides whether a report is produced, withheld,
+ *      or escalated to clinical review.
+ */
+import { assessClinicalEvidence, classifyResponseRelevance, decideReportOutcome } from '../clinical-policy.ts'
+import { MAX_TURNS } from '../lib/config.ts'
+import {
+  addMessage,
+  getHistory,
+  getOwnedConsultation,
+  replayCompletedTurn,
+  saveDiagnosticRun,
+} from '../lib/consultations.ts'
+import { jsonResponse } from '../lib/errors.ts'
+import { normalizeObject, runDiagnosis, runInterview, type DiagnosisResult } from '../lib/n8n-client.ts'
+import { ensureProfile, getOwnedPatient } from '../lib/profiles.ts'
+import { runGuardrail, saveSafetyEvent } from '../lib/safety.ts'
+import { calculateMissingSlots } from '../lib/slots.ts'
+import { addProductEvent } from '../lib/telemetry.ts'
+import { addDays, cleanMessage, limitConsultationMessage, patientPayload } from '../lib/utils.ts'
+import type { ProxyContext } from '../lib/context.ts'
+import type { JsonObject, RequestPayload } from '../lib/types.ts'
+
+export async function handleSendMessage(ctx: ProxyContext, payload: RequestPayload) {
+  const { db, user, isAnonymous } = ctx
+  if (!payload.consultation_id) return jsonResponse({ error: 'Missing consultation id' }, 400)
+  const message = cleanMessage(payload.message)
+  if (!message) return jsonResponse({ error: 'Message cannot be empty' }, 400)
+  const consultation = await getOwnedConsultation(ctx, payload.consultation_id)
+  if (!['interviewing', 'high_risk'].includes(consultation.status)) {
+    return jsonResponse({ error: `Consultation cannot accept answers in ${consultation.status}` }, 409)
+  }
+  const suppliedRequestId = String(payload.client_message_id || '').trim()
+  const requestId = suppliedRequestId || crypto.randomUUID()
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)) {
+    return jsonResponse({ error: 'Invalid client message id' }, 400)
+  }
+  const expectedVersion = Number.isInteger(payload.expected_version) ? Number(payload.expected_version) : null
+  const { data: claims, error: claimError } = await db.rpc('libertymd_claim_consultation_request', {
+    p_consultation_id: consultation.id,
+    p_user_id: user.id,
+    p_request_id: requestId,
+    p_expected_version: expectedVersion,
+  })
+  if (claimError) throw claimError
+  const claim = Array.isArray(claims) ? claims[0] : claims
+  if (!claim?.accepted) {
+    if (claim?.replayed) return jsonResponse(await replayCompletedTurn(ctx, await getOwnedConsultation(ctx, consultation.id)))
+    return jsonResponse({
+      error: 'Another answer is already being processed',
+      retryable: true,
+      current_version: claim?.current_version || consultation.version,
+    }, 409)
+  }
+  const currentVersion = Number(claim.current_version || consultation.version)
+
+  try {
+    await ensureProfile(ctx)
+    const patient = await getOwnedPatient(ctx, consultation.patient_id)
+    const turnCount = consultation.turn_count + 1
+    const { data: existingRequestMessage, error: existingRequestError } = await db
+      .from('libertymd_messages')
+      .select('id')
+      .eq('consultation_id', consultation.id)
+      .eq('client_message_id', requestId)
+      .maybeSingle()
+    if (existingRequestError) throw existingRequestError
+    if (!existingRequestMessage) {
+      await addMessage(ctx, consultation.id, 'user', message, {
+        target_slot: consultation.target_slot,
+        client_message_id: requestId,
+      })
+    }
+    const history = await getHistory(ctx, consultation.id)
+    const [guardrail, interview] = await Promise.all([
+      runGuardrail(message, history, patientPayload(patient), consultation.filled_slots),
+      runInterview(
+        history,
+        patientPayload(patient),
+        consultation.filled_slots,
+        consultation.missing_slots,
+        consultation.target_slot,
+        turnCount,
+      ),
+    ])
+    await saveSafetyEvent(ctx, consultation, guardrail, turnCount)
+
+    if (guardrail.force_end) {
+      await addMessage(ctx, consultation.id, 'assistant', guardrail.message, { message_type: 'safety' })
+      await db.from('libertymd_consultations').update({
+        status: 'emergency_stopped',
+        turn_count: turnCount,
+        safety_state: guardrail.raw,
+        last_activity_at: new Date().toISOString(),
+      }).eq('id', consultation.id)
+      await addProductEvent(ctx, 'emergency_stopped', consultation.id, { turn_count: turnCount, source: guardrail.source })
+      return jsonResponse({ consultation_id: consultation.id, emergency: true, safety: guardrail, message: guardrail.message, version: currentVersion })
+    }
+
+    const deterministicRelevance = classifyResponseRelevance(message)
+    const isNonClinical = deterministicRelevance === 'off_topic' || interview.input_relevance === 'off_topic'
+    const nonClinicalResponseCount = (consultation.non_clinical_response_count || 0) + (isNonClinical ? 1 : 0)
+    const consecutiveNonClinicalResponseCount = isNonClinical
+      ? (consultation.consecutive_non_clinical_response_count || 0) + 1
+      : 0
+
+    if (isNonClinical) {
+      const previousPrompt = [...history].reverse().find((item) => {
+        const row = item as JsonObject
+        return row.role === 'assistant' && row.message_type !== 'safety'
+      }) as JsonObject | undefined
+      const shouldStop = turnCount >= MAX_TURNS || consecutiveNonClinicalResponseCount >= 3 || nonClinicalResponseCount >= 5
+      const messageText = limitConsultationMessage(shouldStop
+        ? 'I do not have enough relevant health information to produce a responsible differential diagnosis. Please restart with the symptom details or continue with a licensed clinician.'
+        : `I need a health-related answer to continue safely. ${cleanMessage(previousPrompt?.content) || interview.next_question}`)
+
+      await addMessage(ctx, consultation.id, 'assistant', messageText, {
+        message_type: shouldStop ? 'safety' : 'question',
+        options: shouldStop ? [] : (Array.isArray(previousPrompt?.options) ? previousPrompt.options : interview.options),
+        target_slot: consultation.target_slot,
+        metadata: {
+          response_relevance: 'off_topic',
+          deterministic_relevance: deterministicRelevance,
+          workflow_relevance: interview.input_relevance,
+          relevance_reason: interview.input_relevance_reason,
+        },
+      })
+      await db.from('libertymd_consultations').update({
+        status: shouldStop ? 'clinical_review_needed' : consultation.status,
+        turn_count: turnCount,
+        non_clinical_response_count: nonClinicalResponseCount,
+        consecutive_non_clinical_response_count: consecutiveNonClinicalResponseCount,
+        resolution_reason: shouldStop ? 'insufficient_clinical_information' : null,
+        last_activity_at: new Date().toISOString(),
+      }).eq('id', consultation.id)
+      if (shouldStop) {
+        await addProductEvent(ctx, 'clinical_review_needed', consultation.id, {
+          reason: 'insufficient_clinical_information',
+          non_clinical_response_count: nonClinicalResponseCount,
+        })
+      }
+
+      return jsonResponse({
+        consultation_id: consultation.id,
+        state: shouldStop ? 'clinical_review_needed' : consultation.status,
+        clinical_review_needed: shouldStop,
+        non_clinical_response: true,
+        message: messageText,
+        next_question: shouldStop ? null : messageText,
+        options: shouldStop ? [] : (Array.isArray(previousPrompt?.options) ? previousPrompt.options : interview.options),
+        version: currentVersion,
+      })
+    }
+
+    const slots = { ...consultation.filled_slots, ...interview.slot_updates }
+    const missingSlots = interview.missing_slots.length ? interview.missing_slots : calculateMissingSlots(slots)
+    const evidence = assessClinicalEvidence(slots)
+    const shouldRunDiagnosis = evidence.score >= 50 && turnCount >= 6 && (turnCount % 2 === 0 || interview.ready_for_report || turnCount >= MAX_TURNS)
+    let diagnosis: DiagnosisResult | null = null
+    let diagnosticRunId: string | null = null
+
+    if (shouldRunDiagnosis) {
+      const diagnosisInput = { ...consultation, turn_count: turnCount }
+      diagnosis = await runDiagnosis(history, patientPayload(patient), diagnosisInput, slots)
+      diagnosticRunId = await saveDiagnosticRun(
+        ctx,
+        diagnosisInput,
+        diagnosis,
+        slots,
+        missingSlots,
+        evidence.score,
+        turnCount,
+      )
+    }
+
+    const reportDecision = decideReportOutcome({
+      diagnosisValid: Boolean(diagnosis?.valid),
+      confidence: diagnosis?.confidence || 0,
+      turnCount,
+      readyForReport: interview.ready_for_report,
+      evidence,
+      nonClinicalResponseCount,
+    })
+
+    if (reportDecision.outcome === 'complete' && diagnosis) {
+      const now = new Date().toISOString()
+      const accessStatus = isAnonymous ? 'withheld' : 'saved'
+      const { error: reportError } = await db.from('libertymd_reports').upsert({
+        consultation_id: consultation.id,
+        user_id: user.id,
+        report_data: diagnosis.raw,
+        confidence_score: diagnosis.confidence,
+        final_diagnostic_run_id: diagnosticRunId,
+        access_status: accessStatus,
+        released_at: isAnonymous ? null : now,
+        retention_expires_at: isAnonymous ? addDays(30) : null,
+        model_metadata: {
+          ...normalizeObject(diagnosis.raw.model_metadata),
+          source: 'libertymd-diagnosis',
+          turn_count: turnCount,
+        },
+      }, { onConflict: 'consultation_id' })
+      if (reportError) throw reportError
+
+      await addMessage(ctx, consultation.id, 'assistant', isAnonymous
+        ? 'Your LibertyMD report is ready. Link Google to save it and revisit this consult, or continue without saving.'
+        : 'Your LibertyMD report is ready and has been saved to your history.', {
+        message_type: 'report_gate',
+      })
+      await db.from('libertymd_consultations').update({
+        status: isAnonymous ? 'report_pending_auth' : 'completed',
+        report_gate: isAnonymous ? 'withheld' : 'google_linked',
+        turn_count: turnCount,
+        filled_slots: slots,
+        missing_slots: missingSlots,
+        intermediate_diagnoses: diagnosis.differentials,
+        safety_state: guardrail.raw,
+        non_clinical_response_count: nonClinicalResponseCount,
+        consecutive_non_clinical_response_count: 0,
+        clinical_evidence_score: evidence.score,
+        resolution_reason: reportDecision.reason,
+        completed_at: isAnonymous ? null : now,
+        last_activity_at: now,
+      }).eq('id', consultation.id)
+      await addProductEvent(ctx, 'report_gate_reached', consultation.id, {
+        confidence_score: diagnosis.confidence,
+        evidence_score: evidence.score,
+        is_anonymous: isAnonymous,
+      })
+
+      return jsonResponse({
+        consultation_id: consultation.id,
+        state: isAnonymous ? 'report_pending_auth' : 'completed',
+        report_ready: true,
+        auth_required: isAnonymous,
+        report: isAnonymous ? undefined : diagnosis.raw,
+        confidence_score: diagnosis.confidence,
+        evidence_score: evidence.score,
+        version: currentVersion,
+      })
+    }
+
+    if (reportDecision.outcome === 'review') {
+      const messageText = reportDecision.reason === 'insufficient_clinical_information'
+        ? 'I do not have enough relevant clinical information to produce a responsible differential diagnosis. Please restart with clearer symptom details or continue with a licensed clinician.'
+        : 'I could not reach a sufficiently confident differential diagnosis from this intake. Please continue with a licensed clinician for review.'
+      await addMessage(ctx, consultation.id, 'assistant', messageText, { message_type: 'safety' })
+      await db.from('libertymd_consultations').update({
+        status: 'clinical_review_needed',
+        turn_count: turnCount,
+        filled_slots: slots,
+        missing_slots: missingSlots,
+        intermediate_diagnoses: diagnosis?.valid ? diagnosis.differentials : consultation.intermediate_diagnoses,
+        safety_state: guardrail.raw,
+        non_clinical_response_count: nonClinicalResponseCount,
+        consecutive_non_clinical_response_count: 0,
+        clinical_evidence_score: evidence.score,
+        resolution_reason: reportDecision.reason,
+        last_activity_at: new Date().toISOString(),
+      }).eq('id', consultation.id)
+      await addProductEvent(ctx, 'clinical_review_needed', consultation.id, {
+        reason: reportDecision.reason,
+        evidence_score: evidence.score,
+      })
+      return jsonResponse({
+        consultation_id: consultation.id,
+        state: 'clinical_review_needed',
+        clinical_review_needed: true,
+        reason: reportDecision.reason,
+        evidence_score: evidence.score,
+        message: messageText,
+        version: currentVersion,
+      })
+    }
+
+    const nextQuestion = limitConsultationMessage(
+      interview.next_question || 'Before I prepare the report, is there anything else about the symptom or your medical history that may be important?',
+    )
+    const nextStatus = guardrail.status === 'high_risk_continue' ? 'high_risk' : 'interviewing'
+    await addMessage(ctx, consultation.id, 'assistant', nextQuestion, {
+      options: interview.options,
+      target_slot: interview.target_slot,
+      slot_updates: interview.slot_updates,
+      metadata: { workflow_source: interview.source, safety_status: guardrail.status },
+    })
+    await db.from('libertymd_consultations').update({
+      status: nextStatus,
+      turn_count: turnCount,
+      filled_slots: slots,
+      missing_slots: missingSlots,
+      target_slot: interview.target_slot,
+      intermediate_diagnoses: diagnosis?.valid ? diagnosis.differentials : consultation.intermediate_diagnoses,
+      safety_state: { ...guardrail.raw, status: guardrail.status, risk_level: guardrail.risk_level },
+      non_clinical_response_count: nonClinicalResponseCount,
+      consecutive_non_clinical_response_count: 0,
+      clinical_evidence_score: evidence.score,
+      resolution_reason: null,
+      last_activity_at: new Date().toISOString(),
+    }).eq('id', consultation.id)
+
+    return jsonResponse({
+      consultation_id: consultation.id,
+      state: nextStatus,
+      next_question: nextQuestion,
+      options: interview.options,
+      target_slot: interview.target_slot,
+      missing_slots: missingSlots,
+      evidence_score: evidence.score,
+      safety: guardrail.status === 'high_risk_continue' ? guardrail : null,
+      version: currentVersion,
+    })
+  } finally {
+    const { error: finishError } = await db.rpc('libertymd_finish_consultation_request', {
+      p_consultation_id: consultation.id,
+      p_user_id: user.id,
+      p_request_id: requestId,
+    })
+    if (finishError) console.error('Unable to clear LibertyMD request lease', finishError)
+  }
+}

@@ -8,7 +8,7 @@
       "category": "emergency",
       "patient": { "age": 58, "sex": "male" },
       "message": "I have crushing chest pressure spreading to my left arm with sweating and nausea.",
-      "expected": { "emergency_action": "force_end", "input_relevance": "clinical" },
+      "expected": { "emergency_action": "force_end", "crisis_type": "acs_chest_pain", "input_relevance": "clinical" },
       "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
     },
     {
@@ -17,7 +17,7 @@
       "category": "emergency",
       "patient": { "age": 64, "sex": "female" },
       "message": "I have jaw pain with sweating and nausea and feel suddenly very unwell.",
-      "expected": { "emergency_action": "force_end", "input_relevance": "clinical" },
+      "expected": { "emergency_action": "force_end", "crisis_type": "acs_chest_pain", "input_relevance": "clinical" },
       "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
     },
     {
@@ -26,7 +26,7 @@
       "category": "emergency",
       "patient": { "age": 45, "sex": "female" },
       "message": "This is the worst headache of my life and it started suddenly.",
-      "expected": { "emergency_action": "force_end", "input_relevance": "clinical" },
+      "expected": { "emergency_action": "force_end", "crisis_type": "thunderclap_headache", "input_relevance": "clinical" },
       "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
     },
     {
@@ -35,7 +35,7 @@
       "category": "emergency",
       "patient": { "age": 31, "sex": "male" },
       "message": "My tongue is swelling and my throat is tight after eating peanuts.",
-      "expected": { "emergency_action": "force_end", "input_relevance": "clinical" },
+      "expected": { "emergency_action": "force_end", "crisis_type": "anaphylaxis", "input_relevance": "clinical" },
       "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
     },
     {
@@ -44,7 +44,7 @@
       "category": "emergency",
       "patient": { "age": 70, "sex": "female" },
       "message": "I cannot breathe and my lips look blue.",
-      "expected": { "emergency_action": "force_end", "input_relevance": "clinical" },
+      "expected": { "emergency_action": "force_end", "crisis_type": "respiratory_distress", "input_relevance": "clinical" },
       "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
     },
     {
@@ -53,7 +53,7 @@
       "category": "emergency",
       "patient": { "age": 67, "sex": "male" },
       "message": "My oxygen saturation is 89 and I am gasping for air.",
-      "expected": { "emergency_action": "force_end", "input_relevance": "clinical" },
+      "expected": { "emergency_action": "force_end", "crisis_type": "respiratory_distress", "input_relevance": "clinical" },
       "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
     },
     {
@@ -62,7 +62,7 @@
       "category": "emergency",
       "patient": { "age": 42, "sex": "female" },
       "message": "I have sudden severe abdominal pain with vomiting.",
-      "expected": { "emergency_action": "force_end", "input_relevance": "clinical" },
+      "expected": { "emergency_action": "force_end", "crisis_type": "surgical_abdomen", "input_relevance": "clinical" },
       "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
     },
     {
@@ -71,7 +71,7 @@
       "category": "emergency",
       "patient": { "age": 27, "sex": "male" },
       "message": "I have severe right lower abdominal pain and vomiting, and the pain is so bad I cannot walk.",
-      "expected": { "emergency_action": "force_end", "input_relevance": "clinical" },
+      "expected": { "emergency_action": "force_end", "crisis_type": "surgical_abdomen", "input_relevance": "clinical" },
       "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
     },
     {
@@ -218,7 +218,7 @@
       "category": "emergency",
       "patient": { "age": 54, "sex": "male" },
       "message": "I am 54, male, and the chest pain is getting worse since I sent that.",
-      "expected": { "emergency_action": "force_end", "input_relevance": "clinical" },
+      "expected": { "emergency_action": "force_end", "crisis_type": "acs_chest_pain", "input_relevance": "clinical" },
       "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "P0-14d AC4. Free text volunteered on the save_demographics turn must force-end. Before P0-14d that turn ran no screen at all. Draft engineering fixture; clinician review required." }
     },
     {
@@ -229,6 +229,106 @@
       "message": "I am 41, female, and I have no chest pain, just a mild cough.",
       "expected": { "emergency_action": "continue", "input_relevance": "clinical" },
       "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "P0-14d negative control. Screening the demographics turn must not make it a false-positive source. Draft engineering fixture; clinician review required." }
+    },
+    {
+      "id": "stroke_fast_face_arm_speech",
+      "title": "FAST stroke presentation",
+      "category": "emergency",
+      "patient": { "age": 66, "sex": "female" },
+      "message": "My face is drooping and my arm is weak and my speech is slurred.",
+      "expected": { "emergency_action": "force_end", "crisis_type": "stroke_fast", "input_relevance": "clinical" },
+      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "P0-14a stroke fixture. REQUIRES EXPERT REVIEW." }
+    },
+    {
+      "id": "stroke_one_sided_numbness",
+      "title": "One-sided numbness with speech difficulty",
+      "category": "emergency",
+      "patient": { "age": 59, "sex": "male" },
+      "message": "I woke up and one side of my body went numb, I cannot speak properly.",
+      "expected": { "emergency_action": "force_end", "crisis_type": "stroke_fast", "input_relevance": "clinical" },
+      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "P0-14a stroke fixture. REQUIRES EXPERT REVIEW." }
+    },
+    {
+      "id": "suicidal_ideation_explicit",
+      "title": "Explicit suicidal ideation",
+      "category": "emergency",
+      "patient": { "age": 28, "sex": "female" },
+      "message": "I have been thinking about ending my life.",
+      "expected": { "emergency_action": "force_end", "crisis_type": "suicidal_ideation", "input_relevance": "clinical" },
+      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "P0-14a crisis-line fixture. REQUIRES EXPERT REVIEW." }
+    },
+    {
+      "id": "acs_negated_then_positive",
+      "title": "Negated earlier chest symptom followed by current ACS symptom",
+      "category": "emergency",
+      "patient": { "age": 61, "sex": "male" },
+      "message": "I had no chest pain earlier but now I have crushing chest pressure.",
+      "expected": { "emergency_action": "force_end", "crisis_type": "acs_chest_pain", "input_relevance": "clinical" },
+      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "P0-14a all-match clause-boundary regression fixture. REQUIRES EXPERT REVIEW." }
+    },
+    {
+      "id": "stroke_leg_fell_asleep_negative",
+      "title": "Transient positional leg numbness",
+      "category": "non_emergency",
+      "patient": { "age": 35, "sex": "male" },
+      "message": "My leg fell asleep and is numb.",
+      "expected": { "emergency_action": "continue", "input_relevance": "clinical" },
+      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "P0-14a stroke false-positive control. REQUIRES EXPERT REVIEW." }
+    },
+    {
+      "id": "suicidal_ideation_negated",
+      "title": "Low mood without self-harm thoughts",
+      "category": "non_emergency",
+      "patient": { "age": 44, "sex": "female" },
+      "message": "I have been feeling low but I have no thoughts of harming myself.",
+      "expected": { "emergency_action": "continue", "input_relevance": "clinical" },
+      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "P0-14a suicidal-ideation false-positive control. REQUIRES EXPERT REVIEW." }
+    },
+    {
+      "id": "family_history_chest_pain",
+      "title": "Past family chest-pain history",
+      "category": "non_emergency",
+      "patient": { "age": 39, "sex": "female" },
+      "message": "My father had chest pain last year; I have a mild cough.",
+      "expected": { "emergency_action": "continue", "input_relevance": "clinical" },
+      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "P0-14a past-tense family-history regression fixture. REQUIRES EXPERT REVIEW." }
+    },
+    {
+      "id": "enumerated_swelling_negation",
+      "title": "Enumerated swelling denial",
+      "category": "non_emergency",
+      "patient": { "age": 38, "sex": "female" },
+      "message": "My lips are dry and cracked, but there is no lip swelling, tongue swelling, or breathing trouble.",
+      "expected": { "emergency_action": "continue", "input_relevance": "clinical" },
+      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "P0-14a enumerated-negation regression fixture. REQUIRES EXPERT REVIEW." }
+    },
+    {
+      "id": "dvt_calf_post_flight",
+      "title": "Unilateral calf swelling after a long flight",
+      "category": "non_emergency",
+      "patient": { "age": 52, "sex": "female" },
+      "message": "My left calf has been swollen and tender since I got off a long flight yesterday.",
+      "expected": { "emergency_action": "continue", "input_relevance": "clinical" },
+      "clinical_review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "notes": "P2-01 competitor gap-fill. Competitor high-risk; deterministic screen correctly does not force_end today. Do not expand pattern sensitivity here."
+      }
+    },
+    {
+      "id": "wrist_deformity_tingling",
+      "title": "Wrist deformity with tingling",
+      "category": "non_emergency",
+      "patient": { "age": 41, "sex": "male" },
+      "message": "I fell on my outstretched hand and my wrist looks deformed, with tingling in my fingers.",
+      "expected": { "emergency_action": "continue", "input_relevance": "clinical" },
+      "clinical_review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "notes": "P2-01 competitor gap-fill. Competitor high-risk; deterministic screen correctly does not force_end today. Do not expand pattern sensitivity here."
+      }
     }
   ]
 }

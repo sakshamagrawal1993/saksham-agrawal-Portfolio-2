@@ -1,0 +1,476 @@
+{
+  "updatedAt": "2026-07-31T06:14:19.539Z",
+  "createdAt": "2026-07-18T02:25:51.196Z",
+  "id": "9qeE6tUcEY74OYV8",
+  "name": "LibertyMD Guardrail Workflow",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "libertymd-guardrail",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-guardrail",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        0,
+        208
+      ],
+      "webhookId": "libertymd-guardrail-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst body = $('Webhook').first().json.body || $('Webhook').first().json || {};\nconst message = String(body.message || body.text || '').trim();\nconst history = Array.isArray(body.history) ? body.history : [];\nconst patient = body.patient && typeof body.patient === 'object' ? body.patient : {};\nconst msg = message.toLowerCase();\n\n// FIX 2026-07-30 (safety: false-negative risk).\n// negated() used msg.match(re), which returns only the FIRST match. In\n// \"no chest pain but crushing chest pressure\" the first match is negated, so\n// the genuine emergency was suppressed. Now every match is checked and the\n// rule fires if ANY occurrence is un-negated. A missed MI costs far more than\n// an interrupted conversation, so this errs toward firing.\nfunction hasUnnegatedMatch(re) {\n  const g = new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g');\n  let m;\n  while ((m = g.exec(msg)) !== null) {\n    const before = msg.slice(Math.max(0, m.index - 40), m.index);\n    // FIX 2026-07-30: a negation does not carry across a clause boundary.\n    // \"no chest pain BUT crushing chest pressure\" was being suppressed because\n    // the lookbehind window still contained the earlier \"no\". Only the nearest\n    // clause counts.\n    const seg = before.split(/[,;.!?]|\\bbut\\b|\\bhowever\\b|\\balthough\\b|\\bthough\\b/i).pop() || '';\n    const negator = /\\b(no|not|without|denies|denied|never|don'?t have|doesn'?t have)\\b/.test(seg);\n    // Third-person suppression is deliberately narrow: only PAST-TENSE family\n    // history is suppressed. \"my father HAD chest pain last year\" is history;\n    // \"my father IS HAVING chest pain\" is an emergency and must still fire.\n    const thirdPartyHistory =\n      /\\b(my|his|her|their)\\s+\\w*\\s*(father|mother|dad|mum|mom|brother|sister|friend|husband|wife|son|daughter|uncle|aunt)\\s+(had|has had|used to have)\\b/.test(seg)\n      || /\\b(family history|history of|hx of)\\b/.test(seg);\n    if (!negator && !thirdPartyHistory) return true;\n    if (m.index === g.lastIndex) g.lastIndex++;\n  }\n  return false;\n}\n\nconst rules = [\n  {\n    re: /chest (pain|pressure|tightness)|crushing (chest|pressure)|elephant (on|sitting)|pain radiating to (left )?arm|jaw pain.{0,30}(sweat|sweating|nausea)/i,\n    crisis_type: 'acs_chest_pain',\n    message: 'These symptoms can be a medical emergency. Call 911 or go to the ER now. Do not drive yourself.',\n  },\n  {\n    re: /worst headache of (my|his|her) life|thunderclap|sudden(ly)? (severe|worst|excruciating|blinding|intense) headache|headache.{0,25}(came on|hit me|started).{0,15}(suddenly|instantly|out of nowhere)|headache with (neck stiffness|confusion|weakness|vision loss)/i,\n    crisis_type: 'thunderclap_headache',\n    message: 'A sudden worst-of-life headache can be an emergency. Call 911 or go to the ER now.',\n  },\n  {\n    re: /(throat (is )?tight|lip swelling|tongue swelling|anaphylaxis|cannot breathe after|wheezing after (peanut|shellfish|bee|sting))/i,\n    crisis_type: 'anaphylaxis',\n    message: 'This may be anaphylaxis. Use epinephrine if available and call 911 immediately.',\n  },\n  {\n    re: /(cannot breathe|can't breathe|blue lips|gasping for air|oxygen (sat|saturation).{0,12}(8\\d|9[0-2])\\b)/i,\n    crisis_type: 'respiratory_distress',\n    message: 'Severe breathing problems need emergency care. Call 911 or go to the ER now.',\n  },\n  {\n    re: /(severe (lower|right lower) (abdominal|belly|stomach) pain|rigid abdomen|pain so bad I (can'?t|cannot) walk).{0,40}(fever|vomiting)?|(sudden severe abdominal pain)/i,\n    crisis_type: 'surgical_abdomen',\n    message: 'Severe abdominal pain with these features can be a surgical emergency. Seek ER care now.',\n  },\n];\n\nlet hit = null;\nfor (const rule of rules) {\n  if (hasUnnegatedMatch(rule.re)) {\n    hit = rule;\n    break;\n  }\n}\n\nif (hit) {\n  return [{\n    json: {\n      route: 'force_end',\n      status: 'force_end',\n      risk_level: 'emergency',\n      crisis_type: hit.crisis_type,\n      force_end: true,\n      is_emergency: true,\n      care_setting: 'call_911',\n      message: hit.message,\n      red_flags: [hit.crisis_type],\n      source: 'deterministic',\n      message_text: message,\n      history,\n      patient,\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    route: 'llm',\n    status: 'needs_llm',\n    force_end: false,\n    is_emergency: false,\n    message_text: message,\n    history,\n    patient,\n  }\n}];\n"
+      },
+      "id": "deterministic-prefilter",
+      "name": "Deterministic Prefilter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.route }}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "force_end"
+            }
+          ]
+        },
+        "fallbackOutput": 1
+      },
+      "id": "route-switch",
+      "name": "Route Switch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        448,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Latest message: {{ $json.message_text }}\n\nPatient: {{ JSON.stringify($json.patient || {}) }}\n\nHistory: {{ JSON.stringify($json.history || []) }}\n\nClassify emergency risk for this turn.",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a medical emergency triage guardrail for an AI primary-care chat.\n\nClassify the LATEST patient message in context of history. Be negation-aware:\n- \"no chest pain\", \"denies shortness of breath\" are NOT emergencies.\n- Mild MSK pain, URI, tension headache, seasonal allergy, mild fever \u2192 pass / home.\n- Classic emergencies \u2192 force_end / call_911.\n\nstatus must be one of: pass | high_risk_continue | force_end\nrisk_level: low | medium | high | emergency\ncrisis_type: none | acs_chest_pain | thunderclap_headache | anaphylaxis | surgical_abdomen | respiratory_distress | other_emergency\ncare_setting: home | telehealth | urgent_care | emergency_department | call_911\n\nOnly force_end for true emergencies needing 911/ER now.\nUse high_risk_continue when concerning but interview can continue with caution.\nReturn JSON matching the schema only."
+        }
+      },
+      "id": "crisis-agent",
+      "name": "Crisis Screening Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        704,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite",
+        "options": {}
+      },
+      "id": "guardrail-gemini",
+      "name": "Google Gemini Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        704,
+        528
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "TTFAa6xGCZDmwOAM",
+          "name": "Vertex AI API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"additionalProperties\": true,\n  \"properties\": {\n    \"status\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"pass\",\n        \"high_risk_continue\",\n        \"force_end\"\n      ]\n    },\n    \"risk_level\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"low\",\n        \"medium\",\n        \"high\",\n        \"emergency\"\n      ]\n    },\n    \"crisis_type\": {\n      \"type\": \"string\"\n    },\n    \"force_end\": {\n      \"type\": \"boolean\"\n    },\n    \"care_setting\": {\n      \"type\": \"string\"\n    },\n    \"message\": {\n      \"type\": \"string\"\n    },\n    \"red_flags\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\"\n      }\n    }\n  },\n  \"required\": [\n    \"status\",\n    \"risk_level\",\n    \"crisis_type\",\n    \"force_end\",\n    \"care_setting\",\n    \"message\",\n    \"red_flags\"\n  ]\n}"
+      },
+      "id": "guardrail-parser",
+      "name": "Guardrail Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        864,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst pre = $('Deterministic Prefilter').first().json;\nconst raw = $input.first().json || {};\nconst parsed = raw.output || raw;\n\nconst status = String(parsed.status || (parsed.force_end ? 'force_end' : 'pass')).toLowerCase();\nconst force_end = !!(parsed.force_end || status === 'force_end');\nconst risk_level = String(parsed.risk_level || (force_end ? 'emergency' : 'low')).toLowerCase();\nconst crisis_type = String(parsed.crisis_type || (force_end ? 'other_emergency' : 'none'));\nconst care_setting = String(parsed.care_setting || (force_end ? 'call_911' : 'home'));\nconst message = String(parsed.message || (force_end\n  ? 'Please call emergency services immediately.'\n  : 'No emergency detected.'));\nconst red_flags = Array.isArray(parsed.red_flags) ? parsed.red_flags : [];\n\nreturn [{\n  json: {\n    status: force_end ? 'force_end' : (status === 'high_risk_continue' ? 'high_risk_continue' : 'pass'),\n    risk_level,\n    crisis_type,\n    force_end,\n    is_emergency: force_end,\n    care_setting,\n    message,\n    red_flags,\n    source: 'llm',\n  }\n}];\n"
+      },
+      "id": "normalize-llm",
+      "name": "Normalize LLM Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        992,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "response-guardrail",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        208
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Deterministic Prefilter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deterministic Prefilter": {
+      "main": [
+        [
+          {
+            "node": "Route Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Switch": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Crisis Screening Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardrail Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Crisis Screening Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crisis Screening Agent": {
+      "main": [
+        [
+          {
+            "node": "Normalize LLM Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize LLM Result": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Crisis Screening Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "none",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false,
+    "saveExecutionProgress": false,
+    "executionTimeout": 60,
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "a8232d24-a2c7-4224-9485-4314ae9ee40e",
+  "activeVersionId": "a8232d24-a2c7-4224-9485-4314ae9ee40e",
+  "triggerCount": 1,
+  "shared": null,
+  "activeVersion": {
+    "updatedAt": "2026-07-31T06:14:19.541Z",
+    "createdAt": "2026-07-31T06:14:19.541Z",
+    "versionId": "a8232d24-a2c7-4224-9485-4314ae9ee40e",
+    "workflowId": "9qeE6tUcEY74OYV8",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "libertymd-guardrail",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "id": "webhook-guardrail",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 1,
+        "position": [
+          0,
+          208
+        ],
+        "webhookId": "libertymd-guardrail-webhook"
+      },
+      {
+        "parameters": {
+          "jsCode": "\nconst body = $('Webhook').first().json.body || $('Webhook').first().json || {};\nconst message = String(body.message || body.text || '').trim();\nconst history = Array.isArray(body.history) ? body.history : [];\nconst patient = body.patient && typeof body.patient === 'object' ? body.patient : {};\nconst msg = message.toLowerCase();\n\n// FIX 2026-07-30 (safety: false-negative risk).\n// negated() used msg.match(re), which returns only the FIRST match. In\n// \"no chest pain but crushing chest pressure\" the first match is negated, so\n// the genuine emergency was suppressed. Now every match is checked and the\n// rule fires if ANY occurrence is un-negated. A missed MI costs far more than\n// an interrupted conversation, so this errs toward firing.\nfunction hasUnnegatedMatch(re) {\n  const g = new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g');\n  let m;\n  while ((m = g.exec(msg)) !== null) {\n    const before = msg.slice(Math.max(0, m.index - 40), m.index);\n    // FIX 2026-07-30: a negation does not carry across a clause boundary.\n    // \"no chest pain BUT crushing chest pressure\" was being suppressed because\n    // the lookbehind window still contained the earlier \"no\". Only the nearest\n    // clause counts.\n    const seg = before.split(/[,;.!?]|\\bbut\\b|\\bhowever\\b|\\balthough\\b|\\bthough\\b/i).pop() || '';\n    const negator = /\\b(no|not|without|denies|denied|never|don'?t have|doesn'?t have)\\b/.test(seg);\n    // Third-person suppression is deliberately narrow: only PAST-TENSE family\n    // history is suppressed. \"my father HAD chest pain last year\" is history;\n    // \"my father IS HAVING chest pain\" is an emergency and must still fire.\n    const thirdPartyHistory =\n      /\\b(my|his|her|their)\\s+\\w*\\s*(father|mother|dad|mum|mom|brother|sister|friend|husband|wife|son|daughter|uncle|aunt)\\s+(had|has had|used to have)\\b/.test(seg)\n      || /\\b(family history|history of|hx of)\\b/.test(seg);\n    if (!negator && !thirdPartyHistory) return true;\n    if (m.index === g.lastIndex) g.lastIndex++;\n  }\n  return false;\n}\n\nconst rules = [\n  {\n    re: /chest (pain|pressure|tightness)|crushing (chest|pressure)|elephant (on|sitting)|pain radiating to (left )?arm|jaw pain.{0,30}(sweat|sweating|nausea)/i,\n    crisis_type: 'acs_chest_pain',\n    message: 'These symptoms can be a medical emergency. Call 911 or go to the ER now. Do not drive yourself.',\n  },\n  {\n    re: /worst headache of (my|his|her) life|thunderclap|sudden(ly)? (severe|worst|excruciating|blinding|intense) headache|headache.{0,25}(came on|hit me|started).{0,15}(suddenly|instantly|out of nowhere)|headache with (neck stiffness|confusion|weakness|vision loss)/i,\n    crisis_type: 'thunderclap_headache',\n    message: 'A sudden worst-of-life headache can be an emergency. Call 911 or go to the ER now.',\n  },\n  {\n    re: /(throat (is )?tight|lip swelling|tongue swelling|anaphylaxis|cannot breathe after|wheezing after (peanut|shellfish|bee|sting))/i,\n    crisis_type: 'anaphylaxis',\n    message: 'This may be anaphylaxis. Use epinephrine if available and call 911 immediately.',\n  },\n  {\n    re: /(cannot breathe|can't breathe|blue lips|gasping for air|oxygen (sat|saturation).{0,12}(8\\d|9[0-2])\\b)/i,\n    crisis_type: 'respiratory_distress',\n    message: 'Severe breathing problems need emergency care. Call 911 or go to the ER now.',\n  },\n  {\n    re: /(severe (lower|right lower) (abdominal|belly|stomach) pain|rigid abdomen|pain so bad I (can'?t|cannot) walk).{0,40}(fever|vomiting)?|(sudden severe abdominal pain)/i,\n    crisis_type: 'surgical_abdomen',\n    message: 'Severe abdominal pain with these features can be a surgical emergency. Seek ER care now.',\n  },\n];\n\nlet hit = null;\nfor (const rule of rules) {\n  if (hasUnnegatedMatch(rule.re)) {\n    hit = rule;\n    break;\n  }\n}\n\nif (hit) {\n  return [{\n    json: {\n      route: 'force_end',\n      status: 'force_end',\n      risk_level: 'emergency',\n      crisis_type: hit.crisis_type,\n      force_end: true,\n      is_emergency: true,\n      care_setting: 'call_911',\n      message: hit.message,\n      red_flags: [hit.crisis_type],\n      source: 'deterministic',\n      message_text: message,\n      history,\n      patient,\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    route: 'llm',\n    status: 'needs_llm',\n    force_end: false,\n    is_emergency: false,\n    message_text: message,\n    history,\n    patient,\n  }\n}];\n"
+        },
+        "id": "deterministic-prefilter",
+        "name": "Deterministic Prefilter",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          224,
+          208
+        ]
+      },
+      {
+        "parameters": {
+          "dataType": "string",
+          "value1": "={{ $json.route }}",
+          "rules": {
+            "rules": [
+              {
+                "value2": "force_end"
+              }
+            ]
+          },
+          "fallbackOutput": 1
+        },
+        "id": "route-switch",
+        "name": "Route Switch",
+        "type": "n8n-nodes-base.switch",
+        "typeVersion": 1,
+        "position": [
+          448,
+          208
+        ]
+      },
+      {
+        "parameters": {
+          "promptType": "define",
+          "text": "=Latest message: {{ $json.message_text }}\n\nPatient: {{ JSON.stringify($json.patient || {}) }}\n\nHistory: {{ JSON.stringify($json.history || []) }}\n\nClassify emergency risk for this turn.",
+          "hasOutputParser": true,
+          "options": {
+            "systemMessage": "You are a medical emergency triage guardrail for an AI primary-care chat.\n\nClassify the LATEST patient message in context of history. Be negation-aware:\n- \"no chest pain\", \"denies shortness of breath\" are NOT emergencies.\n- Mild MSK pain, URI, tension headache, seasonal allergy, mild fever \u2192 pass / home.\n- Classic emergencies \u2192 force_end / call_911.\n\nstatus must be one of: pass | high_risk_continue | force_end\nrisk_level: low | medium | high | emergency\ncrisis_type: none | acs_chest_pain | thunderclap_headache | anaphylaxis | surgical_abdomen | respiratory_distress | other_emergency\ncare_setting: home | telehealth | urgent_care | emergency_department | call_911\n\nOnly force_end for true emergencies needing 911/ER now.\nUse high_risk_continue when concerning but interview can continue with caution.\nReturn JSON matching the schema only."
+          }
+        },
+        "id": "crisis-agent",
+        "name": "Crisis Screening Agent",
+        "type": "@n8n/n8n-nodes-langchain.agent",
+        "typeVersion": 3.1,
+        "position": [
+          704,
+          320
+        ]
+      },
+      {
+        "parameters": {
+          "modelName": "models/gemini-3.1-flash-lite",
+          "options": {}
+        },
+        "id": "guardrail-gemini",
+        "name": "Google Gemini Chat Model",
+        "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+        "typeVersion": 1.1,
+        "position": [
+          704,
+          528
+        ],
+        "credentials": {
+          "googlePalmApi": {
+            "id": "TTFAa6xGCZDmwOAM",
+            "name": "Vertex AI API"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "schemaType": "manual",
+          "inputSchema": "{\n  \"type\": \"object\",\n  \"additionalProperties\": true,\n  \"properties\": {\n    \"status\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"pass\",\n        \"high_risk_continue\",\n        \"force_end\"\n      ]\n    },\n    \"risk_level\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"low\",\n        \"medium\",\n        \"high\",\n        \"emergency\"\n      ]\n    },\n    \"crisis_type\": {\n      \"type\": \"string\"\n    },\n    \"force_end\": {\n      \"type\": \"boolean\"\n    },\n    \"care_setting\": {\n      \"type\": \"string\"\n    },\n    \"message\": {\n      \"type\": \"string\"\n    },\n    \"red_flags\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\"\n      }\n    }\n  },\n  \"required\": [\n    \"status\",\n    \"risk_level\",\n    \"crisis_type\",\n    \"force_end\",\n    \"care_setting\",\n    \"message\",\n    \"red_flags\"\n  ]\n}"
+        },
+        "id": "guardrail-parser",
+        "name": "Guardrail Parser",
+        "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+        "typeVersion": 1.3,
+        "position": [
+          864,
+          528
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "\nconst pre = $('Deterministic Prefilter').first().json;\nconst raw = $input.first().json || {};\nconst parsed = raw.output || raw;\n\nconst status = String(parsed.status || (parsed.force_end ? 'force_end' : 'pass')).toLowerCase();\nconst force_end = !!(parsed.force_end || status === 'force_end');\nconst risk_level = String(parsed.risk_level || (force_end ? 'emergency' : 'low')).toLowerCase();\nconst crisis_type = String(parsed.crisis_type || (force_end ? 'other_emergency' : 'none'));\nconst care_setting = String(parsed.care_setting || (force_end ? 'call_911' : 'home'));\nconst message = String(parsed.message || (force_end\n  ? 'Please call emergency services immediately.'\n  : 'No emergency detected.'));\nconst red_flags = Array.isArray(parsed.red_flags) ? parsed.red_flags : [];\n\nreturn [{\n  json: {\n    status: force_end ? 'force_end' : (status === 'high_risk_continue' ? 'high_risk_continue' : 'pass'),\n    risk_level,\n    crisis_type,\n    force_end,\n    is_emergency: force_end,\n    care_setting,\n    message,\n    red_flags,\n    source: 'llm',\n  }\n}];\n"
+        },
+        "id": "normalize-llm",
+        "name": "Normalize LLM Result",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          992,
+          320
+        ]
+      },
+      {
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ $json }}",
+          "options": {}
+        },
+        "id": "response-guardrail",
+        "name": "Respond to Webhook",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1,
+        "position": [
+          1200,
+          208
+        ]
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Deterministic Prefilter",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Deterministic Prefilter": {
+        "main": [
+          [
+            {
+              "node": "Route Switch",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Route Switch": {
+        "main": [
+          [
+            {
+              "node": "Respond to Webhook",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Crisis Screening Agent",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Guardrail Parser": {
+        "ai_outputParser": [
+          [
+            {
+              "node": "Crisis Screening Agent",
+              "type": "ai_outputParser",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Crisis Screening Agent": {
+        "main": [
+          [
+            {
+              "node": "Normalize LLM Result",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Normalize LLM Result": {
+        "main": [
+          [
+            {
+              "node": "Respond to Webhook",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Google Gemini Chat Model": {
+        "ai_languageModel": [
+          [
+            {
+              "node": "Crisis Screening Agent",
+              "type": "ai_languageModel",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Saksham Agrawal",
+    "name": null,
+    "description": null,
+    "autosaved": false
+  }
+}

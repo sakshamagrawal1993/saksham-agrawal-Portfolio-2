@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://libertymd.example/schemas/n8n/guardrail-response-v1.json",
+  "title": "LibertyMD Guardrail Response v1",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "status",
+    "risk_level",
+    "crisis_type",
+    "force_end",
+    "care_setting",
+    "message",
+    "red_flags"
+  ],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["pass", "high_risk_continue", "force_end"]
+    },
+    "risk_level": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "emergency"]
+    },
+    "crisis_type": { "type": "string", "minLength": 1 },
+    "force_end": { "type": "boolean" },
+    "is_emergency": { "type": "boolean" },
+    "care_setting": {
+      "type": "string",
+      "enum": ["home", "telehealth", "urgent_care", "emergency_department", "call_911"]
+    },
+    "message": { "type": "string", "minLength": 1, "maxLength": 2000 },
+    "red_flags": {
+      "type": "array",
+      "maxItems": 12,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "source": { "type": "string" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "force_end" } }, "required": ["status"] },
+      "then": {
+        "properties": {
+          "force_end": { "const": true },
+          "risk_level": { "const": "emergency" },
+          "care_setting": { "enum": ["emergency_department", "call_911"] }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "pass" } }, "required": ["status"] },
+      "then": { "properties": { "force_end": { "const": false } } }
+    }
+  ]
+}

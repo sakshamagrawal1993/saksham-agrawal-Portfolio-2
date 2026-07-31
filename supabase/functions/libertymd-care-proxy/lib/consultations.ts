@@ -10,6 +10,7 @@
  */
 import { MAX_TURNS } from './config.ts'
 import { normalizeObject, type DiagnosisResult } from './n8n-client.ts'
+import { patientDisplayLabelsByIds } from './profiles.ts'
 import { cleanMessage, limitConsultationMessage } from './utils.ts'
 import type { ProxyContext } from './context.ts'
 import type { ConsultationRow, JsonObject } from './types.ts'
@@ -151,9 +152,11 @@ export async function getOwnedConsultation(ctx: ProxyContext, id: string) {
 }
 
 export async function getHistory(ctx: ProxyContext, consultationId: string) {
+  // P1-12 Q6A — include id + client_message_id (PHI-free UUIDs) so Chat can
+  // reconcile durable pending outbound against server history. Select-list only.
   const { data, error } = await ctx.db
     .from('libertymd_messages')
-    .select('role,content,message_type,options,target_slot,created_at')
+    .select('id,client_message_id,role,content,message_type,options,target_slot,created_at')
     .eq('consultation_id', consultationId)
     .order('sequence', { ascending: true })
   if (error) throw error
@@ -206,6 +209,62 @@ export async function addMessage(
 }
 
 /**
+ * P2-06 AC7 — omit report body when retention has closed.
+ * NULL retention → never omit (saved / linked). Invalid timestamps → never omit.
+ */
+export function reportDataIfNotExpired(
+  report: {
+    report_data?: unknown
+    retention_expires_at?: string | null
+  } | null | undefined,
+): unknown {
+  if (!report) return null
+  const expiresAt = report.retention_expires_at
+  if (expiresAt != null && String(expiresAt) !== '') {
+    const ms = Date.parse(String(expiresAt))
+    if (!Number.isNaN(ms) && ms < Date.now()) return null
+  }
+  return report.report_data ?? null
+}
+
+/** P2-13 L6 — omit reason + retention ISO for client lifecycle derivation. */
+export type ReportReadLifecycleMeta = {
+  report: unknown
+  retention_expires_at: string | null
+  report_omitted_reason: 'retention_expired' | null
+}
+
+export function reportReadLifecycleMeta(
+  report: {
+    report_data?: unknown
+    retention_expires_at?: string | null
+  } | null | undefined,
+  nowMs: number = Date.now(),
+): ReportReadLifecycleMeta {
+  if (!report) {
+    return {
+      report: null,
+      retention_expires_at: null,
+      report_omitted_reason: null,
+    }
+  }
+  const expiresRaw = report.retention_expires_at
+  const retentionExpiresAt =
+    expiresRaw != null && String(expiresRaw) !== '' ? String(expiresRaw) : null
+  const body = reportDataIfNotExpired(report)
+  let omitted: 'retention_expired' | null = null
+  if (body == null && retentionExpiresAt != null) {
+    const ms = Date.parse(retentionExpiresAt)
+    if (!Number.isNaN(ms) && ms < nowMs) omitted = 'retention_expired'
+  }
+  return {
+    report: body,
+    retention_expires_at: retentionExpiresAt,
+    report_omitted_reason: omitted,
+  }
+}
+
+/**
  * Idempotent replay of the last completed turn, used when the request-lease RPC
  * reports the client is retrying an already-processed message.
  */
@@ -224,17 +283,21 @@ export async function replayCompletedTurn(ctx: ProxyContext, consultation: Consu
 
   const reportReady = ['report_pending_auth', 'completed'].includes(consultation.status)
   let report = null
-  if (consultation.status === 'completed') {
+  // P2-02 Q3: return report_data while withheld / report_pending_auth (soft gate).
+  // P2-06 AC7: omit when reports.retention_expires_at is past (NULL never omits).
+  if (reportReady) {
     const { data, error } = await db
       .from('libertymd_reports')
-      .select('report_data,confidence_score,access_status')
+      .select('report_data,confidence_score,access_status,retention_expires_at')
       .eq('consultation_id', consultation.id)
       .eq('user_id', user.id)
-      .in('access_status', ['saved', 'guest_released'])
+      .in('access_status', ['saved', 'guest_released', 'withheld'])
       .maybeSingle()
     if (error) throw error
     report = data
   }
+
+  const lifecycle = reportReadLifecycleMeta(report)
 
   return {
     consultation_id: consultation.id,
@@ -248,10 +311,23 @@ export async function replayCompletedTurn(ctx: ProxyContext, consultation: Consu
     next_question: ['interviewing', 'high_risk'].includes(consultation.status) ? latestMessage?.content || null : null,
     options: Array.isArray(latestMessage?.options) ? latestMessage.options : [],
     target_slot: latestMessage?.target_slot || consultation.target_slot,
-    report: report?.report_data || undefined,
-    confidence_score: report?.confidence_score || undefined,
+    report: lifecycle.report ?? undefined,
+    confidence_score: lifecycle.report != null ? (report?.confidence_score || undefined) : undefined,
+    // P2-13 L6 — retention + omit hint for client lifecycle (never leak body after expiry).
+    retention_expires_at: lifecycle.retention_expires_at,
+    report_omitted_reason: lifecycle.report_omitted_reason,
     version: consultation.version,
   }
+}
+
+export type SaveDiagnosticRunOptions = {
+  /** P1-08 — true only for detached pre-warm inserts. */
+  isSpeculative?: boolean
+  /**
+   * Snapshot target_slot for material equality. Prefer the value just persisted
+   * on the interview continue path; defaults to `consultation.target_slot`.
+   */
+  targetSlot?: string | null
 }
 
 export async function saveDiagnosticRun(
@@ -262,6 +338,7 @@ export async function saveDiagnosticRun(
   missingSlots: string[],
   evidenceScore: number,
   turnCount: number,
+  options: SaveDiagnosticRunOptions = {},
 ) {
   assertConsultationOwned(ctx, consultation)
   const clinicalContext = normalizeObject(diagnosis.raw.clinical_context)
@@ -285,6 +362,7 @@ export async function saveDiagnosticRun(
     workflow_versions: consultation.workflow_versions || {},
     source: 'libertymd-diagnosis',
   }
+  const targetSlot = options.targetSlot !== undefined ? options.targetSlot : consultation.target_slot
   const { data, error } = await ctx.db.from('libertymd_diagnostic_runs').insert({
     consultation_id: consultation.id,
     user_id: ctx.user.id,
@@ -302,25 +380,220 @@ export async function saveDiagnosticRun(
       patient: consultation.patient_snapshot || {},
       filled_slots: slots,
       missing_slots: missingSlots,
-      target_slot: consultation.target_slot,
+      target_slot: targetSlot,
     },
     confidence_score: diagnosis.confidence,
     evidence_score: evidenceScore,
     validation_reason: validationReason || null,
     workflow_metadata: workflowMetadata,
+    is_speculative: Boolean(options.isSpeculative),
   }).select('id').single()
   if (error) throw error
   return String(data.id)
 }
 
-export async function historySummary(ctx: ProxyContext) {
+export type DiagnosticRunRow = {
+  id: string
+  turn_count: number
+  run_status: string
+  is_speculative: boolean
+  input_snapshot: JsonObject
+  differential_diagnosis: unknown[]
+  confidence_score: number
+  clinical_summary: JsonObject
+  clinical_reasoning: JsonObject
+  validation_reason: string | null
+  workflow_metadata: JsonObject
+}
+
+/**
+ * P1-08 — latest speculative pre-warm row for a consult (proxy sole reader).
+ * Missing / in-flight → null (caller runs fresh Diagnosis).
+ */
+export async function findLatestSpeculativeDiagnosticRun(
+  ctx: ProxyContext,
+  consultation: ConsultationRow,
+): Promise<DiagnosticRunRow | null> {
+  assertConsultationOwned(ctx, consultation)
+  const { data, error } = await ctx.db
+    .from('libertymd_diagnostic_runs')
+    .select(
+      'id, turn_count, run_status, is_speculative, input_snapshot, differential_diagnosis, confidence_score, clinical_summary, clinical_reasoning, validation_reason, workflow_metadata',
+    )
+    .eq('consultation_id', consultation.id)
+    .eq('user_id', ctx.user.id)
+    .eq('is_speculative', true)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw error
+  if (!data || typeof data !== 'object') return null
+  const row = data as Record<string, unknown>
+  return {
+    id: String(row.id),
+    turn_count: Number(row.turn_count) || 0,
+    run_status: String(row.run_status || ''),
+    is_speculative: Boolean(row.is_speculative),
+    input_snapshot: normalizeObject(row.input_snapshot),
+    differential_diagnosis: Array.isArray(row.differential_diagnosis) ? row.differential_diagnosis : [],
+    confidence_score: Number(row.confidence_score) || 0,
+    clinical_summary: normalizeObject(row.clinical_summary),
+    clinical_reasoning: normalizeObject(row.clinical_reasoning),
+    validation_reason: row.validation_reason == null ? null : String(row.validation_reason),
+    workflow_metadata: normalizeObject(row.workflow_metadata),
+  }
+}
+
+/**
+ * Hydrate a DiagnosisResult from a stored speculative row for report-decision
+ * reuse without a second Diagnosis webhook (P1-08 R1 — no copy-row insert).
+ */
+export function diagnosisResultFromDiagnosticRun(row: DiagnosticRunRow): DiagnosisResult {
+  const differentials = Array.isArray(row.differential_diagnosis) ? row.differential_diagnosis : []
+  const raw: JsonObject = {
+    valid_report: row.run_status === 'validated',
+    confidence_score: row.confidence_score,
+    differential_diagnosis: differentials,
+    validation_reason: row.validation_reason,
+    model_metadata: row.workflow_metadata,
+    clinical_context: {
+      incremental_summary: row.clinical_summary,
+      clinical_reasoning_state: row.clinical_reasoning,
+    },
+    patient_summary: row.clinical_summary.patient_summary ?? null,
+  }
+  return {
+    raw,
+    differentials,
+    confidence: row.confidence_score,
+    valid: row.run_status === 'validated' && differentials.length > 0 && row.confidence_score > 0,
+    unavailable: false,
+    failure: null,
+  }
+}
+
+/** P4-03 S2 — scalar headline from report_data; never invent clinical prose. */
+export function headlineScalarFromReportData(reportData: unknown): string | null {
+  if (!reportData || typeof reportData !== 'object' || Array.isArray(reportData)) return null
+  const root = reportData as Record<string, unknown>
+  const nested = root.report || root.output
+  const sources: unknown[] = [root.headline]
+  if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+    sources.push((nested as Record<string, unknown>).headline)
+  }
+  for (const candidate of sources) {
+    if (typeof candidate !== 'string') continue
+    const trimmed = candidate.trim().replace(/\s+/g, ' ')
+    if (trimmed) return trimmed.slice(0, 200)
+  }
+  return null
+}
+
+/** Truncate chief_complaint for history headline fallback (matches client resume pattern). */
+function truncatedComplaintHeadline(raw: string | null | undefined, maxChars = 72): string | null {
+  const text = String(raw || '').trim().replace(/\s+/g, ' ')
+  if (!text) return null
+  if (text.length <= maxChars) return text
+  const slice = text.slice(0, maxChars)
+  const lastSpace = slice.lastIndexOf(' ')
+  const cut = lastSpace > Math.floor(maxChars * 0.6) ? slice.slice(0, lastSpace) : slice
+  return `${cut.trimEnd()}…`
+}
+
+function isRetentionPast(expiresAt: string | null | undefined, nowMs: number): boolean {
+  if (expiresAt == null || String(expiresAt) === '') return false
+  const ms = Date.parse(String(expiresAt))
+  return !Number.isNaN(ms) && ms < nowMs
+}
+
+/**
+ * P4-03 — enriched linked history. Anonymous → [].
+ * Omits withheld + retention-past report rows (Q1A/S1). Never embeds report_data.
+ */
+export async function historySummary(ctx: ProxyContext, nowMs: number = Date.now()) {
   if (ctx.isAnonymous) return []
   const { data, error } = await ctx.db
     .from('libertymd_consultations')
-    .select('id,status,chief_complaint,turn_count,report_gate,created_at,updated_at,completed_at')
+    .select(
+      'id,status,chief_complaint,turn_count,report_gate,created_at,updated_at,completed_at,patient_id',
+    )
     .eq('user_id', ctx.user.id)
     .order('last_activity_at', { ascending: false })
     .limit(50)
   if (error) throw error
-  return data || []
+  const consults = Array.isArray(data) ? data : data ? [data] : []
+  if (consults.length === 0) return []
+
+  const consultIds = consults
+    .map((row) => (typeof row?.id === 'string' ? row.id : ''))
+    .filter(Boolean)
+
+  const { data: reportRows, error: reportError } = await ctx.db
+    .from('libertymd_reports')
+    .select('consultation_id,access_status,retention_expires_at,triage_tier,report_data')
+    .eq('user_id', ctx.user.id)
+    .in('consultation_id', consultIds)
+  if (reportError) throw reportError
+  const reports = Array.isArray(reportRows) ? reportRows : reportRows ? [reportRows] : []
+  const reportByConsult = new Map<string, Record<string, unknown>>()
+  for (const row of reports) {
+    const cid = typeof row?.consultation_id === 'string' ? row.consultation_id : ''
+    if (cid) reportByConsult.set(cid, row as Record<string, unknown>)
+  }
+
+  const kept = consults.filter((row) => {
+    const id = typeof row?.id === 'string' ? row.id : ''
+    if (!id) return false
+    const report = reportByConsult.get(id)
+    if (!report) return true
+    const access = typeof report.access_status === 'string' ? report.access_status : ''
+    if (access === 'withheld') return false
+    if (isRetentionPast(report.retention_expires_at as string | null, nowMs)) return false
+    return true
+  })
+
+  const patientIds = kept
+    .map((row) => (typeof row?.patient_id === 'string' ? row.patient_id : ''))
+    .filter(Boolean)
+  const labels = await patientDisplayLabelsByIds(ctx, patientIds)
+
+  return kept.map((row) => {
+    const id = String(row.id)
+    const report = reportByConsult.get(id)
+    const chief = typeof row.chief_complaint === 'string' ? row.chief_complaint : null
+    let headline: string | null = null
+    let triageTier: string | null = null
+    let retentionExpiresAt: string | null = null
+    if (report) {
+      headline = headlineScalarFromReportData(report.report_data)
+      const tierRaw = typeof report.triage_tier === 'string' ? report.triage_tier.trim() : ''
+      triageTier = tierRaw || null
+      const expiresRaw = report.retention_expires_at
+      retentionExpiresAt =
+        expiresRaw != null && String(expiresRaw) !== '' ? String(expiresRaw) : null
+    }
+    if (!headline) headline = truncatedComplaintHeadline(chief)
+
+    const patientId = typeof row.patient_id === 'string' ? row.patient_id : null
+    const patientLabel = patientId
+      ? (labels.get(patientId) ?? null)
+      : null
+
+    // Strip report_data from outbound shape — scalars only.
+    return {
+      id,
+      status: String(row.status || ''),
+      chief_complaint: chief,
+      turn_count: typeof row.turn_count === 'number' ? row.turn_count : null,
+      report_gate: typeof row.report_gate === 'string' ? row.report_gate : null,
+      created_at: String(row.created_at || ''),
+      updated_at: row.updated_at != null ? String(row.updated_at) : null,
+      completed_at: row.completed_at != null ? String(row.completed_at) : null,
+      patient_id: patientId,
+      patient_display_label: patientLabel,
+      headline,
+      triage_tier: triageTier,
+      retention_expires_at: retentionExpiresAt,
+    }
+  })
 }

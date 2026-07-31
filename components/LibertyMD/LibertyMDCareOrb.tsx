@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
@@ -17,24 +17,25 @@ interface OrbPalette {
   waveStrength: number;
 }
 
+/** SoT hex literals for THREE.Color (CSS vars are not parseable by WebGL). design-ok */
 const ORB_PALETTES: Record<LibertyMDCareOrbState, OrbPalette> = {
   idle: {
-    colors: ['#8174DF', '#9CCBFF', '#F3ACD7', '#FFD3B8'],
+    colors: ['#5661F6', '#3B82F6', '#DDE7D8', '#DDE7D8'], // design-ok — libertymd indigo/blue-500/sage
     speed: 1.18,
     waveStrength: 1,
   },
   thinking: {
-    colors: ['#7768DD', '#91C7FF', '#F4A8D8', '#FFD0B3'],
+    colors: ['#5661F6', '#3B82F6', '#DDE7D8', '#DDE7D8'], // design-ok — libertymd indigo/blue-500/sage
     speed: 1.34,
     waveStrength: 1,
   },
   alert: {
-    colors: ['#8C3150', '#D95F7D', '#F79B81', '#FFD4A9'],
+    colors: ['#1E3A8A', '#169B52', '#10B981', '#DDE7D8'], // design-ok — libertymd blue-900/green/emerald/sage
     speed: 0.88,
     waveStrength: 0.88,
   },
   report: {
-    colors: ['#326E85', '#72B8CC', '#8ED7CC', '#D7F7E7'],
+    colors: ['#1E40AF', '#3B82F6', '#10B981', '#DDE7D8'], // design-ok — libertymd blue-800/500/emerald/sage
     speed: 0.56,
     waveStrength: 0.58,
   },

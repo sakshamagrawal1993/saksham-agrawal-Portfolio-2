@@ -18,6 +18,11 @@ export interface ProxyContext {
   isAnonymous: boolean
   /** performance.now() captured before the request body was read. */
   requestStartedAt: number
+  /**
+   * P3-07 — clinical journey language for Mixpanel `locale` super.
+   * Handlers set from consultations.language (or gated start result).
+   */
+  clinicalLocale?: 'en' | 'es'
 }
 
 export type ContextResult =

@@ -1,5 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import {
+  buildLandingAttributionPayload,
+  parseLandingQueryParams,
+  rememberLandingSessionId,
+} from './libertymd-landing-attribution';
+import { resolveKeywordLandingCluster } from './libertymd-keyword-content';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useI18n } from '../../i18n';
 import LibertyMDLanguageSwitcher from './LibertyMDLanguageSwitcher';
 import { 
@@ -24,9 +30,7 @@ import {
   Mail,
   Menu,
   RotateCcw,
-  Star,
   Stethoscope,
-  UsersRound
 } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import LibertyMDFooterRibbon from './LibertyMDFooterRibbon';
@@ -38,26 +42,107 @@ import LibertyMDPremiumLogo from './LibertyMDPremiumLogo';
 import LibertyMDParticleWaveSeparator from './LibertyMDParticleWaveSeparator';
 import {
   LibertyMDHealthLibrarySection,
-  LibertyMDPatientStoriesSection,
   LibertyMDPhoneCareSection,
   LibertyMDPricingSection,
 } from './LibertyMDMarketingSections';
 import { LibertyMDScrollFilmSection } from './LibertyMDScrollFilmSection';
+import { LibertyMDTrustRow } from './LibertyMDTrustRow';
+import { formatInterviewTimePromise } from './libertymd-interview-expectations';
+import { LIBERTYMD_COMPLAINT_CHIPS } from './libertymd-complaint-chips';
+import { LibertyMDProgressIndicator } from './LibertyMDProgressIndicator';
+import { LibertyMDReportView } from './LibertyMDReportView';
+import { LibertyMDSampleReport } from './LibertyMDSampleReport';
+import {
+  LibertyMDGuestRetentionWarning,
+  LibertyMDReportLifecycleShell,
+} from './LibertyMDReportLifecycleShell';
+import { LibertyMDDoctorHandoffCta } from './LibertyMDDoctorHandoffCta';
+import { LibertyMDDoctorHandoffPanel } from './LibertyMDDoctorHandoffPanel';
+import {
+  shouldShowDoctorHandoff,
+} from './libertymd-doctor-cta-config';
+import {
+  LibertyMDTypingWaitRow,
+  LibertyMDWaitingIndicator,
+} from './LibertyMDWaitingIndicator';
+import {
+  normalizeReportData,
+  type LibertyMdNormalizedReport,
+} from './libertymd-report';
+import {
+  deriveReportLifecycleState,
+  formatRetentionRemaining,
+  GENERATING_WAIT_TIMEOUT_MS,
+  shouldClearStaleReportOnHydrate,
+  shouldShowGuestRetentionWarning,
+  type ReportOmittedReason,
+} from './libertymd-report-lifecycle';
+import {
+  predictWaitModeFromLastKnown,
+  type WaitMode,
+} from './libertymd-waiting';
+import {
+  isSoftGateDismissed,
+  markSoftGateDismissed,
+  shouldOpenSoftGate,
+} from './libertymd-soft-gate';
+import {
+  buildProgressView,
+  nextHighWater,
+  normalizeMissingSlots,
+  shouldShowInterviewProgress,
+} from './libertymd-progress';
 import {
   LibertyMDAccountDrawer,
   LibertyMDDemographicsPrompt,
+  LibertyMDProfileCapabilityOffer,
   LibertyMDReportGate,
   LibertyMDRequestErrorNotice,
   LibertyMDSeverityNotice,
+  entryProfilesFromPatients,
   libertyMDSafetyNoticeFromResponse,
   type LibertyMDHistoryItem,
   type LibertyMDSafetyNoticeContent,
 } from './LibertyMDCareControls';
+import { LibertyMDContinuationActionBar } from './LibertyMDContinuationActionBar';
 import { LibertyMDEmergencyAlert } from './LibertyMDEmergencyAlert';
+import {
+  emergencyCopyFromPayload,
+  pickEmergencyCopyForDisplay,
+  resolveLibertyMdEmergencyCopy,
+  type LibertyMdEmergencyCopyWire,
+} from './libertymd-emergency-copy';
+import {
+  anonymousAddProfileProbeBody,
+  deletePatientBody,
+  listOwnedPatientsBody,
+  normalizeManagedPatientList,
+  normalizePatientList,
+  normalizeHistorySummary,
+  requestReportEmailBody,
+  someoneElseCreateBody,
+  updatePatientBody,
+  type LibertyMDPatientListItem,
+} from './libertymd-care-proxy-client';
+import {
+  emitIdentityLinked,
+  emitProfileCapabilityOfferCta,
+  emitProfileCapabilityOfferShown,
+  emitReportDeliveryRequested,
+} from './libertymd-analytics';
+import { identifyLibertyMdUser } from './libertymd-mixpanel-identity';
+import {
+  classifyProfileManagementFailure,
+  patientFacingTechnicalMessage,
+  readFunctionsErrorPayload,
+  resolveProfileCapabilityOffer,
+} from './libertymd-failure-taxonomy';
+import {
+  LibertyMDNewMessagePill,
+  TRANSCRIPT_BOTTOM_CLEARANCE_CLASS,
+  useLibertyMDChatScroll,
+} from './LibertyMDChatScroll';
 
-interface LibertyMDAppProps {
-  onBack?: () => void;
-}
 
 interface ChatMessage {
   id: string;
@@ -91,75 +176,6 @@ interface LibertyMDProfile {
   sex_at_birth?: string | null;
 }
 
-interface LibertyReport {
-  summary: string;
-  differentials: Array<{
-    name: string;
-    confidence?: string;
-    description?: string;
-    reason?: string;
-  }>;
-  plan: string[];
-  redFlags: string[];
-  soap: {
-    subjective: string;
-    objective: string;
-    assessment: string;
-    plan: string;
-  };
-}
-
-const asText = (value: unknown, fallback = '') => {
-  if (typeof value === 'string') return value;
-  if (Array.isArray(value)) return value.filter(Boolean).join('\n');
-  if (value && typeof value === 'object') return JSON.stringify(value, null, 2);
-  return fallback;
-};
-
-const listFrom = (value: unknown): string[] => {
-  if (!value) return [];
-  if (Array.isArray(value)) {
-    return value.map((item) => (typeof item === 'string' ? item : asText(item))).filter(Boolean);
-  }
-  if (typeof value === 'string') {
-    return value.split(/\n|;|\.\s+/).map((item) => item.trim()).filter(Boolean);
-  }
-  return [];
-};
-
-const normalizeReport = (raw: any): LibertyReport => {
-  const data = raw?.report || raw?.output || raw || {};
-  const differentials = Array.isArray(data?.differential_diagnosis)
-    ? data.differential_diagnosis
-    : Array.isArray(data?.diagnoses)
-      ? data.diagnoses
-      : Array.isArray(data)
-        ? data
-        : [];
-  const normalizedDifferentials = differentials.slice(0, 4).map((item: any) => ({
-    name: item?.full_name || item?.name || item?.condition || item?.diagnosis || 'Clinical consideration',
-    confidence: item?.confidence || item?.confidence_score || item?.likelihood,
-    description: item?.description || item?.summary,
-    reason: item?.reason || item?.rationale || item?.supporting_reason,
-  }));
-  const soap = data?.soap || data?.soap_note || data?.SOAP || {};
-  return {
-    summary: asText(
-      data?.patient_summary || data?.summary || data?.share_report || data?.report_summary,
-      'LibertyMD completed the AI Care intake and generated a doctor-ready report.'
-    ),
-    differentials: normalizedDifferentials,
-    plan: listFrom(data?.plan || data?.care_plan || data?.assessment_plan || data?.recommendations).slice(0, 6),
-    redFlags: listFrom(data?.red_flags || data?.warning_signs || data?.seek_care_if).slice(0, 6),
-    soap: {
-      subjective: asText(soap?.subjective || data?.subjective, 'Symptoms and history captured during chat.'),
-      objective: asText(soap?.objective || data?.objective, 'No vitals or physical exam were directly measured in this AI consult.'),
-      assessment: asText(soap?.assessment || data?.assessment || normalizedDifferentials.map((d) => d.name).join(', '), 'Assessment generated by the AI Care diagnosis workflow.'),
-      plan: asText(soap?.plan || data?.plan || data?.care_plan, 'Follow the plan above and seek care urgently if red flags appear.'),
-    },
-  };
-};
-
 const HOW_IT_WORKS_ROTATION_MS = 5600;
 /** Below this width the pin is dropped and the rail is tapped through, as freehand.ai does. */
 const HOW_IT_WORKS_PIN_QUERY = '(min-width: 1024px)';
@@ -170,10 +186,21 @@ const HOW_IT_WORKS_PIN_QUERY = '(min-width: 1024px)';
  */
 const HOW_IT_WORKS_PIN_VIEWPORTS = 3.95;
 
-const EMERGENCY_STANDING_INSTRUCTION =
-  'Call local emergency services or go to the nearest emergency department.';
 const EMERGENCY_ACKNOWLEDGE_LABEL = 'I understand';
 const EMERGENCY_PERSISTENCE_NOTE = 'This guidance stays pinned to the bottom of the screen after you acknowledge it.';
+
+function crisisTypeFromSafetyPayload(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') return null
+  const record = payload as Record<string, unknown>
+  const safety = record.safety && typeof record.safety === 'object'
+    ? record.safety as Record<string, unknown>
+    : null
+  const fromSafety = safety?.crisis_type
+  if (typeof fromSafety === 'string' && fromSafety.trim()) return fromSafety.trim()
+  const topLevel = record.crisis_type
+  if (typeof topLevel === 'string' && topLevel.trim()) return topLevel.trim()
+  return null
+}
 
 const howItWorksSteps = [
   {
@@ -343,7 +370,7 @@ function LibertyMDHowItWorksTabs() {
         ref={tabRailRef}
         role="tablist"
         aria-label="How LibertyMD works"
-        className="libertymd-how-tabs flex snap-x snap-mandatory gap-4 overflow-x-auto border-b border-[#CAD8D0] pb-0 lg:grid lg:grid-cols-4 lg:gap-7"
+        className="libertymd-how-tabs flex snap-x snap-mandatory gap-4 overflow-x-auto border-b border-libertymd-green-sage pb-0 lg:grid lg:grid-cols-4 lg:gap-7"
       >
         {steps.map((step, index) => {
           const Icon = step.icon;
@@ -361,13 +388,13 @@ function LibertyMDHowItWorksTabs() {
               tabIndex={isActive ? 0 : -1}
               onClick={() => selectStep(index)}
               className={`relative flex min-w-[12.5rem] snap-start items-center gap-3 pb-5 text-left transition-colors sm:min-w-[15rem] lg:min-w-0 ${
-                isActive ? 'text-[#17325F]' : 'text-[#8290A0] hover:text-[#334155]'
+                isActive ? 'text-libertymd-navy' : 'text-libertymd-slate-400 hover:text-libertymd-slate-700'
               }`}
             >
-              <Icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-[#2563EB]' : 'text-[#A9B5C0]'}`} />
+              <Icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-libertymd-blue-600' : 'text-libertymd-slate-400'}`} />
               <span className="text-sm font-bold leading-5">{step.title}</span>
-              <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[3px] overflow-hidden bg-[#D8E2DC]">
-                {index < activeStep && <span className="block h-full w-full bg-[#8AAEEB]" />}
+              <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[3px] overflow-hidden bg-libertymd-green-sage">
+                {index < activeStep && <span className="block h-full w-full bg-libertymd-blue-500" />}
                 {isActive && (
                   isScrollDriven ? (
                     // Scroll drives this fill imperatively; scaleX avoids a layout pass per frame.
@@ -400,19 +427,19 @@ function LibertyMDHowItWorksTabs() {
         className="mt-10 grid items-center gap-9 lg:grid-cols-[minmax(17rem,0.58fr)_minmax(34rem,1.42fr)] lg:gap-[clamp(3rem,6vw,7rem)]"
       >
         <div className="order-2 mx-auto max-w-lg text-center lg:order-1 lg:mx-0 lg:text-left">
-          <p className="text-xs font-bold uppercase text-[#2563EB]">Step {String(activeStep + 1).padStart(2, '0')} · {currentStep.eyebrow}</p>
-          <h3 className="mt-4 font-serif text-3xl font-semibold leading-tight text-[#111827] sm:text-4xl">{currentStep.title}</h3>
-          <p className="mt-5 text-sm leading-7 text-[#5B6472] sm:text-base">{currentStep.description}</p>
+          <p className="text-xs font-bold uppercase text-libertymd-blue-600">Step {String(activeStep + 1).padStart(2, '0')} · {currentStep.eyebrow}</p>
+          <h3 className="mt-4 font-serif text-3xl font-semibold leading-tight text-libertymd-ink sm:text-4xl">{currentStep.title}</h3>
+          <p className="mt-5 text-sm leading-7 text-libertymd-slate-muted sm:text-base">{currentStep.description}</p>
         </div>
 
         <div className="order-1 lg:order-2">
-          <div className="relative aspect-video overflow-hidden rounded-lg border border-[#C9D9E9] bg-[linear-gradient(145deg,rgba(255,255,255,0.92),rgba(225,238,251,0.82)_55%,rgba(225,245,239,0.9))] shadow-[0_24px_70px_rgba(23,50,95,0.11)]">
+          <div className="relative aspect-video overflow-hidden rounded-lg border border-libertymd-mist bg-[linear-gradient(145deg,rgba(255,255,255,0.92),rgba(225,238,251,0.82)_55%,rgba(225,245,239,0.9))] shadow-[0_24px_70px_rgba(23,50,95,0.11)]">
             <div className="absolute inset-0 opacity-[0.16] [background-image:linear-gradient(rgba(37,99,235,0.18)_1px,transparent_1px),linear-gradient(90deg,rgba(37,99,235,0.18)_1px,transparent_1px)] [background-size:32px_32px]" />
             <div className="relative flex h-full flex-col items-center justify-center px-6 text-center">
-              <span className="inline-flex h-14 w-14 items-center justify-center rounded-full border border-white/90 bg-white/70 text-[#2563EB] shadow-[0_12px_34px_rgba(37,99,235,0.13)] backdrop-blur-md">
+              <span className="inline-flex h-14 w-14 items-center justify-center rounded-full border border-white/90 bg-white/70 text-libertymd-blue-600 shadow-[0_12px_34px_rgba(37,99,235,0.13)] backdrop-blur-md">
                 <Video className="h-6 w-6" />
               </span>
-              <p className="mt-5 text-sm font-semibold text-[#435775] sm:text-base">{currentStep.placeholder}</p>
+              <p className="mt-5 text-sm font-semibold text-libertymd-slate-700 sm:text-base">{currentStep.placeholder}</p>
             </div>
           </div>
         </div>
@@ -422,26 +449,75 @@ function LibertyMDHowItWorksTabs() {
   );
 }
 
-export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
+export default function LibertyMDApp() {
   const navigate = useNavigate();
+  const { topicSlug: topicSlugParam } = useParams<{ topicSlug?: string }>();
   const { t, language } = useI18n();
+  // P3-06 — allow-list framing from opaque URL tokens only (unmatched → generic).
+  const keywordCluster = (() => {
+    if (typeof window === 'undefined') {
+      return resolveKeywordLandingCluster({ pathname: topicSlugParam ? `/liberty-md/t/${topicSlugParam}` : undefined });
+    }
+    const fromQuery = parseLandingQueryParams(window.location.search);
+    return resolveKeywordLandingCluster({
+      pathname: window.location.pathname,
+      keyword_id: fromQuery.keyword_id,
+      matched_topic_slug: fromQuery.matched_topic_slug ?? topicSlugParam,
+    });
+  })();
+  const keywordHeroTitle = keywordCluster
+    ? t(`keywordLanding.${keywordCluster.framingKeySlug}.title`)
+    : null;
+  const keywordHeroSubtitle = keywordCluster
+    ? t(`keywordLanding.${keywordCluster.framingKeySlug}.subtitle`)
+    : null;
+  const highlightedChipId = keywordCluster?.related_chip_id ?? null;
   const [region] = useState<'EU' | 'US'>('EU');
   const [input, setInput] = useState('');
   const [phase, setPhase] = useState<ChatPhase>('initial');
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [demographics, setDemographics] = useState({ age: '', sex: '' });
-  const [report, setReport] = useState<LibertyReport | null>(null);
+  // P1-01 — shared unified control + AC0 parity on residual demographics branch (Q3A).
+  const [entryQuestion, setEntryQuestion] = useState('');
+  const [entryOptions, setEntryOptions] = useState<string[]>([]);
+  const [clinicalAnswer, setClinicalAnswer] = useState('');
+  const [consentChecked, setConsentChecked] = useState(true);
+  const [report, setReport] = useState<LibertyMdNormalizedReport | null>(null);
+  // P2-13 — App lifecycle parity (L9).
+  const [retentionExpiresAt, setRetentionExpiresAt] = useState<string | null>(null);
+  const [reportOmittedReason, setReportOmittedReason] = useState<ReportOmittedReason | null>(null);
+  const [generationFailed, setGenerationFailed] = useState(false);
+  const [waitMode, setWaitMode] = useState<WaitMode>('typing');
+  const [lastTurnCount, setLastTurnCount] = useState(0);
+  const [lastEvidenceScore, setLastEvidenceScore] = useState(0);
   const [error, setError] = useState('');
   const [safetyNotice, setSafetyNotice] = useState<LibertyMDSafetyNoticeContent | null>(null);
   const [isEmergencyAcknowledged, setIsEmergencyAcknowledged] = useState(false);
+  // P0-17 — terminal classification for condition-specific heading/standing/detail.
+  const [emergencyCrisisType, setEmergencyCrisisType] = useState<string | null>(null);
+  const [emergencyCopyWire, setEmergencyCopyWire] = useState<LibertyMdEmergencyCopyWire | null>(null);
+  const applyEmergencyFromPayload = (payload: unknown) => {
+    setEmergencyCrisisType(crisisTypeFromSafetyPayload(payload));
+    setEmergencyCopyWire(emergencyCopyFromPayload(payload));
+  };
+  const clearEmergencyPresentation = () => {
+    setEmergencyCrisisType(null);
+    setEmergencyCopyWire(null);
+  };
+  // P1-06 — residual intake progress (same helper as Chat).
+  const [missingSlots, setMissingSlots] = useState<string[] | null>(null);
+  const [progressHighWater, setProgressHighWater] = useState<number | null>(null);
   const [isAnonymous, setIsAnonymous] = useState(true);
+  const [linkedEmail, setLinkedEmail] = useState('');
   const [greetingName, setGreetingName] = useState('');
   const [profile, setProfile] = useState<LibertyMDProfile | null>(null);
   const [history, setHistory] = useState<LibertyMDHistoryItem[]>([]);
+  const [entryPatients, setEntryPatients] = useState<LibertyMDPatientListItem[]>([]);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isReportGateOpen, setIsReportGateOpen] = useState(false);
   const [isAccountLoading, setIsAccountLoading] = useState(true);
   const [isAuthBusy, setIsAuthBusy] = useState(false);
+  const [isProfileCapabilityOfferOpen, setIsProfileCapabilityOfferOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: '1',
@@ -455,15 +531,52 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
   const [isFloatingComposerVisible, setIsFloatingComposerVisible] = useState(false);
   const [isFloatingInputFocused, setIsFloatingInputFocused] = useState(false);
   const [isHeroInputFocused, setIsHeroInputFocused] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  // P3-02 — landing sample report OverlaySheet (synthetic uri_mundane).
+  const [isSampleReportOpen, setIsSampleReportOpen] = useState(false);
   const chatPanelRef = useRef<HTMLDivElement | null>(null);
   const logoDockHeadlineRef = useRef<HTMLHeadingElement | null>(null);
   const heroComposerRef = useRef<HTMLFormElement | null>(null);
   const heroSymptomsRef = useRef<HTMLTextAreaElement | null>(null);
   const hasActiveConsultRef = useRef(false);
-  const demographicsReady = demographics.age.trim() && demographics.sex;
+  const demographicsReady = demographics.age.trim() && demographics.sex && clinicalAnswer.trim() && consentChecked;
   const shouldShowFloatingComposer = isFloatingComposerVisible && phase === 'initial';
   const identityPromiseRef = useRef<Promise<unknown> | null>(null);
+
+  /** P1-06 — seed/advance high-water from server `missing_slots`. */
+  const observeMissingSlots = (value: unknown) => {
+    const normalized = normalizeMissingSlots(value);
+    if (normalized == null) return;
+    setMissingSlots(normalized);
+    setProgressHighWater((prev) => nextHighWater(prev, normalized));
+  };
+
+  // P0-19 · post-layout anchor via shared hook (same contract as Chat). Bump revision on
+  // transcript-affecting state; the hook schedules after layout and re-anchors on late growth.
+  const [transcriptRevision, setTranscriptRevision] = useState(0);
+  useEffect(() => {
+    setTranscriptRevision((current) => current + 1);
+  }, [messages, isTyping, report, phase, error, safetyNotice, generationFailed]);
+
+  // P2-13 L2 — App generating wait escape (parity with Chat).
+  useEffect(() => {
+    if (!isTyping || waitMode !== 'reviewing') return undefined;
+    const timer = window.setTimeout(() => {
+      setIsTyping(false);
+      setGenerationFailed(true);
+      setError('');
+    }, GENERATING_WAIT_TIMEOUT_MS);
+    return () => window.clearTimeout(timer);
+  }, [isTyping, waitMode]);
+
+  // scrollerKey rebinds RO / pin listeners once the consult shell mounts (phase leaves
+  // 'initial'). Without this the hook's mount-time effects see null refs forever.
+  // P0-20: also consume showJumpToLatest / jumpToLatest for the shared pill (P0-19 deferred).
+  const { scrollRef, contentRef, footerRef, showJumpToLatest, jumpToLatest } = useLibertyMDChatScroll({
+    revision: transcriptRevision,
+    messageRevision: messages.length,
+    force: phase === 'emergency_end',
+    scrollerKey: phase !== 'initial',
+  });
 
   useEffect(() => {
     const composer = heroComposerRef.current;
@@ -480,17 +593,20 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
     return () => observer.disconnect();
   }, []);
 
-  useEffect(() => {
-    if (!hasActiveConsultRef.current) return;
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }, [messages, isTyping, report]);
-
   const ensureIdentity = async () => {
     const { data: sessionData } = await supabase.auth.getSession();
-    if (sessionData.session) return sessionData.session;
+    if (sessionData.session) {
+      // P1-17: stitch device history → anon/linked Supabase id (id-only).
+      identifyLibertyMdUser(sessionData.session.user.id);
+      if (typeof sessionData.session.user.email === 'string' && sessionData.session.user.email) {
+        setLinkedEmail(sessionData.session.user.email);
+      }
+      return sessionData.session;
+    }
     if (!identityPromiseRef.current) {
       identityPromiseRef.current = supabase.auth.signInAnonymously().then(({ data, error: authError }) => {
         if (authError || !data.session) throw authError || new Error('Unable to create a private LibertyMD session.');
+        identifyLibertyMdUser(data.session.user.id);
         return data.session;
       });
     }
@@ -502,7 +618,18 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
     const { data, error: fnError } = await supabase.functions.invoke('libertymd-care-proxy', {
       body: { region, ...body }
     });
-    if (fnError) throw fnError;
+    if (fnError) {
+      if (data && typeof data === 'object') {
+        Object.assign(fnError, { body: data });
+      }
+      throw fnError;
+    }
+    if (data?.error) {
+      const err = new Error(String(data.error)) as Error & { status?: number; body?: unknown };
+      err.body = data;
+      if (data.code === 'sign_in_required') err.status = 403;
+      throw err;
+    }
     return data;
   };
 
@@ -511,7 +638,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
     setIsAccountLoading(true);
     try {
       const data = await invokeCareProxy({ action: 'get_history' });
-      setHistory(Array.isArray(data?.history) ? data.history : []);
+      setHistory(normalizeHistorySummary(data?.history));
     } catch (historyError) {
       console.error('Unable to refresh LibertyMD history', historyError);
     } finally {
@@ -531,8 +658,33 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
           return;
         }
         const action = params.get('auth') === 'complete' ? 'sync_identity' : 'bootstrap';
-        const data = await invokeCareProxy({ action, consultation_id: oauthConsultation || undefined });
+        // P1-19 — capture allow-listed URL attribution + mint session key before App→Chat drop.
+        const landingAttribution = buildLandingAttributionPayload({
+          search: params,
+          pathname: window.location.pathname,
+          locale: language,
+          captureUrl: true,
+        });
+        const data = await invokeCareProxy({
+          action,
+          consultation_id: oauthConsultation || undefined,
+          ...landingAttribution,
+        });
+        if (typeof data?.landing_session_id === 'string') {
+          rememberLandingSessionId(data.landing_session_id);
+        }
         if (cancelled) return;
+        if (action === 'sync_identity') {
+          // P1-17: same-id Google link stitch + client-only identity_linked.
+          const { data: linkSession } = await supabase.auth.getSession();
+          const linkedId = linkSession?.session?.user?.id;
+          if (linkedId) identifyLibertyMdUser(linkedId);
+          emitIdentityLinked({
+            was_merge: false,
+            merge_outcome: 'success',
+            method: 'google_link',
+          });
+        }
         setIsAnonymous(Boolean(data?.is_anonymous));
         setGreetingName(String(data?.greeting_name || ''));
         setProfile(data?.profile || null);
@@ -542,26 +694,57 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
             sex: String(data.profile.sex_at_birth || ''),
           });
         }
-        setHistory(Array.isArray(data?.history) ? data.history : []);
+        setHistory(normalizeHistorySummary(data?.history));
+        setEntryPatients(normalizePatientList(data?.patients));
         if (data?.report && oauthConsultation) {
           setSessionId(oauthConsultation);
-          setReport(normalizeReport(data.report));
+          setReport(normalizeReportData(data.report));
           setPhase('report_ready');
           hasActiveConsultRef.current = true;
           const consult = await invokeCareProxy({ action: 'get_consultation', consultation_id: oauthConsultation });
-          if (!cancelled && Array.isArray(consult?.messages)) {
-            const emergencyStopped = String(consult?.consultation?.status || '') === 'emergency_stopped';
-            setMessages(consult.messages.map((item: any, index: number) => ({
-              id: `${oauthConsultation}-${index}`,
-              sender: item.role === 'user' ? 'user' : 'ai',
-              text: item.content,
-              options: Array.isArray(item.options) ? item.options : [],
-              kind: item.message_type === 'report_gate'
-                ? 'report'
-                : item.message_type === 'safety' && emergencyStopped
-                  ? 'emergency'
-                  : 'normal',
-            })));
+          if (!cancelled) {
+            const nextPhase = String(consult?.consultation?.status || '') === 'emergency_stopped'
+              ? 'emergency_end'
+              : 'report_ready';
+            if (Array.isArray(consult?.messages)) {
+              const emergencyStopped = nextPhase === 'emergency_end';
+              setMessages(consult.messages.map((item: any, index: number) => ({
+                id: `${oauthConsultation}-${index}`,
+                sender: item.role === 'user' ? 'user' : 'ai',
+                text: item.content,
+                options: Array.isArray(item.options) ? item.options : [],
+                kind: item.message_type === 'report_gate'
+                  ? 'report'
+                  : item.message_type === 'safety' && emergencyStopped
+                    ? 'emergency'
+                    : 'normal',
+              })));
+              // P0-17 AC14: get_consultation returns top-level crisis_type / care_setting.
+              if (emergencyStopped) {
+                applyEmergencyFromPayload(consult);
+                setPhase('emergency_end');
+              }
+            }
+            // P2-13 L5/L6 — retention + omit honesty on App hydrate.
+            const expires = typeof consult?.retention_expires_at === 'string'
+              ? consult.retention_expires_at
+              : null;
+            const omitted = consult?.report_omitted_reason === 'retention_expired'
+              ? 'retention_expired' as const
+              : null;
+            setRetentionExpiresAt(expires);
+            setReportOmittedReason(omitted);
+            if (consult?.report) {
+              setReport(normalizeReportData(consult.report));
+            } else if (shouldClearStaleReportOnHydrate({
+              phase: nextPhase === 'emergency_end' ? 'report_ready' : nextPhase,
+              hasIncomingReport: false,
+              reportOmittedReason: omitted,
+              retentionExpiresAt: expires,
+            })) {
+              setReport(null);
+              setPhase('report_ready');
+            }
           }
         } else if (data?.greeting_name) {
           setMessages([{
@@ -575,7 +758,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
           window.history.replaceState({}, '', window.location.pathname);
         }
       } catch (bootstrapError) {
-        if (!cancelled) setError(bootstrapError instanceof Error ? bootstrapError.message : 'Unable to initialize LibertyMD.');
+        if (!cancelled) setError(patientFacingTechnicalMessage(bootstrapError, 'Unable to initialize LibertyMD.'));
       } finally {
         if (!cancelled) setIsAccountLoading(false);
       }
@@ -583,22 +766,29 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
     return () => { cancelled = true; };
   }, []);
 
-  const beginConsultation = (symptom: string) => {
+  const beginConsultation = (
+    symptom: string,
+    entry?: { entry_type?: 'chip' | 'freetext'; chip_id?: string },
+  ) => {
     const cleanedSymptom = symptom.trim();
     if (!cleanedSymptom) return;
 
     setError('');
     setSafetyNotice(null);
     const draftId = crypto.randomUUID();
+    const entryType = entry?.entry_type === 'chip' && entry.chip_id ? 'chip' : 'freetext';
     navigate(`/liberty-md/chat?draftId=${encodeURIComponent(draftId)}`, {
       state: {
         libertyMDStartRequest: {
           draftId,
           symptom: cleanedSymptom,
+          entry_type: entryType,
+          ...(entryType === 'chip' && entry?.chip_id ? { chip_id: entry.chip_id } : {}),
           profile,
           isAnonymous,
           history,
           demographics,
+          patients: entryPatients,
         },
       },
     });
@@ -607,6 +797,12 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
   const sendToWorkflow = async (text: string, activeSessionId?: string) => {
     const sid = activeSessionId || sessionId;
     if (!sid) return;
+    const nextWait = predictWaitModeFromLastKnown({
+      lastTurnCount,
+      evidenceScore: lastEvidenceScore,
+    });
+    setWaitMode(nextWait);
+    setGenerationFailed(false);
     setIsTyping(true);
     setError('');
     try {
@@ -630,35 +826,50 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
       }
       if (lastError) throw lastError;
 
+      if (Number.isFinite(Number(data?.turn_count))) {
+        setLastTurnCount(Math.max(0, Math.floor(Number(data.turn_count))));
+      }
+      if (Number.isFinite(Number(data?.evidence_score))) {
+        setLastEvidenceScore(Number(data.evidence_score));
+      }
+
       if (data?.emergency || data?.state === 'emergency_stopped') {
+        applyEmergencyFromPayload(data);
         setPhase('emergency_end');
         setSafetyNotice(null);
         setMessages(prev => [...prev, {
           id: `${Date.now()}-emergency`,
           sender: 'ai',
           kind: 'emergency',
-          text: String(data?.message || 'These symptoms may be an emergency. Call emergency services or go to the ER now.'),
+          text: String(data?.message || resolveLibertyMdEmergencyCopy(crisisTypeFromSafetyPayload(data)).detail),
         }]);
         return;
       }
 
       if (data?.clinical_review_needed) {
+        setGenerationFailed(false);
         setPhase('clinical_review_needed');
         setMessages(prev => [...prev, {
           id: `${Date.now()}-review`,
           sender: 'ai',
           kind: 'system',
-          text: data.message || 'A reliable report could not be generated. Please continue with a licensed clinician.',
+          text: data.message || t('report.lifecycle.partialBody'),
         }]);
         return;
       }
 
       if (data?.report_ready) {
+        setGenerationFailed(false);
+        // P2-02 Q3: setReport under soft gate before release.
+        if (typeof data?.retention_expires_at === 'string') {
+          setRetentionExpiresAt(data.retention_expires_at);
+        }
+        setReportOmittedReason(null);
+        if (data?.report) setReport(normalizeReportData(data.report));
         if (data?.auth_required) {
           setPhase('report_gate');
-          setIsReportGateOpen(true);
-        } else if (data?.report) {
-          setReport(normalizeReport(data.report));
+          setIsReportGateOpen(shouldOpenSoftGate(true, sessionId));
+        } else {
           setPhase('report_ready');
           await refreshHistory();
         }
@@ -675,6 +886,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
 
       setPhase('intake');
       setSafetyNotice(libertyMDSafetyNoticeFromResponse(data));
+      observeMissingSlots(data?.missing_slots);
       setMessages(prev => [...prev, {
         id: `${Date.now()}-ai`,
         sender: 'ai',
@@ -682,15 +894,23 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
         options: Array.isArray(data?.options) ? data.options : [],
       }]);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'The LibertyMD AI Care workflow is temporarily unavailable.';
-      setError(message);
-      setPhase('error');
-      setMessages(prev => [...prev, {
-        id: `${Date.now()}-error`,
-        sender: 'ai',
-        kind: 'system',
-        text: 'I could not reach the AI Care workflow. Please try again in a moment.',
-      }]);
+      console.error('LibertyMD send-path failure', err);
+      // P0-09 / P0-12-safe: never echo err.message or internal names into user UI.
+      // P2-13 L3 — diagnosis-eligible technical miss → generation failed shell.
+      if (nextWait === 'reviewing') {
+        setGenerationFailed(true);
+        setError('');
+      } else {
+        const message = 'Something went wrong on our side. Please try again.';
+        setError(message);
+        setPhase('error');
+        setMessages(prev => [...prev, {
+          id: `${Date.now()}-error`,
+          sender: 'ai',
+          kind: 'system',
+          text: message,
+        }]);
+      }
     } finally {
       setIsTyping(false);
     }
@@ -698,6 +918,8 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
 
   const submitDemographics = async () => {
     if (!sessionId || !demographicsReady || isTyping) return;
+    const answer = clinicalAnswer.trim();
+    if (!answer) return;
     setIsTyping(true);
     setError('');
     try {
@@ -706,8 +928,10 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
         consultation_id: sessionId,
         age: Number(demographics.age),
         sex_at_birth: demographics.sex,
+        message: answer,
       });
       setProfile(prev => ({ ...prev, age: Number(demographics.age), sex_at_birth: demographics.sex }));
+      // P1-01 AC0 — same emergency early-return as interview send; never fall through to next_question.
       if (data?.emergency || data?.state === 'emergency_stopped') {
         setMessages(prev => [...prev,
           {
@@ -716,13 +940,19 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
             text: `Age ${demographics.age}; ${demographics.sex}`,
           },
           {
+            id: `${Date.now()}-clinical-answer`,
+            sender: 'user',
+            text: answer,
+          },
+          {
             id: `${Date.now()}-demographics-emergency`,
             sender: 'ai',
             kind: 'emergency',
-            text: String(data?.message || 'These symptoms may be an emergency. Seek emergency care now.'),
+            text: String(data?.message || resolveLibertyMdEmergencyCopy(crisisTypeFromSafetyPayload(data)).detail),
           },
         ]);
         setSafetyNotice(null);
+        applyEmergencyFromPayload(data);
         setPhase('emergency_end');
         return;
       }
@@ -733,16 +963,25 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
           text: `Age ${demographics.age}; ${demographics.sex}`,
         },
         {
+          id: `${Date.now()}-clinical-answer`,
+          sender: 'user',
+          text: answer,
+        },
+        {
           id: `${Date.now()}-first-question`,
           sender: 'ai',
           text: data?.next_question || 'When did this symptom begin?',
           options: Array.isArray(data?.options) ? data.options : [],
         },
       ]);
+      setEntryQuestion('');
+      setEntryOptions([]);
+      setClinicalAnswer('');
       setSafetyNotice(libertyMDSafetyNoticeFromResponse(data));
+      observeMissingSlots(data?.missing_slots);
       setPhase('intake');
     } catch (demographicsError) {
-      setError(demographicsError instanceof Error ? demographicsError.message : 'Unable to save the clinical context.');
+      setError(patientFacingTechnicalMessage(demographicsError, 'Unable to save the clinical context.'));
       setPhase('demographics_required');
     } finally {
       setIsTyping(false);
@@ -753,7 +992,18 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
     const text = (textToSend || input).trim();
     if (!text || isTyping) return;
     setInput('');
-    void beginConsultation(text);
+    void beginConsultation(text, { entry_type: 'freetext' });
+  };
+
+  const handleComplaintChip = (chipId: string, label: string) => {
+    if (isTyping) return;
+    void beginConsultation(label, { entry_type: 'chip', chip_id: chipId });
+  };
+
+  /** P3-02 — sample CTA uses freetext (not chip / not invent `sample` entry_type). */
+  const handleSampleReportStart = (complaint: string) => {
+    if (isTyping) return;
+    void beginConsultation(complaint, { entry_type: 'freetext' });
   };
 
   const startGoogleLink = async () => {
@@ -769,9 +1019,73 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
       });
       if (linkError) throw linkError;
     } catch (linkError) {
-      setError(linkError instanceof Error ? linkError.message : 'Unable to start Google sign in.');
+      setError(patientFacingTechnicalMessage(linkError, 'Unable to start Google sign in.'));
       setIsAuthBusy(false);
     }
+  };
+
+  /** P1-04 Q4A — tap → create_patient → offer on reject. */
+  const attemptAddProfile = async (source: 'drawer' | 'unified_entry') => {
+    setIsMenuOpen(false);
+    try {
+      await invokeCareProxy(anonymousAddProfileProbeBody());
+    } catch (createError) {
+      const { status, body } = await readFunctionsErrorPayload(createError);
+      const reason = resolveProfileCapabilityOffer(status, body);
+      setIsProfileCapabilityOfferOpen(true);
+      emitProfileCapabilityOfferShown(reason ? (source === 'drawer' ? 'drawer' : 'unified_entry') : 'create_reject');
+    }
+  };
+
+  /** P4-04 — AccountDrawer linked profile CRUD via proxy only. */
+  const profileManagementHandlers = !isAnonymous ? {
+    fetchList: async () => {
+      const data = await invokeCareProxy(listOwnedPatientsBody());
+      return normalizeManagedPatientList(data?.patients);
+    },
+    create: async (input: { display_label: string; age: number; sex_at_birth: 'female' | 'male' }) => {
+      try {
+        await invokeCareProxy(someoneElseCreateBody(input));
+      } catch (createError) {
+        const { status, body } = await readFunctionsErrorPayload(createError);
+        throw new Error(classifyProfileManagementFailure(status, body).message);
+      }
+    },
+    update: async (input: {
+      patient_id: string;
+      display_label?: string;
+      age: number;
+      sex_at_birth: string;
+    }) => {
+      try {
+        const data = await invokeCareProxy(updatePatientBody(input));
+        if (data?.profile && typeof data.profile === 'object') {
+          const next = data.profile as { age?: number; sex_at_birth?: string };
+          setProfile((current: any) => current ? {
+            ...current,
+            ...(typeof next.age === 'number' ? { age: next.age } : {}),
+            ...(typeof next.sex_at_birth === 'string' ? { sex_at_birth: next.sex_at_birth } : {}),
+          } : current);
+        }
+      } catch (updateError) {
+        const { status, body } = await readFunctionsErrorPayload(updateError);
+        throw new Error(classifyProfileManagementFailure(status, body).message);
+      }
+    },
+    remove: async (patientId: string) => {
+      try {
+        await invokeCareProxy(deletePatientBody(patientId));
+      } catch (deleteError) {
+        const { status, body } = await readFunctionsErrorPayload(deleteError);
+        throw new Error(classifyProfileManagementFailure(status, body).message);
+      }
+    },
+  } : null;
+
+  const startCapabilityGoogleLink = async () => {
+    emitProfileCapabilityOfferCta('create_reject');
+    setIsProfileCapabilityOfferOpen(false);
+    await startGoogleLink();
   };
 
   const skipReportGate = async () => {
@@ -779,13 +1093,33 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
     setIsAuthBusy(true);
     try {
       const data = await invokeCareProxy({ action: 'release_report', consultation_id: sessionId, mode: 'skip' });
-      setReport(normalizeReport(data.report));
+      markSoftGateDismissed(sessionId);
+      setReport(normalizeReportData(data.report));
       setPhase('report_ready');
       setIsReportGateOpen(false);
     } catch (releaseError) {
-      setError(releaseError instanceof Error ? releaseError.message : 'Unable to release the report.');
+      setError(patientFacingTechnicalMessage(releaseError, 'Unable to release the report.'));
     } finally {
       setIsAuthBusy(false);
+    }
+  };
+
+  const dismissReportGate = () => {
+    if (sessionId) markSoftGateDismissed(sessionId);
+    setIsReportGateOpen(false);
+  };
+
+  /** P2-08 — email-me mint/send; does not gate on-screen report. */
+  const requestReportEmail = async (email: string) => {
+    if (!sessionId) {
+      throw new Error('Consultation is not ready for email delivery.');
+    }
+    try {
+      await invokeCareProxy(requestReportEmailBody(sessionId, email));
+      emitReportDeliveryRequested({ method: 'email' });
+    } catch (sendError) {
+      void sendError;
+      throw new Error('We could not send the email right now.');
     }
   };
 
@@ -800,10 +1134,19 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
     setPhase('initial');
     setSessionId(null);
     setReport(null);
+    setRetentionExpiresAt(null);
+    setReportOmittedReason(null);
+    setGenerationFailed(false);
+    setWaitMode('typing');
+    setLastTurnCount(0);
+    setLastEvidenceScore(0);
     setError('');
     setSafetyNotice(null);
     setIsEmergencyAcknowledged(false);
+    clearEmergencyPresentation();
     setIsReportGateOpen(false);
+    setMissingSlots(null);
+    setProgressHighWater(null);
     setDemographics({ age: profile?.age ? String(profile.age) : '', sex: profile?.sex_at_birth || '' });
     setMessages([
       {
@@ -818,31 +1161,69 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
   const dockZoneRef = useRef<HTMLDivElement | null>(null);
   const activeOptions = messages[messages.length - 1]?.options || [];
   const isComposerLocked = isTyping || ['demographics_required', 'report_gate', 'report_ready', 'emergency_end', 'clinical_review_needed'].includes(phase);
+  // P0-21 Q1 B1: hide locked composer while report-gate open CTA owns the footer.
+  // P2-06: after soft-gate dismiss-once, do not re-nag via “View report options”.
+  const softGateDismissed = Boolean(sessionId && isSoftGateDismissed(sessionId));
+  const reportLifecycle = deriveReportLifecycleState({
+    phase,
+    isBusy: isTyping,
+    waitMode,
+    hasReportBody: Boolean(report),
+    reportOmittedReason,
+    retentionExpiresAt,
+    generationFailed,
+    lastTurnCount,
+    evidenceScore: lastEvidenceScore,
+  });
+  const guestExpired = reportLifecycle === 'guest_expired';
+  const continuationOwnsFooter =
+    phase === 'report_gate' && !isReportGateOpen && !softGateDismissed && !guestExpired;
+  const continuationAction = continuationOwnsFooter
+    ? {
+        type: 'report_gate' as const,
+        onOpen: () => { setIsReportGateOpen(true); },
+      }
+    : phase === 'clinical_review_needed'
+      ? {
+          type: 'clinical_review_start_fresh' as const,
+          onStartFresh: () => { resetConsult(); },
+        }
+      : null;
   const isEmergencyStopped = phase === 'emergency_end';
+  const emergencyCopy = pickEmergencyCopyForDisplay(emergencyCopyWire, emergencyCrisisType);
   const emergencyDetail = isEmergencyStopped
-    ? String([...messages].reverse().find((item) => item.kind === 'emergency')?.text || '')
+    ? String([...messages].reverse().find((item) => item.kind === 'emergency')?.text || emergencyCopy.detail)
     : '';
+  const emergencyHeading = emergencyCopy.heading;
+  const emergencyStandingInstruction = emergencyCopy.standingInstruction;
+  const showInterviewProgress = shouldShowInterviewProgress(phase);
+  const interviewProgressView = showInterviewProgress
+    ? buildProgressView({ missingSlots, highWaterRatio: progressHighWater })
+    : null;
 
   useEffect(() => {
-    if (!isEmergencyStopped) setIsEmergencyAcknowledged(false);
+    if (!isEmergencyStopped) {
+      setIsEmergencyAcknowledged(false);
+      clearEmergencyPresentation();
+    }
   }, [isEmergencyStopped, sessionId]);
   return (
     <div
-      className="min-h-screen text-center text-[#111827] font-sans selection:bg-[#2563EB] selection:text-white [&_input]:text-center [&_select]:text-center [&_textarea]:text-center"
+      className="min-h-[100svh] text-center text-libertymd-ink font-sans selection:bg-libertymd-blue-600 selection:text-white [&_input]:text-center [&_select]:text-center [&_textarea]:text-center"
       style={{
         background:
-          'linear-gradient(180deg, #FBFCF9 0%, #F5F9FF 34%, #F3F8F2 66%, #EFF6FF 100%)',
+          'var(--libertymd-surface-wash)',
       }}
     >
       <main>
         <section className="libertymd-page-gutter relative z-10 flex min-h-[100svh] flex-col overflow-visible">
           <div className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(247,250,255,0.9)_54%,rgba(240,248,243,0.96)_100%)]" />
 
-          <header className="libertymd-hero-header libertymd-shell flex h-16 shrink-0 items-center justify-between">
+          <header className="libertymd-hero-header libertymd-shell libertymd-safe-top flex min-h-16 shrink-0 items-center justify-between">
             <a
               href="/liberty-md"
               aria-label="LibertyMD home"
-              className="inline-flex items-center gap-2 font-serif text-xl font-semibold text-[#111827] transition-colors hover:text-[#2563EB] sm:gap-2.5 sm:text-2xl"
+              className="inline-flex items-center gap-2 font-serif text-xl font-semibold text-libertymd-ink transition-colors hover:text-libertymd-blue-600 sm:gap-2.5 sm:text-2xl"
             >
               <img
                 src="/images/libertymd-logo-mark.svg"
@@ -853,7 +1234,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
               LibertyMD
             </a>
 
-            <div className="flex items-center gap-3 text-sm font-semibold text-[#334155] sm:gap-5">
+            <div className="flex items-center gap-3 text-sm font-semibold text-libertymd-slate-700 sm:gap-5">
               {!isAnonymous && greetingName && <span className="hidden sm:inline">Hi, {greetingName}</span>}
               <LibertyMDLanguageSwitcher />
               <button
@@ -863,7 +1244,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                   setIsMenuOpen(true);
                   if (!isAnonymous) void refreshHistory();
                 }}
-                className="inline-flex h-9 w-9 items-center justify-center text-[#111827] transition-colors hover:text-[#2563EB]"
+                className="inline-flex min-h-11 min-w-11 items-center justify-center text-libertymd-ink transition-colors hover:text-libertymd-blue-600"
               >
                 <Menu className="h-5 w-5" />
               </button>
@@ -891,7 +1272,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                 .libertymd-placeholder-dot {
                   display: inline-block;
                   animation: libertymd-placeholder-dot-pulse 1.5s ease-in-out infinite;
-                  color: #2563EB;
+                  color: var(--libertymd-blue-600);
                   will-change: opacity, transform;
                 }
 
@@ -940,7 +1321,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                 }
 
                 .libertymd-start-chat-cta:hover {
-                  background-color: #1D5FE2;
+                  background-color: var(--libertymd-blue-700);
                   box-shadow:
                     inset 0 1px 0 rgba(255, 255, 255, 0.5),
                     inset 0 -1px 0 rgba(15, 54, 153, 0.3),
@@ -992,15 +1373,23 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                 aria-hidden="true"
                 className="libertymd-hero-wordmark-icon h-9 w-9 shrink-0 translate-y-[2px] object-contain sm:h-14 sm:w-14 [@media(max-height:700px)]:h-8 [@media(max-height:700px)]:w-8"
               />
-              <h1 className="libertymd-hero-title font-serif text-[56px] font-semibold leading-none text-[#111827] sm:text-7xl [@media(max-height:700px)]:whitespace-nowrap [@media(max-height:700px)]:text-5xl">
+              <h1 className="libertymd-hero-title font-serif text-[56px] font-semibold leading-none text-libertymd-ink sm:text-7xl [@media(max-height:700px)]:whitespace-nowrap [@media(max-height:700px)]:text-5xl">
                 LibertyMD
               </h1>
             </div>
-            <p className="libertymd-hero-value mt-3 text-base font-semibold leading-6 text-[#334155] sm:text-lg">
-              {t('hero.title')}
-            </p>
             <p
-              className="libertymd-hero-tagline mt-2 flex min-h-6 flex-wrap items-center justify-center gap-x-2 text-sm font-bold text-[#17325F] sm:gap-x-3 sm:text-base"
+              className="libertymd-hero-value mt-3 text-base font-semibold leading-6 text-libertymd-slate-700 sm:text-lg"
+              data-libertymd-keyword-framing={keywordCluster ? keywordCluster.matched_topic_slug : 'generic'}
+            >
+              {keywordHeroTitle || t('hero.title')}
+            </p>
+            {keywordHeroSubtitle ? (
+              <p className="libertymd-hero-keyword-subtitle mt-1 max-w-xl text-sm font-medium leading-5 text-libertymd-slate-500 sm:text-base">
+                {keywordHeroSubtitle}
+              </p>
+            ) : null}
+            <p
+              className="libertymd-hero-tagline mt-2 flex min-h-6 flex-wrap items-center justify-center gap-x-2 text-sm font-bold text-libertymd-navy sm:gap-x-3 sm:text-base"
               aria-label="Free, Anonymous, Built by Doctors"
             >
               {[t('hero.taglineFree'), t('hero.taglineAnonymous'), t('hero.taglineBuiltByDoctors')].map((phrase, index) => (
@@ -1010,7 +1399,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                   style={{ animationDelay: `${220 + index * 120}ms` }}
                 >
                   {index > 0 && (
-                    <span aria-hidden="true" className="text-[#2563EB]">
+                    <span aria-hidden="true" className="text-libertymd-blue-600">
                       •
                     </span>
                   )}
@@ -1018,6 +1407,14 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                 </span>
               ))}
             </p>
+            {phase === 'initial' && (
+              <p
+                className="libertymd-hero-time-promise mt-2 text-sm font-medium leading-5 text-libertymd-slate-500"
+                data-libertymd-time-promise="true"
+              >
+                {formatInterviewTimePromise(t)}
+              </p>
+            )}
 
             <LibertyMDPremiumLogo
               active={phase === 'initial'}
@@ -1036,11 +1433,11 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                   }
                   handleSend();
                 }}
-                className="libertymd-hero-composer relative w-full rounded-[20px] border-[1.5px] border-[#BFD0EE] bg-white/[0.94] p-5 pt-7 text-center shadow-[0_18px_48px_rgba(37,99,235,0.16),0_4px_14px_rgba(15,23,42,0.1),inset_0_1px_0_rgba(255,255,255,0.95)] ring-1 ring-[#2563EB]/10 backdrop-blur-md sm:bg-white/[0.94] sm:shadow-[0_18px_60px_rgba(15,23,42,0.1),0_4px_18px_rgba(37,99,235,0.08)]"
+                className="libertymd-hero-composer relative w-full rounded-[20px] border-[1.5px] border-libertymd-mist bg-white/[0.94] p-5 pt-7 text-center shadow-[0_18px_48px_rgba(37,99,235,0.16),0_4px_14px_rgba(15,23,42,0.1),inset_0_1px_0_rgba(255,255,255,0.95)] ring-1 ring-libertymd-blue-600/10 backdrop-blur-md sm:bg-white/[0.94] sm:shadow-[0_18px_60px_rgba(15,23,42,0.1),0_4px_18px_rgba(37,99,235,0.08)]"
               >
                 <label
                   htmlFor="libertymd-hero-symptoms"
-                  className="absolute -top-4 left-5 rounded-full bg-[#E5FFB8] px-4 py-2 text-sm font-black text-[#111827] shadow-[0_4px_12px_rgba(91,125,44,0.08)] sm:left-8 sm:px-5 sm:text-base [@media(max-height:700px)]:left-5 [@media(max-height:700px)]:px-4 [@media(max-height:700px)]:py-2 [@media(max-height:700px)]:text-xs"
+                  className="absolute -top-4 left-5 rounded-full bg-libertymd-green-sage px-4 py-2 text-sm font-black text-libertymd-ink shadow-[0_4px_12px_rgba(91,125,44,0.08)] sm:left-8 sm:px-5 sm:text-base [@media(max-height:700px)]:left-5 [@media(max-height:700px)]:px-4 [@media(max-height:700px)]:py-2 [@media(max-height:700px)]:text-xs"
                 >
                   {t('hero.whatBringsYouIn')}
                 </label>
@@ -1048,7 +1445,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                   {!input && !isHeroInputFocused && (
                     <div
                       aria-hidden="true"
-                      className="pointer-events-none absolute inset-x-0 top-0 px-4 py-2 !text-left text-base leading-7 text-[#64748B] sm:px-5 sm:py-4 sm:text-xl [@media(max-height:700px)]:px-3 [@media(max-height:700px)]:py-1 [@media(max-height:700px)]:text-xs [@media(max-height:700px)]:leading-5"
+                      className="pointer-events-none absolute inset-x-0 top-0 px-4 py-2 !text-left text-base leading-7 text-libertymd-slate-500 sm:px-5 sm:py-4 sm:text-xl [@media(max-height:700px)]:px-3 [@media(max-height:700px)]:py-1 [@media(max-height:700px)]:text-xs [@media(max-height:700px)]:leading-5"
                     >
                       <span className="sm:hidden">{t('hero.placeholderShort')}</span>
                       <span className="hidden sm:inline">{t('hero.placeholderLong')}</span>
@@ -1081,14 +1478,14 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                         handleSend();
                       }
                     }}
-                    className="libertymd-hero-symptoms h-full min-h-0 w-full resize-none overflow-y-auto bg-transparent px-4 py-2 !text-left text-base leading-7 text-[#334155] caret-[#2563EB] outline-none sm:px-5 sm:py-4 sm:text-xl [@media(max-height:700px)]:px-3 [@media(max-height:700px)]:py-1 [@media(max-height:700px)]:text-xs [@media(max-height:700px)]:leading-5"
+                    className="libertymd-hero-symptoms h-full min-h-0 w-full resize-none overflow-y-auto bg-transparent px-4 py-2 !text-left text-base leading-7 text-libertymd-slate-700 caret-libertymd-blue-600 outline-none sm:px-5 sm:py-4 sm:text-xl [@media(max-height:700px)]:px-3 [@media(max-height:700px)]:py-1 [@media(max-height:700px)]:text-xs [@media(max-height:700px)]:leading-5"
                   />
                 </div>
                 <button
                   type="submit"
                   aria-label={input.trim() ? 'Start LibertyMD chat' : 'Start by describing your symptoms'}
                   disabled={isTyping}
-                  className={`libertymd-start-chat-cta ${!input.trim() ? 'libertymd-start-chat-cta--waiting' : ''} absolute bottom-5 left-5 right-5 isolate inline-flex h-[52px] cursor-pointer items-center justify-center gap-3 overflow-hidden rounded-full bg-[#2563EB] px-8 text-base font-bold text-white ring-1 ring-white/60 transition-[background-color,box-shadow,transform] duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#93C5FD] sm:bottom-5 sm:left-auto sm:right-5 sm:h-14 sm:w-64 [@media(max-height:700px)]:bottom-4 [@media(max-height:700px)]:left-4 [@media(max-height:700px)]:right-4 [@media(max-height:700px)]:h-12 [@media(max-height:700px)]:w-auto`}
+                  className={`libertymd-start-chat-cta ${!input.trim() ? 'libertymd-start-chat-cta--waiting' : ''} absolute bottom-5 left-5 right-5 isolate inline-flex h-[52px] cursor-pointer items-center justify-center gap-3 overflow-hidden rounded-full bg-libertymd-blue-600 px-8 text-base font-bold text-white ring-1 ring-white/60 transition-[background-color,box-shadow,transform] duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-libertymd-blue-500 sm:bottom-5 sm:left-auto sm:right-5 sm:h-14 sm:w-64 [@media(max-height:700px)]:bottom-4 [@media(max-height:700px)]:left-4 [@media(max-height:700px)]:right-4 [@media(max-height:700px)]:h-12 [@media(max-height:700px)]:w-auto`}
                 >
                   {isTyping ? <Loader2 className="relative z-10 h-5 w-5 animate-spin" /> : null}
                   <span className="relative z-10">{isTyping ? t('hero.startChatOpening') : t('common.startChat')}</span>
@@ -1096,36 +1493,59 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                 </button>
               </form>
 
-              <div className="libertymd-hero-trust-row mt-2 flex flex-row items-center justify-between gap-2 text-xs font-medium text-[#626262] sm:text-sm [@media(max-height:700px)]:mt-0 [@media(max-height:700px)]:gap-1">
-                <div className="flex flex-nowrap items-center justify-start gap-2 [@media(max-height:700px)]:gap-1">
-                  <span className="hidden sm:inline">4.5</span>
-                  <span className="inline-flex gap-0.5" aria-label="4.5 out of 5 rating">
-                    {[0, 1, 2, 3, 4].map((item) => (
-                      <span
-                        key={item}
-                        className={`inline-flex h-5 w-5 items-center justify-center ${
-                          item === 4
-                            ? 'bg-[linear-gradient(90deg,#169B52_0%,#169B52_50%,#D4D4D4_50%,#D4D4D4_100%)]'
-                            : 'bg-[#169B52]'
-                        }`}
-                      >
-                        <Star className="h-3.5 w-3.5 fill-white text-white" />
-                      </span>
-                    ))}
-                  </span>
-                </div>
-                <span
-                  className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap font-semibold text-[#17325F] sm:gap-2"
-                  aria-label="Trusted by more than 1,000,000 users"
+              {/* P3-05 — secondary complaint chips; free-text composer stays primary. */}
+              <div
+                className="mt-3 flex flex-wrap items-center justify-center gap-2 sm:mt-4"
+                role="group"
+                aria-label="Common complaints"
+              >
+                {LIBERTYMD_COMPLAINT_CHIPS.map((chip) => {
+                  const isKeywordHighlight = highlightedChipId === chip.chip_id;
+                  return (
+                  <button
+                    key={chip.chip_id}
+                    type="button"
+                    data-libertymd-complaint-chip={chip.chip_id}
+                    data-libertymd-chip-keyword-highlight={isKeywordHighlight ? 'true' : undefined}
+                    aria-current={isKeywordHighlight ? 'true' : undefined}
+                    disabled={isTyping}
+                    onClick={() => handleComplaintChip(chip.chip_id, chip.label)}
+                    className={
+                      isKeywordHighlight
+                        ? 'rounded-full border border-libertymd-blue-600 bg-libertymd-blue-50 px-[var(--libertymd-space-md)] py-[var(--libertymd-space-sm)] text-sm font-semibold text-libertymd-blue-700 shadow-sm ring-1 ring-libertymd-blue-600/30 transition hover:border-libertymd-blue-600 hover:text-libertymd-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-libertymd-blue-600 focus-visible:ring-offset-2 disabled:opacity-50'
+                        : 'rounded-full border border-libertymd-slate-300 bg-white/90 px-[var(--libertymd-space-md)] py-[var(--libertymd-space-sm)] text-sm font-semibold text-libertymd-slate-700 shadow-sm transition hover:border-libertymd-blue-600 hover:text-libertymd-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-libertymd-blue-600 focus-visible:ring-offset-2 disabled:opacity-50'
+                    }
+                  >
+                    {chip.label}
+                  </button>
+                  );
+                })}
+              </div>
+
+              {/* P3-02 — hero-adjacent sample report entry (does not bury chips). */}
+              <div className="mt-2 flex justify-center sm:mt-3">
+                <button
+                  type="button"
+                  data-libertymd-sample-report-entry=""
+                  disabled={isTyping}
+                  onClick={() => setIsSampleReportOpen(true)}
+                  className="libertymd-type-body-small font-semibold text-libertymd-blue-700 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-libertymd-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
                 >
-                  <UsersRound className="h-4 w-4 shrink-0 text-[#17325F] sm:h-5 sm:w-5" aria-hidden="true" />
-                  <span className="sm:hidden">{t('app.trustedByShort')}</span>
-                  <span className="hidden sm:inline">{t('app.trustedBy')}</span>
+                  {t('sampleReport.entry')}
+                </button>
+              </div>
+
+              {/* P3-03 — honest process strip (no stars / 1M+ / HIPAA invent). */}
+              <div className="libertymd-hero-trust-row mt-2 flex flex-row flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs font-medium text-libertymd-slate-500 sm:justify-between sm:text-sm [@media(max-height:700px)]:mt-0 [@media(max-height:700px)]:gap-1">
+                <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-libertymd-navy sm:gap-2">
+                  <FileText className="h-4 w-4 text-libertymd-navy sm:h-5 sm:w-5" aria-hidden="true" />
+                  <span className="sm:hidden">{t('app.heroTrustReportShort')}</span>
+                  <span className="hidden sm:inline">{t('app.heroTrustReport')}</span>
                 </span>
-                <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[#17325F] sm:gap-2">
-                  <ShieldCheck className="h-4 w-4 text-[#17325F] sm:h-5 sm:w-5" />
-                  <span className="sm:hidden">{t('app.hipaaShort')}</span>
-                  <span className="hidden sm:inline">{t('app.hipaaLong')}</span>
+                <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-libertymd-navy sm:gap-2">
+                  <ShieldCheck className="h-4 w-4 text-libertymd-navy sm:h-5 sm:w-5" aria-hidden="true" />
+                  <span className="sm:hidden">{t('app.heroTrustAiShort')}</span>
+                  <span className="hidden sm:inline">{t('app.heroTrustAi')}</span>
                 </span>
               </div>
               {error && phase === 'initial' && (
@@ -1141,11 +1561,11 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
 
         <section ref={chatPanelRef} className="libertymd-page-gutter relative z-0 bg-[linear-gradient(180deg,rgba(245,250,243,0.96),rgba(237,247,241,0.98))] pb-16 pt-[300px] sm:pt-[340px]">
           <div className="mx-auto max-w-3xl text-center">
-            <p className="text-xs font-bold uppercase tracking-normal text-[#2563EB]">{t('app.howItWorksKicker')}</p>
-            <h2 ref={logoDockHeadlineRef} className="mt-3 text-4xl font-black leading-tight tracking-normal text-[#111827] sm:text-5xl">
+            <p className="text-xs font-bold uppercase tracking-normal text-libertymd-blue-600">{t('app.howItWorksKicker')}</p>
+            <h2 ref={logoDockHeadlineRef} className="mt-3 text-4xl font-black leading-tight tracking-normal text-libertymd-ink sm:text-5xl">
               {t('app.howItWorksTitle')}
             </h2>
-            <p className="mx-auto mt-4 max-w-xl text-base font-bold leading-7 text-[#17325F] sm:text-lg">
+            <p className="mx-auto mt-4 max-w-xl text-base font-bold leading-7 text-libertymd-navy sm:text-lg">
               {t('app.howItWorksSubtitle')}
             </p>
           </div>
@@ -1154,31 +1574,61 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
             <LibertyMDHowItWorksTabs />
           ) : (
             <div className="libertymd-content-shell mx-auto mt-14 max-w-4xl text-center">
-              <div className="min-h-[560px]">
-              <div className="mb-4 flex items-center justify-between border-b border-[#DDE7D8] pb-3">
+              {/*
+                P0-19 · Chat-like consult shell: fixed-height flex column so the transcript
+                owns overflow (internal scroller + sibling footer chrome). Keeps marketing
+                page flow outside this shell.
+              */}
+              {/*
+                P0-24 Q2A: height governed by svh — no fixed min-h-[560px] that beats short 70svh.
+                Internal scroller + sibling footer (DoD+): full-bleed consult column cannot use
+                document scroll without covering composer; Lenis isolation via data-lenis-prevent.
+                Mid-consult browser leave drops React-only sessionId/phase — no recovery UI this
+                ticket; durable resume lives on Chat / loadConsultation.
+              */}
+              <div className="libertymd-consult-shell flex h-[min(70svh,720px)] min-h-0 flex-col">
+              <div className="mb-4 flex shrink-0 items-center justify-between border-b border-libertymd-green-sage pb-3">
                 <div className="flex items-center gap-2.5">
-                  <span className="h-2.5 w-2.5 rounded-full bg-[#16A34A]" />
-                  <span className="text-sm font-bold text-[#111827]">{t('app.careAssistant')}</span>
-                  <span className="hidden text-xs text-[#64748B] sm:inline">Private session · {region}</span>
+                  <span className="h-2.5 w-2.5 rounded-full bg-libertymd-green-600" />
+                  <span className="text-sm font-bold text-libertymd-ink">{t('app.careAssistant')}</span>
+                  <span className="hidden text-xs text-libertymd-slate-500 sm:inline">Private session · {region}</span>
                 </div>
-                <button onClick={resetConsult} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#64748B] hover:text-[#2563EB]">
+                <button
+                  type="button"
+                  onClick={resetConsult}
+                  className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 px-2 text-xs font-semibold text-libertymd-slate-500 hover:text-libertymd-blue-600"
+                >
                   <RotateCcw className="h-3.5 w-3.5" />
                   Reset
                 </button>
               </div>
 
+              <div
+                ref={(node) => {
+                  scrollRef.current = node;
+                }}
+                data-lenis-prevent
+                data-libertymd-consult-scroller
+                className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+              >
+                <div ref={contentRef} className={TRANSCRIPT_BOTTOM_CLEARANCE_CLASS}>
+              {showInterviewProgress && interviewProgressView && (
+                <div className="mb-4 flex justify-center" aria-live="polite">
+                  <LibertyMDProgressIndicator view={interviewProgressView} />
+                </div>
+              )}
               <div className="space-y-5">
                 {messages.map((message) => (
                   <div key={message.id} className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
                     <div
                       className={`max-w-[88%] rounded-[20px] px-5 py-4 text-sm leading-7 shadow-[0_14px_40px_rgba(15,23,42,0.045)] ${
                         message.sender === 'user'
-                          ? 'bg-[#5661F6] text-white'
+                          ? 'bg-libertymd-indigo text-white'
                           : message.kind === 'emergency'
-                          ? 'bg-[#FFF1F2] text-[#991B1B]'
+                          ? 'bg-libertymd-blue-50 text-libertymd-blue-900'
                           : message.kind === 'report'
-                          ? 'bg-white text-[#166534]'
-                          : 'bg-white text-[#334155]'
+                          ? 'bg-white text-libertymd-green-600'
+                          : 'bg-white text-libertymd-slate-700'
                       }`}
                     >
                       {message.text}
@@ -1192,8 +1642,19 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                     sex={demographics.sex}
                     loading={isTyping}
                     error={error}
+                    question={entryQuestion}
+                    options={entryOptions}
+                    answer={clinicalAnswer}
+                    consentChecked={consentChecked}
+                    isAnonymous={isAnonymous}
+                    profiles={entryProfilesFromPatients(entryPatients).length > 1
+                      ? entryProfilesFromPatients(entryPatients)
+                      : []}
                     onAgeChange={(age) => setDemographics(prev => ({ ...prev, age }))}
                     onSexChange={(sex) => setDemographics(prev => ({ ...prev, sex }))}
+                    onAnswerChange={setClinicalAnswer}
+                    onConsentChange={setConsentChecked}
+                    onCareForSomeoneElse={isAnonymous ? () => void attemptAddProfile('unified_entry') : undefined}
                     onSubmit={submitDemographics}
                   />
                 )}
@@ -1206,111 +1667,103 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                   />
                 )}
 
-                {phase === 'report_gate' && !isReportGateOpen && (
-                  <button
-                    type="button"
-                    onClick={() => setIsReportGateOpen(true)}
-                    className="mx-auto inline-flex h-11 items-center justify-center rounded-full bg-libertymd-blue-600 px-6 text-sm font-bold text-white shadow-lg shadow-libertymd-blue-600/20 hover:bg-libertymd-blue-700"
-                  >
-                    View report options
-                  </button>
-                )}
-
-                {error && phase !== 'demographics_required' && (
+                {error && phase !== 'demographics_required' && reportLifecycle !== 'generation_failed' && (
                   <LibertyMDRequestErrorNotice message={error} className="mx-auto max-w-2xl text-left" />
                 )}
 
                 {isTyping && (
-                  <div className="flex items-center gap-2 text-sm text-[#64748B]">
-                    <Loader2 className="h-4 w-4 animate-spin text-[#5661F6]" />
-                    Checking safety and generating the next clinical step...
-                  </div>
+                  waitMode === 'reviewing' ? (
+                    <LibertyMDWaitingIndicator
+                      mode="reviewing"
+                      reviewingLabel={t('chatx.waitingReviewing')}
+                      className="mx-auto max-w-2xl"
+                    />
+                  ) : (
+                    <LibertyMDTypingWaitRow label={t('chat.typing')} className="mx-auto max-w-2xl" />
+                  )
                 )}
 
-                {report && (
-                  <div className="border-t border-[#DDE7D8] pt-7">
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                      <div>
-                        <p className="text-xs font-bold uppercase tracking-normal text-[#2563EB]">{t('app.shareReport')}</p>
-                        <h3 className="mt-2 text-3xl font-black tracking-normal text-[#111827]">Assessment & Plan</h3>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedTab('doctors')}
-                        className="w-max rounded-full bg-[#111827] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#1F2937]"
-                      >
-                        Continue to a licensed doctor
-                      </button>
-                    </div>
-
-                    <p className="mt-5 max-w-3xl text-base leading-8 text-[#334155]">{report.summary}</p>
-
-                    {report.differentials.length > 0 && (
-                      <div className="mt-8 space-y-5 border-t border-[#DDE7D8] pt-6">
-                        <p className="text-xs font-bold uppercase tracking-normal text-[#64748B]">{t('app.clinicalConsiderations')}</p>
-                        {report.differentials.map((item, index) => (
-                          <div key={`${item.name}-${index}`} className="border-b border-[#DDE7D8] pb-5">
-                            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                              <div>
-                                <h4 className="font-bold text-[#111827]">{item.name}</h4>
-                                {item.description && <p className="mt-1 text-sm leading-7 text-[#5B6472]">{item.description}</p>}
-                                {item.reason && <p className="mt-2 text-xs leading-6 text-[#64748B]">{item.reason}</p>}
-                              </div>
-                              {item.confidence && <span className="text-xs font-bold text-[#2563EB]">{item.confidence}</span>}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="mt-8 grid gap-8 md:grid-cols-2">
-                      <div>
-                        <h4 className="text-sm font-black text-[#166534]">{t('app.carePlan')}</h4>
-                        <ul className="mt-3 space-y-2 text-sm leading-7 text-[#334155]">
-                          {(report.plan.length ? report.plan : ['Monitor symptoms, rest, hydrate, and follow up if symptoms worsen.']).map((item, index) => (
-                            <li key={index}>- {item}</li>
-                          ))}
-                        </ul>
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-black text-[#991B1B]">{t('app.redFlags')}</h4>
-                        <ul className="mt-3 space-y-2 text-sm leading-7 text-[#334155]">
-                          {(report.redFlags.length ? report.redFlags : ['Seek urgent care for chest pain, trouble breathing, confusion, fainting, severe worsening pain, or symptoms that feel dangerous.']).map((item, index) => (
-                            <li key={index}>- {item}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-
-                    <div className="mt-8 border-t border-[#DDE7D8] pt-6">
-                      <h4 className="font-black text-[#111827]">{t('app.soapNote')}</h4>
-                      <div className="mt-4 grid gap-x-8 gap-y-5 md:grid-cols-2">
-                        {[
-                          ['Subjective', report.soap.subjective],
-                          ['Objective', report.soap.objective],
-                          ['Assessment', report.soap.assessment],
-                          ['Plan', report.soap.plan]
-                        ].map(([label, value]) => (
-                          <div key={label}>
-                            <p className="text-xs font-bold uppercase tracking-normal text-[#64748B]">{label}</p>
-                            <p className="mt-2 whitespace-pre-line text-sm leading-7 text-[#334155]">{value}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="mt-8 flex items-center gap-2 border-t border-[#DDE7D8] pt-5 text-sm text-[#5B6472]">
-                      <ShieldCheck className="h-4 w-4 text-[#2563EB]" />
-                      {isAnonymous ? 'Guest report available for seven days.' : 'Saved privately to your LibertyMD history.'}
-                    </div>
-                  </div>
+                {reportLifecycle === 'partial' && (
+                  <LibertyMDReportLifecycleShell state="partial" className="mx-auto max-w-2xl" />
                 )}
 
-                <div ref={messagesEndRef} />
+                {reportLifecycle === 'generation_failed' && (
+                  <LibertyMDReportLifecycleShell
+                    state="generation_failed"
+                    className="mx-auto max-w-2xl"
+                    onRetry={() => {
+                      const lastUser = [...messages].reverse().find((m) => m.sender === 'user');
+                      if (lastUser?.text) void sendToWorkflow(lastUser.text);
+                    }}
+                  />
+                )}
+
+                {reportLifecycle === 'guest_expired' && (
+                  <LibertyMDReportLifecycleShell
+                    state="guest_expired"
+                    className="mx-auto max-w-2xl"
+                    onSignIn={() => { void startGoogleLink(); }}
+                  />
+                )}
+
+                <div data-libertymd-report-lifecycle={reportLifecycle ?? undefined} className="sr-only">
+                  {reportLifecycle || 'none'}
+                </div>
+
+                {reportLifecycle === 'ready' && report && (
+                  <div className="mx-auto max-w-2xl space-y-[var(--libertymd-space-sm)]">
+                    {shouldShowGuestRetentionWarning({
+                      hasReportBody: true,
+                      saved: !isAnonymous,
+                      retentionExpiresAt,
+                    }) && retentionExpiresAt ? (
+                      <LibertyMDGuestRetentionWarning
+                        remainingLabel={formatRetentionRemaining(retentionExpiresAt)}
+                      />
+                    ) : null}
+                    <LibertyMDReportView
+                      report={report}
+                      saved={!isAnonymous}
+                      scrollParentRef={scrollRef}
+                      consultationId={sessionId || undefined}
+                      retentionExpiresAt={retentionExpiresAt}
+                      onDoctorCta={
+                        shouldShowDoctorHandoff(report.triageTier)
+                          ? () => setSelectedTab('doctors')
+                          : undefined
+                      }
+                      emailDelivery={sessionId ? {
+                        consultationId: sessionId,
+                        prefillEmail: linkedEmail,
+                        onRequest: requestReportEmail,
+                      } : undefined}
+                      footerSlot={
+                        shouldShowDoctorHandoff(report.triageTier) ? (
+                          <LibertyMDDoctorHandoffCta
+                            triageTier={report.triageTier}
+                            position="footer"
+                            sessionKey={sessionId || undefined}
+                            onClick={() => setSelectedTab('doctors')}
+                          />
+                        ) : undefined
+                      }
+                    />
+                  </div>
+                )}
+              </div>
+                </div>
               </div>
 
-              <div className="mt-6 border-t border-[#DDE7D8] pt-4">
-                {!isComposerLocked && activeOptions.length > 0 && (
+              <footer ref={footerRef} className="relative z-20 shrink-0 border-t border-libertymd-green-sage pt-4 pb-[max(12px,env(safe-area-inset-bottom))]">
+                {showJumpToLatest && !isEmergencyStopped && (
+                  <LibertyMDNewMessagePill label="New message" onClick={jumpToLatest} />
+                )}
+                {/*
+                  P0-21 · report-gate open CTA in observed footerRef (Q4A clearance via
+                  ResizeObserver). App has no recovery_required. Safe-area parity (Q2A).
+                */}
+                <LibertyMDContinuationActionBar action={continuationAction} />
+                {!continuationOwnsFooter && !isComposerLocked && activeOptions.length > 0 && (
                   <div className="mb-4 flex flex-wrap gap-x-4 gap-y-2">
                     {activeOptions.map((option) => (
                       <button
@@ -1318,7 +1771,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                         type="button"
                         disabled={isTyping}
                         onClick={() => handleSend(option)}
-                        className="text-center text-xs font-semibold leading-5 text-[#2563EB] hover:text-[#111827] disabled:opacity-50"
+                        className="text-center text-xs font-semibold leading-5 text-libertymd-blue-600 hover:text-libertymd-ink disabled:opacity-50"
                       >
                         {option}
                       </button>
@@ -1326,32 +1779,34 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                   </div>
                 )}
 
-                <form
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    handleSend();
-                  }}
-                  className="flex items-center gap-2 rounded-full border border-white bg-white/92 px-4 py-3 shadow-[0_16px_50px_rgba(37,99,235,0.07)] backdrop-blur-xl"
-                >
-                  <input
-                    type="text"
-                    value={input}
-                    onChange={(event) => setInput(event.target.value)}
-                    disabled={isComposerLocked}
-                    placeholder={phase === 'report_ready' ? 'Report is ready above' : phase === 'report_gate' ? 'Unlock your report to continue' : 'Answer the follow-up question...'}
-                    className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[#94A3B8]"
-                  />
-                  <button
-                    type="submit"
-                    aria-label="Send message"
-                    disabled={!input.trim() || isComposerLocked}
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#5661F6] text-white hover:bg-[#4651E6] disabled:cursor-not-allowed disabled:opacity-40"
+                {!continuationOwnsFooter && (
+                  <form
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      handleSend();
+                    }}
+                    className="flex items-center gap-2 rounded-full border border-white bg-white/92 px-4 py-3 shadow-[0_16px_50px_rgba(37,99,235,0.07)] backdrop-blur-xl"
                   >
-                    <Send className="h-4 w-4" />
-                  </button>
-                </form>
+                    <input
+                      type="text"
+                      value={input}
+                      onChange={(event) => setInput(event.target.value)}
+                      disabled={isComposerLocked}
+                      placeholder={phase === 'report_ready' ? 'Report is ready above' : phase === 'report_gate' ? t('chatx.phReportGate') : 'Answer the follow-up question...'}
+                      className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-libertymd-slate-400"
+                    />
+                    <button
+                      type="submit"
+                      aria-label="Send message"
+                      disabled={!input.trim() || isComposerLocked}
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-libertymd-indigo text-white hover:bg-libertymd-indigo disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <Send className="h-4 w-4" />
+                    </button>
+                  </form>
+                )}
+              </footer>
               </div>
-            </div>
             </div>
           )}
         </section>
@@ -1364,31 +1819,18 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
         />
 
         {selectedTab === 'doctors' && (
-          <section className="libertymd-page-gutter libertymd-section-spacing border-t border-[#E6EDE3] bg-[linear-gradient(180deg,rgba(251,252,248,0.98),rgba(239,246,255,0.72))]">
-            <div className="libertymd-content-shell">
-              <p className="text-xs font-bold uppercase tracking-normal text-[#2563EB]">{t('app.handoffKicker')}</p>
-              <h2 className="mx-auto mt-3 max-w-xl text-3xl font-black tracking-normal text-[#111827] sm:text-4xl">
-                {t('app.handoffTitle')}
-              </h2>
-              <div className="mt-10 grid gap-8 md:grid-cols-3">
-                {[
-                  ['Dr. Elena Rostova, MD', 'Urgent Care', '9 mins'],
-                  ['Dr. Rajiv Patel, MD', 'Internal Medicine', '14 mins'],
-                  ['Dr. Barry Pevner, MD', 'Family Medicine', '18 mins']
-                ].map(([name, specialty, wait]) => (
-                  <div key={name} className="border-t border-[#DDE7D8] pt-5">
-                    <p className="text-xs font-bold uppercase tracking-normal text-[#64748B]">{t('app.availableIn', { wait: String(wait) })}</p>
-                    <h3 className="mt-3 text-lg font-black text-[#111827]">{name}</h3>
-                    <p className="mt-1 text-sm font-semibold text-[#2563EB]">{specialty}</p>
-                    <p className="mt-3 text-sm leading-7 text-[#5B6472]">
-                      {t('app.doctorReview', { price: region === 'EU' ? '€39' : '$39' })}
-                    </p>
-                    <button className="mt-4 rounded-full bg-[#5661F6] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#4651E6]">
-                      Start visit
-                    </button>
-                  </div>
-                ))}
-              </div>
+          <section
+            className="libertymd-page-gutter libertymd-section-spacing border-t border-libertymd-slate-200 bg-[linear-gradient(180deg,rgba(251,252,248,0.98),rgba(239,246,255,0.72))]"
+            data-libertymd-doctors-destination=""
+          >
+            <div className="libertymd-content-shell max-w-xl">
+              <LibertyMDDoctorHandoffPanel
+                triageTier={report?.triageTier || 'unknown'}
+                consultationId={sessionId || undefined}
+                position="footer"
+                sessionKey={sessionId || undefined}
+                hideTriggerCta
+              />
             </div>
           </section>
         )}
@@ -1402,20 +1844,27 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
 
         <LibertyMDScrollFilmSection />
 
-        <LibertyMDPatientStoriesSection />
+        {/* P3-03 — patient-story rail removed (named likeness invent; empty permission inventory). */}
 
         <LibertyMDHealthLibrarySection />
 
       </main>
 
-      {phase === 'report_gate' && isReportGateOpen && (
+      {phase === 'report_gate' && isReportGateOpen && !guestExpired && (
         <LibertyMDReportGate
           loading={isAuthBusy}
           onGoogle={startGoogleLink}
           onSkip={skipReportGate}
-          onClose={() => setIsReportGateOpen(false)}
+          onClose={dismissReportGate}
         />
       )}
+
+      <LibertyMDProfileCapabilityOffer
+        open={isProfileCapabilityOfferOpen}
+        loading={isAuthBusy}
+        onGoogle={startCapabilityGoogleLink}
+        onClose={() => setIsProfileCapabilityOfferOpen(false)}
+      />
 
       <LibertyMDAccountDrawer
         open={isMenuOpen}
@@ -1429,13 +1878,15 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
         loading={isAccountLoading}
         onClose={() => setIsMenuOpen(false)}
         onSelectConsultation={loadConsultation}
+        onCareForSomeoneElse={isAnonymous ? () => void attemptAddProfile('drawer') : undefined}
+        profileManagement={profileManagementHandlers}
       />
 
       {isEmergencyStopped && !isEmergencyAcknowledged && (
         <LibertyMDEmergencyAlert
-          heading={t('chatx.emergencyNow')}
+          heading={emergencyHeading}
           message={emergencyDetail}
-          standingInstruction={EMERGENCY_STANDING_INSTRUCTION}
+          standingInstruction={emergencyStandingInstruction}
           acknowledgeLabel={EMERGENCY_ACKNOWLEDGE_LABEL}
           persistenceNote={EMERGENCY_PERSISTENCE_NOTE}
           onAcknowledge={() => setIsEmergencyAcknowledged(true)}
@@ -1474,22 +1925,25 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
             placeholder={isFloatingInputFocused ? '' : 'Ask about your health...'}
             aria-label="Ask LibertyMD about your health"
             tabIndex={shouldShowFloatingComposer ? 0 : -1}
-            className="min-w-0 flex-1 bg-transparent px-1 !text-left text-sm font-medium text-[#0F172A] outline-none placeholder:text-[#64748B] sm:text-lg"
+            className="min-w-0 flex-1 bg-transparent px-1 !text-left text-sm font-medium text-libertymd-slate-900 outline-none placeholder:text-libertymd-slate-500 sm:text-lg"
           />
           <button
             type="submit"
             aria-label="Send health question"
             tabIndex={shouldShowFloatingComposer ? 0 : -1}
             disabled={isComposerLocked || !input.trim()}
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#2563EB] text-white shadow-[0_10px_24px_rgba(37,99,235,0.38)] transition-[background-color,box-shadow,opacity,transform] hover:bg-[#1D4ED8] hover:shadow-[0_13px_30px_rgba(37,99,235,0.45)] active:scale-95 disabled:cursor-not-allowed disabled:bg-[#A7B3C5] disabled:opacity-70 disabled:shadow-none sm:h-16 sm:w-16"
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-libertymd-blue-600 text-white shadow-[0_10px_24px_rgba(37,99,235,0.38)] transition-[background-color,box-shadow,opacity,transform] hover:bg-libertymd-blue-700 hover:shadow-[0_13px_30px_rgba(37,99,235,0.45)] active:scale-95 disabled:cursor-not-allowed disabled:bg-libertymd-slate-400 disabled:opacity-70 disabled:shadow-none sm:h-16 sm:w-16"
           >
             <Send className="h-5 w-5 sm:h-6 sm:w-6" />
           </button>
         </form>
       </div>
 
+      {/* P3-03 — honest trust band immediately above frozen marketing footer. */}
+      {phase === 'initial' && <LibertyMDTrustRow />}
+
       {/* Exact Doctronic-Style 3D Volumetric Ribbon Footer in Blue */}
-      <footer className="relative mt-24 bg-gradient-to-b from-[#EFF6FF] via-[#F0F9FF] to-[#E0F2FE] text-[#0F172A] overflow-hidden min-h-[720px] flex flex-col justify-between">
+      <footer className="relative mt-24 bg-gradient-to-b from-libertymd-blue-50 via-libertymd-blue-50 to-libertymd-blue-50 text-libertymd-slate-900 overflow-hidden min-h-[720px] flex flex-col justify-between">
         {/* Three.js WebGL 3D Silk Wave Ribbon (Blue Theme) */}
         <LibertyMDFooterRibbon />
 
@@ -1497,56 +1951,56 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
         <div className="relative z-10 max-w-7xl mx-auto px-6 sm:px-10 pt-16 w-full">
           <div className="flex flex-col lg:flex-row justify-between items-start gap-12">
             {/* Left Columns */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-8 text-xs font-medium text-[#334155]">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-8 text-xs font-medium text-libertymd-slate-700">
               <div className="space-y-4">
-                <p className="font-semibold text-sm text-[#0F172A]">{t('footer.clinicalCare')}</p>
+                <p className="font-semibold text-sm text-libertymd-slate-900">{t('footer.clinicalCare')}</p>
                 <ul className="space-y-2.5">
-                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.symptomChecker')}</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.urgentCare')}</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.primaryTelehealth')}</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.refills')}</li>
+                  <li className="hover:text-libertymd-blue-600 cursor-pointer">{t('footer.symptomChecker')}</li>
+                  <li className="hover:text-libertymd-blue-600 cursor-pointer">{t('footer.urgentCare')}</li>
+                  <li className="hover:text-libertymd-blue-600 cursor-pointer">{t('footer.primaryTelehealth')}</li>
+                  <li className="hover:text-libertymd-blue-600 cursor-pointer">{t('footer.refills')}</li>
                 </ul>
 
-                <p className="font-semibold text-sm text-[#0F172A] pt-4">{t('footer.helpPrivacy')}</p>
+                <p className="font-semibold text-sm text-libertymd-slate-900 pt-4">{t('footer.helpPrivacy')}</p>
                 <ul className="space-y-2.5">
-                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.faqs')}</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.privacyGdpr')}</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.hipaa')}</li>
+                  <li className="hover:text-libertymd-blue-600 cursor-pointer">{t('footer.faqs')}</li>
+                  <li className="hover:text-libertymd-blue-600 cursor-pointer">{t('footer.privacyGdpr')}</li>
+                  <li className="hover:text-libertymd-blue-600 cursor-pointer">{t('footer.hipaa')}</li>
                 </ul>
               </div>
 
               <div className="space-y-4">
-                <p className="font-semibold text-sm text-[#0F172A]">{t('footer.company')}</p>
+                <p className="font-semibold text-sm text-libertymd-slate-900">{t('footer.company')}</p>
                 <ul className="space-y-2.5">
-                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.about')}</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.careers')}</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.reviewers')}</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.team')}</li>
+                  <li className="hover:text-libertymd-blue-600 cursor-pointer">{t('footer.about')}</li>
+                  <li className="hover:text-libertymd-blue-600 cursor-pointer">{t('footer.careers')}</li>
+                  <li className="hover:text-libertymd-blue-600 cursor-pointer">{t('footer.reviewers')}</li>
+                  <li className="hover:text-libertymd-blue-600 cursor-pointer">{t('footer.team')}</li>
                 </ul>
               </div>
 
               <div className="space-y-4">
-                <p className="font-semibold text-sm text-[#0F172A]">{t('footer.conditions')}</p>
+                <p className="font-semibold text-sm text-libertymd-slate-900">{t('footer.conditions')}</p>
                 <ul className="space-y-2.5">
-                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.respiratory')}</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.cardiovascular')}</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.neurology')}</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.allConditions')}</li>
+                  <li className="hover:text-libertymd-blue-600 cursor-pointer">{t('footer.respiratory')}</li>
+                  <li className="hover:text-libertymd-blue-600 cursor-pointer">{t('footer.cardiovascular')}</li>
+                  <li className="hover:text-libertymd-blue-600 cursor-pointer">{t('footer.neurology')}</li>
+                  <li className="hover:text-libertymd-blue-600 cursor-pointer">{t('footer.allConditions')}</li>
                 </ul>
 
-                <p className="font-semibold text-sm text-[#0F172A] pt-4">{t('footer.research')}</p>
+                <p className="font-semibold text-sm text-libertymd-slate-900 pt-4">{t('footer.research')}</p>
                 <ul className="space-y-2.5">
-                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.blog')}</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">Peer-Reviewed RAG</li>
+                  <li className="hover:text-libertymd-blue-600 cursor-pointer">{t('footer.blog')}</li>
+                  <li className="hover:text-libertymd-blue-600 cursor-pointer">Peer-Reviewed RAG</li>
                 </ul>
               </div>
 
               <div className="space-y-4">
-                <p className="font-semibold text-sm text-[#0F172A]">{t('footer.partnerships')}</p>
+                <p className="font-semibold text-sm text-libertymd-slate-900">{t('footer.partnerships')}</p>
                 <ul className="space-y-2.5">
-                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.becomePartner')}</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.euHealth')}</li>
-                  <li className="hover:text-[#2563EB] cursor-pointer">{t('footer.usInsurance')}</li>
+                  <li className="hover:text-libertymd-blue-600 cursor-pointer">{t('footer.becomePartner')}</li>
+                  <li className="hover:text-libertymd-blue-600 cursor-pointer">{t('footer.euHealth')}</li>
+                  <li className="hover:text-libertymd-blue-600 cursor-pointer">{t('footer.usInsurance')}</li>
                 </ul>
               </div>
             </div>
@@ -1579,7 +2033,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
             <PatientOathEmblem className="w-48 h-48" />
           </div>
 
-          <p className="libertymd-type-footer-oath mx-auto mt-10 max-w-4xl text-balance font-medium text-[#0F172A] sm:mt-12">
+          <p className="libertymd-type-footer-oath mx-auto mt-10 max-w-4xl text-balance font-medium text-libertymd-slate-900 sm:mt-12">
             <strong className="font-extrabold">
               I will first do no harm. Every response, every recommendation, and every action taken by LibertyMD will be measured against one question: does this serve the patient’s wellbeing?
             </strong>
@@ -1587,11 +2041,18 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
         </div>
 
         {/* Bottom Copyright */}
-        <div className="relative z-10 max-w-7xl mx-auto px-6 sm:px-10 py-6 w-full flex flex-col sm:flex-row items-center justify-between text-xs text-[#475569] border-t border-[#CBD5E1]/60">
+        <div className="relative z-10 max-w-7xl mx-auto px-6 sm:px-10 py-6 w-full flex flex-col sm:flex-row items-center justify-between text-xs text-libertymd-slate-600 border-t border-libertymd-slate-300/60">
           <p>© {new Date().getFullYear()} LibertyMD Health Technologies. All rights reserved.</p>
           <p>Privacy-first AI triage • EU GDPR Article 9 & US HIPAA Safe Harbor</p>
         </div>
       </footer>
+
+      {/* P3-02 — sample report OverlaySheet (synthetic only; outside footer). */}
+      <LibertyMDSampleReport
+        open={isSampleReportOpen && phase === 'initial'}
+        onClose={() => setIsSampleReportOpen(false)}
+        onStartConsult={handleSampleReportStart}
+      />
 
     </div>
   );

@@ -7,93 +7,279 @@
       "libertymd": "e7f3af3d-9a36-492d-8c13-47fc49240b0c"
     },
     "sourceOfTruth": {
-      "saksham-experiments": ["index.css", "tailwind.config.js", "components/ui/"],
-      "libertymd": ["index.css (--libertymd-space-*)", "components/LibertyMD/"]
+      "saksham-experiments": [
+        "index.css",
+        "tailwind.config.js",
+        "components/ui/"
+      ],
+      "libertymd": [
+        "index.css (--libertymd-space-*)",
+        "components/LibertyMD/"
+      ]
     }
   },
-
   "saksham-experiments": {
     "color": {
       "brand": {
-        "dark":  { "value": "#2C2A26", "role": "ink / headings" },
-        "light": { "value": "#F5F2EB", "role": "canvas" },
-        "gray":  { "value": "#A8A29E", "role": "muted" },
-        "text":  { "value": "#5D5A53", "role": "body" },
-        "gold":  { "value": "#8B7644", "role": "links / rules" }
+        "dark": {
+          "value": "#2C2A26",
+          "role": "ink / headings"
+        },
+        "light": {
+          "value": "#F5F2EB",
+          "role": "canvas"
+        },
+        "gray": {
+          "value": "#A8A29E",
+          "role": "muted"
+        },
+        "text": {
+          "value": "#5D5A53",
+          "role": "body"
+        },
+        "gold": {
+          "value": "#8B7644",
+          "role": "links / rules"
+        }
       },
       "semantic": {
         "_note": "shadcn/ui HSL CSS variables; hex is the light-theme resolution",
-        "background":            { "value": "#FFFFFF", "hsl": "0 0% 100%" },
-        "foreground":            { "value": "#0A0A0A", "hsl": "0 0% 3.9%" },
-        "primary":               { "value": "#171717", "hsl": "0 0% 9%" },
-        "primary-foreground":    { "value": "#FAFAFA", "hsl": "0 0% 98%" },
-        "secondary":             { "value": "#F5F5F5", "hsl": "0 0% 96.1%" },
-        "muted-foreground":      { "value": "#737373", "hsl": "0 0% 45.1%" },
-        "accent":                { "value": "#F5F5F5", "hsl": "0 0% 96.1%" },
-        "destructive":           { "value": "#EF4444", "hsl": "0 84.2% 60.2%" },
-        "border":                { "value": "#E5E5E5", "hsl": "0 0% 89.8%" },
-        "input":                 { "value": "#E5E5E5", "hsl": "0 0% 89.8%" },
-        "ring":                  { "value": "#0A0A0A", "hsl": "0 0% 3.9%" }
+        "background": {
+          "value": "#FFFFFF",
+          "hsl": "0 0% 100%"
+        },
+        "foreground": {
+          "value": "#0A0A0A",
+          "hsl": "0 0% 3.9%"
+        },
+        "primary": {
+          "value": "#171717",
+          "hsl": "0 0% 9%"
+        },
+        "primary-foreground": {
+          "value": "#FAFAFA",
+          "hsl": "0 0% 98%"
+        },
+        "secondary": {
+          "value": "#F5F5F5",
+          "hsl": "0 0% 96.1%"
+        },
+        "muted-foreground": {
+          "value": "#737373",
+          "hsl": "0 0% 45.1%"
+        },
+        "accent": {
+          "value": "#F5F5F5",
+          "hsl": "0 0% 96.1%"
+        },
+        "destructive": {
+          "value": "#EF4444",
+          "hsl": "0 84.2% 60.2%"
+        },
+        "border": {
+          "value": "#E5E5E5",
+          "hsl": "0 0% 89.8%"
+        },
+        "input": {
+          "value": "#E5E5E5",
+          "hsl": "0 0% 89.8%"
+        },
+        "ring": {
+          "value": "#0A0A0A",
+          "hsl": "0 0% 3.9%"
+        }
       }
     },
     "font": {
-      "serif": { "value": "'Playfair Display', Georgia, serif", "use": "display & headings" },
-      "sans":  { "value": "'Inter', system-ui, sans-serif", "use": "body & UI" }
+      "serif": {
+        "value": "'Playfair Display', Georgia, serif",
+        "use": "display & headings"
+      },
+      "sans": {
+        "value": "'Inter', system-ui, sans-serif",
+        "use": "body & UI"
+      }
     },
-    "radius": { "sm": "4px", "md": "6px", "lg": "8px", "base": "0.5rem" },
-    "components": "shadcn/ui in components/ui/ — Button (6 variants), Badge (4), Card, Input, Label, Select, Tabs, Dialog, Table, Popover, Separator, Skeleton"
+    "radius": {
+      "sm": "4px",
+      "md": "6px",
+      "lg": "8px",
+      "base": "0.5rem"
+    },
+    "components": "shadcn/ui in components/ui/ \u2014 Button (6 variants), Badge (4), Card, Input, Label, Select, Tabs, Dialog, Table, Popover, Separator, Skeleton"
   },
-
   "libertymd": {
     "color": {
       "primary": {
-        "blue-900": { "value": "#1E3A8A" },
-        "blue-800": { "value": "#1E40AF" },
-        "blue-700": { "value": "#1D4ED8" },
-        "blue-600": { "value": "#2563EB", "role": "primary action / links" },
-        "blue-500": { "value": "#3B82F6" },
-        "blue-50":  { "value": "#EFF6FF", "role": "wash" }
+        "blue-900": {
+          "value": "#1E3A8A"
+        },
+        "blue-800": {
+          "value": "#1E40AF"
+        },
+        "blue-700": {
+          "value": "#1D4ED8"
+        },
+        "blue-600": {
+          "value": "#2563EB",
+          "role": "primary action / links"
+        },
+        "blue-500": {
+          "value": "#3B82F6"
+        },
+        "blue-50": {
+          "value": "#EFF6FF",
+          "role": "wash"
+        }
       },
       "neutral": {
-        "ink-900":   { "value": "#111827" },
-        "slate-900": { "value": "#0F172A" },
-        "slate-700": { "value": "#334155" },
-        "slate-500": { "value": "#64748B" },
-        "slate-300": { "value": "#CBD5E1" },
-        "slate-200": { "value": "#E2E8F0" }
+        "ink-900": {
+          "value": "#111827"
+        },
+        "slate-900": {
+          "value": "#0F172A"
+        },
+        "slate-700": {
+          "value": "#334155"
+        },
+        "slate-500": {
+          "value": "#64748B"
+        },
+        "slate-300": {
+          "value": "#CBD5E1"
+        },
+        "slate-200": {
+          "value": "#E2E8F0"
+        },
+        "slate-600": {
+          "value": "#475569",
+          "role": "secondary UI chrome / icons"
+        },
+        "slate-400": {
+          "value": "#94A3B8",
+          "role": "muted borders / icons"
+        },
+        "slate-100": {
+          "value": "#F1F5F9",
+          "role": "subtle surface / hover wash"
+        },
+        "navy": {
+          "value": "#17325F",
+          "role": "structure / marketing ink across App+Chat"
+        },
+        "slate-muted": {
+          "value": "#5B6472",
+          "role": "supporting body / muted copy"
+        }
       },
       "accent": {
-        "green-600": { "value": "#169B52", "role": "positive / in-network" },
-        "emerald":   { "value": "#10B981" },
-        "sage":      { "value": "#DDE7D8" },
-        "indigo":    { "value": "#5661F6" }
+        "green-600": {
+          "value": "#169B52",
+          "role": "positive / in-network"
+        },
+        "emerald": {
+          "value": "#10B981"
+        },
+        "sage": {
+          "value": "#DDE7D8"
+        },
+        "indigo": {
+          "value": "#5661F6"
+        }
       },
       "surface": {
-        "wash": { "value": "linear-gradient(180deg,#FBFCF9 0%,#F5F9FF 34%,#F3F8F2 66%,#EFF6FF 100%)" }
+        "wash": {
+          "value": "linear-gradient(180deg,#FBFCF9 0%,#F5F9FF 34%,#F3F8F2 66%,#EFF6FF 100%)"
+        },
+        "mist": {
+          "value": "#DCE6F1",
+          "role": "soft blue consult surface"
+        }
+      },
+      "brandMark": {
+        "_note": "Approved LibertyMD logo-mark asset colors from public/images/libertymd-logo-mark.svg (comment-locked). Documentation for AC7 review \u2014 do not recolor the mark to Trust Blue (primary.blue-600). PDF chrome uses primary/neutral tokens; mark pixels stay in the committed PNG raster.",
+        "navy": {
+          "value": "#0B2E63",
+          "role": "mark cross / torch body"
+        },
+        "blue": {
+          "value": "#1769FF",
+          "role": "mark flame accent"
+        },
+        "mint": {
+          "value": "#67D7B4",
+          "role": "mark torch band"
+        }
       }
     },
     "font": {
-      "display": { "value": "'Playfair Display', Georgia, serif", "use": "Hero and editorial marketing headings; italic for editorial taglines" },
-      "sans":    { "value": "'Inter', system-ui, sans-serif", "use": "UI, body, chat, cards, reports, and legal copy" }
+      "display": {
+        "value": "'Playfair Display', Georgia, serif",
+        "use": "Hero and editorial marketing headings; italic for editorial taglines"
+      },
+      "sans": {
+        "value": "'Inter', system-ui, sans-serif",
+        "use": "UI, body, chat, cards, reports, and legal copy"
+      }
     },
     "typeScale": {
       "_note": "Exact semantic sizes. Display tiers use the mobile value below 640px and desktop value at 640px and above. Do not scale type continuously with viewport width.",
-      "display":          { "mobile": "3.5rem",   "desktop": "4.5rem",  "role": "Hero product name only" },
-      "section-title":    { "mobile": "2.25rem",  "desktop": "3rem",    "role": "Primary marketing section headings" },
-      "subsection-title": { "mobile": "1.875rem", "desktop": "2.25rem", "role": "Feature panels and report headings" },
-      "card-title":       { "value": "1.25rem",   "role": "Cards and article titles" },
-      "lead":             { "value": "1.125rem",  "role": "Taglines and emphasized supporting copy" },
-      "body":             { "value": "1rem",      "role": "Body and chat copy" },
-      "body-small":       { "value": "0.875rem",  "role": "Supporting copy and compact UI" },
-      "label":            { "value": "0.75rem",   "role": "Eyebrows, metadata, and control labels" },
-      "legal":            { "value": "0.75rem",   "role": "Disclaimers, consent helper, and copyright" },
-      "footer-oath":      { "mobile": "1.125rem", "desktop": "1.5rem", "role": "Patient oath statement" }
+      "display": {
+        "mobile": "3.5rem",
+        "desktop": "4.5rem",
+        "role": "Hero product name only"
+      },
+      "section-title": {
+        "mobile": "2.25rem",
+        "desktop": "3rem",
+        "role": "Primary marketing section headings"
+      },
+      "subsection-title": {
+        "mobile": "1.875rem",
+        "desktop": "2.25rem",
+        "role": "Feature panels and report headings"
+      },
+      "card-title": {
+        "value": "1.25rem",
+        "role": "Cards and article titles"
+      },
+      "lead": {
+        "value": "1.125rem",
+        "role": "Taglines and emphasized supporting copy"
+      },
+      "body": {
+        "value": "1rem",
+        "role": "Body and chat copy"
+      },
+      "body-small": {
+        "value": "0.875rem",
+        "role": "Supporting copy and compact UI"
+      },
+      "label": {
+        "value": "0.75rem",
+        "role": "Eyebrows, metadata, and control labels"
+      },
+      "legal": {
+        "value": "0.75rem",
+        "role": "Disclaimers, consent helper, and copyright"
+      },
+      "footer-oath": {
+        "mobile": "1.125rem",
+        "desktop": "1.5rem",
+        "role": "Patient oath statement"
+      }
     },
     "spacing": {
       "_note": "4px base grid; --libertymd-space-* in index.css",
-      "xs": "0.25rem", "sm": "0.5rem", "md": "0.75rem", "lg": "1rem",
-      "xl": "1.5rem", "2xl": "2rem", "3xl": "3rem", "section": "4rem"
+      "xs": "0.25rem",
+      "sm": "0.5rem",
+      "md": "0.75rem",
+      "lg": "1rem",
+      "xl": "1.5rem",
+      "2xl": "2rem",
+      "3xl": "3rem",
+      "section": "4rem"
     },
-    "components": "components/LibertyMD/ — logo lockups, trust/credential badges, CTA buttons, marketing sections, footer ribbon (live logos/separators use 3D/particle canvas)"
+    "components": "components/LibertyMD/ \u2014 logo lockups, trust/credential badges, CTA buttons, marketing sections, footer ribbon (live logos/separators use 3D/particle canvas)"
   }
 }

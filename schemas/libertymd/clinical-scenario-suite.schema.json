@@ -48,6 +48,18 @@
             "required": ["emergency_action", "input_relevance"],
             "properties": {
               "emergency_action": { "type": "string", "enum": ["force_end", "continue"] },
+              "crisis_type": {
+                "type": "string",
+                "enum": [
+                  "acs_chest_pain",
+                  "thunderclap_headache",
+                  "anaphylaxis",
+                  "respiratory_distress",
+                  "surgical_abdomen",
+                  "stroke_fast",
+                  "suicidal_ideation"
+                ]
+              },
               "input_relevance": { "type": "string", "enum": ["clinical", "unclear", "off_topic"] },
               "report_outcome": { "type": "string", "enum": ["continue", "complete", "review"] }
             }

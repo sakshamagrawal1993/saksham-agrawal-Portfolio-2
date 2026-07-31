@@ -1,3 +1,9 @@
+import {
+  EMERGENCY_PATTERNS,
+  EMERGENCY_PATTERN_SET_VERSION,
+  type EmergencyCareSetting,
+} from './emergency-patterns.ts'
+
 export type ClinicalSlots = Record<string, unknown>
 
 export type ResponseRelevance = 'clinical' | 'unclear' | 'off_topic'
@@ -25,7 +31,16 @@ export type ReportDecision =
 
 export interface DeterministicEmergency {
   crisisType: string
+  careSetting: EmergencyCareSetting
   message: string
+  patternId: string
+  /** Verbatim slice of the original inbound message (not the lowercased scan). */
+  matchedSpan: string
+  /** Inclusive start index of `matchedSpan` on the original message. */
+  spanStart: number
+  /** Exclusive end index of `matchedSpan` on the original message. */
+  spanEnd: number
+  patternSetVersion: string
 }
 
 const SLOT_WEIGHTS: Record<string, number> = {
@@ -38,7 +53,8 @@ const SLOT_WEIGHTS: Record<string, number> = {
   relevant_history: 10,
 }
 
-const hasValue = (value: unknown) => {
+/** Shared slot-value gate (P1-09 eligibility reuses for `chief_complaint`). */
+export const hasValue = (value: unknown): boolean => {
   if (value === undefined || value === null) return false
   if (typeof value === 'string') {
     const text = value.trim()
@@ -51,36 +67,8 @@ const hasValue = (value: unknown) => {
 
 export function detectDeterministicEmergency(message: string): DeterministicEmergency | null {
   const text = message.toLowerCase()
-  const rules = [
-    {
-      pattern: /chest (pain|pressure|tightness)|crushing (chest|pressure)|pain radiating to (left )?arm|jaw pain.{0,30}(sweat|sweating|nausea)/i,
-      crisisType: 'acs_chest_pain',
-      message: 'These symptoms can be a medical emergency. Call emergency services or go to the ER now. Do not drive yourself.',
-    },
-    {
-      pattern: /worst headache of (my|his|her) life|thunderclap|sudden severe headache/i,
-      crisisType: 'thunderclap_headache',
-      message: 'A sudden worst-of-life headache can be an emergency. Call emergency services or go to the ER now.',
-    },
-    {
-      pattern: /throat (is )?tight|lip swelling|tongue swelling|anaphylaxis|cannot breathe after/i,
-      crisisType: 'anaphylaxis',
-      message: 'This may be anaphylaxis. Use epinephrine if available and call emergency services immediately.',
-    },
-    {
-      pattern: /cannot breathe|can't breathe|blue lips|gasping for air|oxygen (sat|saturation).{0,12}(8\d|9[0-2])\b/i,
-      crisisType: 'respiratory_distress',
-      message: 'Severe breathing problems need emergency care. Call emergency services or go to the ER now.',
-    },
-    {
-      pattern: /sudden severe (abdominal|belly|stomach) pain|severe (right lower|lower right|lower) (abdominal|belly|stomach) pain|rigid abdomen|pain (is )?so bad i (can't|cannot) walk/i,
-      crisisType: 'surgical_abdomen',
-      message: 'Severe abdominal pain with these features can be a surgical emergency. Seek ER care now.',
-    },
-  ]
-
-  for (const rule of rules) {
-    const globalPattern = new RegExp(rule.pattern.source, rule.pattern.flags.includes('g') ? rule.pattern.flags : `${rule.pattern.flags}g`)
+  for (const rule of EMERGENCY_PATTERNS) {
+    const globalPattern = new RegExp(rule.matcher.source, rule.matcher.flags.includes('g') ? rule.matcher.flags : `${rule.matcher.flags}g`)
     let match: RegExpExecArray | null
     while ((match = globalPattern.exec(text)) !== null) {
       if (match.index === undefined) continue
@@ -97,7 +85,19 @@ export function detectDeterministicEmergency(message: string): DeterministicEmer
         /\b(my|his|her|their)\s+\w*\s*(father|mother|dad|mum|mom|brother|sister|friend|husband|wife|son|daughter|uncle|aunt)\s+(had|has had|used to have)\b/.test(before)
         || /\b(family history|history of|hx of)\b/.test(before)
       ) continue
-      return { crisisType: rule.crisisType, message: rule.message }
+      const spanStart = match.index
+      const spanEnd = match.index + match[0].length
+      return {
+        crisisType: rule.crisisType,
+        careSetting: rule.careSetting,
+        message: rule.message,
+        patternId: rule.id,
+        // Slice the original message so casing is preserved for audit (AC4).
+        matchedSpan: message.slice(spanStart, spanEnd),
+        spanStart,
+        spanEnd,
+        patternSetVersion: EMERGENCY_PATTERN_SET_VERSION,
+      }
     }
   }
   return null

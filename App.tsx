@@ -8,6 +8,10 @@ import React, { useEffect, useState, Suspense, lazy } from 'react';
 import { Routes, Route, useNavigate, useLocation, useParams, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Analytics from './services/analytics';
+import {
+  isLibertyMdClinicalPath,
+  syncLibertyMdSessionReplayForPath,
+} from './components/LibertyMD/libertymd-session-replay';
 import { AuthProvider } from './context/AuthContext';
 import Hero from './components/Hero';
 import ProductGrid from './components/ProductGrid';
@@ -54,9 +58,19 @@ const AICareChat = lazy(() => import('./components/AICare/AICareChat').then(m =>
 const AICareObservations = lazy(() => import('./components/AICare/AICareObservations').then(m => ({ default: m.AICareObservations })));
 const LibertyMDApp = lazy(() => import('./components/LibertyMD/LibertyMDApp'));
 const LibertyMDChat = lazy(() => import('./components/LibertyMD/LibertyMDChat'));
+const LibertyMDReportRedeemPage = lazy(() => import('./components/LibertyMD/LibertyMDReportRedeemPage'));
+const LibertyMDFollowupCheckinPage = lazy(() => import('./components/LibertyMD/LibertyMDFollowupCheckinPage'));
+const LibertyMDFollowupUnsubscribePage = lazy(() => import('./components/LibertyMD/LibertyMDFollowupUnsubscribePage'));
 
 const LoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-[#F5F2EB] font-serif italic text-[#2C2A26]/50">
+    Loading...
+  </div>
+);
+
+/** P4-09 — LibertyMD Suspense fallback; never Saksham cream/ink on `/liberty-md*`. */
+const LibertyMDLoadingFallback = () => (
+  <div className="flex min-h-screen items-center justify-center bg-[image:var(--libertymd-surface-wash)] font-sans text-libertymd-slate-500">
     Loading...
   </div>
 );
@@ -186,13 +200,28 @@ function App() {
     Analytics.trackPageView(location.pathname + location.hash + location.search);
   }, [location.pathname, location.hash, location.search]);
 
+  // P1-18 — Session Replay clinical gate SoT (pathname prefix `/liberty-md*`).
+  // Runs before/without waiting on lazy Chat; Chat remount calls the same helper.
+  useEffect(() => {
+    syncLibertyMdSessionReplayForPath(location.pathname);
+  }, [location.pathname]);
+
+  // P4-09 — deliberate boundary: isolate `/liberty-md*` from Saksham cream / Grain.
+  const isLibertyMdRoute = isLibertyMdClinicalPath(location.pathname);
+
   return (
     <AuthProvider>
       {/* Lenis is the single scrolling experience across the portfolio. */}
       <SmoothScroll />
-      {/* Subtle film-grain texture over the whole UI for a premium feel. Tune opacity/blend here. */}
-      <GrainOverlay />
-      <div className="min-h-screen bg-[#F5F2EB] font-sans text-[#2C2A26] selection:bg-[#D6D1C7] selection:text-[#2C2A26]">
+      {/* Grain is portfolio-only — skip on LibertyMD so routes do not mix visual languages. */}
+      {!isLibertyMdRoute && <GrainOverlay />}
+      <div
+        className={
+          isLibertyMdRoute
+            ? 'min-h-screen bg-[image:var(--libertymd-surface-wash)] font-sans text-libertymd-ink selection:bg-libertymd-blue-50 selection:text-libertymd-ink'
+            : 'min-h-screen bg-[#F5F2EB] font-sans text-[#2C2A26] selection:bg-[#D6D1C7] selection:text-[#2C2A26]'
+        }
+      >
         {location.pathname === '/' && <Navbar onNavClick={handleNavClick} activeSection={activeSection} />}
 
 
@@ -200,13 +229,34 @@ function App() {
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/liberty-md" element={
-              <Suspense fallback={<LoadingFallback />}>
-                <LibertyMDApp onBack={() => navigate('/#work')} />
+              <Suspense fallback={<LibertyMDLoadingFallback />}>
+                <LibertyMDApp />
+              </Suspense>
+            } />
+            {/* P3-06 — topic path preferred paid destination; same App chrome. */}
+            <Route path="/liberty-md/t/:topicSlug" element={
+              <Suspense fallback={<LibertyMDLoadingFallback />}>
+                <LibertyMDApp />
               </Suspense>
             } />
             <Route path="/liberty-md/chat" element={
-              <Suspense fallback={<LoadingFallback />}>
+              <Suspense fallback={<LibertyMDLoadingFallback />}>
                 <LibertyMDChat />
+              </Suspense>
+            } />
+            <Route path="/liberty-md/report" element={
+              <Suspense fallback={<LibertyMDLoadingFallback />}>
+                <LibertyMDReportRedeemPage />
+              </Suspense>
+            } />
+            <Route path="/liberty-md/checkin/unsubscribe" element={
+              <Suspense fallback={<LibertyMDLoadingFallback />}>
+                <LibertyMDFollowupUnsubscribePage />
+              </Suspense>
+            } />
+            <Route path="/liberty-md/checkin" element={
+              <Suspense fallback={<LibertyMDLoadingFallback />}>
+                <LibertyMDFollowupCheckinPage />
               </Suspense>
             } />
             <Route path="/portfolio" element={

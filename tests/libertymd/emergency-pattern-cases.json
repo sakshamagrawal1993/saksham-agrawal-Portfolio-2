@@ -1,0 +1,97 @@
+{
+  "pattern_set_version": "1.0.0",
+  "positives": [
+    {
+      "id": "acs_clause_boundary",
+      "message": "I had no chest pain earlier but now I have crushing chest pressure.",
+      "crisis_type": "acs_chest_pain",
+      "care_setting": "call_911"
+    },
+    {
+      "id": "acs_elephant",
+      "message": "It feels like an elephant sitting on my chest.",
+      "crisis_type": "acs_chest_pain",
+      "care_setting": "call_911"
+    },
+    {
+      "id": "thunderclap_out_of_nowhere",
+      "message": "My headache came on suddenly and hit me out of nowhere.",
+      "crisis_type": "thunderclap_headache",
+      "care_setting": "call_911"
+    },
+    {
+      "id": "anaphylaxis_bee_sting",
+      "message": "I started wheezing after a bee sting.",
+      "crisis_type": "anaphylaxis",
+      "care_setting": "call_911"
+    },
+    {
+      "id": "respiratory_gasping",
+      "message": "I am gasping for air and cannot breathe.",
+      "crisis_type": "respiratory_distress",
+      "care_setting": "call_911"
+    },
+    {
+      "id": "surgical_lower_right",
+      "message": "I have severe lower right abdominal pain.",
+      "crisis_type": "surgical_abdomen",
+      "care_setting": "call_911"
+    },
+    {
+      "id": "stroke_fast",
+      "message": "My face is drooping and my arm is weak and my speech is slurred.",
+      "crisis_type": "stroke_fast",
+      "care_setting": "call_911"
+    },
+    {
+      "id": "stroke_one_sided",
+      "message": "I woke up and one side of my body went numb, I cannot speak properly.",
+      "crisis_type": "stroke_fast",
+      "care_setting": "call_911"
+    },
+    {
+      "id": "suicidal_kill_myself",
+      "message": "I want to kill myself.",
+      "crisis_type": "suicidal_ideation",
+      "care_setting": "crisis_line"
+    },
+    {
+      "id": "suicidal_end_life",
+      "message": "I have been thinking about ending my life.",
+      "crisis_type": "suicidal_ideation",
+      "care_setting": "crisis_line"
+    }
+  ],
+  "negatives": [
+    { "id": "negated_chest", "message": "I have a low fever and fatigue, with no chest pain and no trouble breathing." },
+    { "id": "enumerated_swelling_negation", "message": "My lips are dry and cracked, but there is no lip swelling, tongue swelling, or breathing trouble." },
+    { "id": "family_chest_history", "message": "My father had chest pain last year; I have a mild cough." },
+    { "id": "simple_chest_negation", "message": "I don't have chest pain." },
+    { "id": "family_history", "message": "There is a family history of chest pain but I feel fine." },
+    { "id": "leg_fell_asleep", "message": "My leg fell asleep and is numb." },
+    { "id": "si_explicit_negation", "message": "I have been feeling low but I have no thoughts of harming myself." },
+    { "id": "killing_headache_idiom", "message": "This headache is killing me." },
+    { "id": "allergy_negation", "message": "My eyes are itchy and I am sneezing, but there is no throat tightness or swelling." },
+    { "id": "dry_lips", "message": "My lips are dry because of the weather." },
+    { "id": "gradual_headache", "message": "A mild headache gradually built up after work." },
+    { "id": "usual_migraine", "message": "My usual migraine is back and feels the same as always." },
+    { "id": "mild_cramps", "message": "I have mild stomach cramps after a heavy meal." },
+    { "id": "normal_oxygen", "message": "My oxygen saturation is 98 and I am breathing normally." },
+    { "id": "blue_shirt", "message": "I am wearing a blue shirt and feel well." },
+    { "id": "speech_clear", "message": "My speech is clear and I have no facial droop or arm weakness." },
+    { "id": "arm_sore", "message": "My arm is sore after lifting weights." },
+    { "id": "face_skin", "message": "One side of my face has dry skin." },
+    { "id": "sad_no_self_harm", "message": "I feel sad, but I do not want to harm myself." },
+    { "id": "figurative_dying", "message": "I am dying of embarrassment." },
+    { "id": "third_party_threat", "message": "I could kill him for taking my parking space." },
+    { "id": "movie_quote", "message": "The character said he wanted to end his life." },
+    { "id": "prevention_topic", "message": "I am writing an article about suicide prevention." },
+    { "id": "crisis_line_information", "message": "What is the number for a crisis line?" },
+    { "id": "no_anaphylaxis", "message": "The doctor said this is not anaphylaxis." },
+    { "id": "past_resolved_breathing", "message": "Yesterday I worried about breathing, but today I feel normal." },
+    { "id": "abdominal_mild", "message": "My lower abdomen feels mildly tender before my period." },
+    { "id": "jaw_dental", "message": "My jaw aches near a broken tooth without sweating or nausea." },
+    { "id": "headache_metaphor", "message": "This paperwork is a headache." },
+    { "id": "healthy_checkin", "message": "I feel fine and have no urgent symptoms." }
+  ]
+}

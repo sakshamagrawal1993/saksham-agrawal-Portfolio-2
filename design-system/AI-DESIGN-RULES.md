@@ -23,10 +23,21 @@ Use **only** for LibertyMD routes / `components/LibertyMD/*`.
 
 - **Fonts:** Playfair Display for the hero and editorial marketing headings (italic only for editorial taglines); Inter for UI, body, chat, cards, reports, oath, and legal text. These are the only LibertyMD font families.
 - **Type scale:** use the semantic `--libertymd-type-*` tokens and matching `.libertymd-type-*` classes in `index.css`. Display `56/72`, section title `36/48`, subsection title `30/36`, card title `20`, lead `18`, body/chat `16`, supporting body `14`, label/legal `12`, and footer oath `18/24` (mobile/desktop where two values are listed). Do not invent intermediate sizes for new LibertyMD surfaces.
-- **Color:** primary **Trust Blue `#2563EB`** (scale 900→50), slate neutrals for ink/structure, **clinical green `#169B52`** for positive/in-network, indigo `#5661F6` accent, soft blue/green **surface wash** gradient.
+- **Color:** primary **Trust Blue `#2563EB`** (scale 900→50), slate neutrals for ink/structure (incl. structure navy `#17325F`), **clinical green `#169B52`** for positive/in-network, indigo `#5661F6` accent, soft blue/green **surface wash** gradient.
 - **Spacing:** semantic 4px-grid scale via `--libertymd-space-*` (`xs 4 → section 64`). Use these, not arbitrary px.
 - **Components:** reuse `components/LibertyMD/*` (logo lockups, trust badges, CTA buttons, marketing sections, footer ribbon). CTAs use the blue gradient + `10px` radius + blue glow shadow.
 - **Do not** mix in Saksham brand tones (warm beige/gold) — LibertyMD is cool blue/slate/green.
+
+### Deliberate boundary (P4-09 / DECISIONS 2026-07-30 · Product structure)
+
+LibertyMD and Dr. Jivi / AI Care are **two products**. Do **not** unify them into one shell, one token set, or shared clinical chrome.
+
+- `/liberty-md*` speaks **only** the LibertyMD token language (SoT in `design-tokens.json` → `index.css` `--libertymd-*` → Tailwind `libertymd.*`).
+- The portfolio App shell **skips Grain** and does **not** paint Saksham cream/ink (`#F5F2EB` / `#2C2A26` / `brand-*`) as the LibertyMD route language; Suspense fallback on those routes is LibertyMD wash.
+- Do **not** import `components/ui/*` or `components/AICare/*` into LibertyMD product chrome.
+- Do **not** invent a third “bridge” palette, a LibertyMD↔AI Care deep link, or a portfolio leave CTA from LibertyMD (`onBack` is not wired).
+- Soft-leave / draft persistence keep consult state recoverable inside LibertyMD; there is no LibertyMD→portfolio / →AI Care chrome.
+- Footer ribbon (`LibertyMDFooterRibbon`) stays frozen.
 
 ---
 

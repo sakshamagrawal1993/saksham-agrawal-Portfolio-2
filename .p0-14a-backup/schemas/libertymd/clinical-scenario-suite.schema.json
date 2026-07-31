@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://libertymd.example/schemas/clinical-scenario-suite-v1.json",
+  "title": "LibertyMD Clinical Scenario Suite v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["suite_version", "clinical_status", "scenarios"],
+  "properties": {
+    "suite_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "clinical_status": { "type": "string", "enum": ["draft", "clinician_reviewed", "approved"] },
+    "scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "title", "category", "patient", "message", "expected", "clinical_review"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+          "title": { "type": "string", "minLength": 1 },
+          "category": { "type": "string", "enum": ["emergency", "non_emergency", "off_topic", "report_gate"] },
+          "patient": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["age", "sex"],
+            "properties": {
+              "age": { "type": "integer", "minimum": 18, "maximum": 120 },
+              "sex": { "type": "string", "enum": ["female", "male", "intersex", "prefer_not_to_say"] }
+            }
+          },
+          "message": { "type": "string", "minLength": 1, "maxLength": 4000 },
+          "filled_slots": { "type": "object" },
+          "decision_input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["diagnosis_valid", "confidence", "turn_count", "ready_for_report", "non_clinical_response_count"],
+            "properties": {
+              "diagnosis_valid": { "type": "boolean" },
+              "confidence": { "type": "number", "minimum": 0, "maximum": 100 },
+              "turn_count": { "type": "integer", "minimum": 0, "maximum": 15 },
+              "ready_for_report": { "type": "boolean" },
+              "non_clinical_response_count": { "type": "integer", "minimum": 0, "maximum": 15 }
+            }
+          },
+          "expected": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["emergency_action", "input_relevance"],
+            "properties": {
+              "emergency_action": { "type": "string", "enum": ["force_end", "continue"] },
+              "input_relevance": { "type": "string", "enum": ["clinical", "unclear", "off_topic"] },
+              "report_outcome": { "type": "string", "enum": ["continue", "complete", "review"] }
+            }
+          },
+          "clinical_review": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["status", "reviewer", "reviewed_at", "notes"],
+            "properties": {
+              "status": { "type": "string", "enum": ["pending", "approved", "changes_requested"] },
+              "reviewer": { "type": ["string", "null"] },
+              "reviewed_at": { "type": ["string", "null"], "format": "date-time" },
+              "notes": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,52 @@
+/**
+ * Environment + fixed configuration for the LibertyMD care proxy.
+ *
+ * Moved verbatim from index.ts in L0-5 (pure structural refactor).
+ *
+ * Separability rule (scripts/libertymd-separability-check.mjs): every webhook
+ * env var read anywhere in this function must be LIBERTYMD_-prefixed, and no
+ * hardcoded non-libertymd webhook URL may appear.
+ */
+const N8N_BASE = 'https://n8n.saksham-experiments.com/webhook'
+
+export const GUARDRAIL_WEBHOOK = Deno.env.get('LIBERTYMD_GUARDRAIL_WEBHOOK') || `${N8N_BASE}/libertymd-guardrail`
+export const INTERVIEW_WEBHOOK = Deno.env.get('LIBERTYMD_INTERVIEW_WEBHOOK') || `${N8N_BASE}/libertymd-interview`
+export const DIAGNOSIS_WEBHOOK = Deno.env.get('LIBERTYMD_DIAGNOSIS_WEBHOOK') || `${N8N_BASE}/libertymd-diagnosis`
+export const WEBHOOK_SECRET = Deno.env.get('LIBERTYMD_N8N_WEBHOOK_SECRET') || ''
+
+export const CONSENT_VERSION = 'libertymd-ai-care-v1'
+export const MAX_TURNS = 15
+
+/**
+ * n8n inference timeout budgets, in milliseconds. P0-14e.
+ *
+ * These were inline literals at four call sites. They are config now so the
+ * safety budget is reviewable in one place, and so P0-11 (retries + breaker)
+ * has somewhere to land.
+ *
+ * ## The guardrail budget is one number, used on every turn.
+ *
+ * Before P0-14e, `start_consultation` gave the guardrail **2 000 ms** while
+ * `send_message` gave it **10 000 ms**. The tightest budget therefore sat on
+ * turn 1 — the turn most likely to carry an untriaged emergency, and the only
+ * turn where the deterministic edge screen is the sole backstop. A 2 s abort
+ * did not fail loudly: it fell through to `error_fail_cautious`, i.e. a
+ * `high_risk_continue` verdict that never actually screened the message.
+ *
+ * There is deliberately **no per-turn difference** (P0-14e AC1: turn 1's budget
+ * must be >= every later turn's; equal satisfies it with nothing left to
+ * justify). Safety asymmetry, CONTEXT.md §4: a slower first paint annoys a
+ * user, a missed MI kills one.
+ *
+ * If a future ticket needs turn 1 to feel faster, the answer is a faster
+ * guardrail, a streamed acknowledgement, or optimistic rendering — never a
+ * tighter safety budget on turn 1 than on turn 4. Any change to
+ * `guardrail` here requires a corpus run (`npm run test:libertymd:evaluation`,
+ * `falseNegative` must stay 0).
+ */
+export const N8N_TIMEOUT_MS = {
+  /** Guardrail. Identical on turn 1, the demographics turn, and every interview turn. */
+  guardrail: 10_000,
+  interview: 25_000,
+  diagnosis: 55_000,
+} as const

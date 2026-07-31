@@ -1,0 +1,46 @@
+{
+  "locales": [
+    {
+      "code": "en",
+      "label": "English",
+      "nativeLabel": "English",
+      "flag": "🇺🇸"
+    },
+    {
+      "code": "es",
+      "label": "Spanish (Latin America)",
+      "nativeLabel": "Español (Latinoamérica)",
+      "flag": "🇲🇽"
+    },
+    {
+      "code": "es-ES",
+      "label": "Spanish (Spain)",
+      "nativeLabel": "Español (España)",
+      "flag": "🇪🇸"
+    },
+    {
+      "code": "pt",
+      "label": "Portuguese",
+      "nativeLabel": "Português",
+      "flag": "🇧🇷"
+    },
+    {
+      "code": "hi",
+      "label": "Hindi",
+      "nativeLabel": "हिन्दी",
+      "flag": "🇮🇳"
+    },
+    {
+      "code": "fr",
+      "label": "French",
+      "nativeLabel": "Français",
+      "flag": "🇫🇷"
+    },
+    {
+      "code": "de",
+      "label": "German",
+      "nativeLabel": "Deutsch",
+      "flag": "🇩🇪"
+    }
+  ]
+}

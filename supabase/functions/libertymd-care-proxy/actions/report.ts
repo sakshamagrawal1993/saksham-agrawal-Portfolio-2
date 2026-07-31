@@ -6,6 +6,12 @@
  *
  * Guest release keeps a 7-day retention window; a linked account saves
  * indefinitely. The proxy decides both — the client only names the mode.
+ *
+ * P2-07: this module updates access / retention metadata only
+ * (`access_status`, `released_at`, `retention_expires_at`). Clinical body
+ * columns are insert-once immutable (BEFORE UPDATE trigger +
+ * `lib/report-persistence.ts`); never rewrite `report_data` /
+ * `confidence_score` / `final_diagnostic_run_id` / clinical `model_metadata` here.
  */
 import { getOwnedConsultation } from '../lib/consultations.ts'
 import { jsonResponse } from '../lib/errors.ts'
@@ -56,7 +62,10 @@ export async function releaseReport(ctx: ProxyContext, consultationId: string, m
     ctx,
     mode === 'skip' ? 'report_released_guest' : 'report_saved_google',
     consultationId,
-    { access_status: accessStatus },
+    {
+      access_status: accessStatus,
+      method: mode === 'skip' ? 'guest' : 'google',
+    },
   )
 
   return report

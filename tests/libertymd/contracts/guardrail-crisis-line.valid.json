@@ -1,0 +1,11 @@
+{
+  "status": "force_end",
+  "risk_level": "emergency",
+  "crisis_type": "suicidal_ideation",
+  "force_end": true,
+  "is_emergency": true,
+  "care_setting": "crisis_line",
+  "message": "Please call or text 988 now to reach the Suicide & Crisis Lifeline.",
+  "red_flags": ["suicidal_ideation"],
+  "source": "deterministic"
+}

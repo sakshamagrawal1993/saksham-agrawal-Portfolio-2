@@ -23,6 +23,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # In-workspace checkout (actions/checkout rejects path: ../ outside $GITHUB_WORKSPACE).
+      # CI overrides --definitions-dir; local package.json keeps sibling ../n8n-workflows/definitions.
+      - name: Checkout n8n-workflows definitions
+        uses: actions/checkout@v4
+        with:
+          repository: sakshamagrawal1993/n8n-workflows
+          path: n8n-workflows
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -31,8 +38,12 @@ jobs:
         with:
           deno-version: v2.x
       - run: npm ci
+      - name: Ban native dialogs on LibertyMD UI
+        run: npm run test:libertymd:no-native-dialogs
+      - name: Ban Mixpanel pollution from clinical harness
+        run: npm run test:libertymd:harness-no-mixpanel
       - name: Validate n8n response contracts
-        run: npm run test:libertymd:contracts
+        run: node scripts/libertymd-contract-validation.mjs --definitions-dir=n8n-workflows/definitions
       - name: Test deterministic clinical policy
         run: npm run test:libertymd:policy
       - name: Run ten fixed simulations

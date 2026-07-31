@@ -267,7 +267,7 @@ export function LibertyMDScrollFilmSection() {
     <section
       ref={sectionRef}
       style={isStatic ? undefined : { height: `${SCRUB_VIEWPORTS * 100}vh` }}
-      className="relative border-t border-[#E6EDE3] bg-[linear-gradient(180deg,rgba(245,250,243,0.96)_0%,rgba(248,250,247,0.97)_100%)]"
+      className="relative border-t border-libertymd-green-sage bg-libertymd-green-sage/30"
     >
       <div
         className={`libertymd-page-gutter flex flex-col justify-center overflow-hidden ${
@@ -281,7 +281,7 @@ export function LibertyMDScrollFilmSection() {
           <h2 className="mx-auto mt-3 max-w-xl text-3xl font-black tracking-normal text-libertymd-ink sm:text-4xl">
             {t('app.humanCareTitle')}
           </h2>
-          <p className="mx-auto mt-4 max-w-lg text-sm leading-7 text-[#5B6472]">
+          <p className="mx-auto mt-4 max-w-lg text-sm leading-7 text-libertymd-slate-muted">
             {t('app.humanCareSubtitle')}
           </p>
         </div>
@@ -297,7 +297,7 @@ export function LibertyMDScrollFilmSection() {
               <img
                 src="/film/poster.jpg"
                 alt="A doctor gently examining a patient with a stethoscope, in a soft, glowing style"
-                className="w-full object-cover [mask-image:linear-gradient(180deg,transparent_0%,#000_14%,#000_86%,transparent_100%)] [-webkit-mask-image:linear-gradient(180deg,transparent_0%,#000_14%,#000_86%,transparent_100%)]"
+                className="w-full object-cover [mask-image:linear-gradient(180deg,transparent_0%,black_14%,black_86%,transparent_100%)] [-webkit-mask-image:linear-gradient(180deg,transparent_0%,black_14%,black_86%,transparent_100%)]"
                 style={{ aspectRatio: FRAME_ASPECT }}
               />
             ) : (
@@ -305,7 +305,7 @@ export function LibertyMDScrollFilmSection() {
                 ref={canvasRef}
                 role="img"
                 aria-label="Ambient LibertyMD film, advancing as you scroll: a doctor gently examining a patient with a stethoscope in a soft, glowing style"
-                className={`w-full object-cover transition-opacity duration-500 [mask-image:linear-gradient(180deg,transparent_0%,#000_14%,#000_86%,transparent_100%)] [-webkit-mask-image:linear-gradient(180deg,transparent_0%,#000_14%,#000_86%,transparent_100%)] ${
+                className={`w-full object-cover transition-opacity duration-500 [mask-image:linear-gradient(180deg,transparent_0%,black_14%,black_86%,transparent_100%)] [-webkit-mask-image:linear-gradient(180deg,transparent_0%,black_14%,black_86%,transparent_100%)] ${
                   isReady ? 'opacity-100' : 'opacity-0'
                 }`}
                 style={{ aspectRatio: FRAME_ASPECT }}

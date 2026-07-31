@@ -16,7 +16,7 @@ Runs tickets through PM → Tech → QA using independent subagents. Two modes:
 - **Single** — one ticket, five phases. Start here if unsure.
 - **Parallel** — many tickets across conflict-free lanes with worktree isolation and a staged merge. Use when the user asks for parallel execution or names a lane count.
 
-If the repo has `loop/loop.sh` and `./loop/loop.sh doctor` prints READY, prefer that orchestrator for execution and use this skill as the protocol authority (artifacts, isolation rules, QA blindness). Otherwise orchestrate phases yourself via Cursor Task subagents.
+If the repo has `loop/loop.sh`, **do not invoke it**. Orchestrate every phase yourself via **Cursor Task subagents only** — never Claude CLI, Codex CLI, `cursor-agent` CLI, or `./loop/loop.sh`. The skill is the protocol; Cursor Task is the only runtime.
 
 ## Isolation vs ignorance — read this before changing anything
 

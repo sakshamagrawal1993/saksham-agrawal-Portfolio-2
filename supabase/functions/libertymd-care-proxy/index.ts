@@ -22,14 +22,34 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { corsHeaders } from '../_shared/cors.ts'
 import { handleAbandonConsultation, handleResumeConsultation } from './actions/abandon-resume.ts'
 import { handleBootstrap } from './actions/bootstrap.ts'
+import { handleCreatePatient } from './actions/create-patient.ts'
+import { handleUpdatePatient } from './actions/update-patient.ts'
+import { handleDeletePatient } from './actions/delete-patient.ts'
+import { handleListOwnedPatients } from './actions/list-owned-patients.ts'
 import {
   handleCompleteAccountMerge,
   handlePrepareAccountMerge,
   handleRecordIdentityEvent,
   handleSyncIdentity,
 } from './actions/identity.ts'
-import { handleGetConsultation, handleGetHistory } from './actions/reads.ts'
+import {
+  handleGetConsultation,
+  handleGetHistory,
+  handleGetPartialOutcome,
+} from './actions/reads.ts'
 import { handleReleaseReport } from './actions/report.ts'
+import {
+  handleRedeemReportLink,
+  handleRequestReportEmail,
+} from './actions/report-email-delivery.ts'
+import { handleSubmitReportFeedback } from './actions/submit-report-feedback.ts'
+import { handleRecordCareInterest } from './actions/record-care-interest.ts'
+import { handleUploadPhoto } from './actions/photo-upload.ts'
+import { handleUploadLab } from './actions/lab-upload.ts'
+import {
+  handleRespondFollowupCheckin,
+  handleUnsubscribeFollowupCheckin,
+} from './actions/followup-checkin.ts'
 import { handleSaveDemographics } from './actions/save-demographics.ts'
 import { handleSendMessage } from './actions/send-message.ts'
 import { handleStartConsultation } from './actions/start-consultation.ts'
@@ -60,6 +80,19 @@ const HANDLERS = new Map<ProxyAction, ActionHandler>([
   ['record_identity_event', handleRecordIdentityEvent],
   ['get_history', handleGetHistory],
   ['get_consultation', handleGetConsultation],
+  ['get_partial_outcome', handleGetPartialOutcome],
+  ['create_patient', handleCreatePatient],
+  ['update_patient', handleUpdatePatient],
+  ['delete_patient', handleDeletePatient],
+  ['list_owned_patients', handleListOwnedPatients],
+  ['request_report_email', handleRequestReportEmail],
+  ['redeem_report_link', handleRedeemReportLink],
+  ['submit_report_feedback', handleSubmitReportFeedback],
+  ['record_care_interest', handleRecordCareInterest],
+  ['upload_photo', handleUploadPhoto],
+  ['upload_lab', handleUploadLab],
+  ['respond_followup_checkin', handleRespondFollowupCheckin],
+  ['unsubscribe_followup_checkin', handleUnsubscribeFollowupCheckin],
 ])
 
 serve(async (req) => {

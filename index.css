@@ -3,6 +3,35 @@
 @tailwind utilities;
 
 :root {
+  /* LibertyMD color SoT — mirror design-system/design-tokens.json (libertymd.color). */
+  --libertymd-blue-900: #1E3A8A;
+  --libertymd-blue-800: #1E40AF;
+  --libertymd-blue-700: #1D4ED8;
+  --libertymd-blue-600: #2563EB;
+  --libertymd-blue-500: #3B82F6;
+  --libertymd-blue-50: #EFF6FF;
+  --libertymd-ink: #111827;
+  --libertymd-navy: #17325F;
+  --libertymd-slate-900: #0F172A;
+  --libertymd-slate-700: #334155;
+  --libertymd-slate-600: #475569;
+  --libertymd-slate-500: #64748B;
+  --libertymd-slate-400: #94A3B8;
+  --libertymd-slate-muted: #5B6472;
+  --libertymd-slate-300: #CBD5E1;
+  --libertymd-slate-200: #E2E8F0;
+  --libertymd-slate-100: #F1F5F9;
+  --libertymd-mist: #DCE6F1;
+  --libertymd-green-600: #169B52;
+  --libertymd-green-emerald: #10B981;
+  --libertymd-green-sage: #DDE7D8;
+  --libertymd-indigo: #5661F6;
+  --libertymd-brand-navy: #0B2E63;
+  --libertymd-brand-blue: #1769FF;
+  --libertymd-brand-mint: #67D7B4;
+  --libertymd-surface-wash: linear-gradient(180deg, #FBFCF9 0%, #F5F9FF 34%, #F3F8F2 66%, #EFF6FF 100%);
+  --libertymd-surface-mist: #DCE6F1;
+
   /* LibertyMD spacing follows a 4px base grid. Components consume semantic roles. */
   --libertymd-space-xs: 0.25rem;
   --libertymd-space-sm: 0.5rem;
@@ -130,6 +159,18 @@
   width: 100%;
   max-width: var(--libertymd-content-max);
   margin-inline: auto;
+}
+
+/* P0-24 · top safe-area when viewport-fit=cover (AC2). Bottom insets stay on footers. */
+.libertymd-safe-top {
+  padding-top: max(0.75rem, env(safe-area-inset-top));
+}
+
+/* P0-24 · consult shells: contain page-level horizontal overflow at narrow widths (AC6).
+   Chip rails may still scroll inside their own overflow-x-auto containers. */
+.libertymd-consult-shell {
+  min-width: 0;
+  overflow-x: clip;
 }
 
 .libertymd-section-spacing {

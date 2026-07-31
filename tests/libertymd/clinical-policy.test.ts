@@ -6,6 +6,10 @@
 // rides along here rather than adding a script. See the header of the imported
 // file for the clean follow-up if a named gate is preferred.
 import './severity-mapping.test.ts'
+import './emergency-patterns.test.ts'
+import './emergency-copy.test.ts'
+import './i18n-substrate.test.ts'
+import './journey-locale.test.ts'
 
 import {
   assessClinicalEvidence,
@@ -13,6 +17,7 @@ import {
   decideReportOutcome,
   detectDeterministicEmergency,
 } from '../../supabase/functions/libertymd-care-proxy/clinical-policy.ts'
+import { EMERGENCY_PATTERN_SET_VERSION } from '../../supabase/functions/libertymd-care-proxy/emergency-patterns.ts'
 import { LIBERTYMD_VALIDATION_CASES } from '../../scripts/libertymd-validation-cases.ts'
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -144,4 +149,67 @@ Deno.test('five non-clinical answers force clinical review', () => {
   })
   assertEquals(decision.outcome, 'review', 'Non-clinical terminal outcome')
   assertEquals(decision.reason, 'insufficient_clinical_information', 'Non-clinical terminal reason')
+})
+
+// ---------------------------------------------------------------- P0-14c AC1–AC5
+// Single Deno.test keeps tsc Deno-name noise to +1 (repo pattern); bodies cover AC1–AC5.
+
+Deno.test('P0-14c AC1–AC5 · span provenance, audit keys, verbatim slices, bound', () => {
+  // AC1 / AC3
+  const acs = 'I have crushing chest pain and pain radiating to my left arm.'
+  const result = detectDeterministicEmergency(acs)
+  assert(result, 'Expected ACS deterministic match')
+  assertEquals(result.patternId, 'acs_chest_pain', 'patternId / rule_id source')
+  assertEquals(result.matchedSpan, 'crushing chest', 'canonical ACS span')
+  assertEquals(result.spanStart, 7, 'ACS span_start')
+  assertEquals(result.spanEnd, 21, 'ACS span_end')
+  assertEquals(result.patternSetVersion, EMERGENCY_PATTERN_SET_VERSION, 'pattern set version on detector')
+  assert(EMERGENCY_PATTERN_SET_VERSION.length > 0, 'EMERGENCY_PATTERN_SET_VERSION must be non-empty')
+
+  // AC2
+  const match = {
+    rule_id: result.patternId,
+    span: result.matchedSpan,
+    span_start: result.spanStart,
+    span_end: result.spanEnd,
+    pattern_set_version: result.patternSetVersion,
+    lane: 'edge' as const,
+  }
+  assertEquals(
+    JSON.stringify(Object.keys(match).sort()),
+    JSON.stringify(['lane', 'pattern_set_version', 'rule_id', 'span', 'span_end', 'span_start'].sort()),
+    'audit match key set',
+  )
+
+  // AC4
+  const samples: Array<{ crisis: string; message: string }> = [
+    { crisis: 'acs_chest_pain', message: 'I have Crushing Chest pain tonight.' },
+    { crisis: 'thunderclap_headache', message: 'My headache came on Suddenly and hit me out of nowhere.' },
+    { crisis: 'anaphylaxis', message: 'I started Wheezing after a bee sting.' },
+    { crisis: 'respiratory_distress', message: 'I am Gasping for air and cannot breathe.' },
+    { crisis: 'surgical_abdomen', message: 'I have Severe lower right abdominal pain.' },
+    { crisis: 'stroke_fast', message: 'My Face is drooping and my arm is weak.' },
+    { crisis: 'suicidal_ideation', message: 'I want to Kill myself.' },
+  ]
+  assertEquals(samples.length, 7, 'one sample per live presentation')
+  for (const sample of samples) {
+    const hit = detectDeterministicEmergency(sample.message)
+    assert(hit, `Expected match for ${sample.crisis}`)
+    assertEquals(hit.crisisType, sample.crisis, `${sample.crisis} crisis type`)
+    assertEquals(
+      sample.message.slice(hit.spanStart, hit.spanEnd),
+      hit.matchedSpan,
+      `${sample.crisis} verbatim slice`,
+    )
+  }
+
+  // AC5
+  const phrase = 'crushing chest'
+  const longMessage = `${'x'.repeat(2000)}${phrase}${'y'.repeat(2000 - phrase.length)}`
+  assertEquals(longMessage.length, 4000, 'fixture length')
+  const longHit = detectDeterministicEmergency(longMessage)
+  assert(longHit, 'Expected match inside long message')
+  assert(longHit.matchedSpan.length <= 120, 'persist-bound span length')
+  assert(longHit.spanEnd - longHit.spanStart <= 120, 'persist-bound span window')
+  assert(longHit.matchedSpan.length <= 64, 'detector guard still ≤64')
 })

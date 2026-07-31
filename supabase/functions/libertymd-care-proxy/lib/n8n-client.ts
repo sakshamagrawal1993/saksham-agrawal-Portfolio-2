@@ -24,11 +24,86 @@ import { cleanMessage, limitConsultationMessage } from './utils.ts'
 import type { ConsultationRow, InterviewResult, JsonObject } from './types.ts'
 import type { ResponseRelevance } from '../clinical-policy.ts'
 
-export function n8nHeaders() {
+export function n8nHeaders(correlationId?: string) {
   return {
     'Content-Type': 'application/json',
     ...(WEBHOOK_SECRET ? { 'x-libertymd-secret': WEBHOOK_SECRET } : {}),
+    // P0-07 D1 — joinable across client → proxy logs → n8n; never put PHI here.
+    ...(correlationId ? { 'x-libertymd-correlation-id': correlationId } : {}),
   }
+}
+
+/** PHI-free call outcome for structured boundary logs (P0-07 AC3). */
+export type N8nCallStatus =
+  | 'ok'
+  | `http_${number}`
+  | 'timeout'
+  | 'breaker_open'
+  | 'network'
+
+export type PostJsonOptions = {
+  /** Turn / invocation UUID — logs + `x-libertymd-correlation-id` only (no body mutation). */
+  correlationId?: string
+  /**
+   * Observational shadow LLM path. Logs `target: 'guardrail_shadow'` and
+   * `shadow_llm: true`; still uses `stage: null` so it cannot trip the breaker.
+   */
+  shadowLlm?: boolean
+}
+
+/**
+ * Stage label, `guardrail_shadow`, or URL pathname — never the secret, never a body.
+ */
+export function n8nCallTarget(
+  url: string,
+  stage: N8nStage | null,
+  options?: Pick<PostJsonOptions, 'shadowLlm'>,
+): string {
+  if (options?.shadowLlm) return 'guardrail_shadow'
+  if (stage) return stage
+  try {
+    return new URL(url).pathname
+  } catch {
+    return 'unknown'
+  }
+}
+
+function classifyN8nCallStatus(error: unknown): N8nCallStatus {
+  if (isN8nStageUnavailable(error)) return 'breaker_open'
+  const name = error && typeof error === 'object' ? (error as { name?: unknown }).name : undefined
+  if (name === 'AbortError' || name === 'TimeoutError') return 'timeout'
+  const message = error instanceof Error ? error.message : String(error)
+  const http = message.match(/Workflow HTTP (\d+)/)
+  if (http) return `http_${Number(http[1])}`
+  return 'network'
+}
+
+function payloadByteLength(body: unknown): number {
+  try {
+    return JSON.stringify(body).length
+  } catch {
+    return 0
+  }
+}
+
+/** P0-07 AC3 — one PHI-free structured line per postJson attempt (incl. breaker reject). */
+function logN8nCall(fields: {
+  correlation_id: string | null
+  target: string
+  status: N8nCallStatus
+  duration_ms: number
+  payload_bytes: number
+  shadow_llm?: boolean
+}) {
+  const line: Record<string, unknown> = {
+    correlation_id: fields.correlation_id,
+    target: fields.target,
+    status: fields.status,
+    duration_ms: fields.duration_ms,
+    payload_bytes: fields.payload_bytes,
+  }
+  if (fields.shadow_llm) line.shadow_llm = true
+  console.log('LibertyMD n8n call', line)
 }
 
 // ---------------------------------------------------------------------------
@@ -242,28 +317,72 @@ function recordFailure(stage: N8nStage, isProbe: boolean) {
 }
 
 /**
+ * P0-08 AC3 — HTTP 200 was recorded as breaker success in `postJson` before the
+ * stage runner validated shape. An unusable body must revoke that optimism so
+ * malformed 200s count toward the breaker like transport failures.
+ */
+export function revokeStageSuccessAsFailure(stage: N8nStage) {
+  recordFailure(stage, false)
+}
+
+/**
  * POST to an n8n workflow under a timeout budget and the stage breaker.
  *
  * `stage` is normally inferred from the URL; it stays an explicit parameter so
  * the breaker can be exercised against a stub URL in tests.
+ *
+ * P0-07 AC3/D1: every attempt (including breaker reject) emits a PHI-free
+ * structured log; optional `correlationId` is sent as `x-libertymd-correlation-id`
+ * only — never mutated into the n8n JSON body.
  */
-export async function postJson(url: string, body: unknown, timeoutMs: number, stage: N8nStage | null = n8nStageForUrl(url)) {
-  const gate = stage ? admit(stage) : { isProbe: false }
+export async function postJson(
+  url: string,
+  body: unknown,
+  timeoutMs: number,
+  stage: N8nStage | null = n8nStageForUrl(url),
+  options: PostJsonOptions = {},
+) {
+  const correlationId = options.correlationId?.trim() || null
+  const target = n8nCallTarget(url, stage, options)
+  const payloadBytes = payloadByteLength(body)
+  const startedAt = Date.now()
+  const emit = (status: N8nCallStatus) => {
+    logN8nCall({
+      correlation_id: correlationId,
+      target,
+      status,
+      duration_ms: Math.max(0, Date.now() - startedAt),
+      payload_bytes: payloadBytes,
+      ...(options.shadowLlm ? { shadow_llm: true } : {}),
+    })
+  }
+
+  let gate: { isProbe: boolean }
+  try {
+    gate = stage ? admit(stage) : { isProbe: false }
+  } catch (error) {
+    // Breaker short-circuit — still log before rethrow (AC3 includes reject).
+    emit(classifyN8nCallStatus(error))
+    throw error
+  }
+
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
     const response = await fetch(url, {
       method: 'POST',
-      headers: n8nHeaders(),
+      headers: n8nHeaders(correlationId || undefined),
       body: JSON.stringify(body),
       signal: controller.signal,
     })
     if (!response.ok) throw new Error(`Workflow HTTP ${response.status}`)
     const parsed = await response.json()
     if (stage) recordSuccess(stage)
+    emit('ok')
     return parsed
   } catch (error) {
     if (stage) recordFailure(stage, gate.isProbe)
+    emit(classifyN8nCallStatus(error))
     throw error
   } finally {
     clearTimeout(timer)
@@ -331,6 +450,50 @@ export function assertInferenceAllowed(stage: N8nStage, status?: string | null, 
   throw new PostEmergencyInferenceError(stage, status)
 }
 
+/**
+ * P0-08 AC3 / Q2 — minimal shape for a trusted interview screen.
+ * Usable when `ready_for_report` is set, or a non-empty question string exists.
+ * Empty `{}` and bodies with neither signal are unusable (holding, not clinical).
+ */
+export function isUsableInterviewPayload(raw: JsonObject): boolean {
+  if (Boolean(raw.ready_for_report)) return true
+  const question = String(raw.next_question || raw.question || '').trim()
+  return question.length > 0
+}
+
+/** Holding-path sources consumed by `send_message` (never clinical clothing). */
+export function isInterviewHoldingSource(source: string): boolean {
+  return source === 'breaker_open' || source === 'unavailable'
+}
+
+function interviewHoldingResult(
+  missingSlots: string[],
+  source: 'breaker_open' | 'unavailable',
+): InterviewResult {
+  // Placeholders exist only so the type is satisfied; send_message short-circuits
+  // on holding sources and must never surface this copy to the user.
+  return {
+    next_question: '',
+    options: [],
+    ready_for_report: false,
+    target_slot: 'none',
+    slot_updates: {},
+    missing_slots: missingSlots,
+    input_relevance: 'unclear',
+    input_relevance_reason: 'Interview workflow unavailable',
+    source,
+  }
+}
+
+export function classifyInterviewTransportError(error: unknown): 'timeout' | 'http_error' | 'breaker_open' | 'unavailable' {
+  if (isN8nStageUnavailable(error)) return 'breaker_open'
+  const name = error && typeof error === 'object' ? (error as { name?: unknown }).name : undefined
+  if (name === 'AbortError' || name === 'TimeoutError') return 'timeout'
+  const message = error instanceof Error ? error.message : String(error)
+  if (/Workflow HTTP \d+/.test(message)) return 'http_error'
+  return 'unavailable'
+}
+
 export async function runInterview(
   history: unknown[],
   patient: JsonObject,
@@ -340,10 +503,14 @@ export async function runInterview(
   turnCount: number,
   status?: string | null,
   consultationId?: string | null,
+  correlationId?: string | null,
+  /** P3-07 — clinical journey language (`en` | `es`). */
+  language?: string | null,
 ): Promise<InterviewResult> {
   // Thrown, not swallowed: a post-emergency interview attempt is a caller bug,
   // and returning a fallback question would hide it behind a plausible reply.
   assertInferenceAllowed('interview', status, consultationId)
+  const clinicalLanguage = String(language || 'en').trim().toLowerCase() === 'es' ? 'es' : 'en'
   try {
     const raw = normalizeObject(await postJson(INTERVIEW_WEBHOOK, {
       history,
@@ -352,7 +519,16 @@ export async function runInterview(
       missing_slots: missingSlots,
       target_slot: targetSlot,
       turn_count: turnCount,
-    }, N8N_TIMEOUT_MS.interview))
+      language: clinicalLanguage,
+      locale: clinicalLanguage,
+    }, N8N_TIMEOUT_MS.interview, undefined, {
+      correlationId: correlationId || undefined,
+    }))
+    // P0-08 AC3: unusable HTTP 200 → holding, never fabricate an onset questionnaire.
+    if (!isUsableInterviewPayload(raw)) {
+      revokeStageSuccessAsFailure('interview')
+      return interviewHoldingResult(missingSlots, 'unavailable')
+    }
     const ready = Boolean(raw.ready_for_report)
     const question = limitConsultationMessage(raw.next_question || raw.question)
     const options = Array.isArray(raw.options) ? raw.options.map(String).filter(Boolean).slice(0, 4) : []
@@ -360,6 +536,7 @@ export async function runInterview(
       ? String(raw.input_relevance) as ResponseRelevance
       : 'clinical'
     return {
+      // Partial but schema-shaped responses may keep empty-field defaults under n8n.
       next_question: question || (ready ? '' : 'Could you tell me what has changed since the symptom began?'),
       options: ready ? [] : options,
       ready_for_report: ready,
@@ -373,21 +550,9 @@ export async function runInterview(
   } catch (error) {
     if (error instanceof PostEmergencyInferenceError) throw error
     console.error('LibertyMD interview unavailable', error)
-    // `breaker_open` is load-bearing: send_message turns it into one calm
-    // holding state instead of showing this fabricated question, which is a
-    // technical failure wearing clinical clothing (CONTEXT.md §4).
+    // Transport / breaker → holding path (P0-08 Q2). Never invent a clinical question.
     const breakerOpen = isN8nStageUnavailable(error)
-    return {
-      next_question: 'Could you briefly tell me when this started and whether it is getting better, worse, or staying the same?',
-      options: ['Started today', 'A few days ago', 'More than a week ago', 'I will type the details'],
-      ready_for_report: false,
-      target_slot: 'onset',
-      slot_updates: {},
-      missing_slots: missingSlots,
-      input_relevance: 'unclear',
-      input_relevance_reason: 'Interview workflow unavailable',
-      source: breakerOpen ? 'breaker_open' : 'fallback',
-    }
+    return interviewHoldingResult(missingSlots, breakerOpen ? 'breaker_open' : 'unavailable')
   }
 }
 
@@ -415,16 +580,40 @@ export function parseDiagnosis(rawValue: unknown) {
   }
 }
 
+export function classifyDiagnosisTransportError(error: unknown): 'timeout' | 'http_error' | 'breaker_open' | 'unavailable' {
+  if (isN8nStageUnavailable(error)) return 'breaker_open'
+  const name = error && typeof error === 'object' ? (error as { name?: unknown }).name : undefined
+  if (name === 'AbortError' || name === 'TimeoutError') return 'timeout'
+  const message = error instanceof Error ? error.message : String(error)
+  if (/Workflow HTTP \d+/.test(message)) return 'http_error'
+  return 'unavailable'
+}
+
+export type RunDiagnosisOptions = {
+  /**
+   * P1-08 — detached pre-warm. Uses `postJson(..., stage: null)` so hangs /
+   * failures cannot open the acted-upon diagnosis breaker or trip holding UX.
+   * Callers must not emit `inference_failed` for speculative soft-fails.
+   */
+  speculative?: boolean
+}
+
 export async function runDiagnosis(
   history: unknown[],
   patient: JsonObject,
   consultation: ConsultationRow,
   slots: JsonObject,
+  correlationId?: string | null,
+  options: RunDiagnosisOptions = {},
 ) {
   // P0-13 AC2. The consultation row is already in hand here, so this needs no
   // signature change and covers every diagnosis call site by construction.
   assertInferenceAllowed('diagnosis', consultation.status, consultation.id)
+  const speculative = Boolean(options.speculative)
+  const clinicalLanguage = String(consultation.language || 'en').trim().toLowerCase() === 'es' ? 'es' : 'en'
   try {
+    // Speculative: stage null — isolate from N8N_BREAKER.diagnosis (S1).
+    const stage = speculative ? null : undefined
     const parsed = parseDiagnosis(await postJson(DIAGNOSIS_WEBHOOK, {
       history,
       patient,
@@ -432,16 +621,39 @@ export async function runDiagnosis(
       missing_slots: calculateMissingSlots(slots),
       intermediate_diagnoses: consultation.intermediate_diagnoses || [],
       turn_count: consultation.turn_count,
-    }, N8N_TIMEOUT_MS.diagnosis))
-    return { ...parsed, unavailable: false }
+      language: clinicalLanguage,
+      locale: clinicalLanguage,
+    }, N8N_TIMEOUT_MS.diagnosis, stage, {
+      correlationId: correlationId || undefined,
+    }))
+    // Unusable diagnosis body: revoke breaker success; callers emit telemetry.
+    // Speculative never revokes / trips acted-upon breaker.
+    if (!parsed.valid) {
+      if (!speculative) revokeStageSuccessAsFailure('diagnosis')
+      return { ...parsed, unavailable: false, failure: 'malformed_payload' as const }
+    }
+    return { ...parsed, unavailable: false, failure: null }
   } catch (error) {
     if (error instanceof PostEmergencyInferenceError) throw error
-    console.error('LibertyMD diagnosis unavailable', error)
+    if (speculative) {
+      console.warn('LibertyMD speculative diagnosis soft-fail', {
+        failure: classifyDiagnosisTransportError(error),
+      })
+    } else {
+      console.error('LibertyMD diagnosis unavailable', error)
+    }
     // `unavailable` separates "the model withheld a report" from "we never got
     // to ask". Without it, an n8n outage at the turn cap would permanently
     // dead-end a consult as `clinical_review_needed` on purely technical
     // grounds — a failure wearing clinical clothing.
-    return { raw: {} as JsonObject, differentials: [] as unknown[], confidence: 0, valid: false, unavailable: true }
+    return {
+      raw: {} as JsonObject,
+      differentials: [] as unknown[],
+      confidence: 0,
+      valid: false,
+      unavailable: true,
+      failure: classifyDiagnosisTransportError(error),
+    }
   }
 }
 

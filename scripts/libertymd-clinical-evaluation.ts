@@ -21,6 +21,7 @@ type Scenario = {
   }
   expected: {
     emergency_action: 'force_end' | 'continue'
+    crisis_type?: string
     input_relevance: 'clinical' | 'unclear' | 'off_topic'
     report_outcome?: 'continue' | 'complete' | 'review'
   }
@@ -51,7 +52,8 @@ let falseNegative = 0
 const failures: Array<Record<string, unknown>> = []
 
 for (const scenario of suite.scenarios) {
-  const emergencyActual = detectDeterministicEmergency(scenario.message) ? 'force_end' : 'continue'
+  const emergencyResult = detectDeterministicEmergency(scenario.message)
+  const emergencyActual = emergencyResult ? 'force_end' : 'continue'
   const relevanceActual = classifyResponseRelevance(scenario.message)
   if (scenario.expected.emergency_action === 'force_end') {
     if (emergencyActual === 'force_end') truePositive += 1
@@ -61,6 +63,18 @@ for (const scenario of suite.scenarios) {
 
   if (emergencyActual !== scenario.expected.emergency_action) {
     failures.push({ id: scenario.id, dimension: 'emergency_action', expected: scenario.expected.emergency_action, actual: emergencyActual })
+  }
+  if (scenario.expected.emergency_action === 'force_end') {
+    if (!scenario.expected.crisis_type) {
+      failures.push({ id: scenario.id, dimension: 'crisis_type', expected: 'declared crisis_type', actual: null })
+    } else if (emergencyResult?.crisisType !== scenario.expected.crisis_type) {
+      failures.push({
+        id: scenario.id,
+        dimension: 'crisis_type',
+        expected: scenario.expected.crisis_type,
+        actual: emergencyResult?.crisisType ?? null,
+      })
+    }
   }
   if (relevanceActual !== scenario.expected.input_relevance) {
     failures.push({ id: scenario.id, dimension: 'input_relevance', expected: scenario.expected.input_relevance, actual: relevanceActual })
