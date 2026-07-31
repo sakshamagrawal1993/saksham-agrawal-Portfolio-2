@@ -2,7 +2,7 @@
  * P3-03 · Trust chrome allow-list (permissioned likenesses + rating metadata).
  *
  * Empty inventory is a valid DoD state: ship zero named likenesses until a
- * documented permission pack exists. See tickets/P3-03/permissions.md.
+ * documented permission pack exists. See docs/libertymd/trust-permissions.md.
  */
 
 export type LibertyMdTrustPermission = {

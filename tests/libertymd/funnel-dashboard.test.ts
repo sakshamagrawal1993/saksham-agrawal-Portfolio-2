@@ -12,7 +12,7 @@ const FUNNEL_XLSX = 'docs/libertymd/FUNNEL-DASHBOARD.xlsx'
 const FUNNEL_SQL = 'scripts/sql/libertymd-funnel-dashboard.sql'
 const LEXICON = 'docs/libertymd/MIXPANEL-LEXICON.md'
 const CARE = 'docs/libertymd/CARE-ARCHITECTURE.md'
-const DECISIONS = 'tickets/DECISIONS.md'
+const DECISIONS = 'docs/libertymd/COHORT-BOUNDARIES.md'
 const TELEMETRY = 'supabase/functions/libertymd-care-proxy/lib/telemetry.ts'
 const PACKAGE_JSON = 'package.json'
 
@@ -176,14 +176,14 @@ Deno.test('P1-22 AC4 · reliability SQL + emit_origin Mixpanel mirror', () => {
   )
 })
 
-Deno.test('P1-22 AC5 · P1-01 + P1-08 + P2-14 cohort dates in DECISIONS + funnel doc + SQL', () => {
+Deno.test('P1-22 AC5 · P1-01 + P1-08 + P2-14 cohort dates in COHORT-BOUNDARIES + funnel doc + SQL', () => {
   const decisions = Deno.readTextFileSync(DECISIONS)
   const doc = Deno.readTextFileSync(FUNNEL_DOC)
   const sql = Deno.readTextFileSync(FUNNEL_SQL)
-  assertTrue(/P1-01/i.test(decisions) && /2026-07-31/i.test(decisions), 'P1-01 in DECISIONS')
-  assertTrue(/P1-08/i.test(decisions) && /Speculative diagnosis cohort/i.test(decisions), 'P1-08 DECISIONS entry')
+  assertTrue(/P1-01/i.test(decisions) && /2026-07-31/i.test(decisions), 'P1-01 in cohort boundaries')
+  assertTrue(/P1-08/i.test(decisions) && /Speculative diagnosis cohort/i.test(decisions), 'P1-08 cohort entry')
   assertTrue(/was_speculative/i.test(decisions) && /served_from_cache/i.test(decisions), 'P1-08 compare props')
-  assertTrue(/P2-14/i.test(decisions) && /Diagnosis eligibility retune cohort/i.test(decisions), 'P2-14 DECISIONS cohort')
+  assertTrue(/P2-14/i.test(decisions) && /Diagnosis eligibility retune cohort/i.test(decisions), 'P2-14 cohort')
   assertTrue(/report_ready/i.test(decisions) && /outcome\s*=\s*'valid'|outcome = 'valid'/i.test(decisions), 'P2-14 completion + validity keys')
   assertTrue(/P1-01/i.test(doc) && /P1-08/i.test(doc) && /P2-14/i.test(doc) && /2026-07-31/i.test(doc), 'funnel cohort table')
   assertTrue(/FUNNEL_COHORT/i.test(sql), 'SQL cohort section')

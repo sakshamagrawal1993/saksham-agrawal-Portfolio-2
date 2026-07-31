@@ -18,7 +18,7 @@ const EN_I18N = new URL('i18n/locales/en.json', ROOT)
 const APP = new URL('components/LibertyMD/LibertyMDApp.tsx', ROOT)
 const TRUST_ROW = new URL('components/LibertyMD/LibertyMDTrustRow.tsx', ROOT)
 const MARKETING = new URL('components/LibertyMD/LibertyMDMarketingSections.tsx', ROOT)
-const PERMISSIONS = new URL('tickets/P3-03/permissions.md', ROOT)
+const PERMISSIONS = new URL('docs/libertymd/trust-permissions.md', ROOT)
 
 function assertTrue(cond: unknown, msg: string) {
   if (!cond) throw new Error(msg)

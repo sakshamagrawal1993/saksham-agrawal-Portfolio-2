@@ -30,7 +30,7 @@ Never put PHI on funnel property lists: no symptom text, slot values, exact age/
 
 | Ticket | Boundary (UTC) | Compare basis | Notes |
 |---|---|---|---|
-| **P1-01** unified entry | **2026-07-31** | Demographics shown vs answered (`consultation_started` / `awaiting_demographics` vs `demographics_saved`); before vs on/after date | Annotated in `tickets/DECISIONS.md` |
+| **P1-01** unified entry | **2026-07-31** | Demographics shown vs answered (`consultation_started` / `awaiting_demographics` vs `demographics_saved`); before vs on/after date | Annotated in `docs/libertymd/COHORT-BOUNDARIES.md` (vault: Startups `tickets/DECISIONS.md`) |
 | **P1-08** speculative diagnosis | **2026-07-31** | `diagnosis_attempted` props `was_speculative` / `served_from_cache` (and/or Diagnosis-stage `inference_failed`) before vs on/after | Flag default-off ⇒ **empty post-enable cohort is OK**, not a build failure |
 | **P2-14** diagnosis eligibility retune | **2026-07-31** | **Completion:** distinct `consultation_id` with `report_ready` and/or consult `status ∈ {completed, report_pending_auth}`. **Validity:** `diagnosis_attempted` with `outcome = 'valid'` and/or `libertymd_diagnostic_runs.run_status = 'validated'` ∧ `is_speculative = false`. Before vs on/after deploy timestamp | Even-turn removed; floor stays 6; no new event names. Live paste = DoD+ |
 
