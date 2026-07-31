@@ -211,6 +211,24 @@
       "message": "asdf qwrty zxcv",
       "expected": { "emergency_action": "continue", "input_relevance": "off_topic" },
       "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "Draft engineering fixture; clinician review required." }
+    },
+    {
+      "id": "demographics_turn_emergency",
+      "title": "Emergency volunteered during the demographics step",
+      "category": "emergency",
+      "patient": { "age": 54, "sex": "male" },
+      "message": "I am 54, male, and the chest pain is getting worse since I sent that.",
+      "expected": { "emergency_action": "force_end", "input_relevance": "clinical" },
+      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "P0-14d AC4. Free text volunteered on the save_demographics turn must force-end. Before P0-14d that turn ran no screen at all. Draft engineering fixture; clinician review required." }
+    },
+    {
+      "id": "demographics_turn_negated_red_flag",
+      "title": "Demographics step with a negated red flag",
+      "category": "non_emergency",
+      "patient": { "age": 41, "sex": "female" },
+      "message": "I am 41, female, and I have no chest pain, just a mild cough.",
+      "expected": { "emergency_action": "continue", "input_relevance": "clinical" },
+      "clinical_review": { "status": "pending", "reviewer": null, "reviewed_at": null, "notes": "P0-14d negative control. Screening the demographics turn must not make it a false-positive source. Draft engineering fixture; clinician review required." }
     }
   ]
 }

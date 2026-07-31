@@ -68,20 +68,40 @@ try {
   console.warn(`WARN: skipping workflow validation. ${message}`)
 }
 
-const MIN_MODEL = { major: 3, minor: 1, variant: 'flash-lite' }
+/**
+ * Approved models for the LibertyMD clinical inference path.
+ *
+ * History of this assertion, because it has now been wrong twice:
+ *  - Originally an exact match on 'models/gemini-3.1-flash-lite'. Workflows ran
+ *    3.5-flash-lite, so it asserted FALSE on all three -- and nobody saw it,
+ *    because the npm script never passed --definitions-dir (fixed in L0-1).
+ *  - Then a gemini version floor. That went blind on 2026-07-30 when a deploy
+ *    migrated all three workflows from lmChatGoogleGemini to lmChatOpenAi:
+ *    'parameters.modelName' became 'parameters.model.value', so the extractor
+ *    found nothing and reported an empty model list.
+ *
+ * Lesson encoded below: read every known parameter shape, and assert against an
+ * explicit allow-list rather than a pattern. A pattern silently stops matching
+ * when the schema moves; an allow-list plus a "found nothing" failure does not.
+ *
+ * Seeded with what is actually deployed. Changing the clinical model is a
+ * deliberate decision -- add it here in the same change.
+ */
+const APPROVED_MODELS = new Set([
+  'gpt-5.6-luna',                  // deployed 2026-07-30, all three workflows
+  'models/gemini-3.5-flash-lite',  // previous; retained so a rollback still passes
+])
 
-// L0-2 (2026-07-30): was an exact match on 'models/gemini-3.1-flash-lite'. The
-// workflows run 3.5-flash-lite, so this asserted FALSE on all three -- a stale
-// assertion, not a model defect. A floor accepts newer models and still catches
-// downgrades or a switch to an unapproved variant.
-function modelMeetsFloor(model) {
-  const parsed = /^models\/gemini-(\d+)\.(\d+)-(.+)$/.exec(String(model))
-  if (!parsed) return false
-  const [, major, minor, variant] = parsed
-  if (variant !== MIN_MODEL.variant) return false
-  const maj = Number(major)
-  const min = Number(minor)
-  return maj > MIN_MODEL.major || (maj === MIN_MODEL.major && min >= MIN_MODEL.minor)
+/** Reads the model id across every node shape n8n has used for LLM nodes. */
+function extractModel(node) {
+  const p = node.parameters ?? {}
+  // lmChatOpenAi (typeVersion >= 1.3): resource-locator object
+  if (p.model && typeof p.model === 'object' && 'value' in p.model) return p.model.value
+  // plain string form
+  if (typeof p.model === 'string' && p.model) return p.model
+  // lmChatGoogleGemini legacy
+  if (typeof p.modelName === 'string' && p.modelName) return p.modelName
+  return null
 }
 
 const workflowResults = []
@@ -105,15 +125,23 @@ if (definitionsDir) {
   ]
   for (const [name, file] of expected) {
     const workflow = JSON.parse(await fs.readFile(path.join(definitionsDir, file), 'utf8'))
-    const models = [...new Set(workflow.nodes
-      .map((node) => node.parameters?.modelName)
-      .filter(Boolean))]
+    const llmNodes = workflow.nodes.filter((node) => String(node.type).includes('lmChat'))
+    const models = [...new Set(llmNodes.map(extractModel).filter(Boolean))]
+    // An LLM node whose model we cannot read is a blind spot, not a pass.
+    const unreadableModelNodes = llmNodes
+      .filter((node) => !extractModel(node))
+      .map((node) => ({ name: node.name, type: node.type, typeVersion: node.typeVersion }))
     const settings = workflow.settings || {}
     workflowResults.push({
       workflow: name,
       active: workflow.active === true,
       models,
-      correctModel: models.length > 0 && models.every(modelMeetsFloor),
+      llmNodeCount: llmNodes.length,
+      unreadableModelNodes,
+      correctModel: llmNodes.length > 0
+        && unreadableModelNodes.length === 0
+        && models.length > 0
+        && models.every((model) => APPROVED_MODELS.has(model)),
       noPayloadRetention: settings.saveDataErrorExecution === 'none'
         && settings.saveDataSuccessExecution === 'none'
         && settings.saveManualExecutions === false

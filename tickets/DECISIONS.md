@@ -56,6 +56,19 @@ Append only. Never rewrite. Read this before writing any story; never escalate a
 **Recorded for the record, once:** adding paid licensed clinicians is what changed here — a consumer symptom checker and a service that routes patient data to clinicians for a fee are different postures, and the status can attach by function rather than by scale or intent. The practical form this is most likely to take is **the network partner requiring a BAA before they will accept patient data** — a commercial gate, not a legal opinion. Flagged for the business owner's counsel; not an engineering task.
 **Copy constraint that still holds:** the privacy page and consent copy must not *claim* HIPAA compliance or attestation while none exists. Silence is fine; overclaiming is not.
 
+## 2026-07-31 · P0-14a · Suicidal ideation terminality
+**Q:** Is `suicidal_ideation` terminal (`force_end`), or should the interview continue while showing a crisis line?
+**A:** **Yes — terminal.** Same as a medical emergency: `force_end` stops the consult. Only `care_setting` and copy differ (crisis line / 988, never ER/911 framing).
+**Implication:** AC14/AC16 in P0-14a stand as written. P0-17 must not reintroduce ER copy for this `crisis_type`.
+
+## 2026-07-31 · P0-14a · `care_setting: crisis_line` in schema
+**Q:** Put `care_setting: 'crisis_line'` in the guardrail schema, or route crisis only via `crisis_type`?
+**A:** **Add `crisis_line` to the schema** (and to the `force_end` allowed set). An ER care setting on a suicidal user is wrong in the data, not just in the copy. Report and handoff surfaces will consume `care_setting`.
+
+## 2026-07-31 · Defect pack base for Phase 0–4 lanes
+**Q:** Commit the defect-pack client/server wiring so worktrees rebase onto it?
+**A:** **Yes.** Defects 1–6 are the required base before continuing Phase 0–4 parallel lanes.
+
 ---
 
 ## Standing constraints (not re-decidable per ticket)

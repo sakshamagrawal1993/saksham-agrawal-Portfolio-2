@@ -23,7 +23,7 @@ MAX_BUILD_ATTEMPTS=5
 MAX_ENRICH_ATTEMPTS=2
 
 # Gates. Run individually — the full chain can exceed a single timeout.
-GATES=(contracts separability policy recovery simulations evaluation)
+GATES=(contracts separability policy recovery breaker simulations evaluation)
 
 # Portable timeout.
 #
@@ -236,15 +236,36 @@ run_stage() {
   info "[$id] $stage -> $log"
   info "      $* (cwd $wt)"
   local rc=0
-  # tee: visible live, and kept for post-mortem
+
+  # Heartbeat. These CLIs run in print mode, which BUFFERS the whole response and
+  # emits nothing until it finishes -- so a healthy multi-minute stage looks
+  # identical to a hang. The loop reports liveness itself rather than relying on
+  # the child to stream, which also works for whichever CLI does not.
+  local started; started=$(date +%s)
+  ( while :; do
+      sleep 30
+      printf '\033[0;36m      … %s running %ss\033[0m\n' "$stage" "$(( $(date +%s) - started ))" >&2
+    done ) &
+  local hb=$!
+  # Kill the subshell AND its in-flight `sleep`; killing only the parent leaves an
+  # orphan per stage, which accumulates across tickets.
+  stop_hb() { pkill -P "$hb" 2>/dev/null; kill "$hb" 2>/dev/null; wait "$hb" 2>/dev/null; }
+  # shellcheck disable=SC2064
+  trap stop_hb RETURN
+
+  # tee: visible live where the CLI does stream, and always kept for post-mortem
   if [ -n "$TIMEOUT_BIN" ]; then
     render "$tmpl" "$id" "$wt" | (cd "$wt" && "$TIMEOUT_BIN" "$STAGE_TIMEOUT" "$@") 2>&1 | tee "$log" >&2 || rc=$?
   else
     render "$tmpl" "$id" "$wt" | (cd "$wt" && "$@") 2>&1 | tee "$log" >&2 || rc=$?
   fi
+  stop_hb
+
   if [ "$rc" = 124 ]; then
-    bad "[$id] $stage TIMED OUT after ${STAGE_TIMEOUT}s — check $log; a blocked prompt is the usual cause"
+    bad "[$id] $stage TIMED OUT after ${STAGE_TIMEOUT}s — see $log; a blocked prompt is the usual cause"
   fi
+  local lines; lines="$(wc -l < "$log" 2>/dev/null | tr -d ' ')"
+  info "[$id] $stage finished rc=$rc, ${lines:-0} log lines"
   return 0   # stage success is judged by the artifact, not the exit code
 }
 
@@ -264,9 +285,38 @@ qa_verdict() { # PASS | FAIL | UNTESTABLE | NONE
 }
 
 # ---------------------------------------------------------------- run
+# One ticket, one runner.
+#
+# Without this, a second `run <same ticket>` happily starts a parallel pipeline in
+# the SAME worktree and both write 01-story.md, 04-implementation.md and the diff
+# on top of each other. That happened. mkdir is atomic, so it is the lock.
+acquire_lease() {
+  local id="$1" lock; lock="$(ticket_dir "$id")/.lease"
+  mkdir -p "$(ticket_dir "$id")"
+  if mkdir "$lock" 2>/dev/null; then
+    printf '%s\n%s\n' "$$" "$(date)" > "$lock/owner"
+    LEASE_DIR="$lock"
+    return 0
+  fi
+  local owner; owner="$(head -1 "$lock/owner" 2>/dev/null || echo unknown)"
+  if [ "$owner" != unknown ] && kill -0 "$owner" 2>/dev/null; then
+    bad "$id is already being run by PID $owner (since $(sed -n 2p "$lock/owner" 2>/dev/null))"
+    info "two runners in one worktree corrupt each other's artifacts"
+    info "wait for it, or: kill $owner && rm -rf $lock"
+    return 1
+  fi
+  warn "$id had a stale lease from dead PID $owner — reclaiming"
+  printf '%s\n%s\n' "$$" "$(date)" > "$lock/owner"
+  LEASE_DIR="$lock"
+  return 0
+}
+release_lease() { [ -n "${LEASE_DIR:-}" ] && rm -rf "$LEASE_DIR"; LEASE_DIR=""; }
+
 run_ticket() {
   local id="$1" wt d build=0 enrich=0
   c '1;37' "── $id ──"
+  acquire_lease "$id" || return 4
+  trap 'release_lease' EXIT INT TERM
   wt="$(ensure_worktree "$id")" || die "[$id] cannot proceed without a worktree"
   # Guard against the class of bug that broke this once: a captured value that is
   # not a single clean path means some function logged to stdout.
@@ -303,6 +353,7 @@ run_ticket() {
       PASS)
         run_gates "$wt" || { bad "[$id] QA passed but gates failed — treating as FAIL"; }
         ok "[$id] QA PASS"
+        release_lease
         grep -qi 'REQUIRES EXPERT REVIEW' "$d/05-qa-report.md" \
           && warn "[$id] REQUIRES EXPERT REVIEW — not safe to ship without a clinician"
         return 0 ;;

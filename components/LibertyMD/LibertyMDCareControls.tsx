@@ -1,19 +1,32 @@
 import React from 'react';
 import { useI18n } from '../../i18n';
 import {
+  AlertTriangle,
   Brain,
   Check,
   ClipboardPlus,
   Clock3,
   FileClock,
+  Info,
   Loader2,
   LogIn,
   Plus,
   RotateCcw,
+  ShieldAlert,
   ShieldCheck,
   UserRound,
+  Wrench,
   X,
 } from 'lucide-react';
+import {
+  LIBERTYMD_SEVERITY_PRESENTATION,
+  libertyMDSafetyNoticeFromResponse,
+  libertyMDSeverityForRequestFailure,
+  libertyMDSeverityForSignal,
+  type LibertyMDSafetyNoticeContent,
+  type LibertyMDSafetySignal,
+  type LibertyMDSeverity,
+} from './libertymd-severity';
 
 export interface LibertyMDHistoryItem {
   id: string;
@@ -21,6 +34,144 @@ export interface LibertyMDHistoryItem {
   chief_complaint: string | null;
   created_at: string;
 }
+
+// ---------------------------------------------------------------------------
+// P0-16 · four-severity presentation
+//
+// One component draws all four tiers. It takes a severity (or a raw safety
+// signal) and looks everything up in LIBERTYMD_SEVERITY_PRESENTATION — no
+// caller ever picks a colour, and no caller can invent a fifth treatment.
+//
+// The defect this closes: today both LibertyMDChat and LibertyMDApp render a
+// clinical caution and an app error in the *same* amber box
+// (`border-amber-200 bg-amber-50 text-amber-900`), and the guardrail's
+// transport-failure verdict arrives with `status: 'high_risk_continue'`, so a
+// network timeout is shown to a patient as a warning about their body. Two live
+// `error_fail_cautious` rows are two occurrences of exactly that.
+//
+// Emergency reachability: `LibertyMDSeverityNotice` will render emergency chrome
+// if handed `severity="emergency"` directly, so the safe entry point for
+// server-derived signals is `LibertyMDSafetyNotice`, which derives the severity
+// and therefore cannot reach emergency without a `force_end`.
+// tests/libertymd/severity-mapping.test.ts asserts that over the whole matrix.
+// ---------------------------------------------------------------------------
+
+const SEVERITY_ICONS = {
+  'info': Info,
+  'alert-triangle': AlertTriangle,
+  'shield-alert': ShieldAlert,
+  'wrench': Wrench,
+} as const;
+
+interface SeverityNoticeProps {
+  severity: LibertyMDSeverity;
+  message: string;
+  /** Optional override for the tier label. The label is never removed. */
+  label?: string;
+  className?: string;
+}
+
+/**
+ * The single rendering of a severity tier.
+ *
+ * `info` renders `null` on purpose: the info tier is "plain, no chrome", so
+ * ordinary assistant content belongs in the normal message bubble, not in a
+ * notice box wearing no styling.
+ */
+export function LibertyMDSeverityNotice({ severity, message, label, className }: SeverityNoticeProps) {
+  if (severity === 'info') return null;
+  const text = message.trim();
+  if (!text) return null;
+
+  const presentation = LIBERTYMD_SEVERITY_PRESENTATION[severity];
+  const TierIcon = SEVERITY_ICONS[presentation.iconName];
+  const tierLabel = label || presentation.label;
+
+  return (
+    <div
+      role={presentation.role === 'note' ? undefined : presentation.role}
+      aria-live={presentation.live === 'off' ? undefined : presentation.live}
+      data-libertymd-severity={severity}
+      className={[presentation.container, className].filter(Boolean).join(' ')}
+    >
+      <div className="flex items-start gap-2.5">
+        <TierIcon className={presentation.icon} aria-hidden="true" />
+        <div className="min-w-0">
+          {/* Text label, always present: the tier must survive greyscale and
+              forced-colours mode. P0-16 AC5 — never colour alone. */}
+          <p className={presentation.labelClass}>{tierLabel}</p>
+          <p className={presentation.body}>{text}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface SafetyNoticeProps {
+  /** `status` + `source` straight off the proxy's `safety` object or a stored row. */
+  signal: LibertyMDSafetySignal | null | undefined;
+  message: string;
+  className?: string;
+}
+
+/**
+ * The safe entry point for anything that came from the guardrail.
+ *
+ * Derives the tier from `status` + `source` rather than accepting one, so
+ * `error_fail_cautious` renders **technical** (P0-16 AC3) and only a `force_end`
+ * can reach emergency (P0-16 AC4).
+ */
+export function LibertyMDSafetyNotice({ signal, message, className }: SafetyNoticeProps) {
+  return (
+    <LibertyMDSeverityNotice
+      severity={libertyMDSeverityForSignal(signal)}
+      message={message}
+      className={className}
+    />
+  );
+}
+
+/**
+ * A failed request to the proxy — network error, timeout, 4xx, 5xx. Always the
+ * technical tier. Replaces the amber `{error && ...}` boxes in the chat trees,
+ * which currently make an app failure indistinguishable from a clinical caution.
+ */
+export function LibertyMDRequestErrorNotice({ message, className }: { message: string; className?: string }) {
+  return (
+    <LibertyMDSeverityNotice
+      severity={libertyMDSeverityForRequestFailure()}
+      message={message}
+      className={className}
+    />
+  );
+}
+
+// Re-exported so an adopter needs one import: the components above plus the
+// helper that turns a whole proxy response into `{ severity, message } | null`.
+//
+// The two-step adoption in LibertyMDChat.tsx / LibertyMDApp.tsx (owned by other
+// lanes right now, so not done here):
+//
+//   const [safetyNotice, setSafetyNotice] =
+//     useState<LibertyMDSafetyNoticeContent | null>(null);
+//   ...
+//   setSafetyNotice(libertyMDSafetyNoticeFromResponse(data));
+//   ...
+//   {safetyNotice && phase === 'intake' && (
+//     <LibertyMDSeverityNotice
+//       severity={safetyNotice.severity}
+//       message={safetyNotice.message}
+//       className="ml-10"
+//     />
+//   )}
+//   {error && phase !== 'demographics_required' && (
+//     <LibertyMDRequestErrorNotice message={error} className="ml-10" />
+//   )}
+//
+// which replaces the two amber boxes that currently make a clinical caution and
+// an app failure look identical.
+export { libertyMDSafetyNoticeFromResponse };
+export type { LibertyMDSafetyNoticeContent, LibertyMDSafetySignal, LibertyMDSeverity };
 
 interface DemographicsPromptProps {
   age: string;

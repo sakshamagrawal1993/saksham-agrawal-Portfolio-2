@@ -80,11 +80,25 @@ export function detectDeterministicEmergency(message: string): DeterministicEmer
   ]
 
   for (const rule of rules) {
-    const match = text.match(rule.pattern)
-    if (!match || match.index === undefined) continue
-    const before = text.slice(Math.max(0, match.index - 36), match.index)
-    if (/\b(no|not|without|denies|denied|never)\b/.test(before)) continue
-    return { crisisType: rule.crisisType, message: rule.message }
+    const globalPattern = new RegExp(rule.pattern.source, rule.pattern.flags.includes('g') ? rule.pattern.flags : `${rule.pattern.flags}g`)
+    let match: RegExpExecArray | null
+    while ((match = globalPattern.exec(text)) !== null) {
+      if (match.index === undefined) continue
+      const before = text.slice(Math.max(0, match.index - 40), match.index)
+      // Negation does not carry across sentence/contrast boundaries. Deliberately
+      // do NOT split on commas — "no lip swelling, tongue swelling, or X" is one
+      // negated list (corpus: lip_dryness_no_swelling).
+      const seg = before.split(/[;.!?]|\bbut\b|\bhowever\b|\balthough\b|\bthough\b/i).pop() || ''
+      if (/\b(no|not|without|denies|denied|never|don'?t have|doesn'?t have)\b/.test(seg)) continue
+      // Past-tense family history only — "my father had chest pain last year" is not
+      // the patient's emergency; "my father is having chest pain" still fires.
+      // Check the window before the match (includes the relative + had).
+      if (
+        /\b(my|his|her|their)\s+\w*\s*(father|mother|dad|mum|mom|brother|sister|friend|husband|wife|son|daughter|uncle|aunt)\s+(had|has had|used to have)\b/.test(before)
+        || /\b(family history|history of|hx of)\b/.test(before)
+      ) continue
+      return { crisisType: rule.crisisType, message: rule.message }
+    }
   }
   return null
 }

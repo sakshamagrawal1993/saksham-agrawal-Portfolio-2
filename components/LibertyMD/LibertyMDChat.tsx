@@ -20,9 +20,19 @@ import {
   LibertyMDAccountDrawer,
   LibertyMDDemographicsPrompt,
   LibertyMDReportGate,
+  LibertyMDRequestErrorNotice,
+  LibertyMDSeverityNotice,
+  libertyMDSafetyNoticeFromResponse,
   type LibertyMDHistoryItem,
+  type LibertyMDSafetyNoticeContent,
 } from './LibertyMDCareControls';
 import { LibertyMDCareOrb } from './LibertyMDCareOrb';
+import { LibertyMDEmergencyAlert, LibertyMDEmergencyPinnedBar } from './LibertyMDEmergencyAlert';
+import {
+  LibertyMDNewMessagePill,
+  TRANSCRIPT_BOTTOM_CLEARANCE_CLASS,
+  useLibertyMDChatScroll,
+} from './LibertyMDChatScroll';
 
 type ChatPhase =
   | 'loading'
@@ -145,6 +155,19 @@ const statusCopy: Record<ChatPhase, string> = {
   clinical_review_needed: 'A clinician should review your symptoms',
   error: 'Connection interrupted',
 };
+
+/**
+ * P0-18 · the standing instruction. Deliberately identical to the sentence this surface
+ * already showed, so the ticket changes *where* emergency guidance renders and not *what*
+ * it says — clinical wording is P0-17's scope and is flagged for clinician review. It is
+ * repeated in the pinned alert independently of the model-authored message so that a vague
+ * or truncated safety message still leaves an actionable instruction on screen.
+ */
+const EMERGENCY_STANDING_INSTRUCTION =
+  'Call local emergency services or go to the nearest emergency department.';
+const EMERGENCY_ACKNOWLEDGE_LABEL = 'I understand';
+const EMERGENCY_PERSISTENCE_NOTE = 'This guidance stays pinned to the bottom of the screen after you acknowledge it.';
+const EMERGENCY_REOPEN_LABEL = 'Show details';
 
 const RESPONSE_STAGES = ['Understanding', 'Mulling', 'Correlating', 'Typing'] as const;
 const RESPONSE_STAGE_MS = 500;
@@ -323,7 +346,7 @@ export default function LibertyMDChat() {
   const [demographics, setDemographics] = useState({ age: '', sex: '' });
   const [report, setReport] = useState<LibertyReport | null>(null);
   const [error, setError] = useState('');
-  const [safetyNotice, setSafetyNotice] = useState('');
+  const [safetyNotice, setSafetyNotice] = useState<LibertyMDSafetyNoticeContent | null>(null);
   const [isBusy, setIsBusy] = useState(Boolean(initialStartRequestRef.current));
   const [isAnonymous, setIsAnonymous] = useState(true);
   const [profile, setProfile] = useState<LibertyMDProfile | null>(null);
@@ -335,7 +358,9 @@ export default function LibertyMDChat() {
   const [accountLoading, setAccountLoading] = useState(false);
   const [consultationVersion, setConsultationVersion] = useState<number | null>(null);
   const [responseStageIndex, setResponseStageIndex] = useState(0);
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  // P0-18 AC4 — the *only* thing that dismisses the emergency alert. Not scroll, not a tap
+  // outside, not Escape, and not navigation: nothing else writes this flag.
+  const [isEmergencyAcknowledged, setIsEmergencyAcknowledged] = useState(false);
   const identityPromiseRef = useRef<Promise<any> | null>(null);
   const startConsultationPromiseRef = useRef<Promise<any> | null>(null);
   const resolvedDraftConsultationIdRef = useRef<string | null>(null);
@@ -370,19 +395,25 @@ export default function LibertyMDChat() {
     return data;
   };
 
-  const mapMessages = (rows: any[]): ChatMessage[] => rows.map((item, index) => ({
-    id: String(item.id || `${consultationId}-${index}`),
-    sender: item.role === 'user' ? 'user' : 'ai',
-    text: String(item.content || ''),
-    options: Array.isArray(item.options) ? item.options.map(String) : [],
-    kind: item.message_type === 'safety'
-      ? 'emergency'
-      : item.message_type === 'report_gate'
-        ? 'report'
-        : item.message_type === 'demographics'
-          ? 'demographics'
-          : 'normal',
-  }));
+  const mapMessages = (
+    rows: any[],
+    opts?: { emergencyStopped?: boolean },
+  ): ChatMessage[] => rows.map((item, index) => {
+    // Defect 4 / P0-16 AC4: message_type === 'safety' is also used for
+    // clinical_review_needed, turn-cap close, and off-topic stop. Only a
+    // force_end consult may promote those rows to emergency chrome.
+    let kind: ChatMessage['kind'] = 'normal';
+    if (item.message_type === 'report_gate') kind = 'report';
+    else if (item.message_type === 'demographics') kind = 'demographics';
+    else if (item.message_type === 'safety' && opts?.emergencyStopped) kind = 'emergency';
+    return {
+      id: String(item.id || `${consultationId}-${index}`),
+      sender: item.role === 'user' ? 'user' : 'ai',
+      text: String(item.content || ''),
+      options: Array.isArray(item.options) ? item.options.map(String) : [],
+      kind,
+    };
+  });
 
   const refreshAccount = async () => {
     setAccountLoading(true);
@@ -396,9 +427,28 @@ export default function LibertyMDChat() {
     }
   };
 
+  const isEmergencyStopped = phase === 'emergency_end';
+
+  // P0-19 · the old implementation called `scrollIntoView` from this effect, i.e. in the
+  // same commit that set the state — before layout, and before the footer had grown by the
+  // height of any new option chips. The dependency list is kept identical so the *trigger*
+  // is unchanged; only the timing moves, into `useLibertyMDChatScroll`, which anchors after
+  // layout and re-anchors on late growth.
+  const [transcriptRevision, setTranscriptRevision] = useState(0);
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [messages, isBusy, report, phase]);
+    setTranscriptRevision((current) => current + 1);
+  }, [messages, isBusy, report, phase, error, safetyNotice]);
+
+  const { scrollRef, contentRef, footerRef, showJumpToLatest, jumpToLatest } = useLibertyMDChatScroll({
+    revision: transcriptRevision,
+    messageRevision: messages.length,
+    force: isEmergencyStopped,
+  });
+
+  // A fresh emergency must never inherit an earlier acknowledgement.
+  useEffect(() => {
+    if (!isEmergencyStopped) setIsEmergencyAcknowledged(false);
+  }, [isEmergencyStopped, consultationId]);
 
   useEffect(() => {
     if (!isBusy) {
@@ -470,7 +520,7 @@ export default function LibertyMDChat() {
           ].filter((message) => message.text));
           setPhase(nextPhase);
           setIsReportGateOpen(nextPhase === 'report_gate');
-          setSafetyNotice(data.safety?.message ? String(data.safety.message) : '');
+          setSafetyNotice(libertyMDSafetyNoticeFromResponse(data));
           setConsultationVersion(Number.isInteger(data.version) ? Number(data.version) : null);
           resolvedDraftConsultationIdRef.current = nextConsultationId;
           initialStartRequestRef.current = null;
@@ -512,7 +562,7 @@ export default function LibertyMDChat() {
           ].filter((message) => message.text));
           setPhase(initialPhase);
           setIsReportGateOpen(initialPhase === 'report_gate');
-          setSafetyNotice(initialStart.safety?.message ? String(initialStart.safety.message) : '');
+          setSafetyNotice(libertyMDSafetyNoticeFromResponse(initialStart));
           setConsultationVersion(Number.isInteger(initialStart.version) ? Number(initialStart.version) : null);
           setProfile(initialStart.profile || null);
           setIsAnonymous(Boolean(initialStart.isAnonymous));
@@ -570,7 +620,10 @@ export default function LibertyMDChat() {
         if (cancelled) return;
         const nextPhase = phaseFromStatus(String(data?.consultation?.status || 'interviewing'));
         setConsultationVersion(Number.isInteger(data?.consultation?.version) ? Number(data.consultation.version) : null);
-        setMessages(mapMessages(Array.isArray(data?.messages) ? data.messages : []));
+        setMessages(mapMessages(
+          Array.isArray(data?.messages) ? data.messages : [],
+          { emergencyStopped: String(data?.consultation?.status || '') === 'emergency_stopped' },
+        ));
         setPhase(nextPhase);
         setIsReportGateOpen(nextPhase === 'report_gate');
         if (data?.report) setReport(normalizeReport(data.report));
@@ -616,12 +669,33 @@ export default function LibertyMDChat() {
         age: Number(demographics.age),
         sex_at_birth: demographics.sex,
       }));
+      // Defect 1 / P0-14d AC2: force_end on this turn must reach the user.
+      // Never fall through to next_question when emergency is set.
+      if (data?.emergency || data?.state === 'emergency_stopped') {
+        setMessages((current) => [...current,
+          {
+            id: `${Date.now()}-demographics-user`,
+            sender: 'user',
+            kind: 'demographics',
+            text: `Age ${demographics.age}; ${String(demographics.sex).replace(/_/g, ' ')}`,
+          },
+          {
+            id: `${Date.now()}-demographics-emergency`,
+            sender: 'ai',
+            kind: 'emergency',
+            text: String(data?.message || 'These symptoms may be an emergency. Seek emergency care now.'),
+          },
+        ]);
+        setSafetyNotice(null);
+        setPhase('emergency_end');
+        return;
+      }
       setMessages((current) => [...current,
         {
           id: `${Date.now()}-demographics-user`,
           sender: 'user',
           kind: 'demographics',
-          text: `Age ${demographics.age}; ${demographics.sex.replaceAll('_', ' ')}`,
+          text: `Age ${demographics.age}; ${String(demographics.sex).replace(/_/g, ' ')}`,
         },
         {
           id: `${Date.now()}-demographics-ai`,
@@ -630,6 +704,7 @@ export default function LibertyMDChat() {
           options: Array.isArray(data?.options) ? data.options.map(String) : [],
         },
       ]);
+      setSafetyNotice(libertyMDSafetyNoticeFromResponse(data));
       setPhase('intake');
     } catch (demographicsError) {
       setError(demographicsError instanceof Error ? demographicsError.message : 'Unable to save this information.');
@@ -655,9 +730,10 @@ export default function LibertyMDChat() {
       setMessages((current) => [...current, {
         id: `${Date.now()}-review`,
         sender: 'ai',
-        kind: 'emergency',
+        kind: 'normal',
         text: String(data?.message || 'A reliable report could not be generated. Please continue with a licensed clinician.'),
       }]);
+      setSafetyNotice(null);
       setPhase('clinical_review_needed');
       return;
     }
@@ -683,7 +759,7 @@ export default function LibertyMDChat() {
     }
 
     const nextQuestion = String(data?.next_question || data?.message || 'Could you tell me more about that?');
-    setSafetyNotice(data?.safety?.message ? String(data.safety.message) : '');
+    setSafetyNotice(libertyMDSafetyNoticeFromResponse(data));
     setMessages((current) => [...current, {
       id: `${Date.now()}-assistant`,
       sender: 'ai',
@@ -889,9 +965,15 @@ export default function LibertyMDChat() {
   };
 
   const composerLocked = isBusy || phase !== 'intake';
-  const emergencyMessage = phase === 'emergency_end'
-    ? [...messages].reverse().find((item) => item.kind === 'emergency')?.text
-    : null;
+  // Safety-grade: the trigger is the consult *state*, never the presence of a
+  // correctly-tagged message. Previously a persisted emergency whose row was not typed
+  // `safety` rendered no emergency UI at all. The detail text is best-effort; the standing
+  // instruction is unconditional, so the alert is never empty.
+  // Defect 4: never fall back to safetyNotice — that can hold technical copy and would
+  // put an app fault into the red role=alert emergency panel.
+  const emergencyDetail = isEmergencyStopped
+    ? String([...messages].reverse().find((item) => item.kind === 'emergency')?.text || '')
+    : '';
 
   return (
     <div className="flex h-[100svh] flex-col overflow-hidden bg-[linear-gradient(180deg,#FBFCFF_0%,#F3F8FF_52%,#F1F8F3_100%)] font-sans text-[#111827] selection:bg-[#2563EB] selection:text-white">
@@ -944,21 +1026,37 @@ export default function LibertyMDChat() {
         </div>
       </header>
 
-      <main className="min-h-0 flex-1 overflow-y-auto px-3 py-5 sm:px-6 sm:py-8">
-        <div className="mx-auto w-full max-w-3xl">
+      <main
+        ref={scrollRef}
+        // `data-lenis-prevent` keeps the site-wide Lenis instance from swallowing wheel and
+        // touch events over the transcript. Lenis is mounted at the app root, hijacks wheel
+        // on `window`, and the chat shell is `h-[100svh] overflow-hidden`, so without this
+        // the wheel gesture is spent on a page that cannot scroll instead of on the
+        // transcript. It also opts the container into `overscroll-behavior: contain`.
+        data-lenis-prevent
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pt-5 sm:px-6 sm:pt-8"
+      >
+        <div ref={contentRef} className={`mx-auto w-full max-w-3xl ${TRANSCRIPT_BOTTOM_CLEARANCE_CLASS}`}>
           <div className="mb-6 flex items-center justify-center gap-2 text-center text-xs font-semibold text-[#64748B]" aria-live="polite">
             <span className={`h-2 w-2 rounded-full ${phase === 'error' ? 'bg-amber-500' : 'bg-emerald-500'}`} />
             {statusCopy[phase]}
           </div>
 
-          {emergencyMessage && (
+          {isEmergencyStopped && (
+            // The transcript copy is the durable record (P0-18 AC5): it stays in the consult
+            // after acknowledgement and is what a user finds when they scroll back. It is
+            // explicitly *not* the mechanism that gets the instruction into the viewport —
+            // that is `LibertyMDEmergencyAlert` below. It is deliberately left visible to
+            // assistive tech: it carries no live region, so it is never announced
+            // spontaneously and cannot double-speak over the alert, but it does keep the
+            // detail text reachable by browsing after the alert has been acknowledged.
             <section className="mb-5 rounded-lg border border-red-200 bg-red-50 p-4 text-left shadow-sm">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
                 <div>
                   <h2 className="font-bold text-red-900">{t('chatx.emergencyNow')}</h2>
-                  <p className="mt-1 text-sm leading-6 text-red-800">{emergencyMessage}</p>
-                  <p className="mt-2 text-sm font-bold text-red-900">Call local emergency services or go to the nearest emergency department.</p>
+                  {emergencyDetail && <p className="mt-1 text-sm leading-6 text-red-800">{emergencyDetail}</p>}
+                  <p className="mt-2 text-sm font-bold text-red-900">{EMERGENCY_STANDING_INSTRUCTION}</p>
                 </div>
               </div>
             </section>
@@ -1010,9 +1108,11 @@ export default function LibertyMDChat() {
             )}
 
             {safetyNotice && phase === 'intake' && (
-              <div className="ml-10 rounded-md border-l-2 border-amber-500 bg-amber-50 px-4 py-3 text-left text-sm leading-6 text-amber-900">
-                {safetyNotice}
-              </div>
+              <LibertyMDSeverityNotice
+                severity={safetyNotice.severity}
+                message={safetyNotice.message}
+                className="ml-10"
+              />
             )}
 
             {isBusy && (
@@ -1037,9 +1137,7 @@ export default function LibertyMDChat() {
             )}
 
             {error && phase !== 'demographics_required' && (
-              <div className="ml-10 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-left text-sm text-amber-900">
-                {error}
-              </div>
+              <LibertyMDRequestErrorNotice message={error} className="ml-10" />
             )}
 
             {phase === 'report_gate' && !isReportGateOpen && (
@@ -1053,13 +1151,34 @@ export default function LibertyMDChat() {
             )}
 
             {report && <LibertyMDReportView report={report} saved={!isAnonymous} />}
-            <div ref={messagesEndRef} />
           </div>
         </div>
       </main>
 
-      <footer className="z-20 shrink-0 border-t border-white/80 bg-white/72 px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 backdrop-blur-xl sm:px-6 sm:pb-4">
+      {/*
+        The footer is a `shrink-0` flex sibling of the scrolling transcript inside a
+        `h-[100svh] overflow-hidden` column, so everything in it holds viewport space that
+        the transcript cannot scroll over. That is why the acknowledged emergency bar and
+        the "new message" pill live here rather than in the transcript. `relative` is the
+        positioning context for the pill.
+      */}
+      <footer
+        ref={footerRef}
+        className="relative z-20 shrink-0 border-t border-white/80 bg-white/72 px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 backdrop-blur-xl sm:px-6 sm:pb-4"
+      >
+        {showJumpToLatest && !isEmergencyStopped && (
+          <LibertyMDNewMessagePill label="New message" onClick={jumpToLatest} />
+        )}
         <div className="mx-auto max-w-3xl">
+          {isEmergencyStopped && isEmergencyAcknowledged && (
+            <LibertyMDEmergencyPinnedBar
+              heading={t('chatx.emergencyNow')}
+              standingInstruction={EMERGENCY_STANDING_INSTRUCTION}
+              reopenLabel={EMERGENCY_REOPEN_LABEL}
+              onReopen={() => setIsEmergencyAcknowledged(false)}
+            />
+          )}
+
           {currentOptions.length > 0 && (
             <div className="mb-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap">
               {currentOptions.map((option) => (
@@ -1116,6 +1235,22 @@ export default function LibertyMDChat() {
           </p>
         </div>
       </footer>
+
+      {/*
+        P0-18 · rendered last and portalled to `document.body` at z-120, so it sits above
+        the report gate (z-90) and the account drawer (z-85). An emergency outranks every
+        other surface, including any gate — "emergency guidance precedes everything".
+      */}
+      {isEmergencyStopped && !isEmergencyAcknowledged && (
+        <LibertyMDEmergencyAlert
+          heading={t('chatx.emergencyNow')}
+          message={emergencyDetail}
+          standingInstruction={EMERGENCY_STANDING_INSTRUCTION}
+          acknowledgeLabel={EMERGENCY_ACKNOWLEDGE_LABEL}
+          persistenceNote={EMERGENCY_PERSISTENCE_NOTE}
+          onAcknowledge={() => setIsEmergencyAcknowledged(true)}
+        />
+      )}
 
       {phase === 'report_gate' && isReportGateOpen && (
         <LibertyMDReportGate

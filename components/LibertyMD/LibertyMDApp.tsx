@@ -47,8 +47,13 @@ import {
   LibertyMDAccountDrawer,
   LibertyMDDemographicsPrompt,
   LibertyMDReportGate,
+  LibertyMDRequestErrorNotice,
+  LibertyMDSeverityNotice,
+  libertyMDSafetyNoticeFromResponse,
   type LibertyMDHistoryItem,
+  type LibertyMDSafetyNoticeContent,
 } from './LibertyMDCareControls';
+import { LibertyMDEmergencyAlert } from './LibertyMDEmergencyAlert';
 
 interface LibertyMDAppProps {
   onBack?: () => void;
@@ -164,6 +169,11 @@ const HOW_IT_WORKS_PIN_QUERY = '(min-width: 1024px)';
  * ratio (3480px against an 880px viewport), which lands each of the 4 steps at ~0.74vh.
  */
 const HOW_IT_WORKS_PIN_VIEWPORTS = 3.95;
+
+const EMERGENCY_STANDING_INSTRUCTION =
+  'Call local emergency services or go to the nearest emergency department.';
+const EMERGENCY_ACKNOWLEDGE_LABEL = 'I understand';
+const EMERGENCY_PERSISTENCE_NOTE = 'This guidance stays pinned to the bottom of the screen after you acknowledge it.';
 
 const howItWorksSteps = [
   {
@@ -422,7 +432,8 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
   const [demographics, setDemographics] = useState({ age: '', sex: '' });
   const [report, setReport] = useState<LibertyReport | null>(null);
   const [error, setError] = useState('');
-  const [safetyNotice, setSafetyNotice] = useState('');
+  const [safetyNotice, setSafetyNotice] = useState<LibertyMDSafetyNoticeContent | null>(null);
+  const [isEmergencyAcknowledged, setIsEmergencyAcknowledged] = useState(false);
   const [isAnonymous, setIsAnonymous] = useState(true);
   const [greetingName, setGreetingName] = useState('');
   const [profile, setProfile] = useState<LibertyMDProfile | null>(null);
@@ -539,12 +550,17 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
           hasActiveConsultRef.current = true;
           const consult = await invokeCareProxy({ action: 'get_consultation', consultation_id: oauthConsultation });
           if (!cancelled && Array.isArray(consult?.messages)) {
+            const emergencyStopped = String(consult?.consultation?.status || '') === 'emergency_stopped';
             setMessages(consult.messages.map((item: any, index: number) => ({
               id: `${oauthConsultation}-${index}`,
               sender: item.role === 'user' ? 'user' : 'ai',
               text: item.content,
               options: Array.isArray(item.options) ? item.options : [],
-              kind: item.message_type === 'safety' ? 'emergency' : item.message_type === 'report_gate' ? 'report' : 'normal',
+              kind: item.message_type === 'report_gate'
+                ? 'report'
+                : item.message_type === 'safety' && emergencyStopped
+                  ? 'emergency'
+                  : 'normal',
             })));
           }
         } else if (data?.greeting_name) {
@@ -572,7 +588,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
     if (!cleanedSymptom) return;
 
     setError('');
-    setSafetyNotice('');
+    setSafetyNotice(null);
     const draftId = crypto.randomUUID();
     navigate(`/liberty-md/chat?draftId=${encodeURIComponent(draftId)}`, {
       state: {
@@ -614,13 +630,14 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
       }
       if (lastError) throw lastError;
 
-      if (data?.emergency) {
+      if (data?.emergency || data?.state === 'emergency_stopped') {
         setPhase('emergency_end');
+        setSafetyNotice(null);
         setMessages(prev => [...prev, {
           id: `${Date.now()}-emergency`,
           sender: 'ai',
           kind: 'emergency',
-          text: data.message || 'These symptoms may be an emergency. Call emergency services or go to the ER now.',
+          text: String(data?.message || 'These symptoms may be an emergency. Call emergency services or go to the ER now.'),
         }]);
         return;
       }
@@ -657,7 +674,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
       }
 
       setPhase('intake');
-      setSafetyNotice(data?.safety?.message ? String(data.safety.message) : '');
+      setSafetyNotice(libertyMDSafetyNoticeFromResponse(data));
       setMessages(prev => [...prev, {
         id: `${Date.now()}-ai`,
         sender: 'ai',
@@ -691,7 +708,24 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
         sex_at_birth: demographics.sex,
       });
       setProfile(prev => ({ ...prev, age: Number(demographics.age), sex_at_birth: demographics.sex }));
-      setPhase('intake');
+      if (data?.emergency || data?.state === 'emergency_stopped') {
+        setMessages(prev => [...prev,
+          {
+            id: `${Date.now()}-demographic-answer`,
+            sender: 'user',
+            text: `Age ${demographics.age}; ${demographics.sex}`,
+          },
+          {
+            id: `${Date.now()}-demographics-emergency`,
+            sender: 'ai',
+            kind: 'emergency',
+            text: String(data?.message || 'These symptoms may be an emergency. Seek emergency care now.'),
+          },
+        ]);
+        setSafetyNotice(null);
+        setPhase('emergency_end');
+        return;
+      }
       setMessages(prev => [...prev,
         {
           id: `${Date.now()}-demographic-answer`,
@@ -705,6 +739,8 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
           options: Array.isArray(data?.options) ? data.options : [],
         },
       ]);
+      setSafetyNotice(libertyMDSafetyNoticeFromResponse(data));
+      setPhase('intake');
     } catch (demographicsError) {
       setError(demographicsError instanceof Error ? demographicsError.message : 'Unable to save the clinical context.');
       setPhase('demographics_required');
@@ -765,7 +801,8 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
     setSessionId(null);
     setReport(null);
     setError('');
-    setSafetyNotice('');
+    setSafetyNotice(null);
+    setIsEmergencyAcknowledged(false);
     setIsReportGateOpen(false);
     setDemographics({ age: profile?.age ? String(profile.age) : '', sex: profile?.sex_at_birth || '' });
     setMessages([
@@ -781,6 +818,14 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
   const dockZoneRef = useRef<HTMLDivElement | null>(null);
   const activeOptions = messages[messages.length - 1]?.options || [];
   const isComposerLocked = isTyping || ['demographics_required', 'report_gate', 'report_ready', 'emergency_end', 'clinical_review_needed'].includes(phase);
+  const isEmergencyStopped = phase === 'emergency_end';
+  const emergencyDetail = isEmergencyStopped
+    ? String([...messages].reverse().find((item) => item.kind === 'emergency')?.text || '')
+    : '';
+
+  useEffect(() => {
+    if (!isEmergencyStopped) setIsEmergencyAcknowledged(false);
+  }, [isEmergencyStopped, sessionId]);
   return (
     <div
       className="min-h-screen text-center text-[#111827] font-sans selection:bg-[#2563EB] selection:text-white [&_input]:text-center [&_select]:text-center [&_textarea]:text-center"
@@ -1154,9 +1199,11 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                 )}
 
                 {safetyNotice && phase !== 'emergency_end' && (
-                  <div className="mx-auto max-w-2xl border-l-2 border-amber-500 bg-amber-50 px-4 py-3 text-left text-sm leading-6 text-amber-900">
-                    {safetyNotice}
-                  </div>
+                  <LibertyMDSeverityNotice
+                    severity={safetyNotice.severity}
+                    message={safetyNotice.message}
+                    className="mx-auto max-w-2xl text-left"
+                  />
                 )}
 
                 {phase === 'report_gate' && !isReportGateOpen && (
@@ -1170,9 +1217,7 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
                 )}
 
                 {error && phase !== 'demographics_required' && (
-                  <div className="border-t border-[#FDE68A] pt-5 text-sm leading-6 text-[#92400E]">
-                    {error}
-                  </div>
+                  <LibertyMDRequestErrorNotice message={error} className="mx-auto max-w-2xl text-left" />
                 )}
 
                 {isTyping && (
@@ -1385,6 +1430,17 @@ export default function LibertyMDApp({ onBack }: LibertyMDAppProps) {
         onClose={() => setIsMenuOpen(false)}
         onSelectConsultation={loadConsultation}
       />
+
+      {isEmergencyStopped && !isEmergencyAcknowledged && (
+        <LibertyMDEmergencyAlert
+          heading={t('chatx.emergencyNow')}
+          message={emergencyDetail}
+          standingInstruction={EMERGENCY_STANDING_INSTRUCTION}
+          acknowledgeLabel={EMERGENCY_ACKNOWLEDGE_LABEL}
+          persistenceNote={EMERGENCY_PERSISTENCE_NOTE}
+          onAcknowledge={() => setIsEmergencyAcknowledged(true)}
+        />
+      )}
 
       <div
         aria-hidden={!shouldShowFloatingComposer}

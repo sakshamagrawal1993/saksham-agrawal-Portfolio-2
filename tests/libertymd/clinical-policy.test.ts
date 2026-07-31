@@ -1,5 +1,12 @@
 /// <reference lib="deno.ns" />
 
+// P0-16 / P0-14f — registers the severity-boundary tests into this gate.
+// `deno test` collects every Deno.test reached through the module graph, and
+// `package.json` is outside that ticket's file manifest, so the severity suite
+// rides along here rather than adding a script. See the header of the imported
+// file for the clean follow-up if a named gate is preferred.
+import './severity-mapping.test.ts'
+
 import {
   assessClinicalEvidence,
   classifyResponseRelevance,
