@@ -15,7 +15,7 @@ const IDENTITY_SOURCE = new URL(
   import.meta.url,
 )
 const MIGRATION = new URL(
-  '../../supabase/migrations/20260731260000_libertymd_merge_collision_rule.sql',
+  '../../supabase/migrations/20260731261000_libertymd_merge_collision_rule.sql',
   import.meta.url,
 )
 const CHAT_SOURCE = new URL('../../components/LibertyMD/LibertyMDChat.tsx', import.meta.url)
