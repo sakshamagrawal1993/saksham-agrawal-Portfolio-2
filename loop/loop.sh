@@ -23,7 +23,7 @@ MAX_BUILD_ATTEMPTS=5
 MAX_ENRICH_ATTEMPTS=2
 
 # Gates. Run individually — the full chain can exceed a single timeout.
-GATES=(contracts separability policy recovery breaker simulations evaluation)
+GATES=(contracts separability policy recovery breaker invariants simulations evaluation)
 
 # Portable timeout.
 #

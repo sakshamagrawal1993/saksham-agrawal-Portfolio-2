@@ -31,12 +31,15 @@
     "test:libertymd:policy": "deno test --no-config tests/libertymd/clinical-policy.test.ts",
     "test:libertymd:recovery": "deno test --no-config tests/libertymd/abandoned-chat-recovery.test.ts",
     "test:libertymd:breaker": "deno test --no-config --no-check --allow-env --allow-net tests/libertymd/n8n-breaker.mts",
+    "test:libertymd:invariants": "deno test --no-config --no-check --allow-env tests/libertymd/proxy-invariants.mts",
+    "test:libertymd:pattern-parity": "node --experimental-strip-types scripts/libertymd-emergency-pattern-sync.mjs --check",
+    "sync:libertymd:patterns": "node --experimental-strip-types scripts/libertymd-emergency-pattern-sync.mjs --write",
     "test:libertymd:simulations": "node scripts/libertymd-run-simulations.mjs",
     "test:libertymd:evaluation": "deno run --no-config --allow-read scripts/libertymd-clinical-evaluation.ts",
     "test:libertymd:db": "supabase test db",
     "test:libertymd:live": "node --env-file=.env scripts/libertymd-live-backend-smoke.mjs",
     "test:libertymd:separability": "node scripts/libertymd-separability-check.mjs",
-    "test:libertymd:ci": "npm run test:libertymd:contracts && npm run test:libertymd:separability && npm run test:libertymd:policy && npm run test:libertymd:recovery && npm run test:libertymd:breaker && npm run test:libertymd:simulations && npm run test:libertymd:evaluation",
+    "test:libertymd:ci": "npm run test:libertymd:contracts && npm run test:libertymd:separability && npm run test:libertymd:pattern-parity && npm run test:libertymd:policy && npm run test:libertymd:recovery && npm run test:libertymd:breaker && npm run test:libertymd:invariants && npm run test:libertymd:simulations && npm run test:libertymd:evaluation",
     "test:demo-smoke": "node scripts/demo_smoke_runner.mjs"
   },
   "dependencies": {

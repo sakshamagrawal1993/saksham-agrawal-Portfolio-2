@@ -33,7 +33,7 @@
  * client-side rendering of a `force_end` on this turn is NOT wired — see
  * §"Deliberately left alone" in tickets/P0-14d-14e/04-implementation.md.
  */
-import { addMessage, getHistory, getOwnedConsultation } from '../lib/consultations.ts'
+import { addMessage, getHistory, getOwnedConsultation, updateOwnedConsultation } from '../lib/consultations.ts'
 import { jsonResponse } from '../lib/errors.ts'
 import { runInterview } from '../lib/n8n-client.ts'
 import { runGuardrail, saveSafetyEvent, unscreenedTurnResult } from '../lib/safety.ts'
@@ -120,7 +120,7 @@ export async function handleSaveDemographics(ctx: ProxyContext, payload: Request
   if (guardrail.force_end) {
     // Emergency guidance precedes everything, including the interview question.
     await addMessage(ctx, consultation.id, 'assistant', guardrail.message, { message_type: 'safety' })
-    await db.from('libertymd_consultations').update({
+    await updateOwnedConsultation(ctx, consultation, {
       status: 'emergency_stopped',
       filled_slots: slots,
       safety_state: guardrail.raw,
@@ -131,7 +131,7 @@ export async function handleSaveDemographics(ctx: ProxyContext, payload: Request
         sex_at_birth: sex,
       },
       last_activity_at: now,
-    }).eq('id', consultation.id)
+    })
     // The demographics *were* saved — the funnel event still belongs here.
     await addProductEvent(ctx, 'demographics_saved', consultation.id, {
       patient_relationship: patient.relationship,
@@ -187,7 +187,7 @@ export async function handleSaveDemographics(ctx: ProxyContext, payload: Request
   if (guardrail.status === 'high_risk_continue') {
     consultationUpdate.safety_state = { ...guardrail.raw, status: guardrail.status, risk_level: guardrail.risk_level }
   }
-  await db.from('libertymd_consultations').update(consultationUpdate).eq('id', consultation.id)
+  await updateOwnedConsultation(ctx, consultation, consultationUpdate)
   await addProductEvent(ctx, 'demographics_saved', consultation.id, {
     patient_relationship: patient.relationship,
     consent_version: CONSENT_VERSION,
