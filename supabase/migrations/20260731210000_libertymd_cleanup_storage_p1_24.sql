@@ -109,8 +109,10 @@ comment on function public.count_libertymd_care_storage_would_delete() is
 -- Extend dry-run twin with deleted_storage_objects (would-delete; zero mutations)
 -- Postgres destructive RETURNS unchanged (P1-23). Storage ops count lives here
 -- + Edge runner log line deleted_storage_objects.
+-- DROP first: OUT list grows vs P1-23 (SQLSTATE 42P13 otherwise).
 -- ---------------------------------------------------------------------------
-create or replace function public.cleanup_expired_libertymd_data_dry_run()
+drop function if exists public.cleanup_expired_libertymd_data_dry_run();
+create function public.cleanup_expired_libertymd_data_dry_run()
 returns table (
   deleted_consultations bigint,
   deleted_profiles bigint,

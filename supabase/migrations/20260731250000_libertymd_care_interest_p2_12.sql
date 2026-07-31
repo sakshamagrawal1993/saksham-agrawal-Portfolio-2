@@ -50,8 +50,10 @@ grant select, insert, update, delete on table public.libertymd_care_interest to 
 -- Delete order: care_interest retention branch first (honest count for rows whose
 -- consult still exists); then consults (CASCADE clears interest under purged
 -- consults); then profiles; then landings. P1-23/24 Storage unchanged.
+-- DROP first: OUT list grows with deleted_care_interest (SQLSTATE 42P13 otherwise).
 -- ---------------------------------------------------------------------------
-create or replace function public.cleanup_expired_libertymd_data()
+drop function if exists public.cleanup_expired_libertymd_data();
+create function public.cleanup_expired_libertymd_data()
 returns table (
   deleted_consultations bigint,
   deleted_profiles bigint,
@@ -130,8 +132,10 @@ comment on function public.cleanup_expired_libertymd_data() is
 
 -- ---------------------------------------------------------------------------
 -- Dry-run twin — zero mutations; care_interest + Postgres + Storage would-delete
+-- DROP first: OUT list grows vs P1-24 (SQLSTATE 42P13 otherwise).
 -- ---------------------------------------------------------------------------
-create or replace function public.cleanup_expired_libertymd_data_dry_run()
+drop function if exists public.cleanup_expired_libertymd_data_dry_run();
+create function public.cleanup_expired_libertymd_data_dry_run()
 returns table (
   deleted_consultations bigint,
   deleted_profiles bigint,

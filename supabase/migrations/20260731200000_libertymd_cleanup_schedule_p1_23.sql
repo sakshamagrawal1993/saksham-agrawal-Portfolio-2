@@ -16,8 +16,11 @@
 
 -- ---------------------------------------------------------------------------
 -- Destructive cleanup (service_role)
+-- DROP first: return type grows from (consultations, profiles) → +landing_sessions
+-- (CREATE OR REPLACE cannot change OUT column list — SQLSTATE 42P13).
 -- ---------------------------------------------------------------------------
-create or replace function public.cleanup_expired_libertymd_data()
+drop function if exists public.cleanup_expired_libertymd_data();
+create function public.cleanup_expired_libertymd_data()
 returns table (
   deleted_consultations bigint,
   deleted_profiles bigint,
