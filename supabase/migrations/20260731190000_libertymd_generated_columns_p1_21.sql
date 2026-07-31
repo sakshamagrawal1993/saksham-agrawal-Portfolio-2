@@ -197,11 +197,15 @@ create index if not exists libertymd_consultations_filled_slot_count_idx
   on public.libertymd_consultations (filled_slot_count);
 
 -- ---------------------------------------------------------------------------
--- Q6B · CREATE OR REPLACE libertymd_turn_facts — prefer generated cols
+-- Q6B · recreate libertymd_turn_facts — prefer generated cols
 -- Preserve P1-20 locks: series spine, DISTINCT ON, plain VIEW, revoke-all,
 -- PHI allow-list / ban list, stall target_slot. No reports join for triage.
+-- DROP first: CREATE OR REPLACE cannot rename/reorder view columns
+-- (P1-20 ended with is_speculative; this revision inserts top_dx_confidence
+-- before it → SQLSTATE 42P16 without DROP).
 -- ---------------------------------------------------------------------------
-create or replace view public.libertymd_turn_facts as
+drop view if exists public.libertymd_turn_facts;
+create view public.libertymd_turn_facts as
 with turn_spine as (
   select
     c.id as consultation_id,

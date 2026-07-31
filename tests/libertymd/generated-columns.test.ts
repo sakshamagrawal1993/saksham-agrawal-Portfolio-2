@@ -23,7 +23,7 @@ function assertTrue(value: unknown, message?: string) {
 
 function extractViewBody(migration: string): string {
   const match = migration.match(
-    /create\s+or\s+replace\s+view\s+public\.libertymd_turn_facts\s+as([\s\S]*?);[\s\n]*comment\s+on\s+view/i,
+    /create(?:\s+or\s+replace)?\s+view\s+public\.libertymd_turn_facts\s+as([\s\S]*?);[\s\n]*comment\s+on\s+view/i,
   )
   assertTrue(match, 'CREATE VIEW body present')
   return match?.[1] || ''

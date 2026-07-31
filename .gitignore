@@ -45,3 +45,13 @@ scratch/test_fundamentals_after_fix.json
 
 # loop.sh per-ticket worktrees
 .worktrees/
+
+# Ticket-cycle local backups (never ship)
+.p0-*-backup/
+.p0-*-rework*-backup/
+.l0-*-backup/
+**/.p0-*-backup/
+**/.l0-*-backup/
+**/*.pre-*.bak
+**/*.pre-defect.bak
+**/*.bak
