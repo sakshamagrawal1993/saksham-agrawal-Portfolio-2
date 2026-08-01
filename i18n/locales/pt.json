@@ -38,7 +38,9 @@
     "typing": "LibertyMD está pensando…",
     "inputPlaceholder": "Digite sua resposta…",
     "newConsultation": "Nova consulta",
-    "redirect": "Vamos manter o foco na sua pergunta de saúde para eu poder ajudar."
+    "redirect": "Vamos manter o foco na sua pergunta de saúde para eu poder ajudar.",
+    "demographicsHeading": "A few details before we start",
+    "demographicsSubcopy": "Your age and sex at birth let us ask safer, more relevant questions."
   },
   "demographics": {
     "prompt": "Para dar uma orientação segura e relevante, preciso de dois dados.",

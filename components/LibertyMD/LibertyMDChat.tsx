@@ -325,8 +325,8 @@ export default function LibertyMDChat() {
   const [input, setInput] = useState('');
   const [demographics, setDemographics] = useState({ age: '', sex: '' });
   // P1-01 — first interview question lives in the unified control (Q6B).
-  const [entryQuestion, setEntryQuestion] = useState('');
-  const [entryOptions, setEntryOptions] = useState<string[]>([]);
+  const [, setEntryQuestion] = useState('');
+  const [, setEntryOptions] = useState<string[]>([]);
   const [clinicalAnswer, setClinicalAnswer] = useState('');
   const [consentChecked, setConsentChecked] = useState(true);
   const [entryPatients, setEntryPatients] = useState<LibertyMDPatientListItem[]>(() =>
@@ -1245,8 +1245,11 @@ export default function LibertyMDChat() {
 
   const submitDemographics = async () => {
     if (!consultationId || isBusy) return;
+    // BO 2026-08-01 — the card is demographics-only, so a clinical answer is no
+    // longer collected here and no longer gates submit. `clinicalAnswer` is kept
+    // and still sent when non-empty so a combined layout would keep working.
     const answer = clinicalAnswer.trim();
-    if (!answer || !consentChecked) return;
+    if (!consentChecked) return;
     setIsBusy(true);
     setError('');
     try {
@@ -1255,7 +1258,7 @@ export default function LibertyMDChat() {
         consultation_id: consultationId,
         age: Number(demographics.age),
         sex_at_birth: demographics.sex,
-        message: answer,
+        ...(answer ? { message: answer } : {}),
       });
       setProfile((current) => ({
         ...current,
@@ -2642,15 +2645,11 @@ export default function LibertyMDChat() {
                   sex={demographics.sex}
                   loading={isBusy}
                   error={error}
-                  question={entryQuestion}
-                  options={entryOptions}
-                  answer={clinicalAnswer}
                   consentChecked={consentChecked}
                   isAnonymous={isAnonymous}
                   profiles={entryProfileRows.length > 1 ? entryProfileRows : []}
                   onAgeChange={(age) => setDemographics((current) => ({ ...current, age }))}
                   onSexChange={(sex) => setDemographics((current) => ({ ...current, sex }))}
-                  onAnswerChange={setClinicalAnswer}
                   onConsentChange={setConsentChecked}
                   onCareForSomeoneElse={isAnonymous ? () => void attemptAddProfile('unified_entry') : undefined}
                   onSubmit={submitDemographics}

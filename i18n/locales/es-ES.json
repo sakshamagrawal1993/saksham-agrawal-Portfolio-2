@@ -358,5 +358,9 @@
       "title": "Guidance for urinary discomfort.",
       "subtitle": "Describe what you're feeling and get a free doctor-ready report."
     }
+  },
+  "chat": {
+    "demographicsHeading": "A few details before we start",
+    "demographicsSubcopy": "Your age and sex at birth let us ask safer, more relevant questions."
   }
 }

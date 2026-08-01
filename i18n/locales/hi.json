@@ -38,7 +38,9 @@
     "typing": "LibertyMD सोच रहा है…",
     "inputPlaceholder": "अपना जवाब लिखें…",
     "newConsultation": "नया परामर्श",
-    "redirect": "आपकी मदद के लिए चलिए आपके स्वास्थ्य प्रश्न पर ध्यान रखें।"
+    "redirect": "आपकी मदद के लिए चलिए आपके स्वास्थ्य प्रश्न पर ध्यान रखें।",
+    "demographicsHeading": "A few details before we start",
+    "demographicsSubcopy": "Your age and sex at birth let us ask safer, more relevant questions."
   },
   "demographics": {
     "prompt": "सुरक्षित और सही मार्गदर्शन देने के लिए मुझे दो जानकारियाँ चाहिए।",

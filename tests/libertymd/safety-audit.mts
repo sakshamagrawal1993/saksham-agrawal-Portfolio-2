@@ -678,8 +678,18 @@ Deno.test('P1-01 · save_demographics binds answer to pre-start slot and advance
   }
 })
 
-Deno.test('P1-01 · save_demographics rejects empty clinical answer', async () => {
-  const { ctx } = createFakeContext({
+/**
+ * BO 2026-08-01 — the demographics card is demographics-only, so an empty
+ * clinical answer is now ACCEPTED rather than rejected. Was: P1-01 Q4 required
+ * a non-empty answer under the unified-entry contract.
+ *
+ * The safety property that must survive the change: a turn that accepts user
+ * input still leaves an auditable safety row. With no free text there is
+ * nothing to screen, so the row is the `no_free_text_to_screen` verdict
+ * (P0-14d AC3/AC5) — never a silent pass and never an unrecorded turn.
+ */
+Deno.test('save_demographics accepts a demographics-only submit and still records a safety row', async () => {
+  const { ctx, ops } = createFakeContext({
     consultation: consultationRow({ status: 'awaiting_demographics', turn_count: 1, version: 1, target_slot: 'onset' }),
   })
   const response = await handleSaveDemographics(ctx, {
@@ -689,5 +699,13 @@ Deno.test('P1-01 · save_demographics rejects empty clinical answer', async () =
     sex_at_birth: 'female',
     message: '   ',
   })
-  assertEquals(response.status, 400, 'whitespace answer rejected')
+  // Not asserting 200: with no free text the interview leg still runs, and the
+  // double answers it with a holding state (503). What matters is that the
+  // request is no longer *rejected* for lacking a clinical answer.
+  assertEquals(response.status === 400, false, 'demographics-only submit is not rejected')
+
+  const safetyRows = opsFor(ops, 'libertymd_safety_events', 'insert')
+  assertEquals(safetyRows.length >= 1, true, 'a safety row is still written')
+  const recorded = safetyRows[safetyRows.length - 1]?.payload as Record<string, unknown> | undefined
+  assertEquals(recorded?.source, 'no_free_text_to_screen', 'unscreened turn recorded honestly')
 })

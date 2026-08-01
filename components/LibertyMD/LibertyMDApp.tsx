@@ -32,8 +32,6 @@ import {
 } from './LibertyMDMarketingSections';
 import { LibertyMDScrollFilmSection } from './LibertyMDScrollFilmSection';
 import { LibertyMDTrustRow } from './LibertyMDTrustRow';
-import { formatInterviewTimePromise } from './libertymd-interview-expectations';
-import { LIBERTYMD_COMPLAINT_CHIPS } from './libertymd-complaint-chips';
 import { LibertyMDProgressIndicator } from './LibertyMDProgressIndicator';
 import { LibertyMDReportView } from './LibertyMDReportView';
 import { LibertyMDSampleReport } from './LibertyMDSampleReport';
@@ -456,15 +454,14 @@ export default function LibertyMDApp() {
   const keywordHeroSubtitle = keywordCluster
     ? t(`keywordLanding.${keywordCluster.framingKeySlug}.subtitle`)
     : null;
-  const highlightedChipId = keywordCluster?.related_chip_id ?? null;
   const [region] = useState<'EU' | 'US'>('EU');
   const [input, setInput] = useState('');
   const [phase, setPhase] = useState<ChatPhase>('initial');
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [demographics, setDemographics] = useState({ age: '', sex: '' });
   // P1-01 — shared unified control + AC0 parity on residual demographics branch (Q3A).
-  const [entryQuestion, setEntryQuestion] = useState('');
-  const [entryOptions, setEntryOptions] = useState<string[]>([]);
+  const [, setEntryQuestion] = useState('');
+  const [, setEntryOptions] = useState<string[]>([]);
   const [clinicalAnswer, setClinicalAnswer] = useState('');
   const [consentChecked, setConsentChecked] = useState(true);
   const [report, setReport] = useState<LibertyMdNormalizedReport | null>(null);
@@ -980,11 +977,6 @@ export default function LibertyMDApp() {
     void beginConsultation(text, { entry_type: 'freetext' });
   };
 
-  const handleComplaintChip = (chipId: string, label: string) => {
-    if (isTyping) return;
-    void beginConsultation(label, { entry_type: 'chip', chip_id: chipId });
-  };
-
   /** P3-02 — sample CTA uses freetext (not chip / not invent `sample` entry_type). */
   const handleSampleReportStart = (complaint: string) => {
     if (isTyping) return;
@@ -1372,33 +1364,13 @@ export default function LibertyMDApp() {
                 {keywordHeroSubtitle}
               </p>
             ) : null}
-            <p
-              className="libertymd-hero-tagline mt-2 flex min-h-6 flex-wrap items-center justify-center gap-x-2 text-sm font-bold text-libertymd-navy sm:gap-x-3 sm:text-base"
-              aria-label="Free, Anonymous, Built by Doctors"
-            >
-              {[t('hero.taglineFree'), t('hero.taglineAnonymous'), t('hero.taglineBuiltByDoctors')].map((phrase, index) => (
-                <span
-                  key={phrase}
-                  className="libertymd-tagline-word inline-flex items-center gap-2 sm:gap-3"
-                  style={{ animationDelay: `${220 + index * 120}ms` }}
-                >
-                  {index > 0 && (
-                    <span aria-hidden="true" className="text-libertymd-blue-600">
-                      •
-                    </span>
-                  )}
-                  <span>{phrase}</span>
-                </span>
-              ))}
-            </p>
-            {phase === 'initial' && (
-              <p
-                className="libertymd-hero-time-promise mt-2 text-sm font-medium leading-5 text-libertymd-slate-500"
-                data-libertymd-time-promise="true"
-              >
-                {formatInterviewTimePromise(t)}
-              </p>
-            )}
+            {/* BO 2026-08-01 — the Free / Anonymous / Built by Doctors trio now
+                renders below the composer (where the chips used to be), so the
+                copy above the logo would be a duplicate. */}
+            {/* BO 2026-08-01: hero time promise removed. The same expectation is
+                still set inside the consult (interview expectations header), so
+                the promise is made where it is actionable rather than on the
+                landing hero. */}
 
             <LibertyMDPremiumLogo
               active={phase === 'initial'}
@@ -1477,36 +1449,31 @@ export default function LibertyMDApp() {
                 </button>
               </form>
 
-              {/* P3-05 — secondary complaint chips; free-text composer stays primary. */}
+              {/* BO 2026-08-01: complaint chips removed from the hero; the
+                  free-text composer is now the only entry control. The chip
+                  catalogue and the proxy's `entry_type`/`chip_id` contract are
+                  deliberately left intact so keyword landings and historic
+                  funnel slices still resolve. */}
+
+              {/* Trust trio, moved below the composer in place of the chips. */}
               <div
-                className="mt-3 flex flex-wrap items-center justify-center gap-2 sm:mt-4"
-                role="group"
-                aria-label="Common complaints"
+                className="libertymd-hero-trust-row mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm font-bold text-libertymd-navy sm:mt-4 sm:gap-x-6"
+                data-libertymd-hero-trust-trio=""
+                aria-label="Free, Anonymous, Built by Doctors"
               >
-                {LIBERTYMD_COMPLAINT_CHIPS.map((chip) => {
-                  const isKeywordHighlight = highlightedChipId === chip.chip_id;
-                  return (
-                  <button
-                    key={chip.chip_id}
-                    type="button"
-                    data-libertymd-complaint-chip={chip.chip_id}
-                    data-libertymd-chip-keyword-highlight={isKeywordHighlight ? 'true' : undefined}
-                    aria-current={isKeywordHighlight ? 'true' : undefined}
-                    disabled={isTyping}
-                    onClick={() => handleComplaintChip(chip.chip_id, chip.label)}
-                    className={
-                      isKeywordHighlight
-                        ? 'rounded-full border border-libertymd-blue-600 bg-libertymd-blue-50 px-[var(--libertymd-space-md)] py-[var(--libertymd-space-sm)] text-sm font-semibold text-libertymd-blue-700 shadow-sm ring-1 ring-libertymd-blue-600/30 transition hover:border-libertymd-blue-600 hover:text-libertymd-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-libertymd-blue-600 focus-visible:ring-offset-2 disabled:opacity-50'
-                        : 'rounded-full border border-libertymd-slate-300 bg-white/90 px-[var(--libertymd-space-md)] py-[var(--libertymd-space-sm)] text-sm font-semibold text-libertymd-slate-700 shadow-sm transition hover:border-libertymd-blue-600 hover:text-libertymd-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-libertymd-blue-600 focus-visible:ring-offset-2 disabled:opacity-50'
-                    }
-                  >
-                    {chip.label}
-                  </button>
-                  );
-                })}
+                {[t('hero.taglineFree'), t('hero.taglineAnonymous'), t('hero.taglineBuiltByDoctors')].map((phrase, index) => (
+                  <span key={phrase} className="inline-flex items-center gap-x-4 sm:gap-x-6">
+                    {index > 0 && (
+                      <span aria-hidden="true" className="text-libertymd-blue-600">
+                        •
+                      </span>
+                    )}
+                    <span>{phrase}</span>
+                  </span>
+                ))}
               </div>
 
-              {/* P3-02 — hero-adjacent sample report entry (does not bury chips). */}
+              {/* P3-02 — hero-adjacent sample report entry. */}
               <div className="mt-2 flex justify-center sm:mt-3">
                 <button
                   type="button"
@@ -1519,17 +1486,16 @@ export default function LibertyMDApp() {
                 </button>
               </div>
 
-              {/* P3-03 — honest process strip (no stars / 1M+ / HIPAA invent). */}
-              <div className="libertymd-hero-trust-row mt-2 flex flex-row flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs font-medium text-libertymd-slate-500 sm:justify-between sm:text-sm [@media(max-height:700px)]:mt-0 [@media(max-height:700px)]:gap-1">
+              {/* BO 2026-08-01 — hero "AI symptom chat — not a clinician" line
+                  removed. The free-report line moves into the row below; the
+                  not-a-clinician disclosure is still carried by the trust band
+                  further down this page and by the chat composer footer, so a
+                  consult is never shown without it. */}
+              <div className="libertymd-hero-trust-row mt-2 flex flex-row flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs font-medium text-libertymd-slate-500 sm:text-sm [@media(max-height:700px)]:mt-0 [@media(max-height:700px)]:gap-1">
                 <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-libertymd-navy sm:gap-2">
                   <FileText className="h-4 w-4 text-libertymd-navy sm:h-5 sm:w-5" aria-hidden="true" />
                   <span className="sm:hidden">{t('app.heroTrustReportShort')}</span>
                   <span className="hidden sm:inline">{t('app.heroTrustReport')}</span>
-                </span>
-                <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-libertymd-navy sm:gap-2">
-                  <ShieldCheck className="h-4 w-4 text-libertymd-navy sm:h-5 sm:w-5" aria-hidden="true" />
-                  <span className="sm:hidden">{t('app.heroTrustAiShort')}</span>
-                  <span className="hidden sm:inline">{t('app.heroTrustAi')}</span>
                 </span>
               </div>
               {error && phase === 'initial' && (
@@ -1626,9 +1592,6 @@ export default function LibertyMDApp() {
                     sex={demographics.sex}
                     loading={isTyping}
                     error={error}
-                    question={entryQuestion}
-                    options={entryOptions}
-                    answer={clinicalAnswer}
                     consentChecked={consentChecked}
                     isAnonymous={isAnonymous}
                     profiles={entryProfilesFromPatients(entryPatients).length > 1
@@ -1636,7 +1599,6 @@ export default function LibertyMDApp() {
                       : []}
                     onAgeChange={(age) => setDemographics(prev => ({ ...prev, age }))}
                     onSexChange={(sex) => setDemographics(prev => ({ ...prev, sex }))}
-                    onAnswerChange={setClinicalAnswer}
                     onConsentChange={setConsentChecked}
                     onCareForSomeoneElse={isAnonymous ? () => void attemptAddProfile('unified_entry') : undefined}
                     onSubmit={submitDemographics}

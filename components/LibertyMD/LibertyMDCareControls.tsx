@@ -27,7 +27,6 @@ import {
   type LibertyMDSeverity,
 } from './libertymd-severity';
 import { LibertyMDOverlaySheet } from './LibertyMDOverlaySheet';
-import { formatInterviewTimePromise } from './libertymd-interview-expectations';
 import {
   LibertyMDProfileManagementPanel,
   type ProfileManagementHandlers,
@@ -236,12 +235,6 @@ interface DemographicsPromptProps {
   sex: string;
   loading: boolean;
   error?: string;
-  /** First clinical question — visual hero (P1-01). */
-  question?: string;
-  /** Optional answer chips under the question (not intake composer chips). */
-  options?: string[];
-  /** Free-text / chip-selected clinical answer (required non-empty to submit). */
-  answer?: string;
   /** Consent checkbox — pre-checked by default (DECISIONS). */
   consentChecked?: boolean;
   /** Presentational only; picker renders only when length > 1 (Q2A). */
@@ -251,7 +244,6 @@ interface DemographicsPromptProps {
   isAnonymous?: boolean;
   onAgeChange: (value: string) => void;
   onSexChange: (value: string) => void;
-  onAnswerChange?: (value: string) => void;
   onConsentChange?: (checked: boolean) => void;
   onProfileChange?: (profileId: string) => void;
   /** P1-04 Q2C secondary — anonymous add-profile attempt (does not gate submit). */
@@ -274,23 +266,18 @@ export function LibertyMDDemographicsPrompt({
   sex,
   loading,
   error,
-  question,
-  options = [],
-  answer = '',
   consentChecked = true,
   profiles = [],
   selectedProfileId,
   isAnonymous = false,
   onAgeChange,
   onSexChange,
-  onAnswerChange,
   onConsentChange,
   onProfileChange,
   onCareForSomeoneElse,
   onSubmit,
 }: DemographicsPromptProps) {
   const { t } = useI18n();
-  const answerReady = Boolean(String(answer || '').trim());
   const ageNum = Number(age);
   // P1-05 Q1A/Q2 — show care pointer only when parsed age is an integer < floor.
   const ageUnderFloor = Boolean(String(age).trim())
@@ -300,10 +287,8 @@ export function LibertyMDDemographicsPrompt({
     && ageNum <= 120
     && Boolean(sex)
     && consentChecked
-    && answerReady
     && !loading;
   const showProfilePick = Array.isArray(profiles) && profiles.length > 1;
-  const heroQuestion = String(question || '').trim() || 'When did this symptom begin?';
 
   return (
     <form
@@ -314,55 +299,20 @@ export function LibertyMDDemographicsPrompt({
       className="mx-auto w-full max-w-2xl border-t border-libertymd-green-sage pt-libertymd-lg"
       data-libertymd-unified-entry="true"
     >
+      {/* BO 2026-08-01 — demographics-only card. The first clinical question and
+          its options used to live here (P1-01 unified entry); they now come as
+          the first interview turn once this card is submitted, so this control
+          does one job: age, sex, and consent. */}
       <div className="space-y-libertymd-md">
-        <p
-          className="text-sm font-medium leading-5 text-libertymd-slate-500"
-          data-libertymd-time-promise="true"
-        >
-          {formatInterviewTimePromise(t)}
-        </p>
         <h2
           id="libertymd-entry-question"
           className="font-serif text-xl font-semibold leading-snug text-libertymd-ink sm:text-2xl"
         >
-          {heroQuestion}
+          {t('chat.demographicsHeading')}
         </h2>
-
-        {options.length > 0 && (
-          <div className="flex flex-wrap gap-2" role="group" aria-labelledby="libertymd-entry-question">
-            {options.map((option) => {
-              const active = answer === option;
-              return (
-                <button
-                  key={option}
-                  type="button"
-                  aria-pressed={active}
-                  disabled={loading}
-                  onClick={() => onAnswerChange?.(option)}
-                  className={`rounded-md border px-3 py-2 text-left text-sm font-semibold transition ${
-                    active
-                      ? 'border-libertymd-blue-600 bg-libertymd-blue-50 text-libertymd-ink'
-                      : 'border-libertymd-slate-300 bg-white text-libertymd-slate-700 hover:border-libertymd-blue-600 hover:text-libertymd-ink'
-                  }`}
-                >
-                  {option}
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        <label className="sr-only" htmlFor="libertymd-entry-answer">Your answer</label>
-        <input
-          id="libertymd-entry-answer"
-          type="text"
-          autoComplete="off"
-          value={answer}
-          disabled={loading}
-          onChange={(event) => onAnswerChange?.(event.target.value)}
-          placeholder="Type your answer"
-          className="h-12 w-full rounded-lg border border-libertymd-slate-300 bg-white px-libertymd-lg text-left text-base text-libertymd-ink outline-none transition focus:border-libertymd-blue-600 focus:ring-4 focus:ring-libertymd-blue-50"
-        />
+        <p className="text-sm font-medium leading-5 text-libertymd-slate-500">
+          {t('chat.demographicsSubcopy')}
+        </p>
       </div>
 
       {showProfilePick && (

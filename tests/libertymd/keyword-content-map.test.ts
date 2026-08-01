@@ -136,7 +136,8 @@ Deno.test('P3-06 AC8 · App route + framing markers present; no accuracy mount',
   assertTrue(app.includes('/liberty-md/t/:topicSlug'), 'topic route')
   const landing = Deno.readTextFileSync('components/LibertyMD/LibertyMDApp.tsx')
   assertTrue(landing.includes('data-libertymd-keyword-framing'), 'framing marker')
-  assertTrue(landing.includes('data-libertymd-chip-keyword-highlight'), 'chip highlight marker')
+  // BO 2026-08-01 — complaint chips removed from the hero, so there is no chip
+  // left to highlight. Keyword framing itself must still render.
   // P3-04 mount none on keyword delta — framing keys / resolve path must not add accuracy %.
   assertTrue(!/keywordLanding\.[^"']*accuracy|diagnostic.?accuracy|%\s*accurate/i.test(landing), 'no accuracy % in keyword framing path')
   const en = Deno.readTextFileSync('i18n/locales/en.json')
@@ -145,10 +146,14 @@ Deno.test('P3-06 AC8 · App route + framing markers present; no accuracy mount',
   assertTrue(!/%\s*(accurate|accuracy)|Pulse|Jivi|sens(?:itivity)?\s*\/\s*spec/i.test(keywordBlock), 'no accuracy invent in keywordLanding EN')
 })
 
+/**
+ * BO 2026-08-01 — with the chips removed the landing can no longer originate a
+ * `chip` entry at all, which makes the original invariant ("a keyword visit must
+ * not invent entry_type chip") strictly easier to hold. Assert the strong form:
+ * the landing emits freetext only.
+ */
 Deno.test('P3-06 Q4 · keyword visit does not invent entry_type chip', () => {
   const landing = Deno.readTextFileSync('components/LibertyMD/LibertyMDApp.tsx')
-  // Highlight is visual-only — chip tap still calls handleComplaintChip with entry_type chip.
-  assertTrue(landing.includes('data-libertymd-chip-keyword-highlight'))
-  assertTrue(landing.includes("entry_type: 'chip'"), 'chip tap still sets chip')
+  assertTrue(!landing.includes("entry_type: 'chip'"), 'landing no longer originates a chip entry')
   assertTrue(landing.includes("entry_type: 'freetext'"), 'freetext path preserved')
 })
