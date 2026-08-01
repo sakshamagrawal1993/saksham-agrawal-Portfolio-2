@@ -1,3 +1,6 @@
+/** P5-MEDIA — BO 2026-08-01: uploads live at most 30 days. Env-overridable. */
+const MEDIA_MAX_AGE_DAYS = Number(Deno.env.get('LIBERTYMD_MEDIA_MAX_AGE_DAYS') || '30')
+
 /**
  * P1-24 · libertymd-cleanup-storage
  *
@@ -55,6 +58,36 @@ async function listOrphanPaths(
   return paths
 }
 
+/**
+ * P5-MEDIA — objects past the 30-day age limit, regardless of whether their
+ * consultation still exists.
+ *
+ * Deliberately separate from orphan detection: an orphan is "the parent row is
+ * gone", an expired object is "this file has simply lived long enough". A photo
+ * on a live consult is never an orphan, so without this it would never be
+ * deleted at all.
+ */
+async function listExpiredPaths(
+  db: ReturnType<typeof createClient>,
+  maxAgeDays: number,
+): Promise<string[]> {
+  // Cast: the generated Database types predate this function, and regenerating
+  // them is a separate change. The row shape is pinned by the migration.
+  const { data, error } = await (db.rpc as unknown as (
+    fn: string,
+    args: Record<string, unknown>,
+  ) => Promise<{ data: Array<{ object_path?: unknown }> | null; error: { message: string } | null }>)(
+    'list_libertymd_care_storage_expired',
+    { p_max_age_days: maxAgeDays },
+  )
+  if (error) {
+    throw new Error(`expired list failed: ${error.message}`)
+  }
+  return (data || [])
+    .map((row) => String(row.object_path || ''))
+    .filter(Boolean)
+}
+
 async function removePaths(
   db: ReturnType<typeof createClient>,
   paths: string[],
@@ -101,7 +134,11 @@ Deno.serve(async (req: Request) => {
     })
 
     const orphanPaths = await listOrphanPaths(db)
-    const wouldDelete = orphanPaths.length
+    const expiredPaths = await listExpiredPaths(db, MEDIA_MAX_AGE_DAYS)
+    // Union, not concat: an object can be both orphaned and expired, and
+    // deleting the same path twice would double-count the log figure.
+    const orphanAndExpired = Array.from(new Set([...orphanPaths, ...expiredPaths]))
+    const wouldDelete = orphanAndExpired.length
 
     if (dryRun) {
       console.log(
@@ -116,7 +153,10 @@ Deno.serve(async (req: Request) => {
       })
     }
 
-    const deleted_storage_objects = await removePaths(db, orphanPaths)
+    // Must be the SAME set the dry-run counted. Deleting only orphans here while
+    // the dry-run reported orphans+expired would make the dry-run a lie, which
+    // is worse than having no dry-run at all.
+    const deleted_storage_objects = await removePaths(db, orphanAndExpired)
     console.log(
       `libertymd storage cleanup: deleted_storage_objects=${deleted_storage_objects}`,
     )
