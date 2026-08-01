@@ -570,10 +570,11 @@ export function isRecordCareInterestActionMissing(
 }
 
 // ---------------------------------------------------------------------------
-// P4-06 — photo upload (proxy sole writer; analysis SoT, zero raw retention)
+// P4-06 — private photo upload + retryable analysis (proxy sole writer)
 // ---------------------------------------------------------------------------
 
 export const UPLOAD_PHOTO_ACTION = 'upload_photo' as const;
+export const RETRY_PHOTO_ANALYSIS_ACTION = 'retry_photo_analysis' as const;
 
 /** Product max — mirror of proxy `PHOTO_MAX_BYTES` (5 MiB). */
 export const PHOTO_MAX_BYTES_CLIENT = 5 * 1024 * 1024;
@@ -590,19 +591,42 @@ export interface UploadPhotoRequestBody {
 export interface UploadPhotoSuccess {
   ok: true;
   consultation_id: string;
-  path: null;
+  path: string;
   object_uuid: string;
   content_type: string;
-  signed_url: null;
-  expires_in: 0;
-  raw_retained: false;
+  signed_url: string | null;
+  expires_in: number;
+  raw_retained: true;
   analysis?: {
     usable: boolean;
     modality: 'clinical_photo' | 'radiograph' | 'other';
     observations: Array<{ feature: string; description: string }>;
     limitations: string[];
+  } | {
+    status: 'pending_retry';
+    analyzed: false;
+    retry_available: true;
   };
+  analysis_retry_available?: boolean;
   consult_continues?: boolean;
+}
+
+export interface RetryPhotoAnalysisRequestBody {
+  action: typeof RETRY_PHOTO_ANALYSIS_ACTION;
+  consultation_id: string;
+  object_uuid: string;
+}
+
+/** Retry uses server-owned Storage attribution; the client never sends a path. */
+export function retryPhotoAnalysisBody(input: {
+  consultation_id: string;
+  object_uuid: string;
+}): RetryPhotoAnalysisRequestBody {
+  return {
+    action: RETRY_PHOTO_ANALYSIS_ACTION,
+    consultation_id: String(input.consultation_id || '').trim(),
+    object_uuid: String(input.object_uuid || '').trim(),
+  };
 }
 
 /**

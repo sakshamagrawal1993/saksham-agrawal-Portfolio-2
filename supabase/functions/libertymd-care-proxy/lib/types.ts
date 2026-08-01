@@ -45,6 +45,7 @@ export type ProxyAction =
   | 'respond_followup_checkin'
   | 'unsubscribe_followup_checkin'
   | 'upload_photo'
+  | 'retry_photo_analysis'
   | 'upload_lab'
 
 /** P4-05 — cross-account merge attribution path (HTTP + identity_event metadata). Not Lexicon merge_outcome. */
@@ -136,6 +137,8 @@ export interface RequestPayload extends LandingAttributionFields {
   image_base64?: string
   /** P4-07 — preferred lab base64 field (PDF + images); image_base64 is alias. */
   file_base64?: string
+  /** P4-06 retry — server resolves the private path; client never supplies it. */
+  object_uuid?: string
 }
 
 export interface ConsultationRow {

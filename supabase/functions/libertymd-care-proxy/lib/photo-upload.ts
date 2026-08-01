@@ -95,7 +95,6 @@ export interface PhotoAnalysisResult {
   observations: Array<{ feature: string; description: string }>
   limitations: string[]
   analysis_kind: 'observation_only'
-  raw_retained: false
 }
 
 /** Treat the workflow response as untrusted and keep diagnosis terms out. */
@@ -137,14 +136,12 @@ export function normalizePhotoAnalysis(raw: unknown): PhotoAnalysisResult | null
     observations,
     limitations,
     analysis_kind: 'observation_only',
-    raw_retained: false,
   }
 }
 
 /**
- * Analysis Done bar for P4-06 = stub only.
- * Future pattern (CARE): service-role re-sign → LibertyMD-configured vision webhook →
- * JSON inside proxy. HT `process-lab-report` is NOT a runtime dependency.
+ * Legacy stub retained for backward-compatible callers/tests. The live action
+ * now stores a private EXIF-stripped object and calls the LibertyMD photo agent.
  */
 export function photoAnalysisStub() {
   return {

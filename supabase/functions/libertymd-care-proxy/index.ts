@@ -44,7 +44,7 @@ import {
 } from './actions/report-email-delivery.ts'
 import { handleSubmitReportFeedback } from './actions/submit-report-feedback.ts'
 import { handleRecordCareInterest } from './actions/record-care-interest.ts'
-import { handleUploadPhoto } from './actions/photo-upload.ts'
+import { handleRetryPhotoAnalysis, handleUploadPhoto } from './actions/photo-upload.ts'
 import { handleUploadLab } from './actions/lab-upload.ts'
 import {
   handleRespondFollowupCheckin,
@@ -90,6 +90,7 @@ const HANDLERS = new Map<ProxyAction, ActionHandler>([
   ['submit_report_feedback', handleSubmitReportFeedback],
   ['record_care_interest', handleRecordCareInterest],
   ['upload_photo', handleUploadPhoto],
+  ['retry_photo_analysis', handleRetryPhotoAnalysis],
   ['upload_lab', handleUploadLab],
   ['respond_followup_checkin', handleRespondFollowupCheckin],
   ['unsubscribe_followup_checkin', handleUnsubscribeFollowupCheckin],

@@ -2409,6 +2409,25 @@ export default function LibertyMDChat() {
     evidenceScore: lastEvidenceScore,
   });
   const guestExpired = reportLifecycle === 'guest_expired';
+
+  // P5-REPORT — the finished report lives on its own page, not in the transcript.
+  //
+  // Navigation waits for the soft gate to resolve rather than firing the moment
+  // the body exists. P2-06's benefits sheet is shown in the consult, and jumping
+  // away underneath it would delete that step; Gate B still holds either way,
+  // because the gate is dismissible and the body is never withheld.
+  //
+  // `replace` so Back returns to the consult rather than bouncing between the
+  // two surfaces.
+  const reportRedirectedRef = useRef(false);
+  useEffect(() => {
+    if (reportLifecycle !== 'ready' || !report || !consultationId) return;
+    if (isReportGateOpen) return;
+    if (reportRedirectedRef.current) return;
+    reportRedirectedRef.current = true;
+    navigate(`/liberty-md/report/${encodeURIComponent(consultationId)}`, { replace: true });
+  }, [reportLifecycle, report, consultationId, isReportGateOpen, navigate]);
+
   const continuationOwnsFooter =
     phase === 'recovery_required'
     || (phase === 'report_gate' && !isReportGateOpen && !softGateDismissed && !guestExpired)

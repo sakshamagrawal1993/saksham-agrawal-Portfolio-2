@@ -59,6 +59,7 @@ const AICareObservations = lazy(() => import('./components/AICare/AICareObservat
 const LibertyMDApp = lazy(() => import('./components/LibertyMD/LibertyMDApp'));
 const LibertyMDChat = lazy(() => import('./components/LibertyMD/LibertyMDChat'));
 const LibertyMDReportRedeemPage = lazy(() => import('./components/LibertyMD/LibertyMDReportRedeemPage'));
+const LibertyMDReportPage = lazy(() => import('./components/LibertyMD/LibertyMDReportPage'));
 const LibertyMDFollowupCheckinPage = lazy(() => import('./components/LibertyMD/LibertyMDFollowupCheckinPage'));
 const LibertyMDFollowupUnsubscribePage = lazy(() => import('./components/LibertyMD/LibertyMDFollowupUnsubscribePage'));
 
@@ -242,6 +243,13 @@ function App() {
             <Route path="/liberty-md/chat" element={
               <Suspense fallback={<LibertyMDLoadingFallback />}>
                 <LibertyMDChat />
+              </Suspense>
+            } />
+            {/* P5-REPORT — dedicated report surface. Declared BEFORE the bare
+                /report redeem route so the id segment is not swallowed. */}
+            <Route path="/liberty-md/report/:consultationId" element={
+              <Suspense fallback={<LibertyMDLoadingFallback />}>
+                <LibertyMDReportPage />
               </Suspense>
             } />
             <Route path="/liberty-md/report" element={

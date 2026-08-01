@@ -199,7 +199,14 @@
       "expiredSignIn": "Sign in for future reports",
       "notYetEligible": "Report not ready yet — keep answering a few more questions",
       "retentionWarning": "Guest access to this report ends in {remaining}. Sign in to keep future reports in your history."
-    }
+    },
+    "pageTitle": "Your doctor-ready report",
+    "pageSubtitle": "Prepared from your consultation",
+    "backToConsult": "Back to the consultation",
+    "loadingHeading": "Opening your report",
+    "generatingHeading": "Preparing your report",
+    "generatingBody": "We are reviewing everything you shared and writing it up for a clinician. This usually takes under a minute.",
+    "loadFailed": "We could not open this report just now. Your consultation is safe — please try again in a moment."
   },
   "sampleReport": {
     "entry": "See a sample report",
