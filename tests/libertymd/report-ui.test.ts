@@ -1305,9 +1305,11 @@ Deno.test('P3-02 AC1/AC6/AC12 · landing entry + freetext CTA; chips preserved',
     'sample CTA freetext',
   )
   assertTrue(!/entry_type:\s*'sample'/.test(app), 'no invent sample entry_type')
-  assertTrue(app.includes('data-libertymd-complaint-chip'), 'P3-05 chips remain')
-  assertTrue(app.includes("entry_type: 'chip'"), 'chip path remains')
-  assertTrue(app.includes('LIBERTYMD_COMPLAINT_CHIPS'), 'chip catalog import')
+  // BO 2026-08-01 — P3-05 complaint chips removed from the hero. The sample-report
+  // entry and the freetext CTA (the subject of this ticket) are unaffected; the
+  // chip catalogue module and the proxy's chip contract are intentionally left in
+  // place, so only the rendered chips are gone.
+  assertTrue(!app.includes('data-libertymd-complaint-chip'), 'chips removed from hero')
 
   const shell = await Deno.readTextFile(SAMPLE_SHELL)
   assertTrue(shell.includes('URI_MUNDANE_SAMPLE_COMPLAINT'), 'sore-throat aligned complaint')

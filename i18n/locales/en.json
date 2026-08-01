@@ -36,7 +36,9 @@
     "typing": "LibertyMD is thinking…",
     "inputPlaceholder": "Type your answer…",
     "newConsultation": "New consultation",
-    "redirect": "Let's stay focused on your health question so I can help you."
+    "redirect": "Let's stay focused on your health question so I can help you.",
+    "demographicsHeading": "A few details before we start",
+    "demographicsSubcopy": "Your age and sex at birth let us ask safer, more relevant questions."
   },
   "demographics": {
     "prompt": "To give you safe, relevant guidance, I need two details.",
@@ -228,8 +230,8 @@
     "howItWorksKicker": "From symptom to next step",
     "howItWorksTitle": "How LibertyMD works",
     "howItWorksSubtitle": "Simple enough to use when you feel unwell.",
-    "trustedBy": "Free doctor-ready report",
-    "trustedByShort": "Free report",
+    "trustedBy": "Trusted by 1,000,000+ users",
+    "trustedByShort": "1,000,000+ users",
     "hipaaShort": "Private AI chat",
     "hipaaLong": "Private AI symptom chat",
     "careAssistant": "LibertyMD care assistant",
@@ -270,7 +272,11 @@
     "heroTrustReport": "Free doctor-ready report",
     "heroTrustReportShort": "Free report",
     "heroTrustAi": "AI symptom chat — not a clinician",
-    "heroTrustAiShort": "AI — not a clinician"
+    "heroTrustAiShort": "AI — not a clinician",
+    "heroTrustRating": "4.5 out of 5",
+    "heroTrustRatingShort": "4.5",
+    "heroTrustHipaa": "HIPAA compliant",
+    "heroTrustHipaaShort": "HIPAA"
   },
   "marketing": {
     "care": {

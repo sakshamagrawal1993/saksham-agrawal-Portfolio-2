@@ -153,13 +153,22 @@ Deno.test('P1-01 AC4 · start force_end short-circuits before runInterview', asy
   }
 })
 
-Deno.test('P1-01 Q4/AC5 · save_demographics requires message and binds pre-start target_slot', async () => {
+/**
+ * BO 2026-08-01 — the clinical answer is now OPTIONAL on save_demographics
+ * (demographics-only card). What still has to hold: when an answer *is* sent it
+ * binds to the pre-start target_slot, and a demographics-only submit neither
+ * fabricates a slot nor an extra turn.
+ */
+Deno.test('P1-01 AC5 · save_demographics binds a supplied answer to the pre-start target_slot', async () => {
   const source = await Deno.readTextFile(SAVE_SOURCE)
-  if (!source.includes("Please answer the clinical question")) {
-    throw new Error('save must 400 when clinical answer missing')
+  if (source.includes("Please answer the clinical question")) {
+    throw new Error('clinical answer must no longer be required')
   }
-  if (!source.includes('if (!freeText)')) {
-    throw new Error('empty free text must be rejected')
+  if (!source.includes('...(freeText ? { [answerSlot]: freeText } : {})')) {
+    throw new Error('supplied answer must still bind to the pre-start slot, absent answer must not')
+  }
+  if (!source.includes('if (freeText) {')) {
+    throw new Error('answer persistence + turn_completed must be conditional on a supplied answer')
   }
   if (!source.includes('answerSlot') && !source.includes('consultation.target_slot')) {
     throw new Error('answer must bind to consultation.target_slot')
@@ -203,28 +212,32 @@ Deno.test('P1-02 AC1/AC2 · App + CareControls consume shared formatter; no dual
   const care = await Deno.readTextFile(CARE_SOURCE)
   const region = demographicsPromptRegion(care)
 
-  if (!app.includes("from './libertymd-interview-expectations'") &&
-      !app.includes('from "./libertymd-interview-expectations"')) {
-    throw new Error('App must import libertymd-interview-expectations')
+  // The import requirement went with the rendered promise: neither surface shows
+  // turns/minutes any more, so requiring the import would only force dead code.
+  // BO 2026-08-01 — the time promise was removed from BOTH the landing hero and
+  // the demographics card. The shared formatter module stays the single owner of
+  // turns/minutes (asserted by P1-02 AC3) so the copy can be reinstated without
+  // reintroducing a hardcoded sentence; what must not exist is a second,
+  // divergent hardcoded promise in either surface.
+  if (app.includes('formatInterviewTimePromise(t)')) {
+    throw new Error('landing hero time promise was removed; do not reinstate without BO sign-off')
   }
-  if (!care.includes("from './libertymd-interview-expectations'") &&
-      !care.includes('from "./libertymd-interview-expectations"')) {
-    throw new Error('CareControls must import libertymd-interview-expectations')
+  if (region.includes('formatInterviewTimePromise(t)')) {
+    throw new Error('demographics card time promise was removed; card is demographics-only')
   }
-  if (!app.includes('formatInterviewTimePromise(t)')) {
-    throw new Error('App landing must render formatInterviewTimePromise(t)')
-  }
-  if (!region.includes('formatInterviewTimePromise(t)')) {
-    throw new Error('DemographicsPrompt must render formatInterviewTimePromise(t)')
-  }
-  if (!app.includes("phase === 'initial'") || !app.includes('data-libertymd-time-promise')) {
-    throw new Error('landing promise must be phase===initial gated with marker')
+  for (const [label, src] of [['App', app], ['CareControls', care]] as const) {
+    if (/roughly\s*\{?\d/.test(src) || /About\s+\d+\s+questions/i.test(src)) {
+      throw new Error(`${label} must not hardcode a turns/minutes sentence`)
+    }
   }
 
-  const promiseIdx = region.indexOf('data-libertymd-time-promise')
-  const h2Idx = region.indexOf('id="libertymd-entry-question"')
-  if (promiseIdx < 0 || h2Idx < 0 || !(promiseIdx < h2Idx)) {
-    throw new Error('time promise must appear above h2#libertymd-entry-question')
+  // Ordering assertion retired with the promise itself. The card's heading is
+  // still required so the control keeps an accessible label.
+  if (!region.includes('id="libertymd-entry-question"')) {
+    throw new Error('demographics card must keep its labelled heading')
+  }
+  if (region.includes('data-libertymd-time-promise')) {
+    throw new Error('demographics card must not carry a time promise')
   }
 
   // Dual hardcoding of the seed sentence as sole source is forbidden in UI files.

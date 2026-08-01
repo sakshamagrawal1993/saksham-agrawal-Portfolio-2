@@ -142,13 +142,18 @@ Deno.test('AC7 Q4A: listed chrome tap targets use min-h-11 / min-w-11', async ()
   const chatNeedles = [
     'min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full text-libertymd-slate-500', // Back
     'min-h-11 min-w-11 items-center justify-center rounded-full text-libertymd-navy', // Menu
-    'min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-bold', // New — icon-only <sm needs min-w-11 (≥44)
+    // "+ New chat" removed from the consult header (BO 2026-08-01); the action
+    // moved into the account drawer, whose tap target is asserted below.
     'min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full bg-libertymd-blue-600', // send
   ]
   for (const needle of chatNeedles) {
     if (!chat.includes(needle)) {
       throw new Error(`Chat missing ≥44 tap-target class needle: ${needle}`)
     }
+  }
+  const care = await Deno.readTextFile('components/LibertyMD/LibertyMDCareControls.tsx')
+  if (!/data-libertymd-start-over="drawer"[\s\S]{0,400}h-12 w-full/.test(care)) {
+    throw new Error('drawer start-over control must keep a ≥44px tap target')
   }
   if (!lang.includes('min-h-11 items-center gap-2')) {
     throw new Error('Language switcher trigger must be min-h-11 (Q4A)')

@@ -258,10 +258,19 @@ Deno.test('P1-06 · presentational indicator uses LibertyMD tokens + ceiling', a
   if (!source.includes('bg-libertymd-blue-600')) {
     throw new Error('track fill must use libertymd-blue-600 token')
   }
-  if (!source.includes('text-libertymd-slate-500')) {
-    throw new Error('copy must use libertymd-slate-500 token')
+  // BO 2026-08-01 — the indicator is a bare line under the header: the stage
+  // label ("Wrapping up") and the hedged ceiling ("Up to 15 questions") are no
+  // longer rendered. Naming the stage invited the reader to estimate what was
+  // left, and the ceiling read as a threat. Both are still computed upstream
+  // (asserted by the model tests above) and the label survives as the
+  // progressbar's accessible name, so screen-reader users keep orientation.
+  if (source.includes('view.ceiling')) {
+    throw new Error('ceiling copy was removed from the indicator; do not reinstate without BO sign-off')
   }
-  if (!source.includes('view.ceiling')) {
-    throw new Error('indicator must render hedged ceiling')
+  if (!source.includes('aria-label={view.label}')) {
+    throw new Error('stage label must survive as the accessible name')
+  }
+  if (!source.includes('role="progressbar"')) {
+    throw new Error('indicator must remain a progressbar for assistive tech')
   }
 })

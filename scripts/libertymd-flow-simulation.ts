@@ -69,9 +69,12 @@ record('random_response_terminal_reason', 'insufficient_clinical_information', r
 const negatedEmergency = detectDeterministicEmergency('I have a sore throat with no chest pain and no trouble breathing.')
 record('negated_emergency', 'continue', negatedEmergency ? 'force_end' : 'continue')
 
+// BO 2026-08-01 — the mid-consult release boundary moved from 60 to 80.
+// `ready_for_report` from the interview agent no longer completes a consult on
+// its own; 80 is the only door out before the turn cap.
 const boundaryDecision = decideReportOutcome({
   diagnosisValid: true,
-  confidence: loop % 2 === 0 ? 59 : 60,
+  confidence: loop % 2 === 0 ? 79 : 80,
   turnCount: 10,
   readyForReport: true,
   evidence: normalEvidence,

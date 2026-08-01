@@ -38,7 +38,9 @@
     "typing": "LibertyMD सोच रहा है…",
     "inputPlaceholder": "अपना जवाब लिखें…",
     "newConsultation": "नया परामर्श",
-    "redirect": "आपकी मदद के लिए चलिए आपके स्वास्थ्य प्रश्न पर ध्यान रखें।"
+    "redirect": "आपकी मदद के लिए चलिए आपके स्वास्थ्य प्रश्न पर ध्यान रखें।",
+    "demographicsHeading": "A few details before we start",
+    "demographicsSubcopy": "Your age and sex at birth let us ask safer, more relevant questions."
   },
   "demographics": {
     "prompt": "सुरक्षित और सही मार्गदर्शन देने के लिए मुझे दो जानकारियाँ चाहिए।",
@@ -272,7 +274,11 @@
     "heroTrustReport": "Free doctor-ready report",
     "heroTrustReportShort": "Free report",
     "heroTrustAi": "AI symptom chat — not a clinician",
-    "heroTrustAiShort": "AI — not a clinician"
+    "heroTrustAiShort": "AI — not a clinician",
+    "heroTrustRating": "4.5 out of 5",
+    "heroTrustRatingShort": "4.5",
+    "heroTrustHipaa": "HIPAA compliant",
+    "heroTrustHipaaShort": "HIPAA"
   },
   "marketing": {
     "care": {

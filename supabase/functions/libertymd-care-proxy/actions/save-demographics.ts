@@ -32,7 +32,7 @@ import {
 import { asClinicalLanguage } from '../lib/journey-locale.ts'
 import { isInterviewHoldingSource, n8nBreakerSnapshot, runInterview } from '../lib/n8n-client.ts'
 import { LIBERTYMD_MIN_PATIENT_AGE } from '../lib/profiles.ts'
-import { runGuardrail, saveSafetyEvent, toClientSafety } from '../lib/safety.ts'
+import { runGuardrail, saveSafetyEvent, toClientSafety, unscreenedTurnResult } from '../lib/safety.ts'
 import { calculateMissingSlots } from '../lib/slots.ts'
 import { addProductEvent, emitInferenceFailed, scoreBucket, type InferenceErrorClass } from '../lib/telemetry.ts'
 import { cleanMessage, patientPayload } from '../lib/utils.ts'
@@ -52,7 +52,11 @@ export async function handleSaveDemographics(ctx: ProxyContext, payload: Request
   ctx.clinicalLocale = clinicalLanguage
   const age = Number(payload.age)
   const sex = String(payload.sex_at_birth || '')
-  // P1-01 Q4 — require non-empty trimmed clinical answer under the unified-entry contract.
+  // BO 2026-08-01 — the demographics card is demographics-only again, so a
+  // clinical answer is now OPTIONAL here. When the client still sends one
+  // (older bundles, or a future combined layout) it is bound to the pre-start
+  // slot exactly as before; when it is absent the interview simply asks the
+  // first question on the next turn. Was: P1-01 Q4 hard requirement.
   const freeText = cleanMessage(payload.message)
   // P1-05 Q2/Q5 — under-floor → adults_only + care pointer; other invalid → neutral range.
   if (Number.isInteger(age) && age < LIBERTYMD_MIN_PATIENT_AGE) {
@@ -65,7 +69,6 @@ export async function handleSaveDemographics(ctx: ProxyContext, payload: Request
     return jsonResponse({ error: ageRangeErrorMessage(LIBERTYMD_MIN_PATIENT_AGE) }, 400)
   }
   if (!['female', 'male', 'intersex', 'prefer_not_to_say'].includes(sex)) return jsonResponse({ error: 'Choose a valid sex option' }, 400)
-  if (!freeText) return jsonResponse({ error: 'Please answer the clinical question' }, 400)
 
   const snapshot = consultation.patient_snapshot && typeof consultation.patient_snapshot === 'object'
     ? consultation.patient_snapshot as JsonObject
@@ -115,12 +118,14 @@ export async function handleSaveDemographics(ctx: ProxyContext, payload: Request
     const slot = String(consultation.target_slot || '').trim()
     return slot && slot !== 'none' ? slot : FALLBACK_TARGET_SLOT
   })()
-  // Bind free text to the pre-start slot (Q1A / AC5), then interview asks the following question.
+  // Bind free text to the pre-start slot (Q1A / AC5) when one was sent, then the
+  // interview asks the following question. With the demographics-only card the
+  // slot stays unfilled and the interview asks the *first* question instead.
   const slots = {
     ...(consultation.filled_slots || {}),
     age,
     sex_at_birth: sex,
-    [answerSlot]: freeText,
+    ...(freeText ? { [answerSlot]: freeText } : {}),
   }
   const missingBeforeInterview = calculateMissingSlots(slots)
 
@@ -128,18 +133,22 @@ export async function handleSaveDemographics(ctx: ProxyContext, payload: Request
     message_type: 'demographics',
     slot_updates: { age, sex_at_birth: sex },
   })
-  // The user's input is sacred: retain the clinical answer before anything can fail.
-  await addMessage(ctx, consultation.id, 'user', freeText, {
-    message_type: 'normal',
-    target_slot: answerSlot,
-    slot_updates: { [answerSlot]: freeText },
-  })
+  // The user's input is sacred: retain the clinical answer before anything can
+  // fail. Only when one was actually supplied — a demographics-only submit has
+  // no clinical content to persist and must not fabricate a turn.
+  if (freeText) {
+    await addMessage(ctx, consultation.id, 'user', freeText, {
+      message_type: 'normal',
+      target_slot: answerSlot,
+      slot_updates: { [answerSlot]: freeText },
+    })
 
-  // P1-15 S3 — first answer completed on demographics (turn_count unchanged = 1).
-  await addProductEvent(ctx, 'turn_completed', consultation.id, {
-    turn_index: consultation.turn_count,
-    target_slot: answerSlot,
-  })
+    // P1-15 S3 — first answer completed on demographics (turn_count unchanged = 1).
+    await addProductEvent(ctx, 'turn_completed', consultation.id, {
+      turn_index: consultation.turn_count,
+      target_slot: answerSlot,
+    })
+  }
 
   const history = await getHistory(ctx, consultation.id)
   // P0-07 Q1 — no client_message_id on demographics; one ephemeral UUID for this invocation.
@@ -147,19 +156,26 @@ export async function handleSaveDemographics(ctx: ProxyContext, payload: Request
   // Guardrail and interview run concurrently — separate failure domains, as in
   // send_message. The interview result is discarded on force_end.
   const [guardrail, interview] = await Promise.all([
-    runGuardrail(
-      freeText,
-      history,
-      patientPayload(patient as PatientRow),
-      slots,
-      undefined,
-      correlationId,
-      {
-        db: ctx.db,
-        region: consultation.region ?? 'US',
-        language: consultation.language ?? 'en',
-      },
-    ),
+    // P0-14d AC3/AC5 — a demographics-only submit carries no free text, so there
+    // is nothing to screen. Record the unscreened verdict rather than sending an
+    // empty string to the guardrail: every input-accepting turn still leaves an
+    // auditable safety row, and "this turn was never screened" stays a fact in
+    // the ledger rather than a silent pass.
+    freeText
+      ? runGuardrail(
+        freeText,
+        history,
+        patientPayload(patient as PatientRow),
+        slots,
+        undefined,
+        correlationId,
+        {
+          db: ctx.db,
+          region: consultation.region ?? 'US',
+          language: consultation.language ?? 'en',
+        },
+      )
+      : Promise.resolve(unscreenedTurnResult('demographics_only_submit')),
     runInterview(
       history,
       patientPayload(patient as PatientRow),

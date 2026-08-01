@@ -83,7 +83,14 @@ Deno.test('short clinical answers remain accepted', () => {
   }
 })
 
-Deno.test('valid Low Fever report completes at confidence 60', () => {
+/**
+ * BO 2026-08-01 — before the turn cap, confidence 80 is the only door out.
+ * A mid-consult `ready_for_report` at confidence 60 used to complete; it now
+ * keeps interviewing, because letting the model's self-report end a clinical
+ * consult is the self-graded threshold P0-15 rules out. Both halves are
+ * asserted here so the boundary cannot drift silently.
+ */
+Deno.test('mid-consult, confidence 60 keeps interviewing even when the workflow says ready', () => {
   const evidence = assessClinicalEvidence(LIBERTYMD_VALIDATION_CASES.lowFever.filledSlots)
   const decision = decideReportOutcome({
     diagnosisValid: true,
@@ -93,7 +100,36 @@ Deno.test('valid Low Fever report completes at confidence 60', () => {
     evidence,
     nonClinicalResponseCount: 0,
   })
-  assertEquals(decision.outcome, 'complete', 'Confidence 60 ready report')
+  assertEquals(decision.outcome, 'continue', 'confidence 60 mid-consult must not complete')
+  assertEquals(decision.reason, 'raise_confidence', 'and the reason is to raise confidence')
+})
+
+Deno.test('mid-consult, confidence 80 completes', () => {
+  const evidence = assessClinicalEvidence(LIBERTYMD_VALIDATION_CASES.lowFever.filledSlots)
+  const decision = decideReportOutcome({
+    diagnosisValid: true,
+    confidence: 80,
+    turnCount: 8,
+    readyForReport: true,
+    evidence,
+    nonClinicalResponseCount: 0,
+  })
+  assertEquals(decision.outcome, 'complete', 'confidence 80 releases the report')
+  assertEquals(decision.reason, 'high_confidence', 'via the high-confidence door')
+})
+
+Deno.test('at the turn cap, a moderately confident report still releases', () => {
+  const evidence = assessClinicalEvidence(LIBERTYMD_VALIDATION_CASES.lowFever.filledSlots)
+  const decision = decideReportOutcome({
+    diagnosisValid: true,
+    confidence: 65,
+    turnCount: 15,
+    readyForReport: true,
+    evidence,
+    nonClinicalResponseCount: 0,
+  })
+  assertEquals(decision.outcome, 'complete', 'cap path unchanged')
+  assertEquals(decision.reason, 'turn_limit_confident', 'cap reason')
 })
 
 Deno.test('confidence 59 cannot release a report', () => {

@@ -38,7 +38,9 @@
     "typing": "LibertyMD réfléchit…",
     "inputPlaceholder": "Écrivez votre réponse…",
     "newConsultation": "Nouvelle consultation",
-    "redirect": "Restons concentrés sur votre question de santé pour que je puisse vous aider."
+    "redirect": "Restons concentrés sur votre question de santé pour que je puisse vous aider.",
+    "demographicsHeading": "A few details before we start",
+    "demographicsSubcopy": "Your age and sex at birth let us ask safer, more relevant questions."
   },
   "demographics": {
     "prompt": "Pour vous donner des conseils sûrs et pertinents, j'ai besoin de deux informations.",
@@ -272,7 +274,11 @@
     "heroTrustReport": "Free doctor-ready report",
     "heroTrustReportShort": "Free report",
     "heroTrustAi": "AI symptom chat — not a clinician",
-    "heroTrustAiShort": "AI — not a clinician"
+    "heroTrustAiShort": "AI — not a clinician",
+    "heroTrustRating": "4.5 out of 5",
+    "heroTrustRatingShort": "4.5",
+    "heroTrustHipaa": "HIPAA compliant",
+    "heroTrustHipaaShort": "HIPAA"
   },
   "marketing": {
     "care": {

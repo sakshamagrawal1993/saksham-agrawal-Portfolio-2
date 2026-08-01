@@ -38,7 +38,9 @@
     "typing": "LibertyMD denkt nach…",
     "inputPlaceholder": "Geben Sie Ihre Antwort ein…",
     "newConsultation": "Neue Konsultation",
-    "redirect": "Bleiben wir bei Ihrer Gesundheitsfrage, damit ich Ihnen helfen kann."
+    "redirect": "Bleiben wir bei Ihrer Gesundheitsfrage, damit ich Ihnen helfen kann.",
+    "demographicsHeading": "A few details before we start",
+    "demographicsSubcopy": "Your age and sex at birth let us ask safer, more relevant questions."
   },
   "demographics": {
     "prompt": "Für eine sichere, passende Orientierung benötige ich zwei Angaben.",
@@ -272,7 +274,11 @@
     "heroTrustReport": "Free doctor-ready report",
     "heroTrustReportShort": "Free report",
     "heroTrustAi": "AI symptom chat — not a clinician",
-    "heroTrustAiShort": "AI — not a clinician"
+    "heroTrustAiShort": "AI — not a clinician",
+    "heroTrustRating": "4.5 out of 5",
+    "heroTrustRatingShort": "4.5",
+    "heroTrustHipaa": "HIPAA compliant",
+    "heroTrustHipaaShort": "HIPAA"
   },
   "marketing": {
     "care": {
