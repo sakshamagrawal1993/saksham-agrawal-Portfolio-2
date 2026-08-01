@@ -146,7 +146,18 @@ export function decideReportOutcome(input: ReportDecisionInput): ReportDecision 
 
   if (input.diagnosisValid && input.evidence.sufficient) {
     if (input.confidence >= 80) return { outcome: 'complete', reason: 'high_confidence' }
-    if (input.readyForReport && input.confidence >= 60) return { outcome: 'complete', reason: 'workflow_ready' }
+    // BO 2026-08-01 — before the turn cap, 80 is the only door out.
+    //
+    // The old `workflow_ready` path let the interview agent end a consult at
+    // confidence 60 simply by asserting ready_for_report. That made the model's
+    // self-report the deciding vote on a clinical stop, which is exactly the
+    // kind of self-graded threshold DECISIONS 2026-07-31 (P0-15) rules out.
+    // Confidence >= 80 is now required to finish early; the interview workflow
+    // enforces the same floor on its side, so the two agree.
+    //
+    // The cap path below is unchanged and still accepts 65: at 15 turns the
+    // choice is between releasing a moderately-confident report and sending the
+    // patient away with nothing, and the report is reviewable by a clinician.
     if (input.turnCount >= 15 && input.confidence >= 65) return { outcome: 'complete', reason: 'turn_limit_confident' }
   }
 
