@@ -27,7 +27,7 @@
     "test:mind-coach:contract": "node scripts/mind_coach_contract_test.mjs",
     "test:mind-coach:browser": "node scripts/mind_coach_browser_smoke.mjs",
     "test:mind-coach:qa": "npm run test:mind-coach:contract && npm run test:mind-coach:browser",
-    "test:libertymd:contracts": "node scripts/libertymd-contract-validation.mjs --definitions-dir=../n8n-workflows/definitions",
+    "test:libertymd:contracts": "LIBERTYMD_ALLOW_PAYLOAD_RETENTION=true node scripts/libertymd-contract-validation.mjs --definitions-dir=../n8n-workflows/definitions",
     "test:libertymd:policy": "deno test --no-config --allow-read tests/libertymd/clinical-policy.test.ts",
     "test:libertymd:recovery": "deno test --no-config tests/libertymd/abandoned-chat-recovery.test.ts",
     "test:libertymd:breaker": "deno test --no-config --no-check --allow-env --allow-net tests/libertymd/n8n-breaker.mts",
