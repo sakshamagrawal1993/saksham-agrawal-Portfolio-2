@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   buildLandingAttributionPayload,
   parseLandingQueryParams,
@@ -8,36 +8,21 @@ import { resolveKeywordLandingCluster } from './libertymd-keyword-content';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useI18n } from '../../i18n';
 import LibertyMDLanguageSwitcher from './LibertyMDLanguageSwitcher';
-import { 
-  ShieldCheck, 
-  Globe, 
-  Send, 
+import {
+  ShieldCheck,
+  Send,
   ArrowRight,
-  UserCheck, 
-  Sparkles, 
-  Clock, 
-  ArrowLeft, 
-  HeartPulse, 
-  FileText, 
-  Video, 
-  CheckCircle2, 
-  AlertTriangle,
+  Sparkles,
+  FileText,
+  Video,
   Activity,
-  Lock,
-  ChevronRight,
-  CheckCircle,
   Loader2,
-  Mail,
   Menu,
   RotateCcw,
-  Stethoscope,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import LibertyMDFooterRibbon from './LibertyMDFooterRibbon';
 import { PatientOathEmblem } from './LibertyMDFooterBadges';
-import LibertyMD3DBlobLogo from './LibertyMD3DBlobLogo';
-import LibertyMDMedicalCrossLogo from './LibertyMDMedicalCrossLogo';
-import LibertyMDHumanSilhouettes from './LibertyMDHumanSilhouettes';
 import LibertyMDPremiumLogo from './LibertyMDPremiumLogo';
 import LibertyMDParticleWaveSeparator from './LibertyMDParticleWaveSeparator';
 import {
@@ -234,7 +219,7 @@ const howItWorksSteps = [
 ];
 
 function LibertyMDHowItWorksTabs() {
-  const { t, language } = useI18n();
+  const { t } = useI18n();
   const steps = howItWorksSteps.map((step, i) => ({
     ...step,
     title: t(`app.steps.${i}.title`),
@@ -1158,7 +1143,6 @@ export default function LibertyMDApp() {
     ]);
   };
 
-  const dockZoneRef = useRef<HTMLDivElement | null>(null);
   const activeOptions = messages[messages.length - 1]?.options || [];
   const isComposerLocked = isTyping || ['demographics_required', 'report_gate', 'report_ready', 'emergency_end', 'clinical_review_needed'].includes(phase);
   // P0-21 Q1 B1: hide locked composer while report-gate open CTA owns the footer.

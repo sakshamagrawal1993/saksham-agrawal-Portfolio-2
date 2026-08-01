@@ -706,7 +706,7 @@ export default function LibertyMDChat() {
       setEntryOptions(nextOptions);
       setClinicalAnswer('');
       setConsentChecked(true);
-      setMessages([
+      setMessages(([
         { id: `${nextConsultationId}-initial-user`, sender: 'user', text: symptom },
         {
           id: `${nextConsultationId}-initial-assistant`,
@@ -714,9 +714,9 @@ export default function LibertyMDChat() {
           kind: 'demographics',
           text: acknowledgement,
         },
-      ].filter((message) => message.text));
+      ] as ChatMessage[]).filter((message) => message.text));
     } else if (nextPhase === 'emergency_end') {
-      setMessages([
+      setMessages(([
         { id: `${nextConsultationId}-initial-user`, sender: 'user', text: symptom },
         {
           id: `${nextConsultationId}-initial-assistant`,
@@ -724,13 +724,13 @@ export default function LibertyMDChat() {
           kind: 'emergency',
           text: acknowledgement || String(data.message || ''),
         },
-      ].filter((message) => message.text));
+      ] as ChatMessage[]).filter((message) => message.text));
     } else {
       // P1-03 skip → intake: first question answers via send_message (Q5A).
       setEntryQuestion('');
       setEntryOptions([]);
       setClinicalAnswer('');
-      setMessages([
+      setMessages(([
         { id: `${nextConsultationId}-initial-user`, sender: 'user', text: symptom },
         {
           id: `${nextConsultationId}-initial-assistant`,
@@ -747,7 +747,7 @@ export default function LibertyMDChat() {
             options: nextOptions,
           }]
           : []),
-      ].filter((message) => message.text));
+      ] as ChatMessage[]).filter((message) => message.text));
     }
 
     setPhase(nextPhase);
@@ -998,6 +998,12 @@ export default function LibertyMDChat() {
           return;
         }
 
+        // Past this point a consultation id is guaranteed: the null case either
+        // navigated away in the guard above or returned inside the draft-start
+        // branch. Restating it narrows the type and keeps a null id from ever
+        // reaching invokeCareProxy / storage keys if that flow changes.
+        if (!consultationId) return;
+
         if (resolvedDraftConsultationIdRef.current === consultationId) {
           resolvedDraftConsultationIdRef.current = null;
           if (!cancelled) setClientPersistHydrated(true);
@@ -1014,7 +1020,7 @@ export default function LibertyMDChat() {
           if (!initialStart) return;
           initialStartRef.current = null;
           const initialPhase = phaseFromStatus(String(initialStart.state || 'awaiting_demographics'));
-          setMessages([
+          setMessages(([
             {
               id: `${consultationId}-initial-user`,
               sender: 'user',
@@ -1026,7 +1032,7 @@ export default function LibertyMDChat() {
               kind: initialPhase === 'emergency_end' ? 'emergency' : 'demographics',
               text: String(initialStart.acknowledgement || ''),
             },
-          ].filter((message) => message.text));
+          ] as ChatMessage[]).filter((message) => message.text));
           setPhase(initialPhase);
           setIsReportGateOpen(shouldOpenSoftGate(initialPhase === 'report_gate', consultationId));
           if (initialPhase === 'emergency_end') {

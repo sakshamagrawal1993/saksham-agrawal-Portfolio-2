@@ -403,7 +403,7 @@ export async function runGuardrail(
   correlationId?: string | null,
   /** P3-08 catalog/region resolve options (db + region + language). */
   resolveOpts?: EmergencyResolveOptions,
-) {
+): Promise<GuardrailResult> {
   const local = detectDeterministicEmergency(message)
   if (local) {
     const core = {
