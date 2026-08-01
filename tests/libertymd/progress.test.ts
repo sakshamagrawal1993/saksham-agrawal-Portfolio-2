@@ -220,11 +220,27 @@ Deno.test('P1-06 · Chat replaces status strip during intake; observes missing_s
   if (!source.includes('aria-live="polite"')) {
     throw new Error('Chat status strip aria-live polite must remain')
   }
-  // Replace, do not stack a second permanent statusCopy alongside progress
+  // P5-CHAT — the progress bar moved into the header (pinned, Mind Coach style),
+  // so it is no longer co-located with the status strip. The invariant P1-06
+  // actually protects is *mutual exclusivity*: never a progress bar AND a
+  // permanent status line at once. That is what is asserted now.
+  const headerStart = source.indexOf('<header')
+  const headerEnd = source.indexOf('</header>')
+  const headerRegion = source.slice(headerStart, headerEnd)
+  if (!headerRegion.includes('LibertyMDProgressIndicator')) {
+    throw new Error('progress indicator must be pinned inside the header')
+  }
   const stripStart = source.indexOf('aria-live="polite"')
   const stripRegion = source.slice(stripStart, stripStart + 600)
-  if (!stripRegion.includes('LibertyMDProgressIndicator') || !stripRegion.includes('statusCopy[phase]')) {
-    throw new Error('Chat must branch progress vs statusCopy in the same polite strip')
+  if (stripRegion.includes('LibertyMDProgressIndicator')) {
+    throw new Error('progress indicator must not also render in the transcript strip')
+  }
+  if (!stripRegion.includes('statusCopy[phase]')) {
+    throw new Error('status strip must still carry statusCopy for non-interview phases')
+  }
+  // Both surfaces gate on the same flag, so they can never both be visible.
+  if (!stripRegion.includes('showInterviewProgress') || !headerRegion.includes('showInterviewProgress')) {
+    throw new Error('progress and status strip must be gated by the same showInterviewProgress flag')
   }
   if (/N of 15|question \d+ of 15/.test(source)) {
     throw new Error('Chat must not hardcode N of 15 progress math')

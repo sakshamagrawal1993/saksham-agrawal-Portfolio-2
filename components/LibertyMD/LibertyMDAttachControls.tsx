@@ -22,6 +22,12 @@ export interface LibertyMDLabChip {
 }
 
 export interface LibertyMDAttachControlsProps {
+  /**
+   * P5-CHAT — the paperclip in the composer now owns the trigger affordances.
+   * The chips and the technical notice still render here, so this hides the
+   * buttons rather than the whole component.
+   */
+  hideTriggers?: boolean;
   /** Same locks as send — intake composer usable. */
   disabled: boolean;
   uploading?: boolean;
@@ -60,6 +66,7 @@ export function LibertyMDAttachControls({
   onRemoveChip,
   onRetryChip,
   retryingObjectUuid = null,
+  hideTriggers = false,
   onRemoveLabChip,
 }: LibertyMDAttachControlsProps) {
   const { t } = useI18n();
@@ -156,6 +163,8 @@ export function LibertyMDAttachControls({
             if (file) onPhotoFile(file);
           }}
         />
+        {hideTriggers ? null : (
+          <>
         <button
           type="button"
           data-libertymd-attach-photo=""
@@ -203,6 +212,8 @@ export function LibertyMDAttachControls({
           <span className="libertymd-type-label text-libertymd-slate-500" data-libertymd-lab-signin-hint="">
             {t('chatx.attachLabSignIn')}
           </span>
+        )}
+          </>
         )}
       </div>
 

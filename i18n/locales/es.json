@@ -642,5 +642,13 @@
       "title": "Guidance for urinary discomfort.",
       "subtitle": "Describe what you're feeling and get a free doctor-ready report."
     }
+  },
+  "attach": {
+    "title": "Attach",
+    "photoTitle": "Photo",
+    "photoHint": "A picture of the affected area",
+    "labTitle": "Lab report",
+    "labHint": "PDF or image of a test result",
+    "labSignInHint": "Sign in to attach a lab report"
   }
 }

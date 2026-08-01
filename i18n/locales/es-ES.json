@@ -374,5 +374,16 @@
   "chat": {
     "demographicsHeading": "A few details before we start",
     "demographicsSubcopy": "Your age and sex at birth let us ask safer, more relevant questions."
+  },
+  "attach": {
+    "title": "Attach",
+    "photoTitle": "Photo",
+    "photoHint": "A picture of the affected area",
+    "labTitle": "Lab report",
+    "labHint": "PDF or image of a test result",
+    "labSignInHint": "Sign in to attach a lab report"
+  },
+  "common": {
+    "close": "Close"
   }
 }

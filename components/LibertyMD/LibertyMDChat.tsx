@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
+  Paperclip,
   AlertTriangle,
   ArrowLeft,
   Menu,
@@ -44,6 +45,7 @@ import {
 } from './LibertyMDReportLifecycleShell';
 import { LibertyMDDoctorHandoffPanel } from './LibertyMDDoctorHandoffPanel';
 import { LibertyMDAttachControls, type LibertyMDPhotoChip, type LibertyMDLabChip } from './LibertyMDAttachControls';
+import { LibertyMDAttachSheet } from './LibertyMDAttachSheet';
 import { LibertyMDLabAttributionSheet } from './LibertyMDLabAttributionSheet';
 import { shouldShowDoctorHandoff } from './libertymd-doctor-cta-config';
 import {
@@ -375,6 +377,9 @@ export default function LibertyMDChat() {
   const [profile, setProfile] = useState<LibertyMDProfile | null>(null);
   const [history, setHistory] = useState<LibertyMDHistoryItem[]>([]);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  // P5-CHAT — WhatsApp-style attach chooser behind a single paperclip.
+  const [attachSheetOpen, setAttachSheetOpen] = useState(false);
+  const photoFileInputRef = useRef<HTMLInputElement | null>(null);
   const [isReportGateOpen, setIsReportGateOpen] = useState(false);
   const [isAuthBusy, setIsAuthBusy] = useState(false);
   const [hasIdentityConflict, setHasIdentityConflict] = useState(false);
@@ -2552,6 +2557,24 @@ export default function LibertyMDChat() {
             </button>
           </div>
         </div>
+
+        {/*
+          P5-CHAT — interview progress pinned to the header.
+
+          Mind Coach keeps its phase stepper in the fixed region directly under
+          the header rather than in the scroll area, so the reader never loses
+          their place indicator by scrolling. Same here: a full-bleed hairline
+          flush to the header's bottom edge, negative-margined out of the
+          header's horizontal padding so it spans the full width.
+
+          Rendered only while interviewing; the report and terminal phases have
+          no progress to show.
+        */}
+        {showInterviewProgress && interviewProgressView ? (
+          <div className="-mx-3 -mb-3 mt-3 sm:-mx-6">
+            <LibertyMDProgressIndicator view={interviewProgressView} />
+          </div>
+        ) : null}
       </header>
 
       <main
@@ -2571,9 +2594,7 @@ export default function LibertyMDChat() {
             aria-live="polite"
             data-libertymd-report-lifecycle={reportLifecycle ?? undefined}
           >
-            {showInterviewProgress && interviewProgressView ? (
-              <LibertyMDProgressIndicator view={interviewProgressView} />
-            ) : (
+            {showInterviewProgress && interviewProgressView ? null : (
               <>
                 <span className={`h-2 w-2 rounded-full ${phase === 'error' || reportLifecycle === 'generation_failed' ? 'bg-amber-500' : 'bg-emerald-500'}`} />
                 {/* P2-13 lifecycle labels; default branch keeps statusCopy[phase] (P1-06 strip contract). */}
@@ -2866,6 +2887,7 @@ export default function LibertyMDChat() {
           {!continuationOwnsFooter && (
             <>
               <LibertyMDAttachControls
+                hideTriggers
                 disabled={composerSendLocked}
                 uploading={photoUploading}
                 labUploading={labUploading}
@@ -2919,8 +2941,44 @@ export default function LibertyMDChat() {
                   event.preventDefault();
                   void sendMessage();
                 }}
-                className="flex min-h-14 items-center gap-2 rounded-full border border-libertymd-mist bg-white p-2 pl-5 shadow-[0_14px_40px_rgba(23,50,95,0.13)] ring-1 ring-libertymd-blue-600/5"
+                className="relative flex min-h-14 items-center gap-2 rounded-full border border-libertymd-mist bg-white p-2 pl-2 shadow-[0_14px_40px_rgba(23,50,95,0.13)] ring-1 ring-libertymd-blue-600/5"
               >
+                {/* P5-CHAT — one paperclip, WhatsApp-style. The chooser decides
+                    photo vs lab; two permanent buttons made attaching look like
+                    the primary action of a clinical conversation. */}
+                <button
+                  type="button"
+                  data-libertymd-attach-trigger=""
+                  aria-haspopup="dialog"
+                  aria-expanded={attachSheetOpen}
+                  aria-label={t('attach.title')}
+                  disabled={composerSendLocked}
+                  onClick={() => setAttachSheetOpen((open) => !open)}
+                  className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full text-libertymd-slate-500 transition hover:bg-libertymd-blue-50 hover:text-libertymd-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-libertymd-blue-600 disabled:opacity-40"
+                >
+                  <Paperclip className="h-5 w-5" aria-hidden="true" />
+                </button>
+                <LibertyMDAttachSheet
+                  open={attachSheetOpen}
+                  labLinked={!isAnonymous}
+                  onClose={() => setAttachSheetOpen(false)}
+                  onChoosePhoto={() => photoFileInputRef.current?.click()}
+                  onChooseLab={() => { void openLabAttribution(); }}
+                  onLabSignInRequired={() => { void startGoogleLink(); }}
+                />
+                <input
+                  ref={photoFileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="sr-only"
+                  tabIndex={-1}
+                  data-libertymd-attach-photo-input=""
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    event.target.value = '';
+                    if (file) void uploadPhoto(file);
+                  }}
+                />
                 <input
                   type="text"
                   value={input}
