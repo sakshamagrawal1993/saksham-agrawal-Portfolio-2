@@ -87,3 +87,45 @@ Deno.test('P0-13 AC4/AC5: a JWT subject cannot update another user consultation'
   )
   assertEquals(opsFor(ops, 'libertymd_consultations', 'update').length, 0, 'unowned consultation must not be written')
 })
+
+/**
+ * BUG-A regression — every `resolution_reason` the proxy writes must be a member
+ * of the closed vocabulary enforced by
+ * `libertymd_consultations_resolution_reason_check`.
+ *
+ * The turn-cap path wrote 'turn_limit_reached', which is not in the CHECK, so
+ * every consult that reached MAX_TURNS failed its UPDATE and surfaced to the
+ * user as a 500. A source scan is the right shape of test here: the values are
+ * string literals in three different branches, and the failure mode is a value
+ * that never appears in any unit fixture.
+ */
+Deno.test('BUG-A: resolution_reason literals stay inside the DB CHECK vocabulary', async () => {
+  const ALLOWED = new Set([
+    'high_confidence',
+    'workflow_ready',
+    'turn_limit_confident',
+    'low_diagnostic_confidence',
+    'insufficient_clinical_information',
+  ])
+  const dir = new URL('../../supabase/functions/libertymd-care-proxy/', import.meta.url)
+  const files: string[] = []
+  for await (const entry of Deno.readDir(dir)) {
+    if (entry.isFile && entry.name.endsWith('.ts')) files.push(entry.name)
+    if (entry.isDirectory) {
+      for await (const sub of Deno.readDir(new URL(`${entry.name}/`, dir))) {
+        if (sub.isFile && sub.name.endsWith('.ts')) files.push(`${entry.name}/${sub.name}`)
+      }
+    }
+  }
+  const offenders: string[] = []
+  for (const file of files) {
+    const src = await Deno.readTextFile(new URL(file, dir))
+    for (const match of src.matchAll(/resolution_reason:\s*'([^']+)'/g)) {
+      if (!ALLOWED.has(match[1])) offenders.push(`${file}: '${match[1]}'`)
+    }
+  }
+  // Compare joined strings: the local assertEquals shim is identity-based, so
+  // two distinct empty arrays would never be equal.
+  assertEquals(offenders.join(', '), '', 'resolution_reason values outside the DB CHECK')
+  assertEquals(files.length > 5, true, 'source scan must actually find proxy files')
+})

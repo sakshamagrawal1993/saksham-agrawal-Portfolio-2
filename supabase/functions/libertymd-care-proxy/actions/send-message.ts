@@ -210,7 +210,13 @@ async function closeAtTurnCap(
     await updateOwnedConsultation(ctx, consultation, {
       status,
       turn_count: MAX_TURNS,
-      resolution_reason: 'turn_limit_reached',
+      // `turn_limit_confident` — the closed vocabulary shared with
+      // clinical-policy and enforced by libertymd_consultations_resolution_
+      // reason_check. This branch is "capped *with* a serve-eligible report",
+      // which is exactly what that reason means. It previously wrote
+      // 'turn_limit_reached', which is not in the CHECK, so every consult that
+      // reached the cap failed its UPDATE and surfaced as a 500.
+      resolution_reason: 'turn_limit_confident',
       completed_at: ctx.isAnonymous ? null : now,
       last_activity_at: now,
     })
@@ -233,7 +239,9 @@ async function closeAtTurnCap(
   await updateOwnedConsultation(ctx, consultation, {
     status: 'clinical_review_needed',
     turn_count: MAX_TURNS,
-    resolution_reason: 'turn_limit_reached',
+    // Capped *without* a serve-eligible report — the same reason the
+    // non-capped review path writes at line ~501. Was 'turn_limit_reached'.
+    resolution_reason: 'insufficient_clinical_information',
     last_activity_at: now,
   })
   await addProductEvent(ctx, 'clinical_review_needed', consultation.id, {
