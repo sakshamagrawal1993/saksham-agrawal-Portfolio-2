@@ -1490,29 +1490,55 @@ export default function LibertyMDApp() {
                   deliberately left intact so keyword landings and historic
                   funnel slices still resolve. */}
 
-              {/* BO 2026-08-01 — trust row: rating, install base, and HIPAA.
-                  Figures are the operating business's, supplied by the BO for
-                  this rebuild; they are not derived from this project's
-                  database. Keep them in i18n so a change is one edit. */}
-              <div className="libertymd-hero-trust-row mt-2 flex flex-row flex-wrap items-center justify-center gap-x-5 gap-y-1 text-xs font-medium text-libertymd-slate-500 sm:text-sm [@media(max-height:700px)]:mt-0 [@media(max-height:700px)]:gap-1">
-                <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap font-semibold text-libertymd-navy" aria-label={t('app.heroTrustRating')}>
-                  <span className="inline-flex gap-0.5" aria-hidden="true">
-                    {[0, 1, 2, 3, 4].map((star) => (
-                      <Star
-                        key={star}
-                        className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${star === 4 ? 'text-libertymd-slate-300' : 'fill-libertymd-green-600 text-libertymd-green-600'}`}
-                      />
+              {/* Trust row — rating, install base, HIPAA. Restored to the original
+                  layout: spread edge-to-edge under the composer with
+                  `justify-between`, not centred, and the rating drawn as filled
+                  boxes rather than bare glyphs.
+
+                  Figures are the operating business's, supplied by the BO; they
+                  are not derived from this project's database, and they live in
+                  i18n so a correction is one edit.
+
+                  Viewport handling follows the original: the numeral and the
+                  long labels are desktop-only, icons and gaps step up at `sm`,
+                  and a short viewport tightens the top margin so the row never
+                  pushes the composer off screen. */}
+              <div className="libertymd-hero-trust-row mt-2 flex flex-row items-center justify-between gap-2 text-xs font-medium text-libertymd-slate-500 sm:text-sm [@media(max-height:700px)]:mt-0 [@media(max-height:700px)]:gap-1">
+                <div className="flex flex-nowrap items-center justify-start gap-2 [@media(max-height:700px)]:gap-1">
+                  <span className="hidden sm:inline">{t('app.heroTrustRatingShort')}</span>
+                  <span className="inline-flex gap-0.5" aria-label={t('app.heroTrustRating')}>
+                    {[0, 1, 2, 3, 4].map((item) => (
+                      item === 4 ? (
+                        // Half star: a token-clean 50/50 fill. The original used a
+                        // raw-hex linear-gradient, which design-guard now rejects.
+                        <span
+                          key={item}
+                          className="relative inline-flex h-5 w-5 items-center justify-center overflow-hidden bg-libertymd-slate-300"
+                        >
+                          <span className="absolute inset-y-0 left-0 w-1/2 bg-libertymd-green-600" aria-hidden="true" />
+                          <Star className="relative h-3.5 w-3.5 fill-white text-white" aria-hidden="true" />
+                        </span>
+                      ) : (
+                        <span
+                          key={item}
+                          className="inline-flex h-5 w-5 items-center justify-center bg-libertymd-green-600"
+                        >
+                          <Star className="h-3.5 w-3.5 fill-white text-white" aria-hidden="true" />
+                        </span>
+                      )
                     ))}
                   </span>
-                  <span>{t('app.heroTrustRatingShort')}</span>
-                </span>
-                <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap font-semibold text-libertymd-navy">
-                  <UsersRound className="h-4 w-4 text-libertymd-navy sm:h-5 sm:w-5" aria-hidden="true" />
+                </div>
+                <span
+                  className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap font-semibold text-libertymd-navy sm:gap-2"
+                  aria-label={t('app.trustedBy')}
+                >
+                  <UsersRound className="h-4 w-4 shrink-0 text-libertymd-navy sm:h-5 sm:w-5" aria-hidden="true" />
                   <span className="sm:hidden">{t('app.trustedByShort')}</span>
                   <span className="hidden sm:inline">{t('app.trustedBy')}</span>
                 </span>
-                <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap font-semibold text-libertymd-navy">
-                  <ShieldCheck className="h-4 w-4 text-libertymd-navy sm:h-5 sm:w-5" aria-hidden="true" />
+                <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-libertymd-navy sm:gap-2">
+                  <ShieldCheck className="h-4 w-4 shrink-0 text-libertymd-navy sm:h-5 sm:w-5" aria-hidden="true" />
                   <span className="sm:hidden">{t('app.heroTrustHipaaShort')}</span>
                   <span className="hidden sm:inline">{t('app.heroTrustHipaa')}</span>
                 </span>
