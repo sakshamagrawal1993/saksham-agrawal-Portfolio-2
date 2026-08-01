@@ -1,5 +1,5 @@
 /**
- * P4-06 · Photo upload contracts (no live Storage).
+ * P4-06 · Private photo upload and retry contracts (no live Storage calls).
  *
  * Covers path kind photo, MIME/size reject, EXIF strip fixture, signed-URL TTL ≤ 900,
  * analysis stub honesty, technical failure non-block, no public URL helpers,
@@ -152,7 +152,7 @@ Deno.test('P4-06 decode · base64 round-trip', () => {
   assertEquals(decoded![0], 0xff)
 })
 
-Deno.test('P4-06 live analysis · canonical observation-only response and raw not retained', () => {
+Deno.test('P4-06 live analysis · canonical observation-only response', () => {
   const encoded = encodePhotoBase64(minimalJpeg())
   assertTrue(encoded.length > 0)
   const result = normalizePhotoAnalysis({
@@ -169,10 +169,9 @@ Deno.test('P4-06 live analysis · canonical observation-only response and raw no
   assertTrue(result !== null)
   assertEquals(result?.observations.length, 1, 'diagnostic leakage must be removed')
   assertEquals(result?.analysis_kind, 'observation_only')
-  assertEquals(result?.raw_retained, false)
 })
 
-Deno.test('P4-06 source · agent analysis persists only sanitized output', async () => {
+Deno.test('P4-06 source · private sanitized object supports an authorized retry', async () => {
   const action = await Deno.readTextFile(
     new URL('../../supabase/functions/libertymd-care-proxy/actions/photo-upload.ts', import.meta.url),
   )
@@ -185,11 +184,17 @@ Deno.test('P4-06 source · agent analysis persists only sanitized output', async
   // Explicit ban on runtime wiring strings that are not documentary CARE text.
   assertFalse(/functions\/process-lab-report/.test(action))
   assertFalse(/N8N_HEALTH_TWIN_LAB/.test(action))
-  assertFalse(/\.storage\s*\./.test(action), 'zero-retention path must not use Storage')
+  assertTrue(/\.storage\s*\n?\s*\.from\(LIBERTYMD_CARE_BUCKET\)/.test(action), 'proxy uses private care bucket')
+  assertTrue(/\.upload\(path, stripped/.test(action), 'only EXIF-stripped bytes are stored')
+  assertTrue(/\.createSignedUrl\(path, PHOTO_SIGNED_URL_TTL_SECONDS\)/.test(action), 'short signed URL')
+  assertTrue(/\.download\(row\.path\)/.test(action), 'retry reloads the server-owned object')
+  assertTrue(/handleRetryPhotoAnalysis/.test(action), 'retry handler exists')
+  assertTrue(/\.eq\('user_id', ctx\.user\.id\)/.test(action), 'retry is scoped to JWT owner')
+  assertTrue(/analysis_attempts\s*>?=\s*20/.test(action), 'retry attempts are bounded')
   assertTrue(/PHOTO_ANALYSIS_WEBHOOK/.test(action), 'must call LibertyMD photo agent')
   assertTrue(/libertymd_photo_analyses/.test(action), 'must persist analysis attribution')
   assertTrue(/user_id:\s*ctx\.user\.id/.test(action), 'must derive user_id from JWT')
-  assertTrue(/raw_retained:\s*false/.test(action))
+  assertTrue(/raw_retained:\s*true/.test(action))
 
   const attach = await Deno.readTextFile(
     new URL('../../components/LibertyMD/LibertyMDAttachControls.tsx', import.meta.url),
@@ -206,11 +211,15 @@ Deno.test('P4-06 source · agent analysis persists only sanitized output', async
   assertFalse(/\.from\(\s*['"]libertymd_/.test(chat), 'Chat must not write clinical tables')
   assertTrue(/LibertyMDAttachControls/.test(chat))
   assertTrue(/uploadPhotoBody/.test(chat))
+  assertTrue(/retryPhotoAnalysisBody/.test(chat))
+  assertTrue(/analysis_status:\s*'ready'/.test(chat))
 
   const care = await Deno.readTextFile(
     new URL('../../docs/libertymd/CARE-ARCHITECTURE.md', import.meta.url),
   )
-  assertTrue(/raw (?:photo|image).*never persisted/i.test(care))
+  assertTrue(/private.*libertymd-care/i.test(care))
+  assertTrue(/retry_photo_analysis/.test(care))
+  assertTrue(/900-second signed URL/.test(care))
   assertTrue(/libertymd_photo_analyses/.test(care))
   assertTrue(/P4-07/.test(care))
 })

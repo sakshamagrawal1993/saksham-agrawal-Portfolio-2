@@ -109,6 +109,7 @@ import {
   readPhotoFileAsBase64,
   readLabFileAsBase64,
   requestReportEmailBody,
+  retryPhotoAnalysisBody,
   someoneElseCreateBody,
   statusFromFunctionsError,
   updatePatientBody,
@@ -355,6 +356,7 @@ export default function LibertyMDChat() {
   const [safetyNotice, setSafetyNotice] = useState<LibertyMDSafetyNoticeContent | null>(null);
   const [photoChips, setPhotoChips] = useState<LibertyMDPhotoChip[]>([]);
   const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoRetryingObjectUuid, setPhotoRetryingObjectUuid] = useState<string | null>(null);
   const [photoNotice, setPhotoNotice] = useState<string | null>(null);
   const [labChips, setLabChips] = useState<LibertyMDLabChip[]>([]);
   const [labUploading, setLabUploading] = useState(false);
@@ -1509,12 +1511,42 @@ export default function LibertyMDChat() {
       const objectUuid = typeof body.object_uuid === 'string' ? body.object_uuid : '';
       const contentType = typeof body.content_type === 'string' ? body.content_type : content_type;
       if (objectUuid) {
-        setPhotoChips((prev) => [...prev, { object_uuid: objectUuid, content_type: contentType }]);
+        const retry = body.analysis_retry_available === true;
+        setPhotoChips((prev) => [...prev, {
+          object_uuid: objectUuid,
+          content_type: contentType,
+          analysis_status: retry ? 'retry' : 'ready',
+        }]);
+        if (retry) setPhotoNotice(copyForPhotoUploadCode('analysis_failed'));
       }
     } catch {
       setPhotoNotice(copyForPhotoUploadCode('upstream_unknown'));
     } finally {
       setPhotoUploading(false);
+    }
+  };
+
+  const retryPhotoAnalysis = async (objectUuid: string) => {
+    if (!consultationId || !objectUuid || photoRetryingObjectUuid) return;
+    setPhotoRetryingObjectUuid(objectUuid);
+    setPhotoNotice(null);
+    try {
+      const { data, error: functionError } = await supabase.functions.invoke('libertymd-care-proxy', {
+        body: retryPhotoAnalysisBody({ consultation_id: consultationId, object_uuid: objectUuid }),
+      });
+      const status = statusFromFunctionsError(functionError) ?? (functionError ? undefined : 200);
+      const body = (data && typeof data === 'object' ? data : null) as Record<string, unknown> | null;
+      if (functionError || !body?.ok) {
+        const classified = classifyPhotoUploadFailure(status, body);
+        setPhotoNotice(classified.message);
+        return;
+      }
+      setPhotoChips((prev) => prev.map((chip) =>
+        chip.object_uuid === objectUuid ? { ...chip, analysis_status: 'ready' } : chip));
+    } catch {
+      setPhotoNotice(copyForPhotoUploadCode('upstream_unknown'));
+    } finally {
+      setPhotoRetryingObjectUuid(null);
     }
   };
 
@@ -2848,6 +2880,8 @@ export default function LibertyMDChat() {
                 onRemoveChip={(objectUuid) => {
                   setPhotoChips((prev) => prev.filter((c) => c.object_uuid !== objectUuid));
                 }}
+                onRetryChip={(objectUuid) => { void retryPhotoAnalysis(objectUuid); }}
+                retryingObjectUuid={photoRetryingObjectUuid}
                 onRemoveLabChip={(objectUuid) => {
                   setLabChips((prev) => prev.filter((c) => c.object_uuid !== objectUuid));
                 }}

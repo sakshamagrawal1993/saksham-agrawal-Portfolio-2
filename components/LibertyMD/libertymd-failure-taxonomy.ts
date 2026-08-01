@@ -557,6 +557,8 @@ export type PhotoUploadFailureCode =
   | 'decode_failed'
   | 'storage_failed'
   | 'sign_failed'
+  | 'analysis_failed'
+  | 'persistence_failed'
   | 'missing_consultation'
   | 'upstream_unknown';
 
@@ -567,6 +569,8 @@ const PHOTO_UPLOAD_COPY: Record<PhotoUploadFailureCode, string> = {
   decode_failed: 'We could not read that photo. Please try another image.',
   storage_failed: 'Something went wrong on our side while saving the photo. Your consultation can continue.',
   sign_failed: 'Something went wrong on our side while saving the photo. Your consultation can continue.',
+  analysis_failed: 'We could not analyze that image just now. Your consultation can continue.',
+  persistence_failed: 'We analyzed the image but could not save the analysis. Your consultation can continue.',
   missing_consultation: 'We could not attach that photo just now. Please try again.',
   upstream_unknown: 'Something went wrong on our side while saving the photo. Your consultation can continue.',
 };

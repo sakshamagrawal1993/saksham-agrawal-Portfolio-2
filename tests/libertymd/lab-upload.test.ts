@@ -245,6 +245,8 @@ Deno.test('P4-07 source · login gate + user-linked standardized rows + zero raw
   assertTrue(/libertymd_lab_results/.test(action), 'canonical result rows')
   assertTrue(/user_id:\s*ctx\.user\.id/.test(action), 'JWT user attribution')
   assertTrue(/LAB_ANALYSIS_WEBHOOK/.test(action), 'LibertyMD lab agent')
+  assertTrue(/\.from\('libertymd_health_parameter_definitions'\)/.test(action), 'LibertyMD-owned taxonomy')
+  assertFalse(/\.from\('health_parameter_definitions'\)/.test(action), 'no Health Twin taxonomy lookup')
   assertFalse(/\.storage\s*\./.test(action), 'raw report must not be persisted')
   assertFalse(/\bgetPublicUrl\s*\(/.test(action))
   assertFalse(/functions\/process-lab-report/.test(action))
@@ -271,8 +273,23 @@ Deno.test('P4-07 source · login gate + user-linked standardized rows + zero raw
   )
   assertTrue(/libertymd_lab_results/.test(analysisMigration))
   assertTrue(/user_id uuid not null references auth\.users/.test(analysisMigration))
-  assertTrue(/parameter_id text not null references public\.health_parameter_definitions/.test(analysisMigration))
   assertTrue(/raw_deleted_at/.test(analysisMigration))
+
+  const dictionaryMigration = await Deno.readTextFile(
+    new URL('../../supabase/migrations/20260801140000_libertymd_parameter_definitions.sql', import.meta.url),
+  )
+  assertTrue(/create table if not exists public\.libertymd_health_parameter_definitions/.test(dictionaryMigration))
+  assertTrue(/references public\.libertymd_health_parameter_definitions\(id\)/.test(dictionaryMigration))
+  assertTrue(/drop constraint if exists libertymd_lab_results_parameter_id_fkey/.test(dictionaryMigration))
+  assertEquals((dictionaryMigration.match(/^  \('/gm) || []).length, 192, 'portable dictionary row count')
+  assertFalse(/(?:insert into|from|references) public\.health_parameter_definitions/i.test(dictionaryMigration), 'portable seed has no shared-table dependency')
+
+  const dictionaryVerification = await Deno.readTextFile(
+    new URL('../../supabase/migrations/20260801141000_libertymd_parameter_dictionary_verify.sql', import.meta.url),
+  )
+  assertTrue(/definition_count <> 192/.test(dictionaryVerification), 'replay verifies complete snapshot')
+  assertTrue(/target_table\.relname = 'libertymd_health_parameter_definitions'/.test(dictionaryVerification))
+  assertTrue(/still depends on the shared parameter dictionary/.test(dictionaryVerification))
 
   const types = await Deno.readTextFile(
     new URL('../../supabase/functions/libertymd-care-proxy/lib/types.ts', import.meta.url),
@@ -304,7 +321,7 @@ Deno.test('P4-07 source · login gate + user-linked standardized rows + zero raw
   const photoAction = await Deno.readTextFile(
     new URL('../../supabase/functions/libertymd-care-proxy/actions/photo-upload.ts', import.meta.url),
   )
-  assertTrue(/upload_photo/.test(photoAction), 'Lane F photo action intact')
+  assertTrue(/handleUploadPhoto/.test(photoAction), 'Lane F photo handler intact')
 
   const care = await Deno.readTextFile(
     new URL('../../docs/libertymd/CARE-ARCHITECTURE.md', import.meta.url),
@@ -312,6 +329,7 @@ Deno.test('P4-07 source · login gate + user-linked standardized rows + zero raw
   assertTrue(/Lab report upload and analysis \(P4-07\)/.test(care))
   assertTrue(/libertymd_lab_uploads/.test(care))
   assertTrue(/libertymd_lab_results/.test(care))
+  assertTrue(/libertymd_health_parameter_definitions/.test(care))
   assertTrue(/raw (?:lab )?report.*never persisted/i.test(care))
   assertTrue(/ai_generated_unreviewed/.test(care))
 

@@ -62,6 +62,7 @@ declare const Deno: {
 const CHAT = new URL('../../components/LibertyMD/LibertyMDChat.tsx', import.meta.url)
 const APP = new URL('../../components/LibertyMD/LibertyMDApp.tsx', import.meta.url)
 const VIEW = new URL('../../components/LibertyMD/LibertyMDReportView.tsx', import.meta.url)
+const REPORT_PAGE = new URL('../../components/LibertyMD/LibertyMDReportPage.tsx', import.meta.url)
 const SAMPLE_SHELL = new URL('../../components/LibertyMD/LibertyMDSampleReport.tsx', import.meta.url)
 const SAMPLE_CATALOG = new URL('../../components/LibertyMD/libertymd-sample-report.ts', import.meta.url)
 const CARD = new URL('../../components/LibertyMD/LibertyMDDiagnosisCard.tsx', import.meta.url)
@@ -1096,6 +1097,38 @@ Deno.test('P2-09 AC2 · no proxy PDF / Storage PHI path; package has jspdf', asy
     new URL('../../supabase/functions/libertymd-care-proxy/index.ts', import.meta.url),
   )
   assertEquals(/pdf_report|generate_pdf|render_pdf/i.test(indexSrc), false, 'no proxy PDF action')
+})
+
+Deno.test('P2-09 async PDF · report paints first, both PDFs prepare client-side, download falls back on demand', async () => {
+  const view = await Deno.readTextFile(VIEW)
+  const preloadStart = view.indexOf('// P2-09 · Prepare both downloads after report_data is available.')
+  const preloadEnd = view.indexOf('const triggerReadyLinkDownload', preloadStart)
+  assertTrue(preloadStart >= 0 && preloadEnd > preloadStart, 'background preparation effect present')
+  const preload = view.slice(preloadStart, preloadEnd)
+
+  assertTrue(preload.includes('window.setTimeout'), 'yields a browser task so report paints first')
+  assertTrue(preload.includes('Promise.all'), 'patient and SOAP prepare together')
+  assertEquals((preload.match(/renderPdfBlob\(/g) || []).length, 2, 'both PDF kinds rendered')
+  assertTrue(preload.includes('URL.createObjectURL'), 'prepared files remain browser-memory URLs')
+  assertEquals(preload.includes('triggerPdfDownload'), false, 'background preparation never auto-downloads')
+  assertTrue(preload.includes('if (isSample)'), 'sample report skips PDF preparation')
+
+  const downloadStart = view.indexOf('const runPdfDownload = async')
+  const downloadEnd = view.indexOf('const onSoapSecondTap', downloadStart)
+  const download = view.slice(downloadStart, downloadEnd)
+  assertTrue(download.includes('preparedPatient') && download.includes('preparedSoap'), 'download reuses prepared files')
+  assertTrue(download.includes('Background preparation can fail'), 'on-demand generation remains fallback')
+  assertTrue(view.includes('data-libertymd-report-pdf-busy'), 'preparing status remains visible')
+  assertTrue(view.includes('data-libertymd-report-pdf-ready-links'), 'ready downloads are surfaced')
+})
+
+Deno.test('P2-09 async PDF · dedicated report page consumes current soft-gate response before preparing files', async () => {
+  const page = await Deno.readTextFile(REPORT_PAGE)
+  assertTrue(page.includes("data?.retention_expires_at"), 'current top-level retention shape consumed')
+  assertTrue(page.includes("'report_data' in reportEnvelope"), 'legacy nested report envelope remains compatible')
+  assertTrue(page.includes('data?.report ?? data?.report_data'), 'current direct report body consumed')
+  assertTrue(page.includes("saved: status === 'completed'"), 'withheld anonymous report remains guest treatment')
+  assertTrue(page.includes('<LibertyMDReportView'), 'ready body reaches shared async PDF report view')
 })
 
 Deno.test('P2-10 AC1/AC2/AC4 · feedback child near saved/guest note; optional comment; not footerSlot', async () => {

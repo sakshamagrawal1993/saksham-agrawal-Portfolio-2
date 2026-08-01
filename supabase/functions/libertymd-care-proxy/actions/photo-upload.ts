@@ -255,6 +255,12 @@ export async function handleRetryPhotoAnalysis(ctx: ProxyContext, payload: Reque
   const expectedPath = buildLibertyMdCarePath(consultation.id, 'photo', objectUuid)
   if (data.path !== expectedPath) return photoReject(PHOTO_UPLOAD_CODES.invalid_payload, 409)
   const row = data as StoredPhotoRow
+  if (row.analysis_attempts >= 20) {
+    return photoReject(PHOTO_UPLOAD_CODES.analysis_failed, 409, {
+      object_uuid: objectUuid,
+      retry_available: false,
+    })
+  }
 
   const { data: stored, error: downloadError } = await ctx.db.storage
     .from(LIBERTYMD_CARE_BUCKET)

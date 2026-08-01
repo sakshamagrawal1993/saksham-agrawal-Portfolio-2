@@ -11,6 +11,7 @@
  *      (Verified zero on 2026-07-30 — this asserts it stays zero.)
  *   2. libertymd-care-proxy imports nothing from ai-care-proxy, and vice versa.
  *   3. The LibertyMD proxy calls only libertymd-* n8n webhooks.
+ *   4. The LibertyMD proxy does not query Health Twin's parameter dictionary.
  *
  * Usage:
  *   node scripts/libertymd-separability-check.mjs            # static checks only
@@ -107,9 +108,16 @@ results.push({
 // have been wired together.
 const proxyFiles = await walk(path.join(root, 'supabase', 'functions', 'libertymd-care-proxy'))
 const foreignWebhooks = []
+const sharedDictionaryReferences = []
 const webhookVars = new Set()
 for (const file of proxyFiles) {
   const src = await fs.readFile(file, 'utf8')
+  if (/\.from\(\s*['"]health_parameter_definitions['"]\s*\)/.test(src)) {
+    sharedDictionaryReferences.push({
+      file: path.relative(root, file),
+      table: 'health_parameter_definitions',
+    })
+  }
   for (const m of src.matchAll(/Deno\.env\.get\(\s*['"]([A-Z0-9_]+)['"]\s*\)/g)) {
     const name = m[1]
     if (!/WEBHOOK/.test(name)) continue
@@ -139,8 +147,17 @@ results.push({
   found: foreignWebhooks,
 })
 
+if (sharedDictionaryReferences.length) {
+  failures.push(`LibertyMD proxy queries the shared Health Twin parameter table: ${JSON.stringify(sharedDictionaryReferences)}`)
+}
+results.push({
+  check: 'no_shared_parameter_dictionary',
+  status: sharedDictionaryReferences.length === 0 ? 'PASS' : 'FAIL',
+  found: sharedDictionaryReferences,
+})
 
-// --------------------------------------- check 4: LibertyMD UI does not import AICare / components/ui
+
+// --------------------------------------- check 5: LibertyMD UI does not import AICare / components/ui
 const libertyUiFiles = await walk(path.join(root, 'components', 'LibertyMD'))
 const uiCoupling = []
 for (const file of libertyUiFiles) {

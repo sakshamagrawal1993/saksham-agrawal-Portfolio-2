@@ -6,12 +6,13 @@
  * LibertyMD tokens only. Never writes clinical tables / Storage directly.
  */
 import { useRef } from 'react';
-import { Camera, FileText, Loader2, X } from 'lucide-react';
+import { Camera, FileText, Loader2, RotateCw, X } from 'lucide-react';
 import { useI18n } from '../../i18n';
 
 export interface LibertyMDPhotoChip {
   object_uuid: string;
   content_type: string;
+  analysis_status?: 'ready' | 'retry';
 }
 
 export interface LibertyMDLabChip {
@@ -37,6 +38,8 @@ export interface LibertyMDAttachControlsProps {
   onLabSignInRequired?: () => void;
   onDismissNotice?: () => void;
   onRemoveChip?: (objectUuid: string) => void;
+  onRetryChip?: (objectUuid: string) => void;
+  retryingObjectUuid?: string | null;
   onRemoveLabChip?: (objectUuid: string) => void;
 }
 
@@ -55,6 +58,8 @@ export function LibertyMDAttachControls({
   onLabSignInRequired,
   onDismissNotice,
   onRemoveChip,
+  onRetryChip,
+  retryingObjectUuid = null,
   onRemoveLabChip,
 }: LibertyMDAttachControlsProps) {
   const { t } = useI18n();
@@ -78,6 +83,21 @@ export function LibertyMDAttachControls({
             >
               <Camera className="h-3.5 w-3.5 text-libertymd-blue-600" aria-hidden="true" />
               <span>{t('chatx.photoChip')}</span>
+              {chip.analysis_status === 'retry' && onRetryChip && (
+                <button
+                  type="button"
+                  onClick={() => onRetryChip(chip.object_uuid)}
+                  disabled={retryingObjectUuid === chip.object_uuid}
+                  className="inline-flex min-h-7 items-center gap-1 rounded-full px-2 font-semibold text-libertymd-blue-700 hover:bg-white disabled:opacity-60"
+                >
+                  {retryingObjectUuid === chip.object_uuid ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <RotateCw className="h-3.5 w-3.5" aria-hidden="true" />
+                  )}
+                  {t('chatx.photoRetry')}
+                </button>
+              )}
               {onRemoveChip && (
                 <button
                   type="button"

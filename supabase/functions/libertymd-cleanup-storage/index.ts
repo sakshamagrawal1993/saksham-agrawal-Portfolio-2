@@ -13,7 +13,7 @@ const MEDIA_MAX_AGE_DAYS = Number(Deno.env.get('LIBERTYMD_MEDIA_MAX_AGE_DAYS') |
  * Schedule (runbook): same UTC family as P1-23 — prefer 0 7 * * * or +5m
  * (0 5 7 * * *). Do not enable destructive prod purge until dry-run counts recorded.
  */
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import {
   LIBERTYMD_CARE_BUCKET,
   assertCleanupBucket,
@@ -21,6 +21,7 @@ import {
 } from './path.ts'
 
 const REMOVE_BATCH = 100
+type CleanupDb = SupabaseClient<any, 'public', any>
 
 type OrphanRow = {
   object_path: string
@@ -40,7 +41,7 @@ function authorize(req: Request, serviceRoleKey: string): boolean {
 }
 
 async function listOrphanPaths(
-  db: ReturnType<typeof createClient>,
+  db: CleanupDb,
 ): Promise<string[]> {
   const { data, error } = await db.rpc('list_libertymd_care_storage_orphans')
   if (error) {
@@ -68,7 +69,7 @@ async function listOrphanPaths(
  * deleted at all.
  */
 async function listExpiredPaths(
-  db: ReturnType<typeof createClient>,
+  db: CleanupDb,
   maxAgeDays: number,
 ): Promise<string[]> {
   // Cast: the generated Database types predate this function, and regenerating
@@ -89,7 +90,7 @@ async function listExpiredPaths(
 }
 
 async function removePaths(
-  db: ReturnType<typeof createClient>,
+  db: CleanupDb,
   paths: string[],
 ): Promise<number> {
   assertCleanupBucket(LIBERTYMD_CARE_BUCKET)
@@ -99,6 +100,18 @@ async function removePaths(
     const { data, error } = await db.storage.from(LIBERTYMD_CARE_BUCKET).remove(batch)
     if (error) {
       throw new Error(`storage.remove failed: ${error.message}`)
+    }
+    const removedAt = new Date().toISOString()
+    const { error: bookkeepingError } = await db
+      .from('libertymd_photo_analyses')
+      .update({
+        path: null,
+        raw_deleted_at: removedAt,
+        updated_at: removedAt,
+      })
+      .in('path', batch)
+    if (bookkeepingError) {
+      throw new Error(`photo cleanup bookkeeping failed: ${bookkeepingError.message}`)
     }
     deleted += Array.isArray(data) ? data.length : batch.length
   }

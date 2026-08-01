@@ -85,7 +85,7 @@ export async function handleUploadLab(ctx: ProxyContext, payload: RequestPayload
   if (!validated.ok) return labReject(validated.code)
 
   const { data: definitionRows, error: definitionError } = await ctx.db
-    .from('health_parameter_definitions')
+    .from('libertymd_health_parameter_definitions')
     .select('id,name,unit')
     .eq('category', 'Lab Report Parameter')
     .order('name', { ascending: true })

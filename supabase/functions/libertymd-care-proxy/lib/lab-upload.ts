@@ -70,7 +70,8 @@ export const LAB_IDENTIFIER_BAN_KEYS = [
 /**
  * Synthetic taxonomy stub map (Eng Done Q3A).
  * Keys are lowercased analyte labels from a stub extract; values are
- * `health_parameter_definitions.id` seeds (SELECT reuse — no parallel dictionary).
+ * `libertymd_health_parameter_definitions.id` seeds. LibertyMD owns this
+ * dictionary so its lab workflow can move to a separate repository/database.
  */
 export const LAB_TAXONOMY_STUB_MAP: Record<string, string> = {
   hba1c: 'HbA1c Bld-mCnc',

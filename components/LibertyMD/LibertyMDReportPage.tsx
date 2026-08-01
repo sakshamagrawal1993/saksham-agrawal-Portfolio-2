@@ -70,8 +70,20 @@ export default function LibertyMDReportPage() {
 
     const consultation = (data?.consultation ?? {}) as Record<string, unknown>
     const status = String(consultation.status || '')
-    const rawReport = data?.report?.report_data ?? data?.report_data ?? null
-    const retentionExpiresAt = (data?.report?.retention_expires_at ?? null) as string | null
+    // Current get_consultation returns report_data directly as `report` and
+    // retention metadata at the top level. Keep the nested reads for older
+    // deployed proxy responses during rollout, but do not require that envelope.
+    const reportEnvelope = data?.report && typeof data.report === 'object' && !Array.isArray(data.report)
+      ? data.report as Record<string, unknown>
+      : null
+    const rawReport = reportEnvelope && 'report_data' in reportEnvelope
+      ? reportEnvelope.report_data
+      : data?.report ?? data?.report_data ?? null
+    const retentionExpiresAt = (
+      data?.retention_expires_at
+      ?? reportEnvelope?.retention_expires_at
+      ?? null
+    ) as string | null
 
     // Retention wins over content: an expired guest report must not render even
     // if the body is still sitting in the row.
@@ -84,7 +96,10 @@ export default function LibertyMDReportPage() {
       setState({
         kind: 'ready',
         report: normalizeReportData(rawReport),
-        saved: !data?.is_anonymous,
+        // Linked and guest-released reports settle at completed. The withheld
+        // anonymous soft-gate remains report_pending_auth and must retain guest
+        // treatment even though get_consultation has no top-level is_anonymous.
+        saved: status === 'completed',
         retentionExpiresAt,
       })
       return 'settled'
