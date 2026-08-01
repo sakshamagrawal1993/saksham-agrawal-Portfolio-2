@@ -15,13 +15,14 @@ import {
   DIAGNOSIS_WEBHOOK,
   GUARDRAIL_WEBHOOK,
   INTERVIEW_WEBHOOK,
+  DIFFERENTIAL_WEBHOOK,
   N8N_BREAKER,
   N8N_TIMEOUT_MS,
   WEBHOOK_SECRET,
 } from './config.ts'
 import { calculateMissingSlots, CORE_SLOTS, sanitizeSlotUpdates } from './slots.ts'
 import { cleanMessage, limitConsultationMessage } from './utils.ts'
-import type { ConsultationRow, InterviewResult, JsonObject } from './types.ts'
+import type { ConsultationRow, DifferentialResult, InterviewResult, JsonObject } from './types.ts'
 import type { ResponseRelevance } from '../clinical-policy.ts'
 
 export function n8nHeaders(correlationId?: string) {
@@ -154,7 +155,7 @@ function logN8nCall(fields: {
  * the breaker's job is to stop *this* isolate from hammering a dead stage, not
  * to be a globally consistent distributed breaker.
  */
-export type N8nStage = 'guardrail' | 'interview' | 'diagnosis'
+export type N8nStage = 'guardrail' | 'interview' | 'diagnosis' | 'differential'
 
 export type N8nBreakerState = 'closed' | 'open' | 'half_open'
 
@@ -193,6 +194,9 @@ const BREAKERS: Record<N8nStage, BreakerRecord> = {
   guardrail: { state: 'closed', failures: [], openedAt: 0, probeInFlight: false, trips: 0 },
   interview: { state: 'closed', failures: [], openedAt: 0, probeInFlight: false, trips: 0 },
   diagnosis: { state: 'closed', failures: [], openedAt: 0, probeInFlight: false, trips: 0 },
+  // P5-DDX — its own breaker so a differential outage cannot open the guardrail
+  // or interview stages. The differential is optional; those two are not.
+  differential: { state: 'closed', failures: [], openedAt: 0, probeInFlight: false, trips: 0 },
 }
 
 /** Stage of a webhook URL. Unknown URLs are not breaker-managed (fail open). */
@@ -200,6 +204,7 @@ export function n8nStageForUrl(url: string): N8nStage | null {
   if (url === GUARDRAIL_WEBHOOK) return 'guardrail'
   if (url === INTERVIEW_WEBHOOK) return 'interview'
   if (url === DIAGNOSIS_WEBHOOK) return 'diagnosis'
+  if (url === DIFFERENTIAL_WEBHOOK) return 'differential'
   return null
 }
 
@@ -681,3 +686,84 @@ export async function runDiagnosis(
 }
 
 export type DiagnosisResult = Awaited<ReturnType<typeof runDiagnosis>>
+
+/**
+ * P5-DDX — the async mini-differential.
+ *
+ * Called detached from the turn, so nothing here may throw into the request
+ * path and nothing here may block a response. Failure returns `null` and the
+ * caller leaves the previously stored differential in place: a missed run costs
+ * one turn of freshness, never a turn of the patient's time.
+ *
+ * `computed_at_turn` is taken from the workflow's echo of the request, not from
+ * anything the model wrote, because the proxy's ordering guard depends on it.
+ */
+export async function runDifferential(
+  history: unknown[],
+  patient: JsonObject,
+  slots: JsonObject,
+  turnCount: number,
+  language: string,
+  priorDifferential: JsonObject | null,
+  correlationId?: string | null,
+): Promise<DifferentialResult | null> {
+  try {
+    const raw = normalizeObject(await postJson(
+      DIFFERENTIAL_WEBHOOK,
+      {
+        history,
+        patient,
+        filled_slots: slots,
+        turn_count: turnCount,
+        language,
+        prior_differential: priorDifferential,
+      },
+      N8N_TIMEOUT_MS.differential,
+      'differential',
+      { correlationId: correlationId || undefined },
+    ))
+
+    const entries = Array.isArray(raw.entries)
+      ? (raw.entries as unknown[])
+        .map((item) => {
+          const row = (item || {}) as Record<string, unknown>
+          return {
+            condition: cleanMessage(row.condition),
+            confidence: parseConfidence(row.confidence),
+            supporting: Array.isArray(row.supporting) ? row.supporting.map(String).slice(0, 5) : [],
+            refuting: Array.isArray(row.refuting) ? row.refuting.map(String).slice(0, 5) : [],
+            discriminator: cleanMessage(row.discriminator),
+          }
+        })
+        .filter((entry) => entry.condition)
+        .slice(0, 3)
+      : []
+
+    if (entries.length === 0) return null
+
+    // Belt to the workflow's braces: the stop rule reads top_confidence, so it
+    // is re-clamped here rather than trusted across a network boundary.
+    const topConfidence = Math.min(parseConfidence(raw.top_confidence), entries[0].confidence)
+
+    return {
+      entries,
+      top_confidence: topConfidence,
+      discriminator: cleanMessage(raw.discriminator) || entries[0].discriminator,
+      red_flags_outstanding: Array.isArray(raw.red_flags_outstanding)
+        ? raw.red_flags_outstanding.map(String).map((flag) => flag.trim()).filter(Boolean).slice(0, 6)
+        : [],
+      delta_reason: cleanMessage(raw.delta_reason),
+      computed_at_turn: Number.isInteger(Number(raw.computed_at_turn))
+        ? Number(raw.computed_at_turn)
+        : turnCount,
+    }
+  } catch (error) {
+    // Soft by contract. A differential outage must never surface to the patient
+    // and must never fail the turn that scheduled it.
+    console.warn('LibertyMD differential unavailable', {
+      class: error instanceof Error ? error.name : 'unknown',
+      stage: 'differential',
+    })
+    return null
+  }
+}

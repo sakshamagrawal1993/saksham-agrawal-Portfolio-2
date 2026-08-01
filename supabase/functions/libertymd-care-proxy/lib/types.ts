@@ -407,10 +407,29 @@ export interface GuardrailResult {
   emergency_copy?: EmergencyCopyWire
 }
 
-/** One entry of the interview agent's running differential (machine-read, EN). */
+/** One entry of the mini-differential (machine-read, English by contract). */
 export interface WorkingDifferentialEntry {
   condition: string
   confidence: number
+  supporting?: string[]
+  refuting?: string[]
+  discriminator?: string
+}
+
+/**
+ * P5-DDX — one async mini-differential run.
+ *
+ * `computed_at_turn` is the ordering key: the proxy accepts a write only when it
+ * exceeds the stored value, so a slow early run landing late cannot regress the
+ * differential to an older view of the case.
+ */
+export interface DifferentialResult {
+  entries: WorkingDifferentialEntry[]
+  top_confidence: number
+  discriminator: string
+  red_flags_outstanding: string[]
+  delta_reason: string
+  computed_at_turn: number
 }
 
 export interface InterviewResult {

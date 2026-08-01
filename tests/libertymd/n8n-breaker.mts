@@ -15,6 +15,7 @@ import './shadow-llm.mts'
 import {
   GUARDRAIL_TIMEOUT_FLOOR_MS,
   GUARDRAIL_WEBHOOK,
+  DIFFERENTIAL_WEBHOOK,
   INTERVIEW_WEBHOOK,
   N8N_BREAKER,
   N8N_TIMEOUT_MS,
@@ -220,7 +221,10 @@ Deno.test('P0-11 AC4: breaker state is observable and carries no PHI', async () 
   resetN8nBreakers()
   await failStage(INTERVIEW_WEBHOOK, N8N_BREAKER.failureThreshold)
   const snapshot = n8nBreakerSnapshot()
-  assertEquals(snapshot.length, 3, 'all three stages must be reported')
+  // P5-DDX added a fourth stage: `differential`. Its own breaker matters —
+  // a differential outage must not open the guardrail or interview stages,
+  // which is asserted separately below.
+  assertEquals(snapshot.length, 4, 'all four stages must be reported')
   const keys = Object.keys(snapshot[0]).sort().join(',')
   assertEquals(
     keys,
@@ -732,4 +736,17 @@ Deno.test('P0-07 D1: holding / failure JSON may echo client_message_id without b
   assertTrue(withEcho !== null, 'holding still recognized with client_message_id echo')
   assertEquals(withEcho!.severity, 'technical')
   assertEquals(withEcho!.holding, true)
+})
+
+Deno.test('P5-DDX: a differential outage does not open guardrail or interview', async () => {
+  // The differential is optional; the guardrail and interview are not. Its
+  // breaker is separate precisely so a flaky optional stage can never degrade
+  // the two stages a consult cannot proceed without.
+  resetN8nBreakers()
+  await failStage(DIFFERENTIAL_WEBHOOK, N8N_BREAKER.failureThreshold)
+  const snapshot = n8nBreakerSnapshot()
+  const byStage = Object.fromEntries(snapshot.map((row) => [row.stage, row.state]))
+  assertEquals(byStage.differential, 'open', 'differential breaker opens on its own failures')
+  assertEquals(byStage.guardrail, 'closed', 'guardrail unaffected')
+  assertEquals(byStage.interview, 'closed', 'interview unaffected')
 })

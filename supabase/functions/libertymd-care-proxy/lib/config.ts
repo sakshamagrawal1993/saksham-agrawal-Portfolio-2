@@ -70,6 +70,8 @@ function envBool(name: string, fallback = false): boolean {
 export const GUARDRAIL_WEBHOOK = envOr(`${N8N_BASE}/libertymd-guardrail`, () => Deno.env.get('LIBERTYMD_GUARDRAIL_WEBHOOK'))
 export const INTERVIEW_WEBHOOK = envOr(`${N8N_BASE}/libertymd-interview`, () => Deno.env.get('LIBERTYMD_INTERVIEW_WEBHOOK'))
 export const DIAGNOSIS_WEBHOOK = envOr(`${N8N_BASE}/libertymd-diagnosis`, () => Deno.env.get('LIBERTYMD_DIAGNOSIS_WEBHOOK'))
+/** P5-DDX — async mini-differential. Off the critical path; never blocks a turn. */
+export const DIFFERENTIAL_WEBHOOK = envOr(`${N8N_BASE}/libertymd-differential`, () => Deno.env.get('LIBERTYMD_DIFFERENTIAL_WEBHOOK'))
 export const WEBHOOK_SECRET = envOr('', () => Deno.env.get('LIBERTYMD_N8N_WEBHOOK_SECRET'))
 
 export const CONSENT_VERSION = 'libertymd-ai-care-v1'
@@ -130,6 +132,9 @@ export const N8N_TIMEOUT_MS = {
   guardrail: envInt('LIBERTYMD_N8N_TIMEOUT_GUARDRAIL_MS', 10_000, GUARDRAIL_TIMEOUT_FLOOR_MS, 60_000),
   interview: envInt('LIBERTYMD_N8N_TIMEOUT_INTERVIEW_MS', 25_000, 1_000, 60_000),
   diagnosis: envInt('LIBERTYMD_N8N_TIMEOUT_DIAGNOSIS_MS', 55_000, 1_000, 60_000),
+  // P5-DDX — detached, so a slow run costs nothing user-visible. Bounded anyway
+  // so a hung request cannot pin an isolate open behind the response.
+  differential: envInt('LIBERTYMD_N8N_TIMEOUT_DIFFERENTIAL_MS', 20_000, 1_000, 60_000),
 } as const
 
 /**
@@ -216,6 +221,36 @@ export function getDiagnosisTurnFloor(): number {
 
 export function getDiagnosisEvidenceFloor(): number {
   return envInt('LIBERTYMD_DIAGNOSIS_EVIDENCE_FLOOR', 50, 1, 100)
+}
+
+/**
+ * P5-DDX — master switch for the async mini-differential.
+ *
+ * Default **off**: with the flag down nothing schedules the differential, the
+ * stop rule falls back to the pre-P5 behaviour, and the columns added by T1 sit
+ * unread. Rollback is this flag, not a revert.
+ */
+export function isAsyncDifferentialEnabled(): boolean {
+  return envBool('LIBERTYMD_ASYNC_DIFFERENTIAL', false)
+}
+
+/** P5-DDX — first turn the differential may run (BO 2026-08-01: 6). */
+export function getDifferentialStartTurn(): number {
+  return envInt('LIBERTYMD_DIFFERENTIAL_START_TURN', 6, 1, MAX_TURNS)
+}
+
+/** P5-DDX — top_confidence needed to stop early (BO 2026-08-01: 75). */
+export function getDifferentialStopConfidence(): number {
+  return envInt('LIBERTYMD_DIFFERENTIAL_STOP_CONFIDENCE', 75, 1, 100)
+}
+
+/**
+ * P5-DDX — how many turns old a differential may be and still steer questions
+ * or satisfy the stop rule. Beyond this the hint is withheld entirely: a
+ * four-turn-old differential aiming questions is worse than none.
+ */
+export function getDifferentialMaxStaleTurns(): number {
+  return envInt('LIBERTYMD_DIFFERENTIAL_MAX_STALE_TURNS', 3, 1, MAX_TURNS)
 }
 
 export function isDiagnosisEvenTurnRequired(): boolean {

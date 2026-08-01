@@ -53,11 +53,18 @@ import {
 import { jsonResponse } from '../lib/errors.ts'
 import { scheduleDetached } from '../lib/mixpanel.ts'
 import {
+  differentialUpdatePatch,
+  readStoredDifferential,
+  shouldAcceptDifferentialWrite,
+  shouldScheduleDifferential,
+} from '../lib/differential.ts'
+import {
   INFERENCE_ALLOWED_STATUSES,
   isInterviewHoldingSource,
   n8nBreakerSnapshot,
   normalizeObject,
   runDiagnosis,
+  runDifferential,
   runInterview,
   type DiagnosisResult,
   type N8nStage,
@@ -922,6 +929,57 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
             class: error instanceof Error ? error.name : 'unknown',
           })
         }
+      })())
+    }
+
+    // P5-DDX T4 — schedule the mini-differential detached. Nothing below this
+    // point may await it: the whole design premise is that the differential
+    // never costs the patient a second. A failure returns null and leaves the
+    // previously stored differential in place.
+    if (shouldScheduleDifferential(turnCount)) {
+      const differentialTurn = turnCount
+      const differentialSlots = slots
+      const differentialHistory = history
+      const differentialPatient = patientPayload(patient)
+      const differentialLanguage = String(consultation.language || 'en')
+      const priorForModel = (() => {
+        const stored = readStoredDifferential(consultation)
+        if (stored.entries.length === 0) return null
+        return { entries: stored.entries, computed_at_turn: stored.computedAtTurn }
+      })()
+      scheduleDetached((async () => {
+        const result = await runDifferential(
+          differentialHistory,
+          differentialPatient,
+          differentialSlots,
+          differentialTurn,
+          differentialLanguage,
+          priorForModel as JsonObject | null,
+          requestId,
+        )
+        if (!result) return
+        // Ordering guard: re-read the row rather than trusting the snapshot this
+        // turn started with, because another detached run may have landed in
+        // between. Accept only a strictly newer view of the case.
+        const { data: fresh } = await db
+          .from('libertymd_consultations')
+          .select('working_differential,differential_top_confidence,differential_red_flags_outstanding,differential_computed_at_turn')
+          .eq('id', consultation.id)
+          .maybeSingle()
+        const stored = readStoredDifferential((fresh || {}) as ConsultationRow)
+        if (!shouldAcceptDifferentialWrite(stored, result)) {
+          console.warn('LibertyMD differential discarded as out of order', {
+            consultation_id: consultation.id,
+            incoming_turn: result.computed_at_turn,
+            stored_turn: stored.computedAtTurn,
+          })
+          return
+        }
+        await db
+          .from('libertymd_consultations')
+          .update(differentialUpdatePatch(result))
+          .eq('id', consultation.id)
+          .eq('user_id', user.id)
       })())
     }
 
