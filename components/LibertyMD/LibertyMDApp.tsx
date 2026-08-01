@@ -218,7 +218,7 @@ const howItWorksSteps = [
   },
 ];
 
-function LibertyMDHowItWorksTabs() {
+function LibertyMDHowItWorksTabs({ onOpenSampleReport }: { onOpenSampleReport?: () => void }) {
   const { t } = useI18n();
   const steps = howItWorksSteps.map((step, i) => ({
     ...step,
@@ -415,6 +415,20 @@ function LibertyMDHowItWorksTabs() {
           <p className="text-xs font-bold uppercase text-libertymd-blue-600">Step {String(activeStep + 1).padStart(2, '0')} · {currentStep.eyebrow}</p>
           <h3 className="mt-4 font-serif text-3xl font-semibold leading-tight text-libertymd-ink sm:text-4xl">{currentStep.title}</h3>
           <p className="mt-5 text-sm leading-7 text-libertymd-slate-muted sm:text-base">{currentStep.description}</p>
+          {/* BO 2026-08-01 — the sample report belongs on the step that talks
+              about the report. Keyed off the step's own icon rather than a
+              hardcoded index so reordering the steps cannot orphan it. */}
+          {currentStep.icon === FileText && onOpenSampleReport && (
+            <button
+              type="button"
+              data-libertymd-sample-report-entry="how-it-works"
+              onClick={onOpenSampleReport}
+              className="mt-6 inline-flex items-center gap-2 rounded-full border border-libertymd-blue-600 bg-white px-5 py-2.5 text-sm font-bold text-libertymd-blue-700 transition hover:bg-libertymd-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-libertymd-blue-600 focus-visible:ring-offset-2"
+            >
+              <FileText className="h-4 w-4" aria-hidden="true" />
+              {t('sampleReport.entry')}
+            </button>
+          )}
         </div>
 
         <div className="order-1 lg:order-2">
@@ -1366,9 +1380,28 @@ export default function LibertyMDApp() {
                 {keywordHeroSubtitle}
               </p>
             ) : null}
-            {/* BO 2026-08-01 — the Free / Anonymous / Built by Doctors trio now
-                renders below the composer (where the chips used to be), so the
-                copy above the logo would be a duplicate. */}
+            {/* Free · Anonymous · Built by Doctors — under the title, as in the
+                original design. The rating / install-base / HIPAA row sits
+                beneath the composer instead (see below). */}
+            <p
+              className="libertymd-hero-tagline mt-2 flex min-h-6 flex-wrap items-center justify-center gap-x-2 text-sm font-bold text-libertymd-navy sm:gap-x-3 sm:text-base"
+              aria-label="Free, Anonymous, Built by Doctors"
+            >
+              {[t('hero.taglineFree'), t('hero.taglineAnonymous'), t('hero.taglineBuiltByDoctors')].map((phrase, index) => (
+                <span
+                  key={phrase}
+                  className="libertymd-tagline-word inline-flex items-center gap-2 sm:gap-3"
+                  style={{ animationDelay: `${220 + index * 120}ms` }}
+                >
+                  {index > 0 && (
+                    <span aria-hidden="true" className="text-libertymd-blue-600">
+                      •
+                    </span>
+                  )}
+                  <span>{phrase}</span>
+                </span>
+              ))}
+            </p>
             {/* BO 2026-08-01: hero time promise removed. The same expectation is
                 still set inside the consult (interview expectations header), so
                 the promise is made where it is actionable rather than on the
@@ -1457,37 +1490,6 @@ export default function LibertyMDApp() {
                   deliberately left intact so keyword landings and historic
                   funnel slices still resolve. */}
 
-              {/* Trust trio, moved below the composer in place of the chips. */}
-              <div
-                className="libertymd-hero-trust-row mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm font-bold text-libertymd-navy sm:mt-4 sm:gap-x-6"
-                data-libertymd-hero-trust-trio=""
-                aria-label="Free, Anonymous, Built by Doctors"
-              >
-                {[t('hero.taglineFree'), t('hero.taglineAnonymous'), t('hero.taglineBuiltByDoctors')].map((phrase, index) => (
-                  <span key={phrase} className="inline-flex items-center gap-x-4 sm:gap-x-6">
-                    {index > 0 && (
-                      <span aria-hidden="true" className="text-libertymd-blue-600">
-                        •
-                      </span>
-                    )}
-                    <span>{phrase}</span>
-                  </span>
-                ))}
-              </div>
-
-              {/* P3-02 — hero-adjacent sample report entry. */}
-              <div className="mt-2 flex justify-center sm:mt-3">
-                <button
-                  type="button"
-                  data-libertymd-sample-report-entry=""
-                  disabled={isTyping}
-                  onClick={() => setIsSampleReportOpen(true)}
-                  className="libertymd-type-body-small font-semibold text-libertymd-blue-700 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-libertymd-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
-                >
-                  {t('sampleReport.entry')}
-                </button>
-              </div>
-
               {/* BO 2026-08-01 — trust row: rating, install base, and HIPAA.
                   Figures are the operating business's, supplied by the BO for
                   this rebuild; they are not derived from this project's
@@ -1515,6 +1517,19 @@ export default function LibertyMDApp() {
                   <span className="hidden sm:inline">{t('app.heroTrustHipaa')}</span>
                 </span>
               </div>
+              {/* P3-02 — hero-adjacent sample report entry. */}
+              <div className="mt-2 flex justify-center sm:mt-3">
+                <button
+                  type="button"
+                  data-libertymd-sample-report-entry=""
+                  disabled={isTyping}
+                  onClick={() => setIsSampleReportOpen(true)}
+                  className="libertymd-type-body-small font-semibold text-libertymd-blue-700 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-libertymd-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
+                >
+                  {t('sampleReport.entry')}
+                </button>
+              </div>
+
               {error && phase === 'initial' && (
                 <p role="alert" className="mt-2 text-center text-xs font-semibold text-amber-800">
                   {error}
@@ -1538,7 +1553,7 @@ export default function LibertyMDApp() {
           </div>
 
           {phase === 'initial' ? (
-            <LibertyMDHowItWorksTabs />
+            <LibertyMDHowItWorksTabs onOpenSampleReport={() => setIsSampleReportOpen(true)} />
           ) : (
             <div className="libertymd-content-shell mx-auto mt-14 max-w-4xl text-center">
               {/*

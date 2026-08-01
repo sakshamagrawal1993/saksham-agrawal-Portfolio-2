@@ -23,7 +23,9 @@ import {
   PHOTO_UPLOAD_SAFE_COPY,
   assertPhotoSignedUrlTtl,
   decodePhotoBase64,
+  encodePhotoBase64,
   normalizePhotoMime,
+  normalizePhotoAnalysis,
   photoAnalysisStub,
   validatePhotoBytes,
 } from '../../supabase/functions/libertymd-care-proxy/lib/photo-upload.ts'
@@ -150,7 +152,27 @@ Deno.test('P4-06 decode · base64 round-trip', () => {
   assertEquals(decoded![0], 0xff)
 })
 
-Deno.test('P4-06 source · no getPublicUrl / FE clinical writers / HT runtime', async () => {
+Deno.test('P4-06 live analysis · canonical observation-only response and raw not retained', () => {
+  const encoded = encodePhotoBase64(minimalJpeg())
+  assertTrue(encoded.length > 0)
+  const result = normalizePhotoAnalysis({
+    usable: true,
+    modality: 'clinical_photo',
+    image_quality: 'good',
+    body_region: 'foot',
+    observations: [
+      { feature: 'surface', description: 'Fine scale and a shallow fissure are visible.' },
+      { feature: 'diagnosis', description: 'Tinea infection' },
+    ],
+    limitations: ['Depth cannot be assessed from a photograph.'],
+  })
+  assertTrue(result !== null)
+  assertEquals(result?.observations.length, 1, 'diagnostic leakage must be removed')
+  assertEquals(result?.analysis_kind, 'observation_only')
+  assertEquals(result?.raw_retained, false)
+})
+
+Deno.test('P4-06 source · agent analysis persists only sanitized output', async () => {
   const action = await Deno.readTextFile(
     new URL('../../supabase/functions/libertymd-care-proxy/actions/photo-upload.ts', import.meta.url),
   )
@@ -163,8 +185,11 @@ Deno.test('P4-06 source · no getPublicUrl / FE clinical writers / HT runtime', 
   // Explicit ban on runtime wiring strings that are not documentary CARE text.
   assertFalse(/functions\/process-lab-report/.test(action))
   assertFalse(/N8N_HEALTH_TWIN_LAB/.test(action))
-  assertTrue(/createSignedUrl/.test(action), 'must issue signed URLs')
-  assertTrue(/PHOTO_SIGNED_URL_TTL_SECONDS/.test(action))
+  assertFalse(/\.storage\s*\./.test(action), 'zero-retention path must not use Storage')
+  assertTrue(/PHOTO_ANALYSIS_WEBHOOK/.test(action), 'must call LibertyMD photo agent')
+  assertTrue(/libertymd_photo_analyses/.test(action), 'must persist analysis attribution')
+  assertTrue(/user_id:\s*ctx\.user\.id/.test(action), 'must derive user_id from JWT')
+  assertTrue(/raw_retained:\s*false/.test(action))
 
   const attach = await Deno.readTextFile(
     new URL('../../components/LibertyMD/LibertyMDAttachControls.tsx', import.meta.url),
@@ -185,8 +210,7 @@ Deno.test('P4-06 source · no getPublicUrl / FE clinical writers / HT runtime', 
   const care = await Deno.readTextFile(
     new URL('../../docs/libertymd/CARE-ARCHITECTURE.md', import.meta.url),
   )
-  assertTrue(/PHOTO_SIGNED_URL_TTL_SECONDS\s*=\s*900/.test(care))
-  assertTrue(/process-lab-report is not a runtime dependency/i.test(care))
-  assertTrue(/Stub only/i.test(care))
+  assertTrue(/raw (?:photo|image).*never persisted/i.test(care))
+  assertTrue(/libertymd_photo_analyses/.test(care))
   assertTrue(/P4-07/.test(care))
 })

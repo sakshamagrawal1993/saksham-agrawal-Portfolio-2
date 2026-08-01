@@ -72,6 +72,9 @@ export const INTERVIEW_WEBHOOK = envOr(`${N8N_BASE}/libertymd-interview`, () => 
 export const DIAGNOSIS_WEBHOOK = envOr(`${N8N_BASE}/libertymd-diagnosis`, () => Deno.env.get('LIBERTYMD_DIAGNOSIS_WEBHOOK'))
 /** P5-DDX — async mini-differential. Off the critical path; never blocks a turn. */
 export const DIFFERENTIAL_WEBHOOK = envOr(`${N8N_BASE}/libertymd-differential`, () => Deno.env.get('LIBERTYMD_DIFFERENTIAL_WEBHOOK'))
+/** Zero-retention media analysis: bytes exist only for this request. */
+export const PHOTO_ANALYSIS_WEBHOOK = envOr(`${N8N_BASE}/libertymd-photo-analysis`, () => Deno.env.get('LIBERTYMD_PHOTO_ANALYSIS_WEBHOOK'))
+export const LAB_ANALYSIS_WEBHOOK = envOr(`${N8N_BASE}/libertymd-lab-analysis`, () => Deno.env.get('LIBERTYMD_LAB_ANALYSIS_WEBHOOK'))
 export const WEBHOOK_SECRET = envOr('', () => Deno.env.get('LIBERTYMD_N8N_WEBHOOK_SECRET'))
 
 export const CONSENT_VERSION = 'libertymd-ai-care-v1'
@@ -135,6 +138,8 @@ export const N8N_TIMEOUT_MS = {
   // P5-DDX — detached, so a slow run costs nothing user-visible. Bounded anyway
   // so a hung request cannot pin an isolate open behind the response.
   differential: envInt('LIBERTYMD_N8N_TIMEOUT_DIFFERENTIAL_MS', 20_000, 1_000, 60_000),
+  photoAnalysis: envInt('LIBERTYMD_N8N_TIMEOUT_PHOTO_ANALYSIS_MS', 90_000, 5_000, 120_000),
+  labAnalysis: envInt('LIBERTYMD_N8N_TIMEOUT_LAB_ANALYSIS_MS', 120_000, 5_000, 120_000),
 } as const
 
 /**

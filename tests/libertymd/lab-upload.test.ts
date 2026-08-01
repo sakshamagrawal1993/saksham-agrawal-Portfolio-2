@@ -26,9 +26,11 @@ import {
   LAB_UPLOAD_SAFE_COPY,
   assertLabSignedUrlTtl,
   decodeLabBase64,
+  encodeLabBase64,
   labAnalysisStub,
   mapLabAnalytesStub,
   normalizeLabMime,
+  normalizeLabAnalysis,
   resolveLabBase64Payload,
   structuredResultsHaveBannedKeys,
   validateLabBytes,
@@ -118,6 +120,39 @@ Deno.test('P4-07 decode · base64 round-trip', () => {
   assertEquals(decoded![0], 0x25)
 })
 
+Deno.test('P4-07 live analysis · validates canonical ids and preserves unmapped rows', () => {
+  assertTrue(encodeLabBase64(new Uint8Array([0x25, 0x50, 0x44, 0x46])).length > 0)
+  const normalized = normalizeLabAnalysis(
+    {
+      usable: true,
+      panel_name: 'CBC',
+      report_date: '',
+      results: [
+        {
+          raw_name: 'Hemoglobin (Hb)', parameter_id: '718-7', parameter_name: 'wrong',
+          value: '12.5', numeric_value: 12.5, raw_unit: 'g/dL', standardized_unit: 'wrong',
+          reference_range: '13.0 - 17.0', printed_flag: 'Low', classification: 'below_range',
+          analysis: 'Below the printed range.',
+        },
+        {
+          raw_name: 'Unknown X', parameter_id: 'invented', parameter_name: 'Invented',
+          value: '1', numeric_value: 1, raw_unit: 'x', standardized_unit: 'x',
+          reference_range: '', printed_flag: '', classification: 'within_range', analysis: '',
+        },
+      ],
+      analysis_summary: { headline: 'One printed low result.', highlights: [], limitations: [] },
+    },
+    [{ id: '718-7', name: 'Hemoglobin Hb', unit: 'g/dL' }],
+  )
+  assertTrue(normalized !== null)
+  assertEquals(normalized?.extracted_count, 2)
+  assertEquals(normalized?.standardized_count, 1)
+  assertEquals(normalized?.unmapped_count, 1)
+  assertEquals(normalized?.results[0]?.parameter_name, 'Hemoglobin Hb')
+  assertEquals(normalized?.results[1]?.parameter_id, null)
+  assertEquals(normalized?.raw_retained, false)
+})
+
 Deno.test('P4-07 redact · OCR-and-drop name/DOB ≠ raw; fail-closed on error', () => {
   const raw =
     'Patient Name: Jane Synthetic\nDOB: 01/02/1990\nMRN: ABC-12345\nHemoglobin 13.2 g/dL'
@@ -200,22 +235,24 @@ Deno.test('P4-07 failure · technical copy + consult continues codes', () => {
   }
 })
 
-Deno.test('P4-07 source · login gate + attribution table + no rebind + no HT + CARE', async () => {
+Deno.test('P4-07 source · login gate + user-linked standardized rows + zero raw retention', async () => {
   const action = await Deno.readTextFile(
     new URL('../../supabase/functions/libertymd-care-proxy/actions/lab-upload.ts', import.meta.url),
   )
   assertTrue(/isAnonymous/.test(action), 'anon login gate')
-  assertTrue(/sign_in_required/.test(action))
+  assertTrue(/new SignInRequiredError\(\)\.code/.test(action))
   assertTrue(/libertymd_lab_uploads/.test(action), 'Q1A attribution insert')
-  assertTrue(/buildLibertyMdCarePath[\s\S]*'lab'/.test(action) || /'lab'/.test(action))
-  assertTrue(/createSignedUrl/.test(action))
+  assertTrue(/libertymd_lab_results/.test(action), 'canonical result rows')
+  assertTrue(/user_id:\s*ctx\.user\.id/.test(action), 'JWT user attribution')
+  assertTrue(/LAB_ANALYSIS_WEBHOOK/.test(action), 'LibertyMD lab agent')
+  assertFalse(/\.storage\s*\./.test(action), 'raw report must not be persisted')
   assertFalse(/\bgetPublicUrl\s*\(/.test(action))
   assertFalse(/functions\/process-lab-report/.test(action))
   assertFalse(/N8N_HEALTH_TWIN_LAB/.test(action))
   assertFalse(/\.update\(\s*\{[^}]*patient_id/.test(action), 'must not rebind consult patient_id')
   assertTrue(/patient_snapshot/.test(action), 'Q2A snapshot unchanged assert present')
   assertTrue(/consult_continues:\s*true/.test(action))
-  assertTrue(/model_egress:\s*false/.test(action))
+  assertTrue(/raw_retained:\s*false/.test(action))
 
   const migration = await Deno.readTextFile(
     new URL('../../supabase/migrations/20260801000000_libertymd_lab_upload_p4_07.sql', import.meta.url),
@@ -228,6 +265,14 @@ Deno.test('P4-07 source · login gate + attribution table + no rebind + no HT + 
   }
   assertFalse(/create table if not exists public\.health_parameter_/i.test(migration), 'no parallel taxonomy')
   assertTrue(/application\/pdf/.test(migration), 'bucket MIME includes PDF')
+
+  const analysisMigration = await Deno.readTextFile(
+    new URL('../../supabase/migrations/20260801120000_libertymd_media_analysis.sql', import.meta.url),
+  )
+  assertTrue(/libertymd_lab_results/.test(analysisMigration))
+  assertTrue(/user_id uuid not null references auth\.users/.test(analysisMigration))
+  assertTrue(/parameter_id text not null references public\.health_parameter_definitions/.test(analysisMigration))
+  assertTrue(/raw_deleted_at/.test(analysisMigration))
 
   const types = await Deno.readTextFile(
     new URL('../../supabase/functions/libertymd-care-proxy/lib/types.ts', import.meta.url),
@@ -264,13 +309,11 @@ Deno.test('P4-07 source · login gate + attribution table + no rebind + no HT + 
   const care = await Deno.readTextFile(
     new URL('../../docs/libertymd/CARE-ARCHITECTURE.md', import.meta.url),
   )
-  assertTrue(/Lab report upload \(P4-07\)/.test(care))
+  assertTrue(/Lab report upload and analysis \(P4-07\)/.test(care))
   assertTrue(/libertymd_lab_uploads/.test(care))
-  assertTrue(/LAB_SIGNED_URL_TTL_SECONDS\s*=\s*900/.test(care))
-  assertTrue(/no model egress/i.test(care) || /model_egress:\s*false/.test(care))
-  assertTrue(/unreviewed|pending clinical review/i.test(care))
-  assertTrue(/operator-controlled|egress risk/i.test(care))
-  assertFalse(/zero retention/i.test(care) && /lab/i.test(care) && /claim/i.test(care))
+  assertTrue(/libertymd_lab_results/.test(care))
+  assertTrue(/raw (?:lab )?report.*never persisted/i.test(care))
+  assertTrue(/ai_generated_unreviewed/.test(care))
 
   const telemetry = await Deno.readTextFile(
     new URL('../../supabase/functions/libertymd-care-proxy/lib/telemetry.ts', import.meta.url),

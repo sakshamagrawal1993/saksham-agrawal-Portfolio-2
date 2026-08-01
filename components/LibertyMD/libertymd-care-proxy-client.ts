@@ -570,7 +570,7 @@ export function isRecordCareInterestActionMissing(
 }
 
 // ---------------------------------------------------------------------------
-// P4-06 — photo upload (proxy sole writer; Storage path SoT)
+// P4-06 — photo upload (proxy sole writer; analysis SoT, zero raw retention)
 // ---------------------------------------------------------------------------
 
 export const UPLOAD_PHOTO_ACTION = 'upload_photo' as const;
@@ -590,12 +590,18 @@ export interface UploadPhotoRequestBody {
 export interface UploadPhotoSuccess {
   ok: true;
   consultation_id: string;
-  path: string;
+  path: null;
   object_uuid: string;
   content_type: string;
-  signed_url: string;
-  expires_in: number;
-  analysis?: { status: string; analyzed?: boolean };
+  signed_url: null;
+  expires_in: 0;
+  raw_retained: false;
+  analysis?: {
+    usable: boolean;
+    modality: 'clinical_photo' | 'radiograph' | 'other';
+    observations: Array<{ feature: string; description: string }>;
+    limitations: string[];
+  };
   consult_continues?: boolean;
 }
 
@@ -662,7 +668,7 @@ export function isPhotoUploadTechnicalFailure(
 }
 
 // ---------------------------------------------------------------------------
-// P4-07 — lab upload (proxy sole writer; attribution table SoT; linked-only)
+// P4-07 — lab upload (proxy sole writer; standardized rows SoT; linked-only)
 // ---------------------------------------------------------------------------
 
 export const UPLOAD_LAB_ACTION = 'upload_lab' as const;
@@ -689,20 +695,25 @@ export interface UploadLabRequestBody {
 export interface UploadLabSuccess {
   ok: true;
   consultation_id: string;
-  path: string;
+  path: null;
   object_uuid: string;
   patient_id: string;
   content_type: string;
-  signed_url: string;
-  expires_in: number;
+  signed_url: null;
+  expires_in: 0;
+  raw_retained: false;
   analysis?: {
-    status: string;
-    analyzed?: boolean;
-    model_egress?: boolean;
-    review_state?: string;
+    usable: boolean;
+    extracted_count: number;
+    standardized_count: number;
+    unmapped_count: number;
+    review_state: string;
   };
   structured_results?: {
     review_state?: string;
+    extracted_count?: number;
+    standardized_count?: number;
+    unmapped_count?: number;
     analytes?: unknown[];
   };
   consult_continues?: boolean;

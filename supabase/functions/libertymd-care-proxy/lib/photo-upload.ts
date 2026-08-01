@@ -16,6 +16,8 @@ export const PHOTO_UPLOAD_CODES = {
   decode_failed: 'decode_failed',
   storage_failed: 'storage_failed',
   sign_failed: 'sign_failed',
+  analysis_failed: 'analysis_failed',
+  persistence_failed: 'persistence_failed',
 } as const
 
 export type PhotoUploadRejectCode = (typeof PHOTO_UPLOAD_CODES)[keyof typeof PHOTO_UPLOAD_CODES]
@@ -29,6 +31,8 @@ export const PHOTO_UPLOAD_SAFE_COPY: Record<PhotoUploadRejectCode, string> = {
   decode_failed: 'We could not read that photo. Please try another image.',
   storage_failed: 'Something went wrong on our side while saving the photo. Your consultation can continue.',
   sign_failed: 'Something went wrong on our side while saving the photo. Your consultation can continue.',
+  analysis_failed: 'We could not analyze that image just now. Your consultation can continue.',
+  persistence_failed: 'We analyzed the image but could not save the analysis. Your consultation can continue.',
 }
 
 export function normalizePhotoMime(raw: unknown): PhotoAllowedMime | null {
@@ -69,6 +73,71 @@ export function decodePhotoBase64(raw: unknown): Uint8Array | null {
     return out
   } catch {
     return null
+  }
+}
+
+/** Re-encode server-sanitized bytes for one ephemeral n8n request. */
+export function encodePhotoBase64(bytes: Uint8Array): string {
+  let binary = ''
+  const chunk = 0x8000
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk))
+  }
+  return btoa(binary)
+}
+
+export interface PhotoAnalysisResult {
+  usable: boolean
+  unusable_reason: string
+  modality: 'clinical_photo' | 'radiograph' | 'other'
+  image_quality: 'good' | 'fair' | 'poor'
+  body_region: string
+  observations: Array<{ feature: string; description: string }>
+  limitations: string[]
+  analysis_kind: 'observation_only'
+  raw_retained: false
+}
+
+/** Treat the workflow response as untrusted and keep diagnosis terms out. */
+export function normalizePhotoAnalysis(raw: unknown): PhotoAnalysisResult | null {
+  const source = raw && typeof raw === 'object' && !Array.isArray(raw)
+    ? raw as Record<string, unknown>
+    : null
+  if (!source) return null
+  const text = (value: unknown, max: number) => String(value ?? '').trim().slice(0, max)
+  const diagnosisWords = /\b(eczema|psoriasis|ringworm|tinea|cellulitis|shingles|herpes|impetigo|scabies|melanoma|carcinoma|covid|pneumonia|diagnos(?:is|tic)|infection)\b/i
+  const observations = (Array.isArray(source.observations) ? source.observations : [])
+    .map((item) => {
+      const row = item && typeof item === 'object' ? item as Record<string, unknown> : {}
+      return { feature: text(row.feature, 60), description: text(row.description, 300) }
+    })
+    .filter((row) => row.feature && row.description)
+    .filter((row) => !diagnosisWords.test(row.feature) && !diagnosisWords.test(row.description))
+    .slice(0, 10)
+  const modality = ['clinical_photo', 'radiograph', 'other'].includes(String(source.modality))
+    ? source.modality as PhotoAnalysisResult['modality']
+    : 'other'
+  const imageQuality = ['good', 'fair', 'poor'].includes(String(source.image_quality))
+    ? source.image_quality as PhotoAnalysisResult['image_quality']
+    : 'fair'
+  const limitations = (Array.isArray(source.limitations) ? source.limitations : [])
+    .map((item) => text(item, 240))
+    .filter(Boolean)
+    .slice(0, 6)
+  if (modality === 'radiograph' && !limitations.some((item) => /radiolog/i.test(item))) {
+    limitations.push('Diagnostic interpretation requires a qualified radiologist.')
+  }
+  const usable = source.usable !== false && observations.length > 0
+  return {
+    usable,
+    unusable_reason: usable ? '' : text(source.unusable_reason, 200) || 'Image could not be assessed.',
+    modality,
+    image_quality: imageQuality,
+    body_region: text(source.body_region, 80),
+    observations,
+    limitations,
+    analysis_kind: 'observation_only',
+    raw_retained: false,
   }
 }
 

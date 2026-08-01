@@ -1,28 +1,22 @@
 /**
- * P4-06 — `upload_photo`
+ * `upload_photo` — zero-retention image analysis.
  *
- * Anonymous-safe photo ingest for a JWT-owned consult:
- *   validate MIME/size → server EXIF strip → service_role put to libertymd-care
- *   path `{consultation_id}/photo/{object_uuid}` → short-TTL (900s) signed read URL.
- *
- * Durable SoT = Storage path only (no attachments table).
- * Analysis = stub (no live vision / no HT lab-OCR edge / no n8n photo bytes).
- * Never issue public URLs. Never log filenames / paths / EXIF in telemetry.
+ * Validated bytes are EXIF-stripped, sent to the LibertyMD n8n agent for this
+ * request, and then fall out of scope. No Storage object or signed URL exists.
+ * Only the observation-only analysis is stored against the JWT user and the
+ * consultation's patient.
  */
-import {
-  LIBERTYMD_CARE_BUCKET,
-  buildLibertyMdCarePath,
-} from '../../_shared/libertymd-care-path.ts'
 import { getOwnedConsultation } from '../lib/consultations.ts'
+import { N8N_TIMEOUT_MS, PHOTO_ANALYSIS_WEBHOOK } from '../lib/config.ts'
 import { jsonResponse } from '../lib/errors.ts'
 import { hasLocationExif, stripImageExif } from '../lib/exif-strip.ts'
+import { normalizeObject, postJson } from '../lib/n8n-client.ts'
 import {
-  PHOTO_SIGNED_URL_TTL_SECONDS,
   PHOTO_UPLOAD_CODES,
   PHOTO_UPLOAD_SAFE_COPY,
-  assertPhotoSignedUrlTtl,
   decodePhotoBase64,
-  photoAnalysisStub,
+  encodePhotoBase64,
+  normalizePhotoAnalysis,
   validatePhotoBytes,
 } from '../lib/photo-upload.ts'
 import type { ProxyContext } from '../lib/context.ts'
@@ -47,15 +41,10 @@ function extensionForMime(mime: string): string {
 }
 
 export async function handleUploadPhoto(ctx: ProxyContext, payload: RequestPayload) {
-  assertPhotoSignedUrlTtl(PHOTO_SIGNED_URL_TTL_SECONDS)
+  if (!payload.consultation_id) return photoReject(PHOTO_UPLOAD_CODES.missing_consultation)
 
-  if (!payload.consultation_id) {
-    return photoReject(PHOTO_UPLOAD_CODES.missing_consultation)
-  }
-
-  // JWT ownership — never trust client user id (CONTEXT §3).
+  // User attribution is derived from the verified JWT; no client user_id exists.
   const consultation = await getOwnedConsultation(ctx, payload.consultation_id)
-
   const bytes = decodePhotoBase64(payload.image_base64)
   if (!bytes) return photoReject(PHOTO_UPLOAD_CODES.decode_failed)
 
@@ -63,63 +52,60 @@ export async function handleUploadPhoto(ctx: ProxyContext, payload: RequestPaylo
   if (!validated.ok) return photoReject(validated.code)
 
   const stripped = stripImageExif(bytes, validated.mime)
-  if (hasLocationExif(stripped)) {
-    // Fail closed rather than store GPS — technical, consult continues.
-    console.warn('LibertyMD photo ingest refused residual location metadata', {
-      outcome: 'reject',
-      reject_reason: 'exif_residual',
-      size_bucket: stripped.byteLength > 1024 * 1024 ? 'gt_1mb' : 'lte_1mb',
+  if (hasLocationExif(stripped)) return photoReject(PHOTO_UPLOAD_CODES.invalid_payload)
+
+  let analysis
+  try {
+    const workflowRaw = normalizeObject(await postJson(
+      PHOTO_ANALYSIS_WEBHOOK,
+      {
+        content_type: validated.mime,
+        image_base64: encodePhotoBase64(stripped),
+        chief_complaint: consultation.chief_complaint || '',
+      },
+      N8N_TIMEOUT_MS.photoAnalysis,
+      null,
+    ))
+    analysis = normalizePhotoAnalysis(workflowRaw)
+  } catch (error) {
+    console.warn('LibertyMD photo analysis unavailable', {
+      outcome: 'analysis_failed',
+      class: error instanceof Error ? error.name : 'unknown',
     })
-    return photoReject(PHOTO_UPLOAD_CODES.invalid_payload)
+    return photoReject(PHOTO_UPLOAD_CODES.analysis_failed, 502)
   }
+  if (!analysis) return photoReject(PHOTO_UPLOAD_CODES.analysis_failed, 502)
 
   const objectUuid = crypto.randomUUID()
-  const path = buildLibertyMdCarePath(consultation.id, 'photo', objectUuid)
-  const contentType = validated.mime
-
-  const { error: uploadError } = await ctx.db.storage
-    .from(LIBERTYMD_CARE_BUCKET)
-    .upload(path, stripped, {
-      contentType,
-      upsert: false,
-      // Hint only — path itself never embeds original filename.
-      cacheControl: 'private, max-age=0',
+  const { error: insertError } = await ctx.db.from('libertymd_photo_analyses').insert({
+    user_id: ctx.user.id,
+    consultation_id: consultation.id,
+    patient_id: consultation.patient_id,
+    object_uuid: objectUuid,
+    content_type: validated.mime,
+    analysis_status: analysis.usable ? 'analyzed' : 'unusable',
+    analysis_data: analysis,
+    raw_deleted_at: new Date().toISOString(),
+  })
+  if (insertError) {
+    console.warn('LibertyMD photo analysis persistence failed', {
+      outcome: 'persistence_failed',
+      code: insertError.code || null,
     })
-
-  if (uploadError) {
-    console.warn('LibertyMD photo storage put failed', {
-      outcome: 'storage_failed',
-      reject_reason: 'storage_failed',
-      size_bucket: stripped.byteLength > 1024 * 1024 ? 'gt_1mb' : 'lte_1mb',
-    })
-    return photoReject(PHOTO_UPLOAD_CODES.storage_failed, 502)
+    return photoReject(PHOTO_UPLOAD_CODES.persistence_failed, 502)
   }
-
-  const { data: signed, error: signError } = await ctx.db.storage
-    .from(LIBERTYMD_CARE_BUCKET)
-    .createSignedUrl(path, PHOTO_SIGNED_URL_TTL_SECONDS)
-
-  if (signError || !signed?.signedUrl) {
-    console.warn('LibertyMD photo signed URL failed', {
-      outcome: 'sign_failed',
-      reject_reason: 'sign_failed',
-    })
-    return photoReject(PHOTO_UPLOAD_CODES.sign_failed, 502)
-  }
-
-  // Analysis stub — never invoke HT lab-OCR edge or n8n vision this ticket.
-  const analysis = photoAnalysisStub()
 
   return jsonResponse({
     ok: true,
     consultation_id: consultation.id,
-    path,
     object_uuid: objectUuid,
-    content_type: contentType,
-    // Extension hint for session chip only — not a Storage path segment.
-    extension: extensionForMime(contentType),
-    signed_url: signed.signedUrl,
-    expires_in: PHOTO_SIGNED_URL_TTL_SECONDS,
+    patient_id: consultation.patient_id,
+    content_type: validated.mime,
+    extension: extensionForMime(validated.mime),
+    path: null,
+    signed_url: null,
+    expires_in: 0,
+    raw_retained: false,
     analysis,
     consult_continues: true,
   })

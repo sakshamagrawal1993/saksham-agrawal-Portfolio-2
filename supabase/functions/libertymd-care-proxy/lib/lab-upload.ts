@@ -26,6 +26,8 @@ export const LAB_UPLOAD_CODES = {
   sign_failed: 'sign_failed',
   attribution_failed: 'attribution_failed',
   redaction_failed: 'redaction_failed',
+  analysis_failed: 'analysis_failed',
+  persistence_failed: 'persistence_failed',
 } as const
 
 export type LabUploadRejectCode = (typeof LAB_UPLOAD_CODES)[keyof typeof LAB_UPLOAD_CODES]
@@ -49,6 +51,10 @@ export const LAB_UPLOAD_SAFE_COPY: Record<LabUploadRejectCode, string> = {
     'Something went wrong on our side while saving the lab report. Your consultation can continue.',
   redaction_failed:
     'We could not prepare that lab report for analysis. Your consultation can continue.',
+  analysis_failed:
+    'We could not analyze that lab report just now. Your consultation can continue.',
+  persistence_failed:
+    'We analyzed the lab report but could not save the results. Your consultation can continue.',
 }
 
 /** AC4 / S5 — never persist these as queryable columns or structured_results keys. */
@@ -118,6 +124,131 @@ export function decodeLabBase64(raw: unknown): Uint8Array | null {
     return out
   } catch {
     return null
+  }
+}
+
+export function encodeLabBase64(bytes: Uint8Array): string {
+  let binary = ''
+  const chunk = 0x8000
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk))
+  }
+  return btoa(binary)
+}
+
+export interface LabParameterDefinition {
+  id: string
+  name: string
+  unit: string | null
+}
+
+export type LabRangeClassification =
+  | 'below_range'
+  | 'within_range'
+  | 'above_range'
+  | 'borderline'
+  | 'flagged'
+  | 'unclassified'
+
+export interface StandardizedLabResult {
+  raw_name: string
+  parameter_id: string | null
+  parameter_name: string | null
+  value: string
+  numeric_value: number | null
+  raw_unit: string
+  standardized_unit: string | null
+  reference_range: string
+  printed_flag: string
+  classification: LabRangeClassification
+  analysis: string
+  mapped: boolean
+}
+
+export interface LabAnalysisResult {
+  usable: boolean
+  unusable_reason: string
+  panel_name: string
+  report_date: string
+  extracted_count: number
+  standardized_count: number
+  unmapped_count: number
+  results: StandardizedLabResult[]
+  analysis_summary: { headline: string; highlights: string[]; limitations: string[] }
+  review_state: 'ai_generated_unreviewed'
+  analysis_kind: 'standardized_bounded_analysis'
+  raw_retained: false
+}
+
+export function normalizeLabAnalysis(
+  raw: unknown,
+  definitions: LabParameterDefinition[],
+): LabAnalysisResult | null {
+  const source = raw && typeof raw === 'object' && !Array.isArray(raw)
+    ? raw as Record<string, unknown>
+    : null
+  if (!source) return null
+  const allowed = new Map(definitions.map((row) => [row.id, row]))
+  const text = (value: unknown, max: number) => String(value ?? '').trim().slice(0, max)
+  const classes = new Set<LabRangeClassification>([
+    'below_range', 'within_range', 'above_range', 'borderline', 'flagged', 'unclassified',
+  ])
+  const bannedAnalysis = /\b(diagnos|disease|anemia|infection|cancer|treatment|medication|urgent|emergency)\b/i
+  const results = (Array.isArray(source.results) ? source.results : [])
+    .map((item): StandardizedLabResult | null => {
+      const row = item && typeof item === 'object' ? item as Record<string, unknown> : {}
+      const rawName = text(row.raw_name, 120)
+      if (!rawName) return null
+      const requestedId = text(row.parameter_id, 120)
+      const canonical = allowed.get(requestedId)
+      const numeric = typeof row.numeric_value === 'number' ? row.numeric_value : Number.NaN
+      const analysis = text(row.analysis, 280)
+      const classification = classes.has(String(row.classification) as LabRangeClassification)
+        ? String(row.classification) as LabRangeClassification
+        : 'unclassified'
+      return {
+        raw_name: rawName,
+        parameter_id: canonical?.id ?? null,
+        parameter_name: canonical?.name ?? null,
+        value: text(row.value, 60),
+        numeric_value: Number.isFinite(numeric) ? numeric : null,
+        raw_unit: text(row.raw_unit, 40),
+        standardized_unit: canonical ? canonical.unit || text(row.standardized_unit, 40) || null : null,
+        reference_range: text(row.reference_range, 80),
+        printed_flag: text(row.printed_flag, 20),
+        classification: canonical ? classification : 'unclassified',
+        analysis: bannedAnalysis.test(analysis) ? '' : analysis,
+        mapped: Boolean(canonical),
+      }
+    })
+    .filter((row): row is StandardizedLabResult => row !== null)
+    .slice(0, 80)
+  const summary = source.analysis_summary && typeof source.analysis_summary === 'object'
+    ? source.analysis_summary as Record<string, unknown>
+    : {}
+  const safeList = (value: unknown) => (Array.isArray(value) ? value : [])
+    .map((item) => text(item, 240))
+    .filter((item) => item && !bannedAnalysis.test(item))
+    .slice(0, 8)
+  const standardizedCount = results.filter((row) => row.mapped).length
+  const usable = source.usable !== false && results.length > 0
+  return {
+    usable,
+    unusable_reason: usable ? '' : text(source.unusable_reason, 200) || 'Document could not be read as a lab report.',
+    panel_name: text(source.panel_name, 100),
+    report_date: text(source.report_date, 40),
+    extracted_count: results.length,
+    standardized_count: standardizedCount,
+    unmapped_count: results.length - standardizedCount,
+    results,
+    analysis_summary: {
+      headline: bannedAnalysis.test(text(summary.headline, 280)) ? '' : text(summary.headline, 280),
+      highlights: safeList(summary.highlights),
+      limitations: safeList(summary.limitations),
+    },
+    review_state: 'ai_generated_unreviewed',
+    analysis_kind: 'standardized_bounded_analysis',
+    raw_retained: false,
   }
 }
 
