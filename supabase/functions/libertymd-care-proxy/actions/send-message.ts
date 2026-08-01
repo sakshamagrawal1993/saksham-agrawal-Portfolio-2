@@ -623,7 +623,11 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
         }
       }
 
-      if (!servedFromSpeculativeCache) {
+      // `|| !diagnosis` is a null-safety belt, not a behaviour change: when the
+      // speculative cache serves, it always assigns. It also lets the compiler
+      // narrow `diagnosis` to non-null for the rest of this block, so a future
+      // cache path that yields null falls back to a real run instead of throwing.
+      if (!servedFromSpeculativeCache || !diagnosis) {
         diagnosis = await runDiagnosis(history, patientPayload(patient), diagnosisInput, slots, requestId)
       }
 

@@ -131,7 +131,9 @@ export async function handleRespondFollowupCheckin(
     : ''
   const answerRaw = payload.followup_answer
   if (!rawToken) {
-    return jsonResponse({ error: 'Missing check-in token', ...TOKEN_EXPIRED }, 400)
+    // Spread first: a *missing* token is not an *expired* one, so the specific
+    // message must survive rather than being overwritten by TOKEN_EXPIRED.error.
+    return jsonResponse({ ...TOKEN_EXPIRED, error: 'Missing check-in token' }, 400)
   }
   if (!isFollowupAnswer(answerRaw)) {
     return jsonResponse({
@@ -381,7 +383,7 @@ export async function handleUnsubscribeFollowupCheckin(
     ? payload.followup_token.trim()
     : ''
   if (!rawToken) {
-    return jsonResponse({ error: 'Missing unsubscribe token', ...TOKEN_EXPIRED }, 400)
+    return jsonResponse({ ...TOKEN_EXPIRED, error: 'Missing unsubscribe token' }, 400)
   }
 
   const token = await lookupFollowupToken(ctx, rawToken, 'unsubscribe')

@@ -32,6 +32,9 @@
   ],
   "exclude": [
     "supabase",
-    "node_modules"
+    "node_modules",
+    "tests/libertymd",
+    "scripts/libertymd-clinical-evaluation.ts",
+    "scripts/libertymd-live-validation.ts"
   ]
 }
