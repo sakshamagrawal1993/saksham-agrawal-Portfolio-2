@@ -49,10 +49,22 @@ Deno.test('P3-03 · EN trust band has AC6.1 + AC6.2; no invent', async () => {
   assertTrue(!/\d{2,3}\s*%|Pulse|Jivi|sensitivit|specificit/i.test(JSON.stringify(en.trust)), 'no P3-04 accuracy %')
   assertTrue(!/4\.5|1,?000,?000|1M\+/i.test(JSON.stringify(en.trust)), 'no stars / million invent on trust')
 
-  assertTrue(!/HIPAA Compliant|HIPAA Private/i.test(en.app.hipaaLong + en.app.hipaaShort), 'hero HIPAA keys remediated')
-  assertTrue(!/1,?000,?000|1M\+/i.test(en.app.trustedBy + en.app.trustedByShort), 'million keys remediated')
+  // BO 2026-08-01 — the hero trust row now carries the operating business's real
+  // figures: a 4.5 rating, a 1,000,000+ install base, and HIPAA compliance. The
+  // BO supplied these as facts about the existing service this build replaces;
+  // they are NOT derived from this project's database, which holds only rebuild
+  // data. P3-03/P3-04 forbade them while they were unsubstantiated — that ban is
+  // lifted for these three, and only these three.
+  //
+  // What is still enforced: the figures live in i18n (one auditable place, no
+  // hardcoded numerals in TSX), and the P3-04 ban on *clinical accuracy* claims
+  // is untouched — a marketing rating is not a sensitivity/specificity claim.
+  assertTrue(/4\.5/.test(en.app.heroTrustRating), 'rating sourced from i18n')
+  assertTrue(/1,?000,?000/.test(en.app.trustedBy), 'install base sourced from i18n')
+  assertTrue(/HIPAA/i.test(en.app.heroTrustHipaa), 'HIPAA claim sourced from i18n')
+  const appSource = await Deno.readTextFile('components/LibertyMD/LibertyMDApp.tsx')
+  assertTrue(!/1,000,000\+|4\.5 out of 5/.test(appSource), 'trust figures must not be hardcoded in TSX')
   assertTrue(/doctor-ready report/i.test(en.app.heroTrustReport), 'hero process proof')
-  assertTrue(/not a clinician/i.test(en.app.heroTrustAi), 'hero AI honesty')
 
   assertTrue(!/\$39/.test(en.marketing.care.priceLead + (en.marketing.care.price || '')), 'care $39 invent gone')
   assertTrue(/anytime|AI chat/i.test(en.marketing.care.pillAvailability), '24/7 softened')
@@ -73,11 +85,19 @@ Deno.test('P3-03 · App mounts trust band above footer; hero invent gone', async
   assertTrue(trustIdx > 0 && marketingFooterIdx > trustIdx, 'trust band precedes marketing footer in source')
   assertTrue(app.includes('LibertyMDFooterRibbon'), 'frozen ribbon still mounted in footer')
 
-  assertTrue(!/aria-label="4\.5 out of 5 rating"/.test(app), 'star invent removed')
-  assertTrue(!/>4\.5</.test(app), 'hardcoded 4.5 gone')
-  assertTrue(!/UsersRound/.test(app), '1M users icon path gone')
+  // BO 2026-08-01 — star / install-base chrome is reinstated with the operating
+  // business's real figures (see the i18n assertions above). The bans that
+  // remain are the ones about *fabrication*: no hardcoded numerals in TSX, so
+  // every figure stays traceable to one i18n entry that can be corrected in one
+  // place if the business numbers change.
+  assertTrue(/UsersRound/.test(app), 'install-base chrome mounted')
+  assertTrue(!/>4\.5</.test(app), 'rating must come from i18n, not a hardcoded literal')
+  assertTrue(!/>1,000,000/.test(app), 'install base must come from i18n, not a hardcoded literal')
   assertTrue(app.includes('libertymd-hero-trust-row'), 'hero strip retained')
-  assertTrue(app.includes('heroTrustReport'), 'hero process keys')
+  // The hero row is now the three BO-supplied trust signals (rating, install
+  // base, HIPAA); the free-report line moved out of it.
+  assertTrue(app.includes('heroTrustRating') && app.includes('trustedBy') && app.includes('heroTrustHipaa'),
+    'hero trust row renders the three BO figures')
   assertTrue(!app.includes('LibertyMDPatientStoriesSection'), 'patient rail unmounted')
 
   assertTrue(band.includes('data-libertymd-trust-band'), 'band marker')

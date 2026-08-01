@@ -925,6 +925,11 @@ interface AccountDrawerProps {
   onSelectConsultation: (id: string) => void;
   /** P1-04 Q2C primary — anonymous add-profile → capability offer path. */
   onCareForSomeoneElse?: () => void;
+  /**
+   * BO 2026-08-01 — start a fresh consult. Moved here from the consult header,
+   * where "+ New chat" sat beside an in-progress clinical conversation.
+   */
+  onStartOver?: () => void;
   /** P4-04 — linked-only profile CRUD handlers. Omit for anonymous. */
   profileManagement?: ProfileManagementHandlers | null;
 }
@@ -942,6 +947,7 @@ export function LibertyMDAccountDrawer({
   onClose,
   onSelectConsultation,
   onCareForSomeoneElse,
+  onStartOver,
   profileManagement = null,
 }: AccountDrawerProps) {
   const { t } = useI18n();
@@ -998,6 +1004,17 @@ export function LibertyMDAccountDrawer({
               >
                 <Plus className="h-4 w-4" />
                 {t('careControls.careForSomeoneElse')}
+              </button>
+            )}
+            {onStartOver && (
+              <button
+                type="button"
+                data-libertymd-start-over="drawer"
+                onClick={onStartOver}
+                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full border border-libertymd-slate-300 bg-white px-4 text-sm font-bold text-libertymd-slate-700 transition hover:bg-libertymd-slate-200"
+              >
+                <RotateCcw className="h-4 w-4" />
+                {t('chatx.newChat')}
               </button>
             )}
           </div>

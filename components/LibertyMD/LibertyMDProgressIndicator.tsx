@@ -1,7 +1,14 @@
 /**
  * P1-06 · Presentational interview progress indicator.
- * Text-first + slim determinate track from high-water slot ratio.
- * LibertyMD tokens only; compact; does not own emergency / continuation chrome.
+ *
+ * BO 2026-08-01 — reduced to a bare determinate line under the header. The
+ * qualitative stage label ("Wrapping up") and the ceiling copy ("Up to 15
+ * questions") are no longer rendered: naming a stage invited the reader to
+ * estimate how much was left, and the ceiling read as a threat rather than a
+ * reassurance. The label survives as the accessible name so screen-reader users
+ * still get orientation, and the hedged ceiling is still computed upstream.
+ *
+ * LibertyMD tokens only; does not own emergency / continuation chrome.
  */
 import type { ProgressView } from './libertymd-progress'
 
@@ -19,13 +26,10 @@ export function LibertyMDProgressIndicator({
   return (
     <div
       data-libertymd-progress-indicator
-      className={`flex w-full max-w-sm flex-col items-center gap-[var(--libertymd-space-xs,4px)] text-center ${className}`}
+      className={`w-full ${className}`}
     >
-      <p className="text-xs font-semibold text-libertymd-slate-500">
-        {view.label}
-      </p>
       <div
-        className="h-1 w-full max-w-[12rem] overflow-hidden rounded-full bg-libertymd-slate-200"
+        className="h-1 w-full overflow-hidden bg-libertymd-slate-200"
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={100}
@@ -33,13 +37,10 @@ export function LibertyMDProgressIndicator({
         aria-label={view.label}
       >
         <div
-          className="h-full rounded-full bg-libertymd-blue-600 transition-[width] duration-300 ease-out"
+          className="h-full bg-libertymd-blue-600 transition-[width] duration-300 ease-out"
           style={{ width: `${pct}%` }}
         />
       </div>
-      <p className="text-[11px] font-medium leading-4 text-libertymd-slate-500">
-        {view.ceiling}
-      </p>
     </div>
   )
 }

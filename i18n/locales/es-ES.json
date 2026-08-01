@@ -304,7 +304,11 @@
     "trustedBy": "Free doctor-ready report",
     "trustedByShort": "Free report",
     "hipaaShort": "Private AI chat",
-    "hipaaLong": "Private AI symptom chat"
+    "hipaaLong": "Private AI symptom chat",
+    "heroTrustRating": "4.5 out of 5",
+    "heroTrustRatingShort": "4.5",
+    "heroTrustHipaa": "HIPAA compliant",
+    "heroTrustHipaaShort": "HIPAA"
   },
   "trust": {
     "kicker": "What LibertyMD is",

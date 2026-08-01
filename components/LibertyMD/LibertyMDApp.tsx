@@ -10,6 +10,8 @@ import { useI18n } from '../../i18n';
 import LibertyMDLanguageSwitcher from './LibertyMDLanguageSwitcher';
 import {
   ShieldCheck,
+  Star,
+  UsersRound,
   Send,
   ArrowRight,
   Sparkles,
@@ -1486,16 +1488,31 @@ export default function LibertyMDApp() {
                 </button>
               </div>
 
-              {/* BO 2026-08-01 — hero "AI symptom chat — not a clinician" line
-                  removed. The free-report line moves into the row below; the
-                  not-a-clinician disclosure is still carried by the trust band
-                  further down this page and by the chat composer footer, so a
-                  consult is never shown without it. */}
-              <div className="libertymd-hero-trust-row mt-2 flex flex-row flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs font-medium text-libertymd-slate-500 sm:text-sm [@media(max-height:700px)]:mt-0 [@media(max-height:700px)]:gap-1">
-                <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-libertymd-navy sm:gap-2">
-                  <FileText className="h-4 w-4 text-libertymd-navy sm:h-5 sm:w-5" aria-hidden="true" />
-                  <span className="sm:hidden">{t('app.heroTrustReportShort')}</span>
-                  <span className="hidden sm:inline">{t('app.heroTrustReport')}</span>
+              {/* BO 2026-08-01 — trust row: rating, install base, and HIPAA.
+                  Figures are the operating business's, supplied by the BO for
+                  this rebuild; they are not derived from this project's
+                  database. Keep them in i18n so a change is one edit. */}
+              <div className="libertymd-hero-trust-row mt-2 flex flex-row flex-wrap items-center justify-center gap-x-5 gap-y-1 text-xs font-medium text-libertymd-slate-500 sm:text-sm [@media(max-height:700px)]:mt-0 [@media(max-height:700px)]:gap-1">
+                <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap font-semibold text-libertymd-navy" aria-label={t('app.heroTrustRating')}>
+                  <span className="inline-flex gap-0.5" aria-hidden="true">
+                    {[0, 1, 2, 3, 4].map((star) => (
+                      <Star
+                        key={star}
+                        className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${star === 4 ? 'text-libertymd-slate-300' : 'fill-libertymd-green-600 text-libertymd-green-600'}`}
+                      />
+                    ))}
+                  </span>
+                  <span>{t('app.heroTrustRatingShort')}</span>
+                </span>
+                <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap font-semibold text-libertymd-navy">
+                  <UsersRound className="h-4 w-4 text-libertymd-navy sm:h-5 sm:w-5" aria-hidden="true" />
+                  <span className="sm:hidden">{t('app.trustedByShort')}</span>
+                  <span className="hidden sm:inline">{t('app.trustedBy')}</span>
+                </span>
+                <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap font-semibold text-libertymd-navy">
+                  <ShieldCheck className="h-4 w-4 text-libertymd-navy sm:h-5 sm:w-5" aria-hidden="true" />
+                  <span className="sm:hidden">{t('app.heroTrustHipaaShort')}</span>
+                  <span className="hidden sm:inline">{t('app.heroTrustHipaa')}</span>
                 </span>
               </div>
               {error && phase === 'initial' && (

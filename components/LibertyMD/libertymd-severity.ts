@@ -125,6 +125,21 @@ export function libertyMDSafetyNoticeFromResponse(response: unknown): LibertyMDS
     source: typeof signal.source === 'string' ? signal.source : null,
   });
   if (severity === 'info') return null;
+  // BO 2026-08-01 — a `caution` verdict no longer renders mid-consult chrome.
+  //
+  // This is a *rendering* suppression, deliberately placed here rather than in
+  // `libertyMDSeverityForSignal`: the mapping stays truthful (and stays equal to
+  // the proxy's, which severity-mapping.test.ts proves across the whole matrix),
+  // the verdict is still persisted to libertymd_safety_events, still reaches the
+  // report, and still escalates to `force_end` when corroborated. Only the amber
+  // "worth keeping an eye on" panel is gone.
+  //
+  // Restores the intent of DECISIONS 2026-07-30 "Conversation interruption
+  // policy": detect / act / show are decoupled, `high_risk_continue` raises
+  // red-flag question priority in the interview and shows nothing, and only a
+  // `force_end` interrupts. The panel was alarm without guidance — it told a
+  // patient something might be wrong while asking them to do nothing about it.
+  if (severity === 'caution') return null;
   const message = typeof signal.message === 'string' ? signal.message.trim() : '';
   if (!message) return null;
   return { severity, message };

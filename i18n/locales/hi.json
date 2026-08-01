@@ -274,7 +274,11 @@
     "heroTrustReport": "Free doctor-ready report",
     "heroTrustReportShort": "Free report",
     "heroTrustAi": "AI symptom chat — not a clinician",
-    "heroTrustAiShort": "AI — not a clinician"
+    "heroTrustAiShort": "AI — not a clinician",
+    "heroTrustRating": "4.5 out of 5",
+    "heroTrustRatingShort": "4.5",
+    "heroTrustHipaa": "HIPAA compliant",
+    "heroTrustHipaaShort": "HIPAA"
   },
   "marketing": {
     "care": {

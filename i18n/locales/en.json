@@ -230,8 +230,8 @@
     "howItWorksKicker": "From symptom to next step",
     "howItWorksTitle": "How LibertyMD works",
     "howItWorksSubtitle": "Simple enough to use when you feel unwell.",
-    "trustedBy": "Free doctor-ready report",
-    "trustedByShort": "Free report",
+    "trustedBy": "Trusted by 1,000,000+ users",
+    "trustedByShort": "1,000,000+ users",
     "hipaaShort": "Private AI chat",
     "hipaaLong": "Private AI symptom chat",
     "careAssistant": "LibertyMD care assistant",
@@ -272,7 +272,11 @@
     "heroTrustReport": "Free doctor-ready report",
     "heroTrustReportShort": "Free report",
     "heroTrustAi": "AI symptom chat — not a clinician",
-    "heroTrustAiShort": "AI — not a clinician"
+    "heroTrustAiShort": "AI — not a clinician",
+    "heroTrustRating": "4.5 out of 5",
+    "heroTrustRatingShort": "4.5",
+    "heroTrustHipaa": "HIPAA compliant",
+    "heroTrustHipaaShort": "HIPAA"
   },
   "marketing": {
     "care": {
