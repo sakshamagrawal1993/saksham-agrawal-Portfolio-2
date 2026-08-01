@@ -52,9 +52,13 @@ import {
 } from '../lib/consultations.ts'
 import { jsonResponse } from '../lib/errors.ts'
 import { scheduleDetached } from '../lib/mixpanel.ts'
+import { isAsyncDifferentialEnabled } from '../lib/config.ts'
 import {
+  buildDifferentialHint,
+  decideDifferentialStop,
   differentialUpdatePatch,
   readStoredDifferential,
+  stalenessTurns,
   shouldAcceptDifferentialWrite,
   shouldScheduleDifferential,
 } from '../lib/differential.ts'
@@ -397,6 +401,9 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
         consultation.id,
         requestId,
         clinicalLanguage,
+        // P5-DDX T5 — steer WHAT is asked. Null when absent or stale; the agent
+        // then falls back to missing_slots exactly as before.
+        buildDifferentialHint(readStoredDifferential(consultation), turnCount),
       ),
     ])
     await saveSafetyEvent(ctx, consultation, guardrail, turnCount, {
@@ -540,11 +547,28 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
     const slots = { ...consultation.filled_slots, ...interview.slot_updates }
     const missingSlots = interview.missing_slots.length ? interview.missing_slots : calculateMissingSlots(slots)
     const evidence = assessClinicalEvidence(slots)
-    const gateOpen = computeShouldRunDiagnosis({
+    // P5-DDX T6 — the stop rule.
+    //
+    // With the flag on, the mini-differential decides when the interview may
+    // end: turn >= 6 AND confidence >= 75 AND no outstanding red flags AND not
+    // stale. All four are evaluated here, from stored state, so neither the
+    // interview nor the differential workflow gets a vote — a model cannot talk
+    // its way past a rule it does not execute.
+    //
+    // With the flag off this collapses to the pre-P5 behaviour exactly.
+    const differentialState = readStoredDifferential(consultation)
+    const differentialStop = decideDifferentialStop(differentialState, turnCount)
+    const legacyGateOpen = computeShouldRunDiagnosis({
       evidenceScore: evidence.score,
       turnCount,
       readyForReport: interview.ready_for_report,
     })
+    const gateOpen = isAsyncDifferentialEnabled()
+      // Evidence sufficiency still applies: the differential says "I know what
+      // this is", the evidence score says "enough was actually recorded to
+      // write a report from". Both, not either.
+      ? (differentialStop.stop && evidence.sufficient)
+      : legacyGateOpen
     const comprehensionDone = isComprehensionCompleted(consultation.workflow_versions)
 
     // P1-14 — Diagnosis-gate short-circuit: slots summary OverlaySheet before Diagnosis.
@@ -654,6 +678,15 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
           : (diagnosis.valid ? 'valid' : 'invalid'),
         was_speculative: servedFromSpeculativeCache,
         ...(servedFromSpeculativeCache ? { served_from_cache: true } : { served_from_cache: false }),
+        // P5-DDX T8 — how the consult reached the gate. Bucketed, never raw:
+        // a confidence figure is clinical reasoning, and CONTEXT §3.5 keeps
+        // that out of telemetry. `stop_reason` is what makes a completion-rate
+        // drop diagnosable — turn_ceiling and red_flags_outstanding are very
+        // different problems with the same symptom.
+        differential_confidence_bucket: scoreBucket(differentialState.topConfidence ?? 0),
+        differential_stale_turns: stalenessTurns(differentialState, turnCount) ?? -1,
+        differential_red_flags_open: differentialState.redFlagsOutstanding.length,
+        stop_reason: differentialStop.stop ? 'confidence_met' : differentialStop.reason,
       })
 
       if (!servedFromSpeculativeCache && diagnosis.failure) {
@@ -993,11 +1026,14 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
       evidence_score: evidence.score,
       turn_count: turnCount,
       diagnosis_ran: Boolean(shouldRunDiagnosis),
-      // BO 2026-08-01 — the running differential and the confidence that gates
-      // the early stop. Machine-read: condition names are English by contract
-      // and no client surface renders them to the patient.
-      working_differential: interview.working_differential,
-      diagnostic_confidence: interview.diagnostic_confidence,
+      // P5-DDX — echo the STORED differential, not the interview's. The
+      // interview stopped computing one when the mini-differential workflow
+      // took the job; reading `interview.*` here reported 0 on every turn while
+      // the real value sat in the row. Machine-read: condition names are
+      // English by contract and no client surface renders them to the patient.
+      working_differential: differentialState.entries,
+      diagnostic_confidence: differentialState.topConfidence ?? 0,
+      differential_stale_turns: stalenessTurns(differentialState, turnCount) ?? -1,
       safety: guardrail.status === 'high_risk_continue' ? toClientSafety(guardrail) : null,
       version: currentVersion,
     })
