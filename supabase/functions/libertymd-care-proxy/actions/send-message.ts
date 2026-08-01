@@ -935,6 +935,11 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
       evidence_score: evidence.score,
       turn_count: turnCount,
       diagnosis_ran: Boolean(shouldRunDiagnosis),
+      // BO 2026-08-01 — the running differential and the confidence that gates
+      // the early stop. Machine-read: condition names are English by contract
+      // and no client surface renders them to the patient.
+      working_differential: interview.working_differential,
+      diagnostic_confidence: interview.diagnostic_confidence,
       safety: guardrail.status === 'high_risk_continue' ? toClientSafety(guardrail) : null,
       version: currentVersion,
     })

@@ -481,6 +481,11 @@ function interviewHoldingResult(
     missing_slots: missingSlots,
     input_relevance: 'unclear',
     input_relevance_reason: 'Interview workflow unavailable',
+    // A holding turn produced no clinical reasoning, so the differential is
+    // empty and confidence is 0 — never carry a stale figure across an outage.
+    working_differential: [],
+    diagnostic_confidence: 0,
+    stop_reason: null,
     source,
   }
 }
@@ -545,6 +550,24 @@ export async function runInterview(
       missing_slots: Array.isArray(raw.missing_slots) ? raw.missing_slots.map(String).filter((slot) => CORE_SLOTS.includes(slot)) : [],
       input_relevance: relevance,
       input_relevance_reason: cleanMessage(raw.input_relevance_reason),
+      // BO 2026-08-01 — per-turn running differential from the interview agent.
+      // Machine-read: condition names stay English and are never rendered to the
+      // patient. Surfaced so the confidence that gates the stop is observable
+      // rather than buried in n8n, and so turn_facts can slice on it.
+      working_differential: Array.isArray(raw.working_differential)
+        ? (raw.working_differential as unknown[])
+          .map((entry) => {
+            const row = (entry || {}) as { condition?: unknown; confidence?: unknown }
+            return {
+              condition: cleanMessage(row.condition),
+              confidence: parseConfidence(row.confidence),
+            }
+          })
+          .filter((entry) => entry.condition)
+          .slice(0, 4)
+        : [],
+      diagnostic_confidence: parseConfidence(raw.diagnostic_confidence),
+      stop_reason: typeof raw.stop_reason === 'string' ? raw.stop_reason : null,
       source: 'n8n',
     }
   } catch (error) {

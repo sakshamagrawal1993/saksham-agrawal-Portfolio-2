@@ -407,6 +407,12 @@ export interface GuardrailResult {
   emergency_copy?: EmergencyCopyWire
 }
 
+/** One entry of the interview agent's running differential (machine-read, EN). */
+export interface WorkingDifferentialEntry {
+  condition: string
+  confidence: number
+}
+
 export interface InterviewResult {
   next_question: string
   options: string[]
@@ -416,5 +422,14 @@ export interface InterviewResult {
   missing_slots: string[]
   input_relevance: ResponseRelevance
   input_relevance_reason: string
+  /**
+   * BO 2026-08-01 — running differential + calibrated confidence for the top
+   * entry, recomputed every turn. `diagnostic_confidence` is what gates the
+   * early stop (>= 80); condition names are English by contract because they are
+   * matched downstream and shown to no patient.
+   */
+  working_differential: WorkingDifferentialEntry[]
+  diagnostic_confidence: number
+  stop_reason: string | null
   source: string
 }
