@@ -2466,7 +2466,7 @@ export default function LibertyMDChat() {
         ...current,
         { id: `${Date.now()}-comprehension-ack`, sender: 'user', text: ack, clientMessageId },
       ]);
-      const data = await invokeCareProxy({
+      const request = invokeCareProxy({
         action: 'send_message',
         consultation_id: consultationId,
         message: ack,
@@ -2474,6 +2474,24 @@ export default function LibertyMDChat() {
         expected_version: consultationVersion,
         comprehension_ack: true,
       });
+      // BO 2026-08-02 — leave for the report surface as soon as the patient
+      // confirms, rather than after a report body exists.
+      //
+      // Diagnosis takes tens of seconds. Waiting for `report` before navigating
+      // meant the report page's loader could never appear in the natural flow,
+      // and the patient sat on a finished transcript with no indication that
+      // anything was happening — or, when generation did not land, no
+      // indication that it never would. The wait now has a home.
+      //
+      // `awaiting` carries the turn we left on, so the report page can tell
+      // "still generating" apart from "the interview asked something else" and
+      // send the patient back rather than spin. See LibertyMDReportPage.
+      navigate(
+        `/liberty-md/report/${encodeURIComponent(consultationId)}?awaiting=${lastTurnCount}`,
+        { replace: true },
+      );
+      reportRedirectedRef.current = true;
+      const data = await request;
       setComprehensionCheck(null);
       await applyWorkflowResult(data);
     } catch (requestError) {

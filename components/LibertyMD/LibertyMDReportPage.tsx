@@ -17,7 +17,7 @@
  * renderers would drift, and the sample would stop being a truthful preview.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import { useI18n } from '../../i18n'
 import { supabase } from '../../lib/supabaseClient'
@@ -52,7 +52,15 @@ type PageState =
 export default function LibertyMDReportPage() {
   const { consultationId = '' } = useParams<{ consultationId: string }>()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { t } = useI18n()
+  // Turn index the consult was on when the chat handed over. Absent for a
+  // direct link or a refresh, in which case there is nothing to compare and the
+  // page simply waits.
+  const awaitingRaw = searchParams.get('awaiting')
+  const awaitingTurn = awaitingRaw !== null && Number.isFinite(Number(awaitingRaw))
+    ? Number(awaitingRaw)
+    : null
   const [state, setState] = useState<PageState>({ kind: 'loading' })
   const startedAtRef = useRef<number>(Date.now())
   const cancelledRef = useRef(false)
@@ -116,10 +124,31 @@ export default function LibertyMDReportPage() {
       return 'settled'
     }
 
-    // Still interviewing or mid-diagnosis: keep waiting.
+    // No report yet. Two very different situations look identical from the
+    // status alone, because the row stays `interviewing` while diagnosis runs:
+    // the report is being generated, or the interview asked another question.
+    //
+    // The turn index separates them. If it has moved past the turn we left on,
+    // the consultation carried on and the patient belongs back in it — spinning
+    // here until the two-minute timeout would strand them in front of a loader
+    // for something that is not coming.
+    const turnCount = Number(consultation.turn_count)
+    if (
+      awaitingTurn !== null
+      && Number.isFinite(turnCount)
+      && turnCount > awaitingTurn
+    ) {
+      navigate(
+        `/liberty-md/chat?consultationId=${encodeURIComponent(consultationId)}`,
+        { replace: true },
+      )
+      return 'settled'
+    }
+
+    // Mid-diagnosis: keep waiting.
     setState({ kind: 'generating' })
     return 'pending'
-  }, [consultationId, navigate, t])
+  }, [consultationId, navigate, t, awaitingTurn])
 
   useEffect(() => {
     if (!consultationId) {
