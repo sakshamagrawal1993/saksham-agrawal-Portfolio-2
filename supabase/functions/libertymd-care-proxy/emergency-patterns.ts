@@ -14,7 +14,7 @@
  */
 import { emergencyCopyDetail } from './lib/emergency-copy.ts'
 
-export const EMERGENCY_PATTERN_SET_VERSION = '1.0.0'
+export const EMERGENCY_PATTERN_SET_VERSION = '1.1.0'
 
 export type EmergencyCareSetting = 'call_911' | 'crisis_line'
 
@@ -41,7 +41,14 @@ export const EMERGENCY_PATTERNS: readonly EmergencyPattern[] = [
     crisisType: 'acs_chest_pain',
     careSetting: 'call_911',
     message: emergencyCopyDetail('acs_chest_pain'),
-    matcher: /chest (pain|pressure|tightness)|crushing (chest|pressure)|elephant (on|sitting)|pain radiating to (left )?arm|jaw pain.{0,30}(sweat|sweating|nausea)/i,
+    // Bare "chest pain" is deliberately not terminal. Pain only while
+    // coughing, taking a deep breath, moving, or pressing the area is common
+    // in respiratory and musculoskeletal presentations. Those cases still go
+    // through the n8n guardrail as high_risk_continue so the interview can ask
+    // persistence, severity, rest/exertion, radiation, and associated signs.
+    // Force-end is reserved for pressure/squeezing/crushing/heaviness or chest
+    // pain paired with a high-specificity ACS warning feature.
+    matcher: /(?:crushing|squeezing|heavy) (?:chest|pressure)|chest (?:pressure|squeezing|heaviness)|elephant (?:on|sitting)|(?:chest (?:pain|discomfort).{0,80}(?:radiat(?:es|ing)?|spread(?:s|ing)?).{0,35}(?:arm|jaw|back|neck))|(?:chest (?:pain|discomfort).{0,80}(?:cold sweat|sweating|lightheaded|faint(?:ed|ing)?))|(?:(?:cold sweat|sweating|lightheaded|faint(?:ed|ing)?).{0,80}chest (?:pain|discomfort))|(?:chest (?:pain|discomfort).{0,60}(?:persistent|keeps returning|comes back|lasting (?:more than )?(?:a few|[5-9]|[1-9]\d) minutes?))|(?:jaw pain.{0,30}(?:cold sweat|sweat|sweating|nausea|lightheaded|faint(?:ed|ing)?))/i,
     clinicianReview: PENDING_REVIEW,
   },
   {

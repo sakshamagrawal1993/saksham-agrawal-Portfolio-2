@@ -1,5 +1,5 @@
 {
-  "pattern_set_version": "1.0.0",
+  "pattern_set_version": "1.1.0",
   "positives": [
     {
       "id": "acs_clause_boundary",
@@ -10,6 +10,24 @@
     {
       "id": "acs_elephant",
       "message": "It feels like an elephant sitting on my chest.",
+      "crisis_type": "acs_chest_pain",
+      "care_setting": "call_911"
+    },
+    {
+      "id": "acs_radiating",
+      "message": "The chest pain is spreading into my left arm and jaw.",
+      "crisis_type": "acs_chest_pain",
+      "care_setting": "call_911"
+    },
+    {
+      "id": "acs_autonomic_signs",
+      "message": "I have chest pain with a cold sweat, nausea, and lightheadedness.",
+      "crisis_type": "acs_chest_pain",
+      "care_setting": "call_911"
+    },
+    {
+      "id": "acs_persistent",
+      "message": "The chest pain has been persistent and keeps returning for more than ten minutes.",
       "crisis_type": "acs_chest_pain",
       "care_setting": "call_911"
     },
@@ -92,6 +110,64 @@
     { "id": "abdominal_mild", "message": "My lower abdomen feels mildly tender before my period." },
     { "id": "jaw_dental", "message": "My jaw aches near a broken tooth without sweating or nausea." },
     { "id": "headache_metaphor", "message": "This paperwork is a headache." },
-    { "id": "healthy_checkin", "message": "I feel fine and have no urgent symptoms." }
+    { "id": "healthy_checkin", "message": "I feel fine and have no urgent symptoms." },
+    { "id": "cough_chest_pain", "message": "I have a fever and cough, and my chest hurts only when I cough." },
+    { "id": "cough_chest_pain_with_nausea", "message": "The coughing fit makes my chest hurt and also makes me feel nauseated." },
+    { "id": "deep_breath_chest_pain", "message": "There is a brief sharp chest pain when I take a deep breath." },
+    { "id": "reproducible_chest_pain", "message": "The chest pain happens when I twist and I can reproduce it by pressing the sore spot." },
+    { "id": "bare_chest_pain_needs_context", "message": "I have chest pain but I have not described it yet." },
+    { "id": "uri_shortness_of_breath", "message": "I have cough and fever with some shortness of breath, but I can speak normally and I am not gasping." },
+    { "id": "resolved_exertional_breathlessness", "message": "I was mildly short of breath after climbing stairs, but it settled with rest." },
+    { "id": "post_cough_chest_soreness", "message": "After coughing all day, the muscles across my chest feel mildly sore." },
+    { "id": "brief_exertional_tightness_resolved", "message": "My chest briefly felt tight after running, but it resolved and I am breathing normally now." }
+  ],
+  "normalizer_downgrades": [
+    {
+      "id": "llm_cough_chest_pain",
+      "message": "I have fever and a cough, and my chest only hurts while coughing.",
+      "crisis_type": "acs_chest_pain"
+    },
+    {
+      "id": "llm_reproducible_chest_pain",
+      "message": "The chest pain is mild and I can reproduce it by pressing on the sore area.",
+      "crisis_type": "acs_chest_pain"
+    },
+    {
+      "id": "llm_cough_chest_pain_with_nausea",
+      "message": "My chest hurts only when I cough, and the coughing also makes me nauseated.",
+      "crisis_type": "acs_chest_pain"
+    },
+    {
+      "id": "llm_unspecified_chest_pain",
+      "message": "I have chest pain but I have not described the severity or duration yet.",
+      "crisis_type": "acs_chest_pain"
+    },
+    {
+      "id": "llm_uri_breathlessness",
+      "message": "I have cough and fever with some shortness of breath, but I can talk normally.",
+      "crisis_type": "respiratory_distress"
+    }
+  ],
+  "normalizer_force_ends": [
+    {
+      "id": "llm_crushing_pressure",
+      "message": "There is crushing pressure in the center of my chest and I feel faint and sweaty.",
+      "crisis_type": "acs_chest_pain"
+    },
+    {
+      "id": "llm_severe_respiratory_distress",
+      "message": "I am gasping and cannot get enough air to speak a full sentence.",
+      "crisis_type": "respiratory_distress"
+    },
+    {
+      "id": "llm_persistent_chest_pain",
+      "message": "The chest pain has been persistent for more than ten minutes and keeps returning.",
+      "crisis_type": "acs_chest_pain"
+    },
+    {
+      "id": "llm_severe_breathlessness_at_rest",
+      "message": "I have severe shortness of breath even while sitting at rest.",
+      "crisis_type": "respiratory_distress"
+    }
   ]
 }

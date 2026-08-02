@@ -485,7 +485,7 @@
         "age": 54,
         "sex": "male"
       },
-      "message": "I am 54, male, and the chest pain is getting worse since I sent that.",
+      "message": "I am 54, male, and now I have crushing chest pressure spreading to my left arm with a cold sweat.",
       "expected": {
         "emergency_action": "force_end",
         "crisis_type": "acs_chest_pain",
