@@ -217,17 +217,6 @@ set name = excluded.name,
     axis_impact_weights = excluded.axis_impact_weights,
     updated_at = now();
 
-alter table public.libertymd_lab_results
-  drop constraint if exists libertymd_lab_results_parameter_id_fkey;
-
-alter table public.libertymd_lab_results
-  drop constraint if exists libertymd_lab_results_libertymd_parameter_fkey;
-
-alter table public.libertymd_lab_results
-  add constraint libertymd_lab_results_libertymd_parameter_fkey
-  foreign key (parameter_id)
-  references public.libertymd_health_parameter_definitions(id);
-
 alter table public.libertymd_health_parameter_definitions enable row level security;
 
 revoke all on table public.libertymd_health_parameter_definitions
@@ -238,5 +227,4 @@ grant select, insert, update, delete
 
 comment on table public.libertymd_health_parameter_definitions is
   'LibertyMD-owned canonical lab dictionary. Independent of Health Twin and portable during repository hive-off.';
-comment on column public.libertymd_lab_results.parameter_id is
-  'Canonical LibertyMD parameter id referencing libertymd_health_parameter_definitions.';
+
