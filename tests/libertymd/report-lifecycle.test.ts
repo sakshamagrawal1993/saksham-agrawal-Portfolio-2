@@ -206,7 +206,7 @@ Deno.test('P2-13 AC4 · partial incomplete copy present; blame clinicalReviewNee
   }
   const chat = await Deno.readTextFile(new URL('components/LibertyMD/LibertyMDChat.tsx', ROOT))
   assertEquals(en.report.lifecycle.partialLabel, 'Incomplete')
-  assertTrue(en.report.lifecycle.partialBody.includes('complete') || en.report.lifecycle.partialBody.includes('incomplete'))
+  assertTrue(en.report.lifecycle.partialBody.includes('No health concern'), 'partial is reserved for no health information')
   assertEquals(copyLooksLikeUserBlame(en.report.lifecycle.failedBody), false)
   assertEquals(copyPromisesFalseGuestRestore(en.report.lifecycle.expiredBody), false)
   // L1: partial chrome uses lifecycle incomplete title (not blame-adjacent chatx seed).

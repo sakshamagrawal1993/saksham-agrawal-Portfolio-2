@@ -104,8 +104,10 @@ Deno.test('BUG-A: resolution_reason literals stay inside the DB CHECK vocabulary
     'high_confidence',
     'workflow_ready',
     'turn_limit_confident',
+    'turn_limit_report',
     'low_diagnostic_confidence',
     'insufficient_clinical_information',
+    'no_health_information',
   ])
   const dir = new URL('../../supabase/functions/libertymd-care-proxy/', import.meta.url)
   const files: string[] = []

@@ -96,10 +96,12 @@
       "readySoap": "Physician SOAP PDF ready"
     },
     "sections": {
+      "sessionSummary": "Session summary",
+      "patientSummary": "Patient summary",
       "triage": "Recommended care setting",
       "nextStep": "What to do now",
-      "differential": "Possible causes",
-      "assessmentAndPlan": "Assessment and plan",
+      "differential": "Differential diagnosis",
+      "assessmentAndPlan": "Recommended action plan",
       "redFlags": "Red flags to watch",
       "soap": "SOAP note"
     },
@@ -124,10 +126,10 @@
     },
     "card": {
       "ordinal": {
-        "most_likely": "Most likely",
-        "possible": "Possible",
-        "less_likely": "Less likely",
-        "most_likely_serious": "Most likely · Serious"
+        "most_likely": "High confidence",
+        "possible": "Moderate confidence",
+        "less_likely": "Low confidence",
+        "most_likely_serious": "High confidence · Serious"
       },
       "serious": "Serious",
       "furtherInvestigations": "Further investigations",
@@ -138,7 +140,7 @@
       "showDetail": "Show details",
       "hideDetail": "Hide details"
     },
-    "viewTitle": "Assessment and next steps",
+    "viewTitle": "Report for Physician Review",
     "emailDelivery": {
       "cta": "Email me my report",
       "title": "Email your report",
@@ -188,7 +190,7 @@
     "lifecycle": {
       "partialLabel": "Incomplete",
       "partialTitle": "This report is incomplete",
-      "partialBody": "We could not produce a complete doctor-ready report from this consultation. No diagnosis list or confidence claim is shown. You can start a fresh consultation anytime.",
+      "partialBody": "No health concern or symptom information was discussed in this consultation, so there is no clinical report to prepare. Start a new consultation whenever you are ready to discuss your health.",
       "partialA11yNoDx": "No differential diagnosis or confidence is included.",
       "partialStartFresh": "Start a fresh consultation",
       "failedTitle": "We could not generate your report",
@@ -543,6 +545,12 @@
     "labAttachedLabel": "Attached lab reports",
     "labRemove": "Remove lab report",
     "labUnreviewed": "Pending clinical review",
+    "mediaProcessing": "Processing evidence…",
+    "mediaProcessed": "Processed and included",
+    "mediaFailed": "Processing failed",
+    "mediaUnusable": "Could not read enough detail",
+    "mediaQuestionPhoto": "About your photo",
+    "mediaQuestionLab": "About your lab report",
     "labAttributionTitle": "Who is this lab report for?",
     "labAttributionBody": "Choose the profile this report belongs to. This does not change who the consultation is for.",
     "labAttributionConfirm": "Continue",

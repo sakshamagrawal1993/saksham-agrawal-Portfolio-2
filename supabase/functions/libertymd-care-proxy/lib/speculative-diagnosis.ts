@@ -28,7 +28,8 @@ export type DiagnosisGateInput = {
  * P2-14 G2: score ≥ evidence floor ∧ turn ≥ turn floor ∧
  * (!EVEN_REQUIRED ∨ even ∨ ready_for_report ∨ ≥ MAX_TURNS).
  * Defaults: EVEN_REQUIRED=false, turn floor 6, evidence floor 50.
- * Turn 15 still requires score ≥ floor (not a low-evidence override).
+ * At the turn cap, any non-zero clinical evidence opens the report attempt.
+ * Zero remains the sole no-health-information state.
  */
 export function computeShouldRunDiagnosis(input: DiagnosisGateInput): boolean {
   const maxTurns = input.maxTurns ?? MAX_TURNS
@@ -40,7 +41,9 @@ export function computeShouldRunDiagnosis(input: DiagnosisGateInput): boolean {
     || input.turnCount % 2 === 0
     || input.readyForReport
     || input.turnCount >= maxTurns
-  return input.evidenceScore >= scoreFloor
+  const evidenceOk = input.evidenceScore >= scoreFloor
+    || (input.turnCount >= maxTurns && input.evidenceScore > 0)
+  return evidenceOk
     && input.turnCount >= turnFloor
     && parityOk
 }
@@ -74,6 +77,7 @@ export type MaterialDiagnosisSnapshot = {
   filled_slots: unknown
   patient: unknown
   target_slot: unknown
+  media_context?: unknown
 }
 
 function sortKeysDeep(value: unknown): unknown {
@@ -99,6 +103,7 @@ export function materialSnapshotsEqual(
   return canonicalizeMaterial(a.filled_slots) === canonicalizeMaterial(b.filled_slots)
     && canonicalizeMaterial(a.patient) === canonicalizeMaterial(b.patient)
     && canonicalizeMaterial(a.target_slot ?? null) === canonicalizeMaterial(b.target_slot ?? null)
+    && canonicalizeMaterial(a.media_context ?? []) === canonicalizeMaterial(b.media_context ?? [])
 }
 
 export function materialSnapshotFromInputSnapshot(inputSnapshot: unknown): MaterialDiagnosisSnapshot {
@@ -109,6 +114,7 @@ export function materialSnapshotFromInputSnapshot(inputSnapshot: unknown): Mater
     filled_slots: snap.filled_slots ?? {},
     patient: snap.patient ?? {},
     target_slot: snap.target_slot ?? null,
+    media_context: snap.media_context ?? [],
   }
 }
 

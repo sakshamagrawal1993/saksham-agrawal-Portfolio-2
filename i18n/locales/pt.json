@@ -98,12 +98,14 @@
       "readySoap": "PDF SOAP do médico pronto"
     },
     "sections": {
-      "triage": "Recommended care setting",
-      "nextStep": "What to do now",
-      "differential": "Possible causes",
-      "assessmentAndPlan": "Assessment and plan",
-      "redFlags": "Red flags to watch",
-      "soap": "SOAP note"
+      "sessionSummary": "Resumo da sessão",
+      "patientSummary": "Resumo do paciente",
+      "triage": "Nível de cuidado recomendado",
+      "nextStep": "O que fazer agora",
+      "differential": "Diagnóstico diferencial",
+      "assessmentAndPlan": "Plano de ação recomendado",
+      "redFlags": "Sinais de alerta a observar",
+      "soap": "Nota SOAP"
     },
     "triage": {
       "home": "Home care",
@@ -114,13 +116,13 @@
       "crisis_line": "Crisis support line",
       "unknown": "Care setting unavailable"
     },
-    "viewTitle": "Assessment and next steps",
+    "viewTitle": "Relatório para revisão médica",
     "card": {
       "ordinal": {
-        "most_likely": "Mais provável",
-        "possible": "Possível",
-        "less_likely": "Menos provável",
-        "most_likely_serious": "Mais provável · Grave"
+        "most_likely": "Confiança alta",
+        "possible": "Confiança moderada",
+        "less_likely": "Confiança baixa",
+        "most_likely_serious": "Confiança alta · Grave"
       },
       "serious": "Grave",
       "furtherInvestigations": "Investigações adicionais",
@@ -188,9 +190,9 @@
       "claimRefund": "Política de reembolso: {refund}"
     },
     "lifecycle": {
-      "partialLabel": "Incomplete",
-      "partialTitle": "This report is incomplete",
-      "partialBody": "We could not produce a complete doctor-ready report from this consultation. No diagnosis list or confidence claim is shown. You can start a fresh consultation anytime.",
+      "partialLabel": "Incompleto",
+      "partialTitle": "Não há informações de saúde para o relatório",
+      "partialBody": "Nenhuma preocupação de saúde ou sintoma foi discutido nesta consulta, portanto não há relatório clínico a preparar. Inicie uma nova consulta quando quiser falar sobre a sua saúde.",
       "partialA11yNoDx": "No differential diagnosis or confidence is included.",
       "partialStartFresh": "Start a fresh consultation",
       "failedTitle": "We could not generate your report",
@@ -545,6 +547,12 @@
     "labAttachedLabel": "Relatórios laboratoriais anexados",
     "labRemove": "Remover relatório laboratorial",
     "labUnreviewed": "Revisão clínica pendente",
+    "mediaProcessing": "Processing evidence…",
+    "mediaProcessed": "Processed and included",
+    "mediaFailed": "Processing failed",
+    "mediaUnusable": "Could not read enough detail",
+    "mediaQuestionPhoto": "About your photo",
+    "mediaQuestionLab": "About your lab report",
     "labAttributionTitle": "Para quem é este relatório laboratorial?",
     "labAttributionBody": "Escolha o perfil a que este relatório pertence. Isto não altera para quem é a consulta.",
     "labAttributionConfirm": "Continuar",

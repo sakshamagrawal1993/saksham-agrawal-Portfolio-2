@@ -6,19 +6,22 @@
  * LibertyMD tokens only. Never writes clinical tables / Storage directly.
  */
 import { useRef } from 'react';
-import { Camera, FileText, Loader2, RotateCw, X } from 'lucide-react';
+import { AlertTriangle, Camera, CheckCircle2, FileText, Loader2, RotateCw, X } from 'lucide-react';
 import { useI18n } from '../../i18n';
 
 export interface LibertyMDPhotoChip {
   object_uuid: string;
   content_type: string;
-  analysis_status?: 'ready' | 'retry';
+  analysis_status?: 'processing' | 'processed' | 'unusable' | 'failed' | 'retry';
+  followups_remaining?: number;
 }
 
 export interface LibertyMDLabChip {
   object_uuid: string;
   content_type: string;
   patient_id: string;
+  analysis_status?: 'processing' | 'processed' | 'unusable' | 'failed';
+  followups_remaining?: number;
 }
 
 export interface LibertyMDAttachControlsProps {
@@ -86,11 +89,31 @@ export function LibertyMDAttachControls({
           {chips.map((chip) => (
             <li
               key={chip.object_uuid}
-              className="inline-flex items-center gap-1 rounded-full border border-libertymd-slate-200 bg-libertymd-slate-50 px-[var(--libertymd-space-sm)] py-1 libertymd-type-label text-libertymd-slate-700"
+              className="inline-flex min-w-44 items-center gap-[var(--libertymd-space-sm)] rounded-lg border border-libertymd-slate-200 bg-libertymd-slate-50 px-[var(--libertymd-space-md)] py-[var(--libertymd-space-sm)] libertymd-type-label text-libertymd-slate-700"
             >
-              <Camera className="h-3.5 w-3.5 text-libertymd-blue-600" aria-hidden="true" />
-              <span>{t('chatx.photoChip')}</span>
-              {chip.analysis_status === 'retry' && onRetryChip && (
+              <Camera className="h-4 w-4 shrink-0 text-libertymd-blue-600" aria-hidden="true" />
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold">{t('chatx.photoChip')}</span>
+                <span className="mt-0.5 flex items-center gap-1 text-libertymd-slate-500" role="status">
+                  {chip.analysis_status === 'processing' ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                  ) : chip.analysis_status === 'processed' ? (
+                    <CheckCircle2 className="h-3.5 w-3.5 text-libertymd-green-600" aria-hidden="true" />
+                  ) : chip.analysis_status === 'unusable' || chip.analysis_status === 'failed' || chip.analysis_status === 'retry' ? (
+                    <AlertTriangle className="h-3.5 w-3.5 text-libertymd-slate-600" aria-hidden="true" />
+                  ) : null}
+                  {chip.analysis_status === 'processing'
+                    ? t('chatx.mediaProcessing')
+                    : chip.analysis_status === 'processed'
+                      ? t('chatx.mediaProcessed')
+                      : chip.analysis_status === 'unusable'
+                        ? t('chatx.mediaUnusable')
+                        : chip.analysis_status === 'failed' || chip.analysis_status === 'retry'
+                          ? t('chatx.mediaFailed')
+                          : t('chatx.mediaProcessing')}
+                </span>
+              </span>
+              {(chip.analysis_status === 'retry' || chip.analysis_status === 'failed') && onRetryChip && (
                 <button
                   type="button"
                   onClick={() => onRetryChip(chip.object_uuid)}
@@ -129,11 +152,26 @@ export function LibertyMDAttachControls({
           {labChips.map((chip) => (
             <li
               key={chip.object_uuid}
-              className="inline-flex items-center gap-1 rounded-full border border-libertymd-slate-200 bg-libertymd-slate-50 px-[var(--libertymd-space-sm)] py-1 libertymd-type-label text-libertymd-slate-700"
+              className="inline-flex min-w-44 items-center gap-[var(--libertymd-space-sm)] rounded-lg border border-libertymd-slate-200 bg-libertymd-slate-50 px-[var(--libertymd-space-md)] py-[var(--libertymd-space-sm)] libertymd-type-label text-libertymd-slate-700"
             >
-              <FileText className="h-3.5 w-3.5 text-libertymd-blue-600" aria-hidden="true" />
-              <span>{t('chatx.labChip')}</span>
-              <span className="text-libertymd-slate-500">{t('chatx.labUnreviewed')}</span>
+              <FileText className="h-4 w-4 shrink-0 text-libertymd-blue-600" aria-hidden="true" />
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold">{t('chatx.labChip')}</span>
+                <span className="mt-0.5 flex items-center gap-1 text-libertymd-slate-500" role="status">
+                  {chip.analysis_status === 'processing' ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                  ) : chip.analysis_status === 'processed' ? (
+                    <CheckCircle2 className="h-3.5 w-3.5 text-libertymd-green-600" aria-hidden="true" />
+                  ) : (
+                    <AlertTriangle className="h-3.5 w-3.5 text-libertymd-slate-600" aria-hidden="true" />
+                  )}
+                  {chip.analysis_status === 'processing'
+                    ? t('chatx.mediaProcessing')
+                    : chip.analysis_status === 'processed'
+                      ? t('chatx.mediaProcessed')
+                      : t('chatx.mediaFailed')}
+                </span>
+              </span>
               {onRemoveLabChip && (
                 <button
                   type="button"

@@ -88,22 +88,24 @@ export function assertConsultationOwned(ctx: ProxyContext, consultation: { id: s
 /**
  * P0-13 AC1 — the turn cap is a hard invariant, not a prompt instruction.
  *
- * Turn 16 must be structurally impossible. `decideReportOutcome` already
- * terminates every turn-15 consult (verified: at `turnCount >= 15` it can only
- * return `complete` or `review`, never `continue`), so today's happy path never
- * reaches this. That is precisely why it is worth asserting — the cap currently
- * *emerges* from a scoring function three modules away, and would disappear
- * silently the moment that function is retuned.
+ * The normal ceiling is 15. The caller may explicitly raise it only for the
+ * bounded media-evidence extension (currently 19); every other path keeps the
+ * default. Passing the allowed maximum makes that exception visible at the
+ * enforcement point instead of weakening the invariant globally.
  */
-export function assertTurnWithinCap(consultationId: string, nextTurnCount: number) {
-  if (nextTurnCount <= MAX_TURNS) return
+export function assertTurnWithinCap(
+  consultationId: string,
+  nextTurnCount: number,
+  allowedMaxTurns = MAX_TURNS,
+) {
+  if (nextTurnCount <= allowedMaxTurns) return
   console.warn('LibertyMD invariant violation: turn count would exceed the cap', {
     invariant: 'max_turns',
     consultation_id: consultationId,
     attempted_turn_count: nextTurnCount,
-    max_turns: MAX_TURNS,
+    max_turns: allowedMaxTurns,
   })
-  throw new InvariantViolation('max_turns', `Consultation has reached its ${MAX_TURNS}-turn limit`)
+  throw new InvariantViolation('max_turns', `Consultation has reached its ${allowedMaxTurns}-turn limit`)
 }
 
 /**
@@ -328,6 +330,8 @@ export type SaveDiagnosticRunOptions = {
    * on the interview continue path; defaults to `consultation.target_slot`.
    */
   targetSlot?: string | null
+  /** Exact processed evidence snapshot supplied to Diagnosis. */
+  mediaContext?: JsonObject[]
 }
 
 export async function saveDiagnosticRun(
@@ -381,6 +385,7 @@ export async function saveDiagnosticRun(
       filled_slots: slots,
       missing_slots: missingSlots,
       target_slot: targetSlot,
+      media_context: options.mediaContext || [],
     },
     confidence_score: diagnosis.confidence,
     evidence_score: evidenceScore,

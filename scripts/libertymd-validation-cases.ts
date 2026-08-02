@@ -91,7 +91,7 @@ export const LIBERTYMD_VALIDATION_CASES = {
     patient: { age: 38, sex: 'male' },
     history: noHighConfidenceHistory,
     filledSlots: noHighConfidenceSlots,
-    expected: 'Withhold the report and resolve to clinical review rather than force completion.',
+    expected: 'Produce a Report for Physician Review with exactly three explicitly low-confidence differentials.',
   },
   nonMedical: {
     id: 'non_medical_answers',
@@ -130,23 +130,23 @@ export const LOOP_PROTOCOL = [
     recommendation: 'Keep differential validation and inspect the 60-point confidence boundary.',
   },
   {
-    focus: 'Confidence threshold enforcement',
-    build: 'Verify confidence below 60 cannot complete even when the remaining evidence is sufficient.',
-    recommendation: 'Keep confidence subordinate to evidence and inspect the 15-message terminal rule.',
+    focus: 'Low-confidence report transparency',
+    build: 'Verify a valid workflow-ready report is shown at low confidence with three ranked possibilities and reasons.',
+    recommendation: 'Keep confidence visible rather than withholding the report, then inspect the 15-message terminal rule.',
   },
   {
     focus: 'Fifteen-patient-message terminal rule',
     build: 'Verify turn count triggers a decision but never manufactures a diagnosis.',
-    recommendation: 'Preserve review fallback and inspect repeated non-medical answers.',
+    recommendation: 'Preserve physician-review output when health information exists and inspect repeated non-medical answers.',
   },
   {
     focus: 'Non-medical response containment',
     build: 'Verify off-topic answers cannot populate slots or mark the consultation report-ready.',
-    recommendation: 'Persist non-clinical response state and inspect report withholding end to end.',
+    recommendation: 'Persist non-clinical response state and reserve incomplete output for no-health-information sessions.',
   },
   {
-    focus: 'Report-release quality gate',
-    build: 'Verify Low Fever can complete only when workflow validity, confidence, and evidence all pass.',
+    focus: 'Report-release validity gate',
+    build: 'Verify Low Fever completes when the workflow output is valid and includes three ranked differentials; confidence remains descriptive.',
     recommendation: 'Freeze deterministic acceptance contracts and prepare live workflow validation.',
   },
   {
@@ -172,11 +172,11 @@ export const LOOP_PROTOCOL = [
   {
     focus: 'Live emergency repeatability',
     build: 'Verify Heart Attack remains force_end across nondeterministic agent calls.',
-    recommendation: 'Keep emergency routing isolated and repeat the 15-message withholding path.',
+    recommendation: 'Keep emergency routing isolated and repeat the 15-message physician-review path.',
   },
   {
-    focus: 'Live low-confidence withholding repeatability',
-    build: 'Verify uncertain 15-message histories remain review-only regardless of model confidence.',
+    focus: 'Live low-confidence physician-review repeatability',
+    build: 'Verify uncertain 15-message health histories still produce three candid low-confidence differentials for physician review.',
     recommendation: 'Keep evidence validation independent of model confidence and repeat off-topic containment.',
   },
   {

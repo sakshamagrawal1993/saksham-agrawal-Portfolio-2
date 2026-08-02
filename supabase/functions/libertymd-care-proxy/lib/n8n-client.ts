@@ -522,6 +522,8 @@ export async function runInterview(
    * differential yet, or stale) and the agent falls back to missing_slots.
    */
   differentialHint?: JsonObject | null,
+  /** Processed, same-patient photo/lab evidence plus answered follow-ups. */
+  mediaContext: JsonObject[] = [],
 ): Promise<InterviewResult> {
   // Thrown, not swallowed: a post-emergency interview attempt is a caller bug,
   // and returning a fallback question would hide it behind a plausible reply.
@@ -537,6 +539,7 @@ export async function runInterview(
       turn_count: turnCount,
       language: clinicalLanguage,
       locale: clinicalLanguage,
+      media_context: mediaContext,
       ...(differentialHint ? { differential_hint: differentialHint } : {}),
     }, N8N_TIMEOUT_MS.interview, undefined, {
       correlationId: correlationId || undefined,
@@ -599,7 +602,12 @@ export function parseDiagnosis(rawValue: unknown) {
     raw,
     differentials,
     confidence,
-    valid: workflowValid && differentials.length > 0 && confidence > 0 && raw.error !== 'Failed to parse differential JSON',
+    // A 0-confidence differential can still be a valid physician-review
+    // report. Shape and presence — not confidence — decide validity.
+    // The workflow validator enforces exactly three for new reports. Keep this
+    // transport parser compatible with older validated rows while accepting a
+    // genuine 0-confidence physician-review result.
+    valid: workflowValid && differentials.length > 0 && confidence >= 0 && raw.error !== 'Failed to parse differential JSON',
   }
 }
 
@@ -619,6 +627,7 @@ export type RunDiagnosisOptions = {
    * Callers must not emit `inference_failed` for speculative soft-fails.
    */
   speculative?: boolean
+  mediaContext?: JsonObject[]
 }
 
 export async function runDiagnosis(
@@ -646,6 +655,7 @@ export async function runDiagnosis(
       turn_count: consultation.turn_count,
       language: clinicalLanguage,
       locale: clinicalLanguage,
+      media_context: options.mediaContext || [],
     }, N8N_TIMEOUT_MS.diagnosis, stage, {
       correlationId: correlationId || undefined,
     }))
@@ -701,6 +711,7 @@ export async function runDifferential(
   language: string,
   priorDifferential: JsonObject | null,
   correlationId?: string | null,
+  mediaContext: JsonObject[] = [],
 ): Promise<DifferentialResult | null> {
   try {
     const raw = normalizeObject(await postJson(
@@ -712,6 +723,7 @@ export async function runDifferential(
         turn_count: turnCount,
         language,
         prior_differential: priorDifferential,
+        media_context: mediaContext,
       },
       N8N_TIMEOUT_MS.differential,
       'differential',

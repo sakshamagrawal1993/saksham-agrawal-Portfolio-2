@@ -45,6 +45,15 @@ export const URI_MUNDANE_SAMPLE_REPORT_DATA = {
       supporting_evidence: [],
       conflicting_evidence: [],
     },
+    {
+      rank: 3,
+      full_name: 'Acute bacterial sinusitis',
+      common_name: 'Sinus infection',
+      confidence: 18,
+      reason: 'This can cause congestion, but the short duration and lack of persistent fever or focal facial pain make it less likely.',
+      supporting_evidence: ['congestion'],
+      conflicting_evidence: ['short duration', 'no persistent fever reported'],
+    },
   ],
   assessment_and_plan: {
     assessment: 'Mild viral URI without emergency features.',

@@ -123,7 +123,7 @@ Deno.test('P2-02 DoD+ · mundane full report maps all major sections; no patient
   assertEquals(view.triageTier, 'home')
   assertTrue(view.nextStep)
   assertTrue(view.assessmentAndPlan)
-  assertEquals(view.differentials.length, 2)
+  assertEquals(view.differentials.length, 3)
   // P2-04 Q7 · common_name first
   assertEquals(view.differentials[0].name, 'Common cold')
   assertEquals(view.differentials[0].ordinal, 'most_likely')
@@ -353,7 +353,7 @@ function assertAscendingPresent(indices: Array<{ label: string; index: number }>
   }
 }
 
-Deno.test('P2-03 AC1 · four-pack DOM marker order + collapse defaults', async () => {
+Deno.test('P2-03 AC1 · physician-review clinical order + open defaults', async () => {
   const view = await Deno.readTextFile(VIEW)
 
   const triage = markerIndex(view, 'data-libertymd-report-triage')
@@ -365,24 +365,21 @@ Deno.test('P2-03 AC1 · four-pack DOM marker order + collapse defaults', async (
   assertTrue(nextStep >= 0, 'next-step marker present')
   assertTrue(differential >= 0, 'differential section present')
   assertTrue(soap >= 0, 'soap section present')
-  assertAscendingPresent([
-    { label: 'triage', index: triage },
-    { label: 'nextStep', index: nextStep },
-    { label: 'differential', index: differential },
-    { label: 'soap', index: soap },
-  ])
+  assertTrue(differential < triage, 'differential precedes action-plan triage')
+  assertTrue(triage < nextStep, 'triage precedes immediate next step inside action plan')
+  assertTrue(nextStep < soap, 'action plan precedes SOAP')
 
   // A&P / red flags stay between differential and SOAP (Q6)
   const ap = markerIndex(view, 'sectionId="assessment_and_plan"')
   const redFlags = markerIndex(view, 'sectionId="red_flags"')
   assertTrue(differential < ap && ap < redFlags && redFlags < soap, 'A&P/red flags between dx and SOAP')
 
-  // Differential default-open; SOAP/A&P/red flags collapsed (P2-05 section map defaults)
+  // All requested physician-review sections are visible on first view.
   const mapper = await Deno.readTextFile(MAPPER)
   assertTrue(mapper.includes('differential: true'), 'differential default open')
-  assertTrue(mapper.includes('soap: false'), 'SOAP starts collapsed')
-  assertTrue(mapper.includes('assessment_and_plan: false'), 'A&P starts collapsed')
-  assertTrue(mapper.includes('red_flags: false'), 'red flags collapsed')
+  assertTrue(mapper.includes('soap: true'), 'SOAP starts open')
+  assertTrue(mapper.includes('assessment_and_plan: true'), 'action plan starts open')
+  assertTrue(mapper.includes('red_flags: true'), 'red flags start open')
 })
 
 Deno.test('P2-03 AC2 · Q1 type/token hierarchy roles (ATF UNTESTABLE)', async () => {
@@ -454,7 +451,7 @@ Deno.test('P2-03 AC3 · differential remains before SOAP + default-open', async 
   )
   const mapper = await Deno.readTextFile(MAPPER)
   assertTrue(mapper.includes('differential: true'), 'mapper default differential open')
-  assertTrue(mapper.includes('assessment_and_plan: false'), 'A&P default closed')
+  assertTrue(mapper.includes('assessment_and_plan: true'), 'A&P default open')
 })
 
 Deno.test('P2-03 AC4 · omit-not-stub partial matrix + relative four-pack order', () => {
@@ -500,24 +497,27 @@ Deno.test('P2-03 AC4 · omit-not-stub partial matrix + relative four-pack order'
   }
 })
 
-Deno.test('P2-03 AC4/Q4 · source omit matrix — present markers never reorder', async () => {
+Deno.test('P2-03 AC4/Q4 · requested clinical sections retain relative order', async () => {
   const view = await Deno.readTextFile(VIEW)
 
-  // Canonical presence order among four: triage ≼ nextStep ≼ differential ≼ soap
-  // (footerSlot between nextStep and differential per Q5)
+  // Canonical clinical order: differential, action plan, red flags, SOAP.
   const triage = markerIndex(view, 'data-libertymd-report-triage')
   const nextStep = markerIndex(view, 'data-libertymd-report-next-step')
   const footerSlot = markerIndex(view, 'data-libertymd-report-footer-slot')
   const differential = markerIndex(view, 'sectionId="differential"')
   const soap = markerIndex(view, 'sectionId="soap"')
 
+  const ap = markerIndex(view, 'sectionId="assessment_and_plan"')
+  const redFlags = markerIndex(view, 'sectionId="red_flags"')
   assertAscendingPresent([
+    { label: 'differential', index: differential },
+    { label: 'assessmentAndPlan', index: ap },
     { label: 'triage', index: triage },
     { label: 'nextStep', index: nextStep },
-    { label: 'footerSlot', index: footerSlot },
-    { label: 'differential', index: differential },
+    { label: 'redFlags', index: redFlags },
     { label: 'soap', index: soap },
   ])
+  assertTrue(footerSlot < differential, 'doctor handoff remains outside the clinical sequence')
 
   // Conditional omit (no reserved stubs): sections gated on show* / report.nextStep
   assertTrue(view.includes('{showTriage ?'), 'triage omitted when absent')
@@ -528,7 +528,7 @@ Deno.test('P2-03 AC4/Q4 · source omit matrix — present markers never reorder'
   assertEquals(view.includes('data-libertymd-report-next-step-stub'), false)
 })
 
-Deno.test('P2-03 Q3/Q5 · framing order kept; footerSlot before differential', async () => {
+Deno.test('P2-03 Q3/Q5 · physician-review framing and summaries precede clinical sections', async () => {
   const view = await Deno.readTextFile(VIEW)
 
   const framing = markerIndex(view, 'report.aiFraming')
@@ -539,10 +539,12 @@ Deno.test('P2-03 Q3/Q5 · framing order kept; footerSlot before differential', a
   const differential = markerIndex(view, 'sectionId="differential"')
 
   assertTrue(framing >= 0 && framing < headline, 'framing before headline')
-  assertTrue(headline < triage, 'headline before triage')
-  assertTrue(triage < nextStep, 'triage before next step')
-  assertTrue(nextStep < footerSlot, 'next step before footerSlot')
+  const sessionSummary = markerIndex(view, 'data-libertymd-report-session-summary')
+  const patientSummary = markerIndex(view, 'data-libertymd-report-patient-summary')
+  assertTrue(headline < sessionSummary, 'report title before session summary')
+  assertTrue(sessionSummary < patientSummary, 'session summary before patient summary')
   assertTrue(footerSlot < differential, 'footerSlot before differential (body start)')
+  assertTrue(differential < triage && triage < nextStep, 'differential before action plan')
 
   // footerSlot prop API retained; placed in body before differential
   assertTrue(view.includes('data-libertymd-report-footer-slot'), 'footerSlot marker in body')
@@ -571,16 +573,15 @@ const FORBIDDEN_CTA_SUBSTRINGS = [
 Deno.test('P2-04 Q1 · mapDifferentialOrdinal rank / confidence / omit', () => {
   assertEquals(mapDifferentialOrdinal({ rank: 1 }), 'most_likely')
   assertEquals(mapDifferentialOrdinal({ rank: 2 }), 'possible')
-  assertEquals(mapDifferentialOrdinal({ rank: 3 }), 'possible')
-  assertEquals(mapDifferentialOrdinal({ rank: 4 }), 'less_likely')
-  assertEquals(mapDifferentialOrdinal({ rank: 5 }), 'less_likely')
-  // Rank wins over confidence
-  assertEquals(mapDifferentialOrdinal({ rank: 2, confidence: 90 }), 'possible')
-  // Confidence fallback
+  assertEquals(mapDifferentialOrdinal({ rank: 3 }), 'less_likely')
+  assertEquals(mapDifferentialOrdinal({ rank: 4 }), undefined)
+  // Confidence wins over rank so low-confidence rank 1 is labelled honestly.
+  assertEquals(mapDifferentialOrdinal({ rank: 2, confidence: 90 }), 'most_likely')
   assertEquals(mapDifferentialOrdinal({ confidence: 70 }), 'most_likely')
   assertEquals(mapDifferentialOrdinal({ confidence: '70%' }), 'most_likely')
   assertEquals(mapDifferentialOrdinal({ confidence: 40 }), 'possible')
   assertEquals(mapDifferentialOrdinal({ confidence: 39 }), 'less_likely')
+  assertEquals(mapDifferentialOrdinal({ rank: 1, confidence: 0 }), 'less_likely')
   assertEquals(mapDifferentialOrdinal({ confidence: 'not-a-score' }), undefined)
   assertEquals(mapDifferentialOrdinal({}), undefined)
   assertEquals(parseConfidenceScore('70%'), 70)
@@ -635,18 +636,17 @@ Deno.test('P2-04 AC5/Q6 · dosing lines omitted; guidance framing in card source
   assertTrue(card.includes('data-treatment-guidance'), 'guidance marker')
 })
 
-Deno.test('P2-04 AC6 · length 1 and 5; sixth dropped', () => {
+Deno.test('P2-04 AC6 · report renders at most the required three differentials', () => {
   const one = normalizeReportData(CARD_LENGTH_ONE_REPORT_DATA)
   assertEquals(one.differentials.length, 1)
   assertEquals(one.differentials[0].ordinal, 'most_likely')
 
   const five = normalizeReportData(CARD_LENGTH_FIVE_REPORT_DATA)
-  assertEquals(five.differentials.length, 5)
+  assertEquals(five.differentials.length, 3)
   assertEquals(five.differentials.map((d) => d.name).includes('Cause six dropped'), false)
   assertEquals(five.differentials[0].ordinal, 'most_likely')
   assertEquals(five.differentials[1].ordinal, 'possible')
-  assertEquals(five.differentials[3].ordinal, 'less_likely')
-  assertEquals(five.differentials[4].ordinal, 'less_likely')
+  assertEquals(five.differentials[2].ordinal, 'possible')
 })
 
 Deno.test('P2-04 AC1–AC5 · shared card chrome + waitlist CTA + badge pair', async () => {
@@ -695,9 +695,9 @@ Deno.test('P2-04 AC1–AC5 · shared card chrome + waitlist CTA + badge pair', a
       `card source must not include "${forbidden}"`,
     )
   }
-  assertEquals(en.report.card.ordinal.most_likely, 'Most likely')
-  assertEquals(en.report.card.ordinal.possible, 'Possible')
-  assertEquals(en.report.card.ordinal.less_likely, 'Less likely')
+  assertEquals(en.report.card.ordinal.most_likely, 'High confidence')
+  assertEquals(en.report.card.ordinal.possible, 'Moderate confidence')
+  assertEquals(en.report.card.ordinal.less_likely, 'Low confidence')
   assertEquals(en.report.card.serious, 'Serious')
 
   // Chat + App share handoff wiring (P2-11 parity)
@@ -830,8 +830,8 @@ Deno.test('P2-05 AC4 · section persistence write/restore/isolation · no PHI', 
   const readA = mergeReportSectionOpen(readReportSections(a, storage))
   assertEquals(readA.differential, false)
   assertEquals(readA.soap, true)
-  assertEquals(readA.assessment_and_plan, false, 'default closed when absent')
-  assertEquals(readA.red_flags, false)
+  assertEquals(readA.assessment_and_plan, true, 'default open when absent')
+  assertEquals(readA.red_flags, true)
 
   const readB = mergeReportSectionOpen(readReportSections(b, storage))
   assertEquals(readB.red_flags, true)

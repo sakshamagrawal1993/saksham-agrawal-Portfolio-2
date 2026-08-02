@@ -182,7 +182,7 @@ Deno.test('AC2/AC4: Chat mounts clinical_review_start_fresh ContinuationActionBa
 Deno.test('R1: emergency still precedes off-topic in send-message', async () => {
   const send = await Deno.readTextFile(SEND)
   const forceIdx = send.indexOf('if (guardrail.force_end)')
-  const offTopicIdx = send.indexOf('if (isNonClinical)')
+  const offTopicIdx = send.indexOf('if (isNonClinical')
   if (forceIdx < 0 || offTopicIdx < 0) {
     throw new Error('force_end and isNonClinical branches required')
   }

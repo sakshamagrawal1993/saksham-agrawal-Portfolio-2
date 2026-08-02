@@ -139,6 +139,8 @@ export interface RequestPayload extends LandingAttributionFields {
   file_base64?: string
   /** P4-06 retry — server resolves the private path; client never supplies it. */
   object_uuid?: string
+  /** Client-side pre-persistence window while an accepted file request is in flight. */
+  media_upload_in_progress?: boolean
 }
 
 export interface ConsultationRow {

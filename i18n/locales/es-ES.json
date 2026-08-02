@@ -59,6 +59,12 @@
     "labAttachedLabel": "Informes de laboratorio adjuntos",
     "labRemove": "Quitar informe de laboratorio",
     "labUnreviewed": "Pendiente de revisión clínica",
+    "mediaProcessing": "Procesando evidencia…",
+    "mediaProcessed": "Procesado e incluido",
+    "mediaFailed": "No se pudo procesar",
+    "mediaUnusable": "No se pudo leer suficiente detalle",
+    "mediaQuestionPhoto": "Sobre tu foto",
+    "mediaQuestionLab": "Sobre tu informe de laboratorio",
     "labAttributionTitle": "¿Para quién es este informe de laboratorio?",
     "labAttributionBody": "Elige el perfil al que pertenece este informe. Esto no cambia para quién es la consulta.",
     "labAttributionConfirm": "Continuar",
@@ -147,12 +153,14 @@
       "readySoap": "PDF SOAP del médico listo"
     },
     "sections": {
-      "triage": "Recommended care setting",
-      "nextStep": "What to do now",
-      "differential": "Possible causes",
-      "assessmentAndPlan": "Assessment and plan",
-      "redFlags": "Red flags to watch",
-      "soap": "SOAP note"
+      "sessionSummary": "Resumen de la sesión",
+      "patientSummary": "Resumen del paciente",
+      "triage": "Nivel de atención recomendado",
+      "nextStep": "Qué hacer ahora",
+      "differential": "Diagnóstico diferencial",
+      "assessmentAndPlan": "Plan de acción recomendado",
+      "redFlags": "Señales de alarma a vigilar",
+      "soap": "Nota SOAP"
     },
     "triage": {
       "home": "Home care",
@@ -163,13 +171,13 @@
       "crisis_line": "Crisis support line",
       "unknown": "Care setting unavailable"
     },
-    "viewTitle": "Assessment and next steps",
+    "viewTitle": "Informe para revisión médica",
     "card": {
       "ordinal": {
-        "most_likely": "Más probable",
-        "possible": "Posible",
-        "less_likely": "Menos probable",
-        "most_likely_serious": "Más probable · Grave"
+        "most_likely": "Confianza alta",
+        "possible": "Confianza moderada",
+        "less_likely": "Confianza baja",
+        "most_likely_serious": "Confianza alta · Grave"
       },
       "serious": "Grave",
       "furtherInvestigations": "Estudios adicionales",
@@ -237,9 +245,9 @@
       "claimRefund": "Política de reembolso: {refund}"
     },
     "lifecycle": {
-      "partialLabel": "Incomplete",
-      "partialTitle": "This report is incomplete",
-      "partialBody": "We could not produce a complete doctor-ready report from this consultation. No diagnosis list or confidence claim is shown. You can start a fresh consultation anytime.",
+      "partialLabel": "Incompleto",
+      "partialTitle": "No hay información de salud para el informe",
+      "partialBody": "En esta consulta no se habló de ningún problema de salud ni de síntomas, por lo que no hay un informe clínico que preparar. Inicia una nueva consulta cuando quieras hablar de tu salud.",
       "partialA11yNoDx": "No differential diagnosis or confidence is included.",
       "partialStartFresh": "Start a fresh consultation",
       "failedTitle": "We could not generate your report",

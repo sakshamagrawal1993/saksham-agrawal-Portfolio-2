@@ -112,6 +112,12 @@ Deno.test('P1-07 AC2 / P2-14 AC1 · diagnosis gate mirrors proxy G2 boolean', ()
   ) {
     throw new Error('at cap must run when score ok')
   }
+  if (!shouldRunDiagnosisGate({ turnCount: MAX_INTERVIEW_TURNS, evidenceScore: 25 })) {
+    throw new Error('at cap must run when any health information exists')
+  }
+  if (shouldRunDiagnosisGate({ turnCount: MAX_INTERVIEW_TURNS, evidenceScore: 0 })) {
+    throw new Error('at cap must stay closed when no health information exists')
+  }
   // Turn <6 + ready still false (G3 rejected)
   if (shouldRunDiagnosisGate({ turnCount: 5, evidenceScore: 90, readyForReport: true })) {
     throw new Error('turn 5 + ready must not open below floor')

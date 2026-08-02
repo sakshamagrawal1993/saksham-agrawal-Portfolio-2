@@ -98,12 +98,14 @@
       "readySoap": "Ärztliche SOAP-PDF bereit"
     },
     "sections": {
-      "triage": "Recommended care setting",
-      "nextStep": "What to do now",
-      "differential": "Possible causes",
-      "assessmentAndPlan": "Assessment and plan",
-      "redFlags": "Red flags to watch",
-      "soap": "SOAP note"
+      "sessionSummary": "Sitzungszusammenfassung",
+      "patientSummary": "Patientenzusammenfassung",
+      "triage": "Empfohlene Versorgungsebene",
+      "nextStep": "Was jetzt zu tun ist",
+      "differential": "Differenzialdiagnose",
+      "assessmentAndPlan": "Empfohlener Handlungsplan",
+      "redFlags": "Warnzeichen, auf die Sie achten sollten",
+      "soap": "SOAP-Notiz"
     },
     "triage": {
       "home": "Home care",
@@ -114,13 +116,13 @@
       "crisis_line": "Crisis support line",
       "unknown": "Care setting unavailable"
     },
-    "viewTitle": "Assessment and next steps",
+    "viewTitle": "Bericht zur ärztlichen Überprüfung",
     "card": {
       "ordinal": {
-        "most_likely": "Am wahrscheinlichsten",
-        "possible": "Möglich",
-        "less_likely": "Weniger wahrscheinlich",
-        "most_likely_serious": "Am wahrscheinlichsten · Ernst"
+        "most_likely": "Hohe Sicherheit",
+        "possible": "Mittlere Sicherheit",
+        "less_likely": "Geringe Sicherheit",
+        "most_likely_serious": "Hohe Sicherheit · Ernst"
       },
       "serious": "Ernst",
       "furtherInvestigations": "Weitere Untersuchungen",
@@ -188,9 +190,9 @@
       "claimRefund": "Rückerstattung: {refund}"
     },
     "lifecycle": {
-      "partialLabel": "Incomplete",
-      "partialTitle": "This report is incomplete",
-      "partialBody": "We could not produce a complete doctor-ready report from this consultation. No diagnosis list or confidence claim is shown. You can start a fresh consultation anytime.",
+      "partialLabel": "Unvollständig",
+      "partialTitle": "Keine Gesundheitsinformationen für den Bericht",
+      "partialBody": "In dieser Konsultation wurden keine gesundheitlichen Beschwerden oder Symptome besprochen. Daher kann kein klinischer Bericht erstellt werden. Beginnen Sie eine neue Konsultation, wenn Sie über Ihre Gesundheit sprechen möchten.",
       "partialA11yNoDx": "No differential diagnosis or confidence is included.",
       "partialStartFresh": "Start a fresh consultation",
       "failedTitle": "We could not generate your report",
@@ -545,6 +547,12 @@
     "labAttachedLabel": "Angehängte Laborberichte",
     "labRemove": "Laborbericht entfernen",
     "labUnreviewed": "Klinische Prüfung ausstehend",
+    "mediaProcessing": "Processing evidence…",
+    "mediaProcessed": "Processed and included",
+    "mediaFailed": "Processing failed",
+    "mediaUnusable": "Could not read enough detail",
+    "mediaQuestionPhoto": "About your photo",
+    "mediaQuestionLab": "About your lab report",
     "labAttributionTitle": "Für wen ist dieser Laborbericht?",
     "labAttributionBody": "Wählen Sie das Profil, zu dem dieser Bericht gehört. Das ändert nicht, für wen die Konsultation ist.",
     "labAttributionConfirm": "Weiter",

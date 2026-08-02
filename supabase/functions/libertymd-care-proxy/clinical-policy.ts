@@ -25,9 +25,9 @@ export interface ReportDecisionInput {
 }
 
 export type ReportDecision =
-  | { outcome: 'complete'; reason: 'high_confidence' | 'workflow_ready' | 'turn_limit_confident' }
-  | { outcome: 'continue'; reason: 'collect_more_evidence' | 'raise_confidence' }
-  | { outcome: 'review'; reason: 'low_diagnostic_confidence' | 'insufficient_clinical_information' }
+  | { outcome: 'complete'; reason: 'high_confidence' | 'workflow_ready' | 'turn_limit_report' }
+  | { outcome: 'continue'; reason: 'collect_more_evidence' | 'raise_confidence' | 'retry_report_generation' }
+  | { outcome: 'review'; reason: 'no_health_information' }
 
 export interface DeterministicEmergency {
   crisisType: string
@@ -140,29 +140,27 @@ export function classifyResponseRelevance(message: string): ResponseRelevance {
 }
 
 export function decideReportOutcome(input: ReportDecisionInput): ReportDecision {
-  if (input.turnCount >= 15 && (!input.evidence.sufficient || input.nonClinicalResponseCount >= 5)) {
-    return { outcome: 'review', reason: 'insufficient_clinical_information' }
-  }
+  const hasHealthInformation = input.evidence.present.length > 0
 
-  if (input.diagnosisValid && input.evidence.sufficient) {
+  // Confidence changes the wording of the physician-review report; it does not
+  // decide whether the patient receives one. Before the turn cap we still wait
+  // for enough evidence to avoid ending the interview prematurely. At the cap,
+  // any usable health information plus a structurally valid three-item
+  // differential is released, even when confidence is low.
+  if (input.diagnosisValid && hasHealthInformation) {
+    if (input.turnCount >= 15) return { outcome: 'complete', reason: 'turn_limit_report' }
+    if (!input.evidence.sufficient) {
+      return { outcome: 'continue', reason: 'collect_more_evidence' }
+    }
     if (input.confidence >= 80) return { outcome: 'complete', reason: 'high_confidence' }
-    // BO 2026-08-01 — before the turn cap, 80 is the only door out.
-    //
-    // The old `workflow_ready` path let the interview agent end a consult at
-    // confidence 60 simply by asserting ready_for_report. That made the model's
-    // self-report the deciding vote on a clinical stop, which is exactly the
-    // kind of self-graded threshold DECISIONS 2026-07-31 (P0-15) rules out.
-    // Confidence >= 80 is now required to finish early; the interview workflow
-    // enforces the same floor on its side, so the two agree.
-    //
-    // The cap path below is unchanged and still accepts 65: at 15 turns the
-    // choice is between releasing a moderately-confident report and sending the
-    // patient away with nothing, and the report is reviewable by a clinician.
-    if (input.turnCount >= 15 && input.confidence >= 65) return { outcome: 'complete', reason: 'turn_limit_confident' }
+    if (input.readyForReport) return { outcome: 'complete', reason: 'workflow_ready' }
   }
 
   if (input.turnCount >= 15) {
-    return { outcome: 'review', reason: input.evidence.sufficient ? 'low_diagnostic_confidence' : 'insufficient_clinical_information' }
+    if (!hasHealthInformation) return { outcome: 'review', reason: 'no_health_information' }
+    // A model/transport/schema failure is technical, not evidence that the
+    // patient's health story is incomplete. Keep the consultation recoverable.
+    return { outcome: 'continue', reason: 'retry_report_generation' }
   }
 
   return {

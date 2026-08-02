@@ -48,7 +48,7 @@ Deno.test('P3-02 · sample catalog allow-list is uri_mundane only', () => {
   assertEquals(URI_MUNDANE_SAMPLE_COMPLAINT, 'Sore throat')
   const view = normalizeReportData(data)
   assertEquals(view.triageTier, 'home')
-  assertTrue(view.differentials.length >= 1, 'differential present')
+  assertEquals(view.differentials.length, 3, 'exactly three differentials present')
 })
 
 Deno.test('P3-02 · Lexicon promotes sample_report_viewed; EN sample chrome keys', async () => {

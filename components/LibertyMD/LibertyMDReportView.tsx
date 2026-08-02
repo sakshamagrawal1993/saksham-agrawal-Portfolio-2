@@ -203,11 +203,15 @@ export function LibertyMDReportView({
   const showDoctorHandoff = shouldShowDoctorHandoff(report.triageTier)
   const handoffProminence = doctorHandoffProminence(report.triageTier)
   const showAp = Boolean(
-    report.assessmentAndPlan
-    && (
-      report.assessmentAndPlan.assessment
-      || report.assessmentAndPlan.plan.length
-      || report.assessmentAndPlan.selfCare.length
+    showTriage
+    || report.nextStep
+    || (
+      report.assessmentAndPlan
+      && (
+        report.assessmentAndPlan.assessment
+        || report.assessmentAndPlan.plan.length
+        || report.assessmentAndPlan.selfCare.length
+      )
     ),
   )
   const showSoap = Boolean(
@@ -549,7 +553,7 @@ export function LibertyMDReportView({
       data-libertymd-retention-expires-at={retentionExpiresAt || undefined}
       className="mt-[var(--libertymd-space-md)] max-w-full rounded-lg border border-libertymd-slate-200 bg-white shadow-[0_20px_65px_rgba(23,50,95,0.09)]"
     >
-      {/* Hero: framing → headline → summary → triage → next step (Q3). footerSlot moved to body (Q5). */}
+      {/* Physician-review framing → title → session summary → patient summary. */}
       <div className="overflow-hidden rounded-t-lg border-b border-libertymd-slate-200 bg-gradient-to-br from-libertymd-blue-50 to-libertymd-green-sage/40 px-[var(--libertymd-space-lg)] py-[var(--libertymd-space-md)] sm:px-[var(--libertymd-space-xl)]">
         <div className="libertymd-type-label flex items-center gap-2 font-bold uppercase text-libertymd-blue-600">
           <FileText className="h-4 w-4 shrink-0" aria-hidden />
@@ -558,44 +562,26 @@ export function LibertyMDReportView({
         <p className="libertymd-type-label mt-[var(--libertymd-space-xs)] font-semibold text-libertymd-slate-500">
           {t('report.aiFraming')}
         </p>
+        <h2 className="libertymd-type-lead mt-[var(--libertymd-space-sm)] font-serif font-semibold text-libertymd-ink">
+          {t('report.viewTitle')}
+        </h2>
         {report.headline ? (
-          <h2 className="libertymd-type-body mt-[var(--libertymd-space-sm)] font-serif font-semibold text-libertymd-ink">
-            {report.headline}
-          </h2>
-        ) : (
-          <h2 className="libertymd-type-body mt-[var(--libertymd-space-sm)] font-serif font-semibold text-libertymd-ink">
-            {t('report.viewTitle')}
-          </h2>
-        )}
-        {report.patientSummary ? (
-          <p className="libertymd-type-body-small mt-[var(--libertymd-space-sm)] line-clamp-3 text-libertymd-slate-700">
-            {report.patientSummary}
-          </p>
-        ) : null}
-
-        {showTriage ? (
-          <div className="mt-[var(--libertymd-space-sm)]" data-libertymd-report-triage>
-            <p className="sr-only">{t('report.sections.triage')}</p>
-            <span
-              className={`libertymd-type-card-title inline-flex max-w-full flex-wrap items-center rounded-md border px-3 py-1.5 font-bold ${TRIAGE_BADGE_CLASS[report.triageTier]}`}
-              data-triage-tier={report.triageTier}
-              data-emergency-tier={isEmergencyTriageTier(report.triageTier) ? 'true' : 'false'}
-            >
-              {t(triageLabelKey(report.triageTier))}
-            </span>
+          <div className="mt-[var(--libertymd-space-md)]" data-libertymd-report-session-summary>
+            <h3 className="libertymd-type-label font-bold uppercase tracking-wide text-libertymd-slate-500">
+              {t('report.sections.sessionSummary')}
+            </h3>
+            <p className="libertymd-type-body-small mt-[var(--libertymd-space-xs)] font-semibold text-libertymd-ink">
+              {report.headline}
+            </p>
           </div>
         ) : null}
-
-        {report.nextStep ? (
-          <div
-            className="mt-[var(--libertymd-space-sm)] rounded-md border border-libertymd-slate-200 bg-white/80 px-3 py-3"
-            data-libertymd-report-next-step
-          >
+        {report.patientSummary ? (
+          <div className="mt-[var(--libertymd-space-md)]" data-libertymd-report-patient-summary>
             <h3 className="libertymd-type-label font-bold uppercase tracking-wide text-libertymd-slate-500">
-              {t('report.sections.nextStep')}
+              {t('report.sections.patientSummary')}
             </h3>
-            <p className="libertymd-type-lead mt-[var(--libertymd-space-xs)] font-bold text-libertymd-ink">
-              {report.nextStep}
+            <p className="libertymd-type-body-small mt-[var(--libertymd-space-xs)] text-libertymd-slate-700">
+              {report.patientSummary}
             </p>
           </div>
         ) : null}
@@ -816,22 +802,64 @@ export function LibertyMDReportView({
             onToggle={() => onExpand('assessment_and_plan', sectionOpen.assessment_and_plan)}
           >
             <div className="libertymd-type-body-small space-y-3 text-libertymd-slate-700">
+              {showTriage ? (
+                <div data-libertymd-report-triage>
+                  <p className="libertymd-type-label font-bold uppercase text-libertymd-slate-500">
+                    {t('report.sections.triage')}
+                  </p>
+                  <span
+                    className={`libertymd-type-card-title mt-1 inline-flex max-w-full flex-wrap items-center rounded-md border px-3 py-1.5 font-bold ${TRIAGE_BADGE_CLASS[report.triageTier]}`}
+                    data-triage-tier={report.triageTier}
+                    data-emergency-tier={isEmergencyTriageTier(report.triageTier) ? 'true' : 'false'}
+                  >
+                    {t(triageLabelKey(report.triageTier))}
+                  </span>
+                </div>
+              ) : null}
+              {report.nextStep ? (
+                <div
+                  className="rounded-md border border-libertymd-slate-200 bg-libertymd-blue-50/50 px-3 py-3"
+                  data-libertymd-report-next-step
+                >
+                  <h3 className="libertymd-type-label font-bold uppercase tracking-wide text-libertymd-slate-500">
+                    {t('report.sections.nextStep')}
+                  </h3>
+                  <p className="libertymd-type-lead mt-[var(--libertymd-space-xs)] font-bold text-libertymd-ink">
+                    {report.nextStep}
+                  </p>
+                </div>
+              ) : null}
               {report.assessmentAndPlan?.assessment ? (
-                <p>{report.assessmentAndPlan.assessment}</p>
+                <div>
+                  <p className="libertymd-type-label font-bold uppercase text-libertymd-slate-500">
+                    {t('report.teasers.assessmentChip')}
+                  </p>
+                  <p className="mt-1">{report.assessmentAndPlan.assessment}</p>
+                </div>
               ) : null}
               {report.assessmentAndPlan && report.assessmentAndPlan.plan.length > 0 ? (
-                <ul className="list-disc space-y-1 pl-5">
-                  {report.assessmentAndPlan.plan.map((item, index) => (
-                    <li key={`plan-${index}`}>{item}</li>
-                  ))}
-                </ul>
+                <div>
+                  <p className="libertymd-type-label font-bold uppercase text-libertymd-slate-500">
+                    {t('report.pdf.plan')}
+                  </p>
+                  <ul className="mt-1 list-disc space-y-1 pl-5">
+                    {report.assessmentAndPlan.plan.map((item, index) => (
+                      <li key={`plan-${index}`}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
               ) : null}
               {report.assessmentAndPlan && report.assessmentAndPlan.selfCare.length > 0 ? (
-                <ul className="list-disc space-y-1 pl-5">
-                  {report.assessmentAndPlan.selfCare.map((item, index) => (
-                    <li key={`self-${index}`}>{item}</li>
-                  ))}
-                </ul>
+                <div>
+                  <p className="libertymd-type-label font-bold uppercase text-libertymd-slate-500">
+                    {t('report.selfCare')}
+                  </p>
+                  <ul className="mt-1 list-disc space-y-1 pl-5">
+                    {report.assessmentAndPlan.selfCare.map((item, index) => (
+                      <li key={`self-${index}`}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
               ) : null}
             </div>
           </ReportCollapsible>

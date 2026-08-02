@@ -351,7 +351,7 @@
         "status": "pending",
         "reviewer": null,
         "reviewed_at": null,
-        "notes": "Report-gate fixture. BO 2026-08-01 raised the mid-consult release floor from 60 to 80, so this scenario's decision_input.confidence moved 60 -> 80 to keep testing the same thing: a valid, sufficiently-evidenced report releases. Clinical meaning unchanged; still requires clinician review."
+        "notes": "Report-gate fixture. A valid, sufficiently evidenced workflow-ready report releases for physician review; the confidence value is displayed rather than used as a withholding threshold. Still requires clinician review."
       }
     },
     {
@@ -386,18 +386,18 @@
       "expected": {
         "emergency_action": "continue",
         "input_relevance": "clinical",
-        "report_outcome": "review"
+        "report_outcome": "complete"
       },
       "clinical_review": {
         "status": "pending",
         "reviewer": null,
         "reviewed_at": null,
-        "notes": "Draft engineering fixture; clinician review required."
+        "notes": "Draft engineering fixture. Real but sparse health information must still produce a candid low-confidence Report for Physician Review with three ranked possibilities; clinician review required."
       }
     },
     {
       "id": "confidence_59",
-      "title": "Complete evidence below confidence threshold",
+      "title": "Complete evidence with low confidence",
       "category": "report_gate",
       "patient": {
         "age": 32,
@@ -428,13 +428,13 @@
       "expected": {
         "emergency_action": "continue",
         "input_relevance": "clinical",
-        "report_outcome": "continue"
+        "report_outcome": "complete"
       },
       "clinical_review": {
         "status": "pending",
         "reviewer": null,
         "reviewed_at": null,
-        "notes": "Draft engineering fixture; clinician review required."
+        "notes": "Draft engineering fixture. Confidence is descriptive, not a report-withholding gate; clinician review required."
       }
     },
     {

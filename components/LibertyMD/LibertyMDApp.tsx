@@ -33,7 +33,6 @@ import {
   LibertyMDPricingSection,
 } from './LibertyMDMarketingSections';
 import { LibertyMDScrollFilmSection } from './LibertyMDScrollFilmSection';
-import { LibertyMDTrustRow } from './LibertyMDTrustRow';
 import { LibertyMDProgressIndicator } from './LibertyMDProgressIndicator';
 import { LibertyMDReportView } from './LibertyMDReportView';
 import { LibertyMDSampleReport } from './LibertyMDSampleReport';
@@ -1645,6 +1644,10 @@ export default function LibertyMDApp() {
                 ))}
 
                 {phase === 'demographics_required' && (
+                  // The hero renders this bare in the message flow rather than
+                  // in a card, so the divider from the messages above lives
+                  // here — the control no longer draws its own.
+                  <div className="border-t border-libertymd-green-sage pt-libertymd-lg">
                   <LibertyMDDemographicsPrompt
                     age={demographics.age}
                     sex={demographics.sex}
@@ -1661,6 +1664,7 @@ export default function LibertyMDApp() {
                     onCareForSomeoneElse={isAnonymous ? () => void attemptAddProfile('unified_entry') : undefined}
                     onSubmit={submitDemographics}
                   />
+                  </div>
                 )}
 
                 {safetyNotice && phase !== 'emergency_end' && (
@@ -1942,9 +1946,6 @@ export default function LibertyMDApp() {
           </button>
         </form>
       </div>
-
-      {/* P3-03 — honest trust band immediately above frozen marketing footer. */}
-      {phase === 'initial' && <LibertyMDTrustRow />}
 
       {/* Exact Doctronic-Style 3D Volumetric Ribbon Footer in Blue */}
       <footer className="relative mt-24 bg-gradient-to-b from-libertymd-blue-50 via-libertymd-blue-50 to-libertymd-blue-50 text-libertymd-slate-900 overflow-hidden min-h-[720px] flex flex-col justify-between">

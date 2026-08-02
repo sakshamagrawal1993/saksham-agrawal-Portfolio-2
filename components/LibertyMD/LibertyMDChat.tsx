@@ -4,6 +4,8 @@ import {
   Paperclip,
   AlertTriangle,
   ArrowLeft,
+  Camera,
+  FileText,
   Menu,
   Send,
 } from 'lucide-react';
@@ -248,6 +250,7 @@ interface ChatMessage {
   revealFullText?: string;
   /** P1-12 / P0-12 — stable outbound id for reconcile + retry. */
   clientMessageId?: string;
+  mediaKind?: 'photo' | 'lab';
 }
 
 interface LibertyMDProfile {
@@ -256,6 +259,15 @@ interface LibertyMDProfile {
   avatar_url?: string | null;
   age?: number | null;
   sex_at_birth?: string | null;
+}
+
+function uniqueEvidenceChips<T extends { object_uuid: string }>(chips: T[]): T[] {
+  const seen = new Set<string>();
+  return chips.filter((chip) => {
+    if (seen.has(chip.object_uuid)) return false;
+    seen.add(chip.object_uuid);
+    return true;
+  });
 }
 
 const phaseFromStatus = (status: string): ChatPhase => {
@@ -654,17 +666,82 @@ export default function LibertyMDChat() {
     if (item.message_type === 'report_gate') kind = 'report';
     else if (item.message_type === 'demographics') kind = 'demographics';
     else if (item.message_type === 'safety' && opts?.emergencyStopped) kind = 'emergency';
+    const metadata = item?.metadata && typeof item.metadata === 'object'
+      ? item.metadata as Record<string, unknown>
+      : null;
+    const mediaKind = metadata?.source === 'media_followup'
+      && (metadata?.evidence_kind === 'photo' || metadata?.evidence_kind === 'lab')
+      ? metadata.evidence_kind
+      : undefined;
     return {
       id: String(item.id || `${consultationId}-${index}`),
       sender: item.role === 'user' ? 'user' : 'ai',
       text: String(item.content || ''),
       options: Array.isArray(item.options) ? item.options.map(String) : [],
       kind,
+      ...(mediaKind ? { mediaKind } : {}),
       ...(typeof item.client_message_id === 'string' && item.client_message_id
         ? { clientMessageId: String(item.client_message_id) }
         : {}),
     };
   });
+
+  const applyMediaEvidence = (raw: unknown) => {
+    const packets = Array.isArray(raw) ? raw : [];
+    const remaining = (packet: any) => Array.isArray(packet?.followups)
+      ? packet.followups.filter((row: any) => row?.status === 'pending' || row?.status === 'asked').length
+      : 0;
+    const serverPhotos = packets
+      .filter((packet: any) => packet?.kind === 'photo' && typeof packet?.evidence_id === 'string')
+      .map((packet: any) => ({
+        object_uuid: String(packet.evidence_id),
+        content_type: String(packet.content_type || 'image/jpeg'),
+        analysis_status: ['processing', 'processed', 'unusable', 'failed'].includes(String(packet.status))
+          ? packet.status
+          : 'processing',
+        followups_remaining: remaining(packet),
+      }));
+    const serverLabs = packets
+      .filter((packet: any) => packet?.kind === 'lab' && typeof packet?.evidence_id === 'string')
+      .map((packet: any) => ({
+        object_uuid: String(packet.evidence_id),
+        content_type: String(packet.content_type || 'application/pdf'),
+        patient_id: String(packet.patient_id || ''),
+        analysis_status: ['processing', 'processed', 'unusable', 'failed'].includes(String(packet.status))
+          ? packet.status
+          : 'processing',
+        followups_remaining: remaining(packet),
+      }));
+    setPhotoChips((current) => [
+      ...serverPhotos,
+      ...current.filter((chip) => chip.object_uuid.startsWith('local-photo-')),
+    ]);
+    setLabChips((current) => [
+      ...serverLabs,
+      ...current.filter((chip) => chip.object_uuid.startsWith('local-lab-')),
+    ]);
+  };
+
+  const hasProcessingMedia = photoChips.some((chip) => chip.analysis_status === 'processing')
+    || labChips.some((chip) => chip.analysis_status === 'processing');
+
+  useEffect(() => {
+    if (!consultationId || phase !== 'intake' || !hasProcessingMedia) return;
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const data = await invokeCareProxy({ action: 'get_consultation', consultation_id: consultationId });
+        if (!cancelled) applyMediaEvidence(data?.media_evidence);
+      } catch {
+        // Upload request owns the visible failure copy. Polling stays quiet.
+      }
+    };
+    const timer = window.setInterval(() => void poll(), 2000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [consultationId, hasProcessingMedia, phase]);
 
   const refreshAccount = async () => {
     setAccountLoading(true);
@@ -1138,6 +1215,7 @@ export default function LibertyMDChat() {
         const nextPhase = phaseFromStatus(String(data?.consultation?.status || 'interviewing'));
         setConsultationVersion(Number.isInteger(data?.consultation?.version) ? Number(data.consultation.version) : null);
         setResumeChiefComplaint(resolveResumeChiefComplaint(data?.consultation));
+        applyMediaEvidence(data?.media_evidence);
         const rawMessages = Array.isArray(data?.messages) ? data.messages : [];
         const storage = typeof window !== 'undefined' ? window.localStorage : null;
         // P1-12 hydrate order: mapMessages → merge pending → restore draft/scroll → then flush.
@@ -1333,6 +1411,7 @@ export default function LibertyMDChat() {
 
   const applyWorkflowResult = async (data: any) => {
     if (Number.isInteger(data?.version)) setConsultationVersion(Number(data.version));
+    if (Array.isArray(data?.media_evidence)) applyMediaEvidence(data.media_evidence);
     observeTurnGate(data);
     if (data?.emergency || data?.state === 'emergency_stopped') {
       setComprehensionCheck(null);
@@ -1416,6 +1495,9 @@ export default function LibertyMDChat() {
       sender: 'ai',
       text: nextQuestion,
       options: Array.isArray(data?.options) ? data.options.map(String) : [],
+      ...(data?.media_followup?.kind === 'photo' || data?.media_followup?.kind === 'lab'
+        ? { mediaKind: data.media_followup.kind }
+        : {}),
     });
     setPhase('intake');
   };
@@ -1438,6 +1520,7 @@ export default function LibertyMDChat() {
       const nextPhase = phaseFromStatus(String(data?.consultation?.status || 'interviewing'));
       setConsultationVersion(Number.isInteger(data?.consultation?.version) ? Number(data.consultation.version) : null);
       setResumeChiefComplaint(resolveResumeChiefComplaint(data?.consultation));
+      applyMediaEvidence(data?.media_evidence);
       const rawMessages = Array.isArray(data?.messages) ? data.messages : [];
       const storage = typeof window !== 'undefined' ? window.localStorage : null;
       const pending = storage
@@ -1492,11 +1575,17 @@ export default function LibertyMDChat() {
       return;
     }
 
+    const optimisticUuid = `local-photo-${crypto.randomUUID()}`;
+    const content_type = (file.type || 'image/jpeg').toLowerCase().split(';')[0]?.trim() || 'image/jpeg';
+    setPhotoChips((prev) => [...prev, {
+      object_uuid: optimisticUuid,
+      content_type,
+      analysis_status: 'processing',
+    }]);
     setPhotoUploading(true);
     setPhotoNotice(null);
     try {
       const image_base64 = await readPhotoFileAsBase64(file);
-      const content_type = (file.type || 'image/jpeg').toLowerCase().split(';')[0]?.trim() || 'image/jpeg';
       const { data, error: functionError } = await supabase.functions.invoke('libertymd-care-proxy', {
         body: uploadPhotoBody({
           consultation_id: consultationId,
@@ -1510,6 +1599,10 @@ export default function LibertyMDChat() {
       if (functionError || !body?.ok) {
         const classified = classifyPhotoUploadFailure(status, body);
         setPhotoNotice(classified.message);
+        const persistedUuid = typeof body?.object_uuid === 'string' ? body.object_uuid : optimisticUuid;
+        setPhotoChips((prev) => uniqueEvidenceChips(prev.map((chip) => chip.object_uuid === optimisticUuid
+          ? { ...chip, object_uuid: persistedUuid, analysis_status: body?.retry_available === true ? 'retry' : 'failed' }
+          : chip)));
         return;
       }
 
@@ -1517,15 +1610,20 @@ export default function LibertyMDChat() {
       const contentType = typeof body.content_type === 'string' ? body.content_type : content_type;
       if (objectUuid) {
         const retry = body.analysis_retry_available === true;
-        setPhotoChips((prev) => [...prev, {
-          object_uuid: objectUuid,
-          content_type: contentType,
-          analysis_status: retry ? 'retry' : 'ready',
-        }]);
+        setPhotoChips((prev) => uniqueEvidenceChips(prev.map((chip) => chip.object_uuid === optimisticUuid
+          ? {
+            object_uuid: objectUuid,
+            content_type: contentType,
+            analysis_status: retry ? 'retry' : 'processed',
+          }
+          : chip)));
         if (retry) setPhotoNotice(copyForPhotoUploadCode('analysis_failed'));
       }
     } catch {
       setPhotoNotice(copyForPhotoUploadCode('upstream_unknown'));
+      setPhotoChips((prev) => prev.map((chip) => chip.object_uuid === optimisticUuid
+        ? { ...chip, analysis_status: 'failed' }
+        : chip));
     } finally {
       setPhotoUploading(false);
     }
@@ -1534,6 +1632,8 @@ export default function LibertyMDChat() {
   const retryPhotoAnalysis = async (objectUuid: string) => {
     if (!consultationId || !objectUuid || photoRetryingObjectUuid) return;
     setPhotoRetryingObjectUuid(objectUuid);
+    setPhotoChips((prev) => prev.map((chip) =>
+      chip.object_uuid === objectUuid ? { ...chip, analysis_status: 'processing' } : chip));
     setPhotoNotice(null);
     try {
       const { data, error: functionError } = await supabase.functions.invoke('libertymd-care-proxy', {
@@ -1544,12 +1644,16 @@ export default function LibertyMDChat() {
       if (functionError || !body?.ok) {
         const classified = classifyPhotoUploadFailure(status, body);
         setPhotoNotice(classified.message);
+        setPhotoChips((prev) => prev.map((chip) =>
+          chip.object_uuid === objectUuid ? { ...chip, analysis_status: 'retry' } : chip));
         return;
       }
       setPhotoChips((prev) => prev.map((chip) =>
-        chip.object_uuid === objectUuid ? { ...chip, analysis_status: 'ready' } : chip));
+        chip.object_uuid === objectUuid ? { ...chip, analysis_status: 'processed' } : chip));
     } catch {
       setPhotoNotice(copyForPhotoUploadCode('upstream_unknown'));
+      setPhotoChips((prev) => prev.map((chip) =>
+        chip.object_uuid === objectUuid ? { ...chip, analysis_status: 'retry' } : chip));
     } finally {
       setPhotoRetryingObjectUuid(null);
     }
@@ -1568,7 +1672,7 @@ export default function LibertyMDChat() {
         invokeCareProxy({ action: 'get_consultation', consultation_id: consultationId }),
       ]);
       const managed = normalizeManagedPatientList(owned?.patients);
-      const profiles = managed.map((p) => ({
+      const allProfiles = managed.map((p) => ({
         id: p.id,
         display_label: p.display_label,
         relationship: p.relationship,
@@ -1577,6 +1681,9 @@ export default function LibertyMDChat() {
         typeof consult?.consultation?.patient_id === 'string'
           ? consult.consultation.patient_id
           : null;
+      const profiles = consultPid
+        ? allProfiles.filter((profile) => profile.id === consultPid)
+        : allProfiles;
       const defaultId =
         (consultPid && profiles.some((p) => p.id === consultPid) ? consultPid : null)
         || profiles.find((p) => p.relationship === 'self')?.id
@@ -1585,6 +1692,17 @@ export default function LibertyMDChat() {
       setLabProfiles(profiles);
       setLabDefaultPatientId(defaultId);
       setLabSelectedPatientId(defaultId);
+      // P4-07 — a lab report may only be attributed to the patient this
+      // consultation is already bound to, so `profiles` is filtered to that one
+      // person above. Asking "who is this lab report for?" when exactly one
+      // answer is possible is a decision the patient cannot make wrongly and
+      // therefore should not be asked to make; it is pure friction in front of
+      // the file picker. The sheet still opens whenever there is a real choice
+      // (an unbound consultation yields the full list).
+      if (profiles.length === 1 && defaultId) {
+        labFileInputRef.current?.click();
+        return;
+      }
       setLabAttributionOpen(true);
     } catch {
       setPhotoNotice(copyForLabUploadCode('upstream_unknown'));
@@ -1608,12 +1726,19 @@ export default function LibertyMDChat() {
       return;
     }
 
+    const optimisticUuid = `local-lab-${crypto.randomUUID()}`;
+    const content_type =
+      (file.type || 'application/pdf').toLowerCase().split(';')[0]?.trim() || 'application/pdf';
+    setLabChips((prev) => [...prev, {
+      object_uuid: optimisticUuid,
+      content_type,
+      patient_id: patientId,
+      analysis_status: 'processing',
+    }]);
     setLabUploading(true);
     setPhotoNotice(null);
     try {
       const file_base64 = await readLabFileAsBase64(file);
-      const content_type =
-        (file.type || 'application/pdf').toLowerCase().split(';')[0]?.trim() || 'application/pdf';
       const { data, error: functionError } = await supabase.functions.invoke('libertymd-care-proxy', {
         body: uploadLabBody({
           consultation_id: consultationId,
@@ -1628,6 +1753,10 @@ export default function LibertyMDChat() {
       if (functionError || !body?.ok) {
         const classified = classifyLabUploadFailure(status, body);
         setPhotoNotice(classified.message);
+        const persistedUuid = typeof body?.object_uuid === 'string' ? body.object_uuid : optimisticUuid;
+        setLabChips((prev) => uniqueEvidenceChips(prev.map((chip) => chip.object_uuid === optimisticUuid
+          ? { ...chip, object_uuid: persistedUuid, analysis_status: 'failed' }
+          : chip)));
         return;
       }
 
@@ -1636,13 +1765,20 @@ export default function LibertyMDChat() {
       const attributed =
         typeof body.patient_id === 'string' ? body.patient_id : patientId;
       if (objectUuid) {
-        setLabChips((prev) => [
-          ...prev,
-          { object_uuid: objectUuid, content_type: contentType, patient_id: attributed },
-        ]);
+        setLabChips((prev) => uniqueEvidenceChips(prev.map((chip) => chip.object_uuid === optimisticUuid
+          ? {
+            object_uuid: objectUuid,
+            content_type: contentType,
+            patient_id: attributed,
+            analysis_status: 'processed',
+          }
+          : chip)));
       }
     } catch {
       setPhotoNotice(copyForLabUploadCode('upstream_unknown'));
+      setLabChips((prev) => prev.map((chip) => chip.object_uuid === optimisticUuid
+        ? { ...chip, analysis_status: 'failed' }
+        : chip));
     } finally {
       setLabUploading(false);
     }
@@ -1759,6 +1895,7 @@ export default function LibertyMDChat() {
             message,
             client_message_id: clientMessageId,
             expected_version: consultationVersion,
+            media_upload_in_progress: photoUploading || labUploading,
           });
           lastError = null;
           break;
@@ -2674,7 +2811,17 @@ export default function LibertyMDChat() {
                         ? 'rounded-bl-sm border border-emerald-200 bg-emerald-50 text-emerald-900'
                         : 'rounded-bl-sm border border-libertymd-mist bg-white text-libertymd-slate-700'
                 }`}>
-                  {message.text}
+                  {message.sender === 'ai' && message.mediaKind ? (
+                    <span className="mb-[var(--libertymd-space-xs)] inline-flex items-center gap-1 rounded-full bg-libertymd-blue-50 px-[var(--libertymd-space-sm)] py-1 libertymd-type-label font-semibold text-libertymd-blue-700">
+                      {message.mediaKind === 'photo'
+                        ? <Camera className="h-3.5 w-3.5" aria-hidden="true" />
+                        : <FileText className="h-3.5 w-3.5" aria-hidden="true" />}
+                      {message.mediaKind === 'photo'
+                        ? t('chatx.mediaQuestionPhoto')
+                        : t('chatx.mediaQuestionLab')}
+                    </span>
+                  ) : null}
+                  <span className="block">{message.text}</span>
                 </div>
               </div>
               );

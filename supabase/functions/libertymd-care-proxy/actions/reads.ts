@@ -17,6 +17,7 @@ import { getHistory, getOwnedConsultation, historySummary, reportReadLifecycleMe
 import { resolveEmergencyCopyForClient } from '../lib/emergency-copy.ts'
 import { jsonResponse } from '../lib/errors.ts'
 import { generatePartialOutcome } from '../lib/partial-outcome.ts'
+import { listMediaEvidence } from '../lib/media-evidence.ts'
 import { ensureProfile, ensureSelfPatient } from '../lib/profiles.ts'
 import type { ProxyContext } from '../lib/context.ts'
 import type { RequestPayload } from '../lib/types.ts'
@@ -58,6 +59,7 @@ export async function handleGetConsultation(ctx: ProxyContext, payload: RequestP
 
   // P2-13 L6 — return retention ISO + omit hint; body still omitted after expiry.
   const lifecycle = reportReadLifecycleMeta(report)
+  const mediaEvidence = await listMediaEvidence(ctx, consultation)
   const response: Record<string, unknown> = {
     consultation,
     messages,
@@ -65,6 +67,7 @@ export async function handleGetConsultation(ctx: ProxyContext, payload: RequestP
     confidence_score: lifecycle.report != null ? (report?.confidence_score || null) : null,
     retention_expires_at: lifecycle.retention_expires_at,
     report_omitted_reason: lifecycle.report_omitted_reason,
+    media_evidence: mediaEvidence,
   }
   if (terminalSafety?.crisis_type) {
     response.crisis_type = terminalSafety.crisis_type

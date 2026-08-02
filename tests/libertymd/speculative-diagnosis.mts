@@ -127,9 +127,12 @@ Deno.test('P2-14 AC1/AC2 · computeShouldRunDiagnosis G2 (even not required by d
         // Turn <6 + ready still false (reject G3)
         assertEquals(computeShouldRunDiagnosis({ evidenceScore: 50, turnCount: 5, readyForReport: false }), false)
         assertEquals(computeShouldRunDiagnosis({ evidenceScore: 50, turnCount: 5, readyForReport: true }), false)
-        // Turn 15 still needs score ≥ floor
+        // At the final turn, any real health information opens diagnosis so a
+        // low-confidence physician-review report can still be produced.
         assertEquals(computeShouldRunDiagnosis({ evidenceScore: 50, turnCount: 15, readyForReport: false }), true)
-        assertEquals(computeShouldRunDiagnosis({ evidenceScore: 40, turnCount: 15, readyForReport: false }), false)
+        assertEquals(computeShouldRunDiagnosis({ evidenceScore: 40, turnCount: 15, readyForReport: false }), true)
+        // Zero evidence is the only final-turn case that remains incomplete.
+        assertEquals(computeShouldRunDiagnosis({ evidenceScore: 0, turnCount: 15, readyForReport: false }), false)
       })
     })
   })

@@ -48,8 +48,8 @@ const lowConfidenceDecision = decideReportOutcome({
   evidence: ambiguousEvidence,
   nonClinicalResponseCount: 0,
 })
-record('turn_15_low_confidence_flow', 'review', lowConfidenceDecision.outcome)
-record('turn_15_low_confidence_reason', 'insufficient_clinical_information', lowConfidenceDecision.reason)
+record('turn_15_low_confidence_flow', 'complete', lowConfidenceDecision.outcome)
+record('turn_15_low_confidence_reason', 'turn_limit_report', lowConfidenceDecision.reason)
 
 const randomClassifications = cases.nonMedical.messages.map(classifyResponseRelevance)
 record('random_response_classification', 'off_topic', randomClassifications.every((value) => value === 'off_topic') ? 'off_topic' : 'mixed')
@@ -64,14 +64,13 @@ const randomDecision = decideReportOutcome({
   nonClinicalResponseCount: 15,
 })
 record('random_response_terminal_flow', 'review', randomDecision.outcome)
-record('random_response_terminal_reason', 'insufficient_clinical_information', randomDecision.reason)
+record('random_response_terminal_reason', 'no_health_information', randomDecision.reason)
 
 const negatedEmergency = detectDeterministicEmergency('I have a sore throat with no chest pain and no trouble breathing.')
 record('negated_emergency', 'continue', negatedEmergency ? 'force_end' : 'continue')
 
-// BO 2026-08-01 — the mid-consult release boundary moved from 60 to 80.
-// `ready_for_report` from the interview agent no longer completes a consult on
-// its own; 80 is the only door out before the turn cap.
+// A valid workflow-ready differential may be released for physician review at
+// any confidence. Confidence is displayed; it is not a report-withholding gate.
 const boundaryDecision = decideReportOutcome({
   diagnosisValid: true,
   confidence: loop % 2 === 0 ? 79 : 80,
@@ -80,7 +79,7 @@ const boundaryDecision = decideReportOutcome({
   evidence: normalEvidence,
   nonClinicalResponseCount: 0,
 })
-record('confidence_boundary', loop % 2 === 0 ? 'continue' : 'complete', boundaryDecision.outcome)
+record('confidence_boundary', 'complete', boundaryDecision.outcome)
 
 const failed = checks.filter((check) => !check.passed)
 const caseResults = [
@@ -100,7 +99,7 @@ const caseResults = [
     case: cases.noHighConfidence.name,
     expected: cases.noHighConfidence.expected,
     actual: `${lowConfidenceDecision.outcome}; ${lowConfidenceDecision.reason}`,
-    passed: lowConfidenceDecision.outcome === 'review',
+    passed: lowConfidenceDecision.outcome === 'complete',
   },
   {
     case: cases.nonMedical.name,

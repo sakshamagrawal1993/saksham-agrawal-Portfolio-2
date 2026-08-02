@@ -212,7 +212,7 @@ Deno.test('P4-06 source · private sanitized object supports an authorized retry
   assertTrue(/LibertyMDAttachControls/.test(chat))
   assertTrue(/uploadPhotoBody/.test(chat))
   assertTrue(/retryPhotoAnalysisBody/.test(chat))
-  assertTrue(/analysis_status:\s*'ready'/.test(chat))
+  assertTrue(/analysis_status:\s*'processed'/.test(chat))
 
   const care = await Deno.readTextFile(
     new URL('../../docs/libertymd/CARE-ARCHITECTURE.md', import.meta.url),

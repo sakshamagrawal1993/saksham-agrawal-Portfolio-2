@@ -83,14 +83,7 @@ Deno.test('short clinical answers remain accepted', () => {
   }
 })
 
-/**
- * BO 2026-08-01 — before the turn cap, confidence 80 is the only door out.
- * A mid-consult `ready_for_report` at confidence 60 used to complete; it now
- * keeps interviewing, because letting the model's self-report end a clinical
- * consult is the self-graded threshold P0-15 rules out. Both halves are
- * asserted here so the boundary cannot drift silently.
- */
-Deno.test('mid-consult, confidence 60 keeps interviewing even when the workflow says ready', () => {
+Deno.test('mid-consult, sufficient evidence and workflow-ready releases moderate-confidence report', () => {
   const evidence = assessClinicalEvidence(LIBERTYMD_VALIDATION_CASES.lowFever.filledSlots)
   const decision = decideReportOutcome({
     diagnosisValid: true,
@@ -100,8 +93,8 @@ Deno.test('mid-consult, confidence 60 keeps interviewing even when the workflow 
     evidence,
     nonClinicalResponseCount: 0,
   })
-  assertEquals(decision.outcome, 'continue', 'confidence 60 mid-consult must not complete')
-  assertEquals(decision.reason, 'raise_confidence', 'and the reason is to raise confidence')
+  assertEquals(decision.outcome, 'complete', 'moderate confidence must not suppress the report')
+  assertEquals(decision.reason, 'workflow_ready', 'workflow-ready closes a sufficiently informed consult')
 })
 
 Deno.test('mid-consult, confidence 80 completes', () => {
@@ -118,7 +111,7 @@ Deno.test('mid-consult, confidence 80 completes', () => {
   assertEquals(decision.reason, 'high_confidence', 'via the high-confidence door')
 })
 
-Deno.test('at the turn cap, a moderately confident report still releases', () => {
+Deno.test('at the turn cap, a moderately confident physician-review report releases', () => {
   const evidence = assessClinicalEvidence(LIBERTYMD_VALIDATION_CASES.lowFever.filledSlots)
   const decision = decideReportOutcome({
     diagnosisValid: true,
@@ -129,10 +122,10 @@ Deno.test('at the turn cap, a moderately confident report still releases', () =>
     nonClinicalResponseCount: 0,
   })
   assertEquals(decision.outcome, 'complete', 'cap path unchanged')
-  assertEquals(decision.reason, 'turn_limit_confident', 'cap reason')
+  assertEquals(decision.reason, 'turn_limit_report', 'confidence-neutral cap reason')
 })
 
-Deno.test('confidence 59 cannot release a report', () => {
+Deno.test('workflow-ready low-confidence report is released', () => {
   const evidence = assessClinicalEvidence(LIBERTYMD_VALIDATION_CASES.lowFever.filledSlots)
   const decision = decideReportOutcome({
     diagnosisValid: true,
@@ -142,10 +135,11 @@ Deno.test('confidence 59 cannot release a report', () => {
     evidence,
     nonClinicalResponseCount: 0,
   })
-  assertEquals(decision.outcome, 'continue', 'Confidence 59 report outcome')
+  assertEquals(decision.outcome, 'complete', 'Low confidence must not suppress a ready report')
+  assertEquals(decision.reason, 'workflow_ready', 'Confidence-neutral ready reason')
 })
 
-Deno.test('empty diagnosis cannot release despite high confidence', () => {
+Deno.test('invalid three-item diagnosis stays recoverable instead of showing incomplete', () => {
   const evidence = assessClinicalEvidence(LIBERTYMD_VALIDATION_CASES.lowFever.filledSlots)
   const decision = decideReportOutcome({
     diagnosisValid: false,
@@ -155,11 +149,11 @@ Deno.test('empty diagnosis cannot release despite high confidence', () => {
     evidence,
     nonClinicalResponseCount: 0,
   })
-  assertEquals(decision.outcome, 'review', 'Empty diagnosis terminal outcome')
-  assertEquals(decision.reason, 'low_diagnostic_confidence', 'Empty diagnosis review reason')
+  assertEquals(decision.outcome, 'continue', 'Invalid diagnosis is a retryable generation state')
+  assertEquals(decision.reason, 'retry_report_generation', 'Technical/schema failure reason')
 })
 
-Deno.test('turn 15 cannot force completion with insufficient evidence', () => {
+Deno.test('turn 15 releases low-information report when the user discussed health', () => {
   const evidence = assessClinicalEvidence(LIBERTYMD_VALIDATION_CASES.noHighConfidence.filledSlots)
   const decision = decideReportOutcome({
     diagnosisValid: true,
@@ -169,11 +163,11 @@ Deno.test('turn 15 cannot force completion with insufficient evidence', () => {
     evidence,
     nonClinicalResponseCount: 0,
   })
-  assertEquals(decision.outcome, 'review', 'Ambiguous turn 15 outcome')
-  assertEquals(decision.reason, 'insufficient_clinical_information', 'Ambiguous turn 15 reason')
+  assertEquals(decision.outcome, 'complete', 'Sparse health information still receives report')
+  assertEquals(decision.reason, 'turn_limit_report', 'Confidence-neutral cap reason')
 })
 
-Deno.test('five non-clinical answers force clinical review', () => {
+Deno.test('off-topic answers do not erase health information already shared', () => {
   const evidence = assessClinicalEvidence(LIBERTYMD_VALIDATION_CASES.lowFever.filledSlots)
   const decision = decideReportOutcome({
     diagnosisValid: true,
@@ -183,8 +177,21 @@ Deno.test('five non-clinical answers force clinical review', () => {
     evidence,
     nonClinicalResponseCount: 5,
   })
-  assertEquals(decision.outcome, 'review', 'Non-clinical terminal outcome')
-  assertEquals(decision.reason, 'insufficient_clinical_information', 'Non-clinical terminal reason')
+  assertEquals(decision.outcome, 'complete', 'Existing health information still receives report')
+  assertEquals(decision.reason, 'turn_limit_report', 'Cap report remains confidence-neutral')
+})
+
+Deno.test('only a consultation with no health information is incomplete', () => {
+  const decision = decideReportOutcome({
+    diagnosisValid: false,
+    confidence: 0,
+    turnCount: 15,
+    readyForReport: false,
+    evidence: assessClinicalEvidence({}),
+    nonClinicalResponseCount: 5,
+  })
+  assertEquals(decision.outcome, 'review', 'No-health consultation is the sole incomplete case')
+  assertEquals(decision.reason, 'no_health_information', 'Explicit no-health reason')
 })
 
 // ---------------------------------------------------------------- P0-14c AC1–AC5

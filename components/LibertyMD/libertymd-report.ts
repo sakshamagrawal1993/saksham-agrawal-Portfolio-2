@@ -27,7 +27,7 @@ export type TriageDisplayTier =
   | 'crisis_line'
   | 'unknown'
 
-/** Patient-facing ordinal bands (CONTEXT §5 / P2-04 Q1). Never paint raw %. */
+/** Patient-facing confidence bands. Never paint raw percentages. */
 export type DifferentialOrdinal = 'most_likely' | 'possible' | 'less_likely'
 
 export type LibertyMdDifferentialItem = {
@@ -178,24 +178,26 @@ function parseRank(value: unknown): number | undefined {
 }
 
 /**
- * P2-04 Q1 · rank → bands; confidence fallback; omit if both missing.
- * Ties allowed (multiple Most likely OK). Never returns digits for UI paint.
+ * Confidence → patient-facing bands; rank is a compatibility fallback only.
+ * A low score still produces a visible low-confidence differential.
  */
 export function mapDifferentialOrdinal(input: {
   rank?: unknown
   confidence?: unknown
 }): DifferentialOrdinal | undefined {
-  const rank = parseRank(input.rank)
-  if (rank !== undefined && rank >= 1 && rank <= 5) {
-    if (rank === 1) return 'most_likely'
-    if (rank <= 3) return 'possible'
+  const score = parseConfidenceScore(input.confidence)
+  if (score !== undefined) {
+    if (score >= 70) return 'most_likely'
+    if (score >= 40) return 'possible'
     return 'less_likely'
   }
-  const score = parseConfidenceScore(input.confidence)
-  if (score === undefined) return undefined
-  if (score >= 70) return 'most_likely'
-  if (score >= 40) return 'possible'
-  return 'less_likely'
+  const rank = parseRank(input.rank)
+  if (rank !== undefined && rank >= 1 && rank <= 3) {
+    if (rank === 1) return 'most_likely'
+    if (rank === 2) return 'possible'
+    return 'less_likely'
+  }
+  return undefined
 }
 
 /** P2-04 Q3 · seriousness from emergency / is_serious / seriousness|severity aliases. */
@@ -254,7 +256,7 @@ function normalizeDifferentials(data: Record<string, unknown>): LibertyMdDiffere
       ? data.diagnoses
       : []
   const out: LibertyMdDifferentialItem[] = []
-  for (const item of list.slice(0, 5)) {
+  for (const item of list.slice(0, 3)) {
     if (!item || typeof item !== 'object') continue
     const record = item as Record<string, unknown>
     // P2-04 Q7 · common_name first for patient cards
@@ -411,12 +413,12 @@ export type ReportSectionsRecord = {
   sections: ReportSectionOpenMap
 }
 
-/** Defaults: differential open; A&P / red_flags / soap closed (P2-03). */
+/** Physician-review report opens every clinical section on first view. */
 export const DEFAULT_REPORT_SECTION_OPEN: Record<ReportSectionId, boolean> = {
   differential: true,
-  assessment_and_plan: false,
-  red_flags: false,
-  soap: false,
+  assessment_and_plan: true,
+  red_flags: true,
+  soap: true,
 }
 
 export function reportSectionsKey(consultationId: string): string {

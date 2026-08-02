@@ -21,6 +21,7 @@ import {
   type LabParameterDefinition,
 } from '../lib/lab-upload.ts'
 import { normalizeObject, postJson } from '../lib/n8n-client.ts'
+import { ensureMediaFollowups, suggestedMediaFollowupQuestions } from '../lib/media-evidence.ts'
 import { getOwnedActivePatient, getOwnedPatient } from '../lib/profiles.ts'
 import type { ProxyContext } from '../lib/context.ts'
 import type { RequestPayload } from '../lib/types.ts'
@@ -28,13 +29,18 @@ import type { RequestPayload } from '../lib/types.ts'
 const LAB_SIGN_IN_COPY =
   'Sign in to upload a lab report. Lab reports are linked to a saved profile.'
 
-function labReject(code: keyof typeof LAB_UPLOAD_SAFE_COPY, status = 400) {
+function labReject(
+  code: keyof typeof LAB_UPLOAD_SAFE_COPY,
+  status = 400,
+  extra: Record<string, unknown> = {},
+) {
   return jsonResponse(
     {
       error: LAB_UPLOAD_SAFE_COPY[code],
       code,
       severity: 'technical' as const,
       consult_continues: true,
+      ...extra,
     },
     status,
   )
@@ -79,6 +85,13 @@ export async function handleUploadLab(ctx: ProxyContext, payload: RequestPayload
     return labReject(LAB_UPLOAD_CODES.patient_not_owned)
   }
 
+  if (attributedPatient.id !== consultation.patient_id) {
+    return labReject(LAB_UPLOAD_CODES.patient_not_owned, 409, {
+      code: 'patient_mismatch',
+      error: 'Choose the same patient as this consultation so the report cannot be applied to the wrong person.',
+    })
+  }
+
   const bytes = decodeLabBase64(resolveLabBase64Payload(payload))
   if (!bytes) return labReject(LAB_UPLOAD_CODES.decode_failed)
   const validated = validateLabBytes(bytes, payload.content_type)
@@ -98,6 +111,31 @@ export async function handleUploadLab(ctx: ProxyContext, payload: RequestPayload
   }
   const definitions = definitionRows as LabParameterDefinition[]
 
+  const objectUuid = crypto.randomUUID()
+  const now = new Date().toISOString()
+  const { error: pendingError } = await ctx.db.from('libertymd_lab_uploads').insert({
+    user_id: ctx.user.id,
+    consultation_id: consultation.id,
+    object_uuid: objectUuid,
+    patient_id: attributedPatient.id,
+    path: null,
+    content_type: validated.mime,
+    analysis_status: 'pending_redaction',
+    structured_results: {},
+    analysis_summary: {},
+    raw_deleted_at: now,
+  })
+  if (pendingError) return labReject(LAB_UPLOAD_CODES.persistence_failed, 502)
+
+  const markFailed = async () => {
+    await ctx.db
+      .from('libertymd_lab_uploads')
+      .update({ analysis_status: 'failed', updated_at: new Date().toISOString() })
+      .eq('user_id', ctx.user.id)
+      .eq('consultation_id', consultation.id)
+      .eq('object_uuid', objectUuid)
+  }
+
   let analysis
   try {
     const workflowRaw = normalizeObject(await postJson(
@@ -116,26 +154,21 @@ export async function handleUploadLab(ctx: ProxyContext, payload: RequestPayload
       outcome: 'analysis_failed',
       class: error instanceof Error ? error.name : 'unknown',
     })
-    return labReject(LAB_UPLOAD_CODES.analysis_failed, 502)
+    await markFailed()
+    return labReject(LAB_UPLOAD_CODES.analysis_failed, 502, { object_uuid: objectUuid })
   }
   if (!analysis || !analysis.usable || analysis.standardized_count === 0) {
-    return labReject(LAB_UPLOAD_CODES.analysis_failed, 422)
+    await markFailed()
+    return labReject(LAB_UPLOAD_CODES.analysis_failed, 422, { object_uuid: objectUuid })
   }
   if (structuredResultsHaveBannedKeys(analysis)) {
-    return labReject(LAB_UPLOAD_CODES.persistence_failed, 500)
+    await markFailed()
+    return labReject(LAB_UPLOAD_CODES.persistence_failed, 500, { object_uuid: objectUuid })
   }
 
-  const objectUuid = crypto.randomUUID()
-  const now = new Date().toISOString()
   const { data: upload, error: uploadError } = await ctx.db
     .from('libertymd_lab_uploads')
-    .insert({
-      user_id: ctx.user.id,
-      consultation_id: consultation.id,
-      object_uuid: objectUuid,
-      patient_id: attributedPatient.id,
-      path: null,
-      content_type: validated.mime,
+    .update({
       analysis_status: 'mapped',
       structured_results: {
         panel_name: analysis.panel_name,
@@ -148,8 +181,11 @@ export async function handleUploadLab(ctx: ProxyContext, payload: RequestPayload
         raw_retained: false,
       },
       analysis_summary: analysis.analysis_summary,
-      raw_deleted_at: now,
+      updated_at: new Date().toISOString(),
     })
+    .eq('user_id', ctx.user.id)
+    .eq('consultation_id', consultation.id)
+    .eq('object_uuid', objectUuid)
     .select('id')
     .single()
   if (uploadError || !upload?.id) {
@@ -157,7 +193,8 @@ export async function handleUploadLab(ctx: ProxyContext, payload: RequestPayload
       outcome: 'persistence_failed',
       code: uploadError?.code || null,
     })
-    return labReject(LAB_UPLOAD_CODES.persistence_failed, 502)
+    await markFailed()
+    return labReject(LAB_UPLOAD_CODES.persistence_failed, 502, { object_uuid: objectUuid })
   }
 
   const seen = new Set<string>()
@@ -186,8 +223,8 @@ export async function handleUploadLab(ctx: ProxyContext, payload: RequestPayload
 
   const { error: resultsError } = await ctx.db.from('libertymd_lab_results').insert(resultRows)
   if (resultsError) {
-    // Parent delete cascades any partially-created child rows.
-    await ctx.db.from('libertymd_lab_uploads').delete().eq('id', upload.id)
+    await ctx.db.from('libertymd_lab_results').delete().eq('lab_upload_id', upload.id)
+    await markFailed()
     console.warn('LibertyMD standardized result persistence failed', {
       outcome: 'persistence_failed',
       code: resultsError.code || null,
@@ -201,9 +238,17 @@ export async function handleUploadLab(ctx: ProxyContext, payload: RequestPayload
     after.patient_id !== consultPatientIdBefore
     || JSON.stringify(after.patient_snapshot) !== JSON.stringify(consultSnapshotBefore)
   ) {
-    await ctx.db.from('libertymd_lab_uploads').delete().eq('id', upload.id)
+    await markFailed()
     return labReject(LAB_UPLOAD_CODES.persistence_failed, 500)
   }
+
+  await ensureMediaFollowups(
+    ctx,
+    consultation,
+    'lab',
+    objectUuid,
+    suggestedMediaFollowupQuestions('lab', analysis as unknown as Record<string, unknown>, consultation.language),
+  )
 
   return jsonResponse({
     ok: true,

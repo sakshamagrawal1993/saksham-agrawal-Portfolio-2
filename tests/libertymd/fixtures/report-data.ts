@@ -50,6 +50,15 @@ export const MUNDANE_FULL_REPORT_DATA = {
       supporting_evidence: [],
       conflicting_evidence: [],
     },
+    {
+      rank: 3,
+      full_name: 'Acute bacterial sinusitis',
+      common_name: 'Sinus infection',
+      confidence: 18,
+      reason: 'This can cause congestion, but the short duration and lack of persistent fever or focal facial pain make it less likely.',
+      supporting_evidence: ['congestion'],
+      conflicting_evidence: ['short duration', 'no persistent fever reported'],
+    },
   ],
   assessment_and_plan: {
     assessment: 'Mild viral URI without emergency features.',
@@ -276,7 +285,7 @@ export const CARD_LENGTH_ONE_REPORT_DATA = {
   },
 }
 
-/** Five entries (+ 6th dropped by normalize ≤5). */
+/** More than three entries; the physician-review contract keeps only three. */
 export const CARD_LENGTH_FIVE_REPORT_DATA = {
   headline: 'Length-5 card fixture',
   patient_summary: 'Five differentials; sixth must drop.',

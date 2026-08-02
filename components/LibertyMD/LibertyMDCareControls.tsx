@@ -290,13 +290,18 @@ export function LibertyMDDemographicsPrompt({
     && !loading;
   const showProfilePick = Array.isArray(profiles) && profiles.length > 1;
 
+  // BO 2026-08-02 — no self-drawn top rule. In the chat these controls render
+  // inside a bordered white card, so a `border-t` here painted a stray divider
+  // across the top of the card, above the heading, separating nothing. The rule
+  // belongs to whichever container actually needs to divide this from content
+  // above it; the landing hero adds it at its own call site.
   return (
     <form
       onSubmit={(event) => {
         event.preventDefault();
         if (canSubmit) onSubmit();
       }}
-      className="mx-auto w-full max-w-2xl border-t border-libertymd-green-sage pt-libertymd-lg"
+      className="mx-auto w-full max-w-2xl"
       data-libertymd-unified-entry="true"
     >
       {/* BO 2026-08-01 — demographics-only card. The first clinical question and
@@ -461,7 +466,7 @@ export function LibertyMDPreStartProfilePicker({
   const { t } = useI18n();
   return (
     <div
-      className="mx-auto w-full max-w-2xl border-t border-libertymd-green-sage pt-libertymd-lg"
+      className="mx-auto w-full max-w-2xl"
       data-libertymd-profile-picker="true"
     >
       <fieldset>
@@ -535,7 +540,7 @@ export function LibertyMDSomeoneElseCreateSheet({
   return (
     <form
       data-libertymd-someone-else-create="true"
-      className="mx-auto w-full max-w-2xl space-y-libertymd-md border-t border-libertymd-green-sage pt-libertymd-lg"
+      className="mx-auto w-full max-w-2xl space-y-libertymd-md"
       onSubmit={(event) => {
         event.preventDefault();
         if (!canSubmit || (sex !== 'female' && sex !== 'male')) return;

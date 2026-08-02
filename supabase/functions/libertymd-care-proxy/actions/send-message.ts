@@ -27,8 +27,8 @@
  *
  * ## P0-13 · the four invariants this handler is the main enforcement point for
  *
- *   1. Turn cap — `consultation.turn_count + 1 > MAX_TURNS` is impossible;
- *      at the cap the consult transitions deterministically instead.
+ *   1. Turn cap — normal interviews stop at 15; unresolved media questions may
+ *      use a bounded four-turn extension, and the hard ceiling is 19.
  *   2. No inference after an emergency — the status allow-list is checked at
  *      entry *and* inside `runInterview` / `runDiagnosis`.
  *   3. Exactly one `message_type` from the closed enum — enforced in
@@ -104,6 +104,15 @@ import {
   isServeEligibleStoredReport,
 } from '../lib/report-persistence.ts'
 import { addDays, cleanMessage, limitConsultationMessage, patientPayload } from '../lib/utils.ts'
+import {
+  MAX_TOTAL_TURNS,
+  answerAskedMediaFollowup,
+  claimNextMediaFollowup,
+  listMediaEvidence,
+  mediaCompletionState,
+  mediaContextForAgents,
+  waivePendingMediaFollowups,
+} from '../lib/media-evidence.ts'
 import type { ProxyContext } from '../lib/context.ts'
 import type { ConsultationRow, GuardrailResult, JsonObject, RequestPayload } from '../lib/types.ts'
 
@@ -195,12 +204,13 @@ async function closeAtTurnCap(
   consultation: ConsultationRow,
   turnCount: number,
   currentVersion: number,
+  maxTurns = MAX_TURNS,
 ) {
   console.warn('LibertyMD turn cap reached; closing deterministically', {
     invariant: 'max_turns',
     consultation_id: consultation.id,
     turn_count: consultation.turn_count,
-    max_turns: MAX_TURNS,
+    max_turns: maxTurns,
     status: consultation.status,
   })
 
@@ -220,7 +230,7 @@ async function closeAtTurnCap(
     }
     await updateOwnedConsultation(ctx, consultation, {
       status,
-      turn_count: MAX_TURNS,
+      turn_count: turnCount,
       // `turn_limit_confident` — the closed vocabulary shared with
       // clinical-policy and enforced by libertymd_consultations_resolution_
       // reason_check. This branch is "capped *with* a serve-eligible report",
@@ -249,7 +259,7 @@ async function closeAtTurnCap(
   await addMessage(ctx, consultation, 'assistant', messageText, { message_type: 'safety' })
   await updateOwnedConsultation(ctx, consultation, {
     status: 'clinical_review_needed',
-    turn_count: MAX_TURNS,
+    turn_count: turnCount,
     // Capped *without* a serve-eligible report — the same reason the
     // non-capped review path writes at line ~501. Was 'turn_limit_reached'.
     resolution_reason: 'insufficient_clinical_information',
@@ -337,15 +347,34 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
   try {
     await ensureProfile(ctx)
     const patient = await getOwnedPatient(ctx, consultation.patient_id)
-    // P0-13 AC1. `atCap` means this consult is already at MAX_TURNS and is
-    // somehow still in an answer-accepting status — a state today's
-    // decideReportOutcome should make unreachable. Rather than trusting that, a
-    // 16th turn is refused: the message is still retained and still screened,
-    // but no interview or diagnosis inference is issued and the consult
-    // transitions deterministically below.
-    const atCap = consultation.turn_count >= MAX_TURNS
-    const turnCount = atCap ? MAX_TURNS : consultation.turn_count + 1
-    assertTurnWithinCap(consultation.id, turnCount)
+    let mediaPackets = await listMediaEvidence(ctx, consultation)
+    const initialMediaState = mediaCompletionState(mediaPackets)
+    const hasClientMediaUpload = payload.media_upload_in_progress === true
+    const hasMediaAllowance = hasClientMediaUpload
+      || initialMediaState.processing
+      || initialMediaState.pendingFollowups.length > 0
+    const continuingMediaExtension = consultation.turn_count >= MAX_TURNS
+      && mediaPackets.some((packet) => packet.considered_in_consultation)
+    const allowedMaxTurns = hasMediaAllowance || continuingMediaExtension
+      ? MAX_TOTAL_TURNS
+      : Math.max(MAX_TURNS, consultation.turn_count)
+    const atCap = consultation.turn_count >= allowedMaxTurns
+    const turnCount = atCap ? consultation.turn_count : consultation.turn_count + 1
+    assertTurnWithinCap(consultation.id, turnCount, allowedMaxTurns)
+    const activeMediaFollowup = initialMediaState.pendingFollowups.find((row) => row.status === 'asked') || null
+    let activeMediaFollowupWasServed = false
+    if (activeMediaFollowup) {
+      const { data: servedMessage, error: servedMessageError } = await db
+        .from('libertymd_messages')
+        .select('id')
+        .eq('consultation_id', consultation.id)
+        .eq('role', 'assistant')
+        .contains('metadata', { media_followup_id: activeMediaFollowup.id })
+        .limit(1)
+        .maybeSingle()
+      if (servedMessageError) throw servedMessageError
+      activeMediaFollowupWasServed = Boolean(servedMessage?.id)
+    }
     const { data: existingRequestMessage, error: existingRequestError } = await db
       .from('libertymd_messages')
       .select('id')
@@ -354,15 +383,21 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
       .maybeSingle()
     if (existingRequestError) throw existingRequestError
     if (!existingRequestMessage) {
+      const userMessageMetadata = comprehensionCorrection
+        ? { source: 'comprehension_correction' }
+        : comprehensionAck
+          ? { source: 'comprehension_ack' }
+          : activeMediaFollowup && activeMediaFollowupWasServed
+            ? {
+              source: 'media_followup_answer',
+              evidence_kind: activeMediaFollowup.evidence_kind,
+              media_followup_id: activeMediaFollowup.id,
+            }
+            : null
       await addMessage(ctx, consultation, 'user', message, {
         target_slot: consultation.target_slot,
         client_message_id: requestId,
-        // P1-14 — tag correction / proceed ack (existing message_type; no schema widen).
-        ...(comprehensionCorrection
-          ? { metadata: { source: 'comprehension_correction' } }
-          : comprehensionAck
-            ? { metadata: { source: 'comprehension_ack' } }
-            : {}),
+        ...(userMessageMetadata ? { metadata: userMessageMetadata } : {}),
       })
       const answeredSlot = String(consultation.target_slot || '').trim() || 'none'
       // P1-15 S3 — user answer persistence that advances the turn.
@@ -371,6 +406,12 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
         target_slot: answeredSlot,
       })
     }
+
+    const answeredMediaFollowup = activeMediaFollowup && activeMediaFollowupWasServed
+      ? await answerAskedMediaFollowup(ctx, consultation, message, turnCount)
+      : null
+    if (answeredMediaFollowup) mediaPackets = await listMediaEvidence(ctx, consultation)
+    let mediaContext = mediaContextForAgents(mediaPackets)
 
     const history = await getHistory(ctx, consultation.id)
     // The guardrail runs on every turn including the capped one. Skipping the
@@ -404,6 +445,7 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
         // P5-DDX T5 — steer WHAT is asked. Null when absent or stale; the agent
         // then falls back to missing_slots exactly as before.
         buildDifferentialHint(readStoredDifferential(consultation), turnCount),
+        mediaContext,
       ),
     ])
     await saveSafetyEvent(ctx, consultation, guardrail, turnCount, {
@@ -452,7 +494,9 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
 
     // P0-13 AC1 — the deterministic transition at the cap. Report if one is
     // already valid, otherwise clinical review. No inference was issued.
-    if (atCap || !interview) return await closeAtTurnCap(ctx, consultation, turnCount, currentVersion)
+    if (atCap || !interview) {
+      return await closeAtTurnCap(ctx, consultation, turnCount, currentVersion, allowedMaxTurns)
+    }
 
     // P2-07 — orphan / idempotent recovery: report row exists while status is
     // still interviewing|high_risk (insert succeeded, status update failed).
@@ -483,17 +527,26 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
     if (isInterviewHoldingSource(interview.source)) return holdingState(consultation, 'interview', currentVersion, requestId)
 
     const deterministicRelevance = classifyResponseRelevance(message)
-    const isNonClinical = deterministicRelevance === 'off_topic' || interview.input_relevance === 'off_topic'
+    const isNonClinical = !activeMediaFollowup
+      && (deterministicRelevance === 'off_topic' || interview.input_relevance === 'off_topic')
     const nonClinicalResponseCount = (consultation.non_clinical_response_count || 0) + (isNonClinical ? 1 : 0)
     const consecutiveNonClinicalResponseCount = isNonClinical
       ? (consultation.consecutive_non_clinical_response_count || 0) + 1
       : 0
+    const provisionalEvidence = assessClinicalEvidence({
+      ...consultation.filled_slots,
+      ...interview.slot_updates,
+    })
 
-    if (isNonClinical) {
+    if (isNonClinical && !(turnCount >= MAX_TURNS && provisionalEvidence.present.length > 0)) {
       // P1-10 Q6A: last non-off-topic clinical ask (skip prior redirects), not nested warm copy.
       const clinicalAsk = selectLastClinicalAsk(history, interview.next_question)
       const replayOptions = Array.isArray(clinicalAsk.options) ? clinicalAsk.options : interview.options
-      const shouldStop = turnCount >= MAX_TURNS || consecutiveNonClinicalResponseCount >= 3 || nonClinicalResponseCount >= 5
+      const shouldStop = provisionalEvidence.present.length === 0 && (
+        turnCount >= MAX_TURNS
+        || consecutiveNonClinicalResponseCount >= 3
+        || nonClinicalResponseCount >= 5
+      )
       // P1-10: warm mid-path / plain terminal stop (off-topic branch only). Thresholds unchanged.
       const messageText = limitConsultationMessage(shouldStop
         ? OFF_TOPIC_STOP_BODY
@@ -520,12 +573,12 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
         turn_count: turnCount,
         non_clinical_response_count: nonClinicalResponseCount,
         consecutive_non_clinical_response_count: consecutiveNonClinicalResponseCount,
-        resolution_reason: shouldStop ? 'insufficient_clinical_information' : null,
+        resolution_reason: shouldStop ? 'no_health_information' : null,
         last_activity_at: new Date().toISOString(),
       })
       if (shouldStop) {
         await addProductEvent(ctx, 'clinical_review_needed', consultation.id, {
-          reason: 'insufficient_clinical_information',
+          reason: 'no_health_information',
           non_clinical_response_count: nonClinicalResponseCount,
         })
       }
@@ -547,6 +600,82 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
     const slots = { ...consultation.filled_slots, ...interview.slot_updates }
     const missingSlots = interview.missing_slots.length ? interview.missing_slots : calculateMissingSlots(slots)
     const evidence = assessClinicalEvidence(slots)
+
+    // File-specific context stays in the normal transcript. It gets priority
+    // over another generic interview question, but never over the guardrail
+    // above. The hard ceiling prevents many uploads from creating an unbounded
+    // consultation; any excess prompts are waived while their evidence remains
+    // available to Diagnosis and Report Composer.
+    if (turnCount >= MAX_TOTAL_TURNS) {
+      await waivePendingMediaFollowups(ctx, consultation)
+      mediaPackets = await listMediaEvidence(ctx, consultation)
+      mediaContext = mediaContextForAgents(mediaPackets)
+    }
+    let currentMediaState = mediaCompletionState(mediaPackets)
+    if (!currentMediaState.processing && currentMediaState.pendingFollowups.length > 0 && turnCount < MAX_TOTAL_TURNS) {
+      const mediaFollowup = activeMediaFollowup && !activeMediaFollowupWasServed
+        ? activeMediaFollowup
+        : await claimNextMediaFollowup(ctx, consultation, turnCount)
+      if (mediaFollowup) {
+        const nextStatus = guardrail.status === 'high_risk_continue' ? 'high_risk' : 'interviewing'
+        const nextQuestion = limitConsultationMessage(mediaFollowup.question_text)
+        await addMessage(ctx, consultation, 'assistant', nextQuestion, {
+          options: [],
+          target_slot: 'media_evidence',
+          metadata: {
+            source: 'media_followup',
+            evidence_kind: mediaFollowup.evidence_kind,
+            evidence_object_uuid: mediaFollowup.evidence_object_uuid,
+            media_followup_id: mediaFollowup.id,
+            question_order: mediaFollowup.question_order,
+          },
+        })
+        await updateOwnedConsultation(ctx, consultation, {
+          status: nextStatus,
+          turn_count: turnCount,
+          filled_slots: slots,
+          missing_slots: missingSlots,
+          target_slot: 'media_evidence',
+          safety_state: { ...guardrail.raw, status: guardrail.status, risk_level: guardrail.risk_level },
+          non_clinical_response_count: nonClinicalResponseCount,
+          consecutive_non_clinical_response_count: 0,
+          clinical_evidence_score: evidence.score,
+          resolution_reason: null,
+          last_activity_at: new Date().toISOString(),
+        })
+        await addProductEvent(ctx, 'question_served', consultation.id, {
+          turn_index: turnCount,
+          target_slot: 'media_evidence',
+          had_options: false,
+          was_repeat: false,
+          evidence_bucket: scoreBucket(evidence.score),
+        })
+        mediaPackets = await listMediaEvidence(ctx, consultation)
+        return jsonResponse({
+          consultation_id: consultation.id,
+          state: nextStatus,
+          next_question: nextQuestion,
+          options: [],
+          target_slot: 'media_evidence',
+          missing_slots: missingSlots,
+          evidence_score: evidence.score,
+          turn_count: turnCount,
+          diagnosis_ran: false,
+          media_followup: {
+            kind: mediaFollowup.evidence_kind,
+            evidence_id: mediaFollowup.evidence_object_uuid,
+            question_order: mediaFollowup.question_order,
+          },
+          media_evidence: mediaPackets,
+          safety: guardrail.status === 'high_risk_continue' ? toClientSafety(guardrail) : null,
+          version: currentVersion,
+        })
+      }
+    }
+    currentMediaState = mediaCompletionState(mediaPackets)
+    const mediaBlocksCompletion = hasClientMediaUpload
+      || currentMediaState.processing
+      || currentMediaState.pendingFollowups.length > 0
     // P5-DDX T6 — the stop rule.
     //
     // With the flag on, the mini-differential decides when the interview may
@@ -563,12 +692,22 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
       turnCount,
       readyForReport: interview.ready_for_report,
     })
-    const gateOpen = isAsyncDifferentialEnabled()
+    const baseGateOpen = isAsyncDifferentialEnabled()
       // Evidence sufficiency still applies: the differential says "I know what
       // this is", the evidence score says "enough was actually recorded to
       // write a report from". Both, not either.
       ? (differentialStop.stop && evidence.sufficient)
       : legacyGateOpen
+    const mediaExtensionReady = Boolean(answeredMediaFollowup)
+      && !mediaBlocksCompletion
+      && evidence.sufficient
+    // At the normal turn cap, any actual health information deserves a final
+    // physician-review report attempt. Confidence affects its labels, not its
+    // existence. A score of zero is the only no-health-information exception.
+    const informationCapReportReady = turnCount >= MAX_TURNS && evidence.present.length > 0
+    const gateOpen = !mediaBlocksCompletion && (
+      baseGateOpen || mediaExtensionReady || informationCapReportReady
+    )
     const comprehensionDone = isComprehensionCompleted(consultation.workflow_versions)
 
     // P1-14 — Diagnosis-gate short-circuit: slots summary OverlaySheet before Diagnosis.
@@ -629,7 +768,7 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
     }
 
     // Ack / correction after a pending sheet must reach Diagnosis even on an odd turn.
-    const shouldRunDiagnosis = gateOpen || completingComprehension
+    const shouldRunDiagnosis = (gateOpen || completingComprehension) && !mediaBlocksCompletion
     let diagnosis: DiagnosisResult | null = null
     let diagnosticRunId: string | null = null
     let servedFromSpeculativeCache = false
@@ -641,6 +780,7 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
         filled_slots: slots,
         patient: consultation.patient_snapshot || {},
         target_slot: consultation.target_slot,
+        media_context: mediaContext,
       }
 
       if (speculationEnabled) {
@@ -667,7 +807,9 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
       // narrow `diagnosis` to non-null for the rest of this block, so a future
       // cache path that yields null falls back to a real run instead of throwing.
       if (!servedFromSpeculativeCache || !diagnosis) {
-        diagnosis = await runDiagnosis(history, patientPayload(patient), diagnosisInput, slots, requestId)
+        diagnosis = await runDiagnosis(history, patientPayload(patient), diagnosisInput, slots, requestId, {
+          mediaContext,
+        })
       }
 
       await addProductEvent(ctx, 'diagnosis_attempted', consultation.id, {
@@ -715,7 +857,7 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
           missingSlots,
           evidence.score,
           turnCount,
-          { isSpeculative: false },
+          { isSpeculative: false, mediaContext },
         )
       }
     }
@@ -729,20 +871,19 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
       nonClinicalResponseCount,
     })
 
-    // P0-11 AC3. The evidence was sufficient and the only thing missing was the
-    // diagnosis call, which we could not make. Escalating to
-    // `clinical_review_needed` here would permanently close a consult on
-    // technical grounds and tell the user their symptoms need a clinician —
-    // a technical failure wearing clinical clothing. Hold instead.
+    // A failed report attempt after the patient shared health information is a
+    // technical state, never an "incomplete consultation" state. Hold so it can
+    // be retried without consuming or closing the consultation.
     if (
-      reportDecision.outcome === 'review'
-      && reportDecision.reason === 'low_diagnostic_confidence'
-      && diagnosis?.unavailable
+      !mediaBlocksCompletion
+      && reportDecision.outcome === 'continue'
+      && reportDecision.reason === 'retry_report_generation'
+      && diagnosis?.failure
     ) {
       return holdingState(consultation, 'diagnosis', currentVersion, requestId)
     }
 
-    if (reportDecision.outcome === 'complete' && diagnosis) {
+    if (!mediaBlocksCompletion && reportDecision.outcome === 'complete' && diagnosis) {
       const now = new Date().toISOString()
       const accessStatus = isAnonymous ? 'withheld' : 'saved'
       // P2-07 — insert-once clinical body (current-turn diagnosis only; no historical
@@ -760,6 +901,7 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
           ...normalizeObject(diagnosis.raw.model_metadata),
           source: 'libertymd-diagnosis',
           turn_count: turnCount,
+          media_evidence_ids: mediaContext.map((item) => String(item.evidence_id || '')).filter(Boolean),
         },
       })
 
@@ -825,10 +967,8 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
       })
     }
 
-    if (reportDecision.outcome === 'review') {
-      const messageText = reportDecision.reason === 'insufficient_clinical_information'
-        ? 'I do not have enough relevant clinical information to produce a responsible differential diagnosis. Please restart with clearer symptom details or continue with a licensed clinician.'
-        : 'I could not reach a sufficiently confident differential diagnosis from this intake. Please continue with a licensed clinician for review.'
+    if (!mediaBlocksCompletion && reportDecision.outcome === 'review') {
+      const messageText = 'I could not identify any health concern or symptom information in this consultation, so there is no clinical report to prepare. Start a new consultation whenever you are ready to discuss your health.'
       await addMessage(ctx, consultation, 'assistant', messageText, { message_type: 'safety' })
       await updateOwnedConsultation(ctx, consultation, {
         status: 'clinical_review_needed',
@@ -902,6 +1042,7 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
     // next_question. Never sets diagnosis_ran. Never writes intermediate_diagnoses.
     if (
       !shouldRunDiagnosis
+      && !mediaBlocksCompletion
       && isSpeculativeDiagnosisEnabled()
       && isOneTurnFromDiagnosisGate({ evidenceScore: evidence.score, turnCount })
       && ['interviewing', 'high_risk'].includes(nextStatus)
@@ -929,7 +1070,7 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
             speculativeConsultation,
             speculativeSlots,
             requestId,
-            { speculative: true },
+            { speculative: true, mediaContext },
           )
           await addProductEvent(ctx, 'diagnosis_attempted', consultation.id, {
             turn_index: speculativeTurn,
@@ -950,7 +1091,7 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
             speculativeMissing,
             evidenceScoreForEvent,
             speculativeTurn,
-            { isSpeculative: true, targetSlot: speculativeTarget },
+            { isSpeculative: true, targetSlot: speculativeTarget, mediaContext },
           )
           console.log('LibertyMD speculative diagnosis completed', {
             consultation_id: consultation.id,
@@ -989,6 +1130,7 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
           differentialLanguage,
           priorForModel as JsonObject | null,
           requestId,
+          mediaContext,
         )
         if (!result) return
         // Ordering guard: re-read the row rather than trusting the snapshot this

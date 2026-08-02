@@ -16,7 +16,6 @@ declare const Deno: {
 const ROOT = new URL('../../', import.meta.url)
 const EN_I18N = new URL('i18n/locales/en.json', ROOT)
 const APP = new URL('components/LibertyMD/LibertyMDApp.tsx', ROOT)
-const TRUST_ROW = new URL('components/LibertyMD/LibertyMDTrustRow.tsx', ROOT)
 const MARKETING = new URL('components/LibertyMD/LibertyMDMarketingSections.tsx', ROOT)
 const PERMISSIONS = new URL('docs/libertymd/trust-permissions.md', ROOT)
 
@@ -70,19 +69,11 @@ Deno.test('P3-03 · EN trust band has AC6.1 + AC6.2; no invent', async () => {
   assertTrue(/anytime|AI chat/i.test(en.marketing.care.pillAvailability), '24/7 softened')
 })
 
-Deno.test('P3-03 · App mounts trust band above footer; hero invent gone', async () => {
+Deno.test('P3-03 · App does not mount above-footer trust band; hero invent gone', async () => {
   const app = await Deno.readTextFile(APP)
-  const band = await Deno.readTextFile(TRUST_ROW)
   const marketing = await Deno.readTextFile(MARKETING)
 
-  assertTrue(app.includes('LibertyMDTrustRow'), 'trust component imported')
-  assertTrue(
-    /phase === ['"]initial['"]\s*&&\s*<LibertyMDTrustRow/.test(app),
-    'initial-only mount',
-  )
-  const trustIdx = app.indexOf('{phase === \'initial\' && <LibertyMDTrustRow')
-  const marketingFooterIdx = app.indexOf('<footer className="relative mt-24')
-  assertTrue(trustIdx > 0 && marketingFooterIdx > trustIdx, 'trust band precedes marketing footer in source')
+  assertTrue(!app.includes('LibertyMDTrustRow'), 'above-footer trust band unmounted')
   assertTrue(app.includes('LibertyMDFooterRibbon'), 'frozen ribbon still mounted in footer')
 
   // BO 2026-08-01 — star / install-base chrome is reinstated with the operating
@@ -99,11 +90,6 @@ Deno.test('P3-03 · App mounts trust band above footer; hero invent gone', async
   assertTrue(app.includes('heroTrustRating') && app.includes('trustedBy') && app.includes('heroTrustHipaa'),
     'hero trust row renders the three BO figures')
   assertTrue(!app.includes('LibertyMDPatientStoriesSection'), 'patient rail unmounted')
-
-  assertTrue(band.includes('data-libertymd-trust-band'), 'band marker')
-  assertTrue(band.includes('trust.aiNotClinicianBody'), 'AC6.1 body key')
-  assertTrue(band.includes('trust.emergencyBody'), 'AC6.2 body key')
-  assertTrue(!/<img/.test(band), 'no seal images on band')
 
   assertTrue(marketing.includes('return null'), 'patient stories stub')
   assertTrue(!/Jordan|Marcus|Ana, 29|Patient story/.test(marketing), 'named patient invent gone')

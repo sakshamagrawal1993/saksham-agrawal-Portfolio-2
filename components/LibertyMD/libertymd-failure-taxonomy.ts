@@ -624,6 +624,7 @@ export type LabUploadFailureCode =
   | 'sign_failed'
   | 'missing_consultation'
   | 'missing_patient'
+  | 'patient_mismatch'
   | 'patient_not_owned'
   | 'patient_inactive'
   | 'attribution_failed'
@@ -643,6 +644,12 @@ const LAB_UPLOAD_COPY: Record<LabUploadFailureCode, string> = {
     'Something went wrong on our side while saving the lab report. Your consultation can continue.',
   missing_consultation: 'We could not attach that lab report just now. Please try again.',
   missing_patient: 'Choose which profile this lab report belongs to, then try again.',
+  // P4-07 — a lab report may only be attached to the patient this consultation
+  // is already for. Distinct copy matters: without it this code degrades to
+  // `upstream_unknown`, which tells the patient something broke on our side
+  // when in fact the upload was correctly refused and is theirs to resolve.
+  patient_mismatch:
+    'This lab report must belong to the same person this consultation is for. Start a consultation for that profile to attach it there.',
   patient_not_owned: 'That profile is not available for this lab upload. Choose another profile.',
   patient_inactive: 'That profile is no longer active. Choose another profile for this lab upload.',
   attribution_failed:

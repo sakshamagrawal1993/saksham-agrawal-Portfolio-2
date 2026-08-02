@@ -15,6 +15,7 @@ import { getOwnedConsultation } from '../lib/consultations.ts'
 import { jsonResponse } from '../lib/errors.ts'
 import { hasLocationExif, stripImageExif } from '../lib/exif-strip.ts'
 import { normalizeObject, postJson } from '../lib/n8n-client.ts'
+import { ensureMediaFollowups, suggestedMediaFollowupQuestions } from '../lib/media-evidence.ts'
 import {
   PHOTO_SIGNED_URL_TTL_SECONDS,
   PHOTO_UPLOAD_CODES,
@@ -92,7 +93,7 @@ async function signedPhotoUrl(ctx: ProxyContext, path: string): Promise<string |
 
 async function saveAnalysisSuccess(
   ctx: ProxyContext,
-  consultationId: string,
+  consultation: ConsultationRow,
   row: StoredPhotoRow,
   analysis: PhotoAnalysisResult,
 ): Promise<boolean> {
@@ -108,9 +109,19 @@ async function saveAnalysisSuccess(
       updated_at: now,
     })
     .eq('user_id', ctx.user.id)
-    .eq('consultation_id', consultationId)
+    .eq('consultation_id', consultation.id)
     .eq('object_uuid', row.object_uuid)
-  return !error
+  if (error) return false
+  if (analysis.usable) {
+    await ensureMediaFollowups(
+      ctx,
+      consultation,
+      'photo',
+      row.object_uuid,
+      suggestedMediaFollowupQuestions('photo', analysis as unknown as Record<string, unknown>, consultation.language),
+    )
+  }
+  return true
 }
 
 async function saveAnalysisFailure(
@@ -141,7 +152,7 @@ async function analyzeStoredPhoto(
 ): Promise<PhotoAnalysisResult | null> {
   try {
     const analysis = await invokePhotoAgent(consultation, bytes, row.content_type)
-    if (!analysis || !(await saveAnalysisSuccess(ctx, consultation.id, row, analysis))) {
+    if (!analysis || !(await saveAnalysisSuccess(ctx, consultation, row, analysis))) {
       await saveAnalysisFailure(ctx, consultation.id, row)
       return null
     }

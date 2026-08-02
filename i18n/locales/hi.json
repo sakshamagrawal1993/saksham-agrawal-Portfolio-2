@@ -98,12 +98,14 @@
       "readySoap": "चिकित्सक SOAP PDF तैयार"
     },
     "sections": {
-      "triage": "Recommended care setting",
-      "nextStep": "What to do now",
-      "differential": "Possible causes",
-      "assessmentAndPlan": "Assessment and plan",
-      "redFlags": "Red flags to watch",
-      "soap": "SOAP note"
+      "sessionSummary": "सत्र सारांश",
+      "patientSummary": "रोगी सारांश",
+      "triage": "अनुशंसित देखभाल स्तर",
+      "nextStep": "अब क्या करें",
+      "differential": "विभेदक निदान",
+      "assessmentAndPlan": "अनुशंसित कार्य योजना",
+      "redFlags": "ध्यान देने योग्य चेतावनी संकेत",
+      "soap": "SOAP नोट"
     },
     "triage": {
       "home": "Home care",
@@ -114,13 +116,13 @@
       "crisis_line": "Crisis support line",
       "unknown": "Care setting unavailable"
     },
-    "viewTitle": "Assessment and next steps",
+    "viewTitle": "चिकित्सक की समीक्षा के लिए रिपोर्ट",
     "card": {
       "ordinal": {
-        "most_likely": "Most likely",
-        "possible": "Possible",
-        "less_likely": "Less likely",
-        "most_likely_serious": "Most likely · Serious"
+        "most_likely": "उच्च विश्वास",
+        "possible": "मध्यम विश्वास",
+        "less_likely": "कम विश्वास",
+        "most_likely_serious": "उच्च विश्वास · गंभीर"
       },
       "serious": "Serious",
       "furtherInvestigations": "Further investigations",
@@ -188,9 +190,9 @@
       "claimRefund": "रिफंड नीति: {refund}"
     },
     "lifecycle": {
-      "partialLabel": "Incomplete",
-      "partialTitle": "This report is incomplete",
-      "partialBody": "We could not produce a complete doctor-ready report from this consultation. No diagnosis list or confidence claim is shown. You can start a fresh consultation anytime.",
+      "partialLabel": "अपूर्ण",
+      "partialTitle": "रिपोर्ट के लिए कोई स्वास्थ्य जानकारी नहीं है",
+      "partialBody": "इस परामर्श में किसी स्वास्थ्य चिंता या लक्षण पर चर्चा नहीं हुई, इसलिए कोई क्लिनिकल रिपोर्ट तैयार नहीं की जा सकती। जब आप अपने स्वास्थ्य के बारे में बात करना चाहें, नया परामर्श शुरू करें।",
       "partialA11yNoDx": "No differential diagnosis or confidence is included.",
       "partialStartFresh": "Start a fresh consultation",
       "failedTitle": "We could not generate your report",
@@ -545,6 +547,12 @@
     "labAttachedLabel": "संलग्न लैब रिपोर्ट",
     "labRemove": "लैब रिपोर्ट हटाएँ",
     "labUnreviewed": "नैदानिक समीक्षा लंबित",
+    "mediaProcessing": "Processing evidence…",
+    "mediaProcessed": "Processed and included",
+    "mediaFailed": "Processing failed",
+    "mediaUnusable": "Could not read enough detail",
+    "mediaQuestionPhoto": "About your photo",
+    "mediaQuestionLab": "About your lab report",
     "labAttributionTitle": "यह लैब रिपोर्ट किसके लिए है?",
     "labAttributionBody": "वह प्रोफ़ाइल चुनें जिससे यह रिपोर्ट जुड़ी है। इससे परामर्श किसके लिए है, वह नहीं बदलता।",
     "labAttributionConfirm": "जारी रखें",

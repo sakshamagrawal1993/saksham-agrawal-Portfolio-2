@@ -103,7 +103,8 @@ export type DiagnosisGateInput = {
 
 /**
  * Same boolean as proxy `computeShouldRunDiagnosis` (P2-14 G2):
- * score ≥ floor ∧ turn ≥ floor ∧ (!EVEN_REQUIRED ∨ even ∨ ready ∨ at cap).
+ * (score ≥ floor OR at-cap score > 0) ∧ turn ≥ floor ∧
+ * (!EVEN_REQUIRED ∨ even ∨ ready ∨ at cap).
  */
 export function shouldRunDiagnosisGate(input: DiagnosisGateInput): boolean {
   const maxTurns = input.maxTurns ?? MAX_INTERVIEW_TURNS
@@ -118,7 +119,8 @@ export function shouldRunDiagnosisGate(input: DiagnosisGateInput): boolean {
     || turnCount % 2 === 0
     || Boolean(input.readyForReport)
     || turnCount >= maxTurns
-  return score >= scoreFloor && turnCount >= turnFloor && parityOk
+  const evidenceOk = score >= scoreFloor || (turnCount >= maxTurns && score > 0)
+  return evidenceOk && turnCount >= turnFloor && parityOk
 }
 
 /**
