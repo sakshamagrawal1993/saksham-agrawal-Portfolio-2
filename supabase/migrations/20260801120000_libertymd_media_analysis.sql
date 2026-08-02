@@ -7,7 +7,7 @@
 
 -- Fill three CBC percentage gaps in the shared parameter dictionary. These are
 -- LibertyMD-owned stable ids (not represented as LOINC codes).
-insert into public.health_parameter_definitions (id, name, category, unit)
+insert into public.libertymd_health_parameter_definitions (id, name, category, unit)
 values
   ('libertymd-cbc-eosinophils-pct', 'Eosinophils Percentage', 'Lab Report Parameter', '%'),
   ('libertymd-cbc-monocytes-pct', 'Monocytes Percentage', 'Lab Report Parameter', '%'),
@@ -18,7 +18,7 @@ set name = excluded.name,
     unit = excluded.unit;
 
 -- Canonical units for the CBC definitions exercised by the closeout sample.
-update public.health_parameter_definitions
+update public.libertymd_health_parameter_definitions
 set unit = case id
   when '718-7' then 'g/dL'
   when '26453-1' then '10^6/uL'
@@ -92,7 +92,7 @@ create table if not exists public.libertymd_lab_results (
   user_id uuid not null references auth.users(id) on delete cascade,
   consultation_id uuid not null references public.libertymd_consultations(id) on delete cascade,
   patient_id uuid not null references public.libertymd_patients(id),
-  parameter_id text not null references public.health_parameter_definitions(id),
+  parameter_id text not null references public.libertymd_health_parameter_definitions(id),
   parameter_name text not null,
   raw_name text not null,
   value_text text,
