@@ -461,7 +461,7 @@ function ReportLoader({ onRefresh }: { onRefresh?: () => void }) {
   const activeItem = stageItems[activeIndex] || stageItems[3]
 
   return (
-    <div className="relative min-h-[580px] w-full overflow-hidden rounded-3xl border border-libertymd-slate-200/80 bg-[#FAFBFD] p-6 sm:p-12 shadow-sm flex flex-col items-center justify-center text-center">
+    <div className="relative min-h-[560px] w-full py-12 px-4 flex flex-col items-center justify-center text-center">
       {/* Dynamic 3D WebGL Ribbon Occupies Whole Container Background (Unboxed) */}
       <div className="pointer-events-none absolute inset-0 z-0 opacity-75 overflow-hidden" aria-hidden="true">
         <LibertyMDFooterRibbon />
