@@ -11,6 +11,7 @@
 
 import type {
   LibertyMdNormalizedReport,
+  LibertyMdPatientInfo,
   TriageDisplayTier,
 } from './libertymd-report'
 
@@ -431,7 +432,8 @@ export async function renderPdfBlob(
     // Rod of Asclepius Watermark
     if (watermarkBytes && watermarkBytes.byteLength > 0) {
       try {
-        pdf.setGState(new pdf.GState({ opacity: 0.05 }))
+        const GStateConstructor = (pdf as unknown as { GState: new (options: { opacity: number }) => unknown }).GState
+        pdf.setGState(new GStateConstructor({ opacity: 0.05 }))
         const wmHeight = 420
         const wmWidth = 336
         pdf.addImage(
@@ -442,7 +444,7 @@ export async function renderPdfBlob(
           wmWidth,
           wmHeight,
         )
-        pdf.setGState(new pdf.GState({ opacity: 1.0 }))
+        pdf.setGState(new GStateConstructor({ opacity: 1.0 }))
       } catch {
         // ignore
       }
@@ -589,7 +591,7 @@ export async function renderPdfBlob(
   const nameStr = doc.patientInfo?.name || 'Anonymous Guest'
   const ageStr = doc.patientInfo?.age ? String(doc.patientInfo.age) : 'Not specified'
   const rawSexStr = doc.patientInfo?.sexAtBirth
-  const sexStr = rawSexStr ? rawSexStr.split('_').join(' ').replace(/^./, (c) => c.toUpperCase()) : 'Not specified'
+  const sexStr = rawSexStr ? rawSexStr.split('_').join(' ').replace(/^./, (c: string) => c.toUpperCase()) : 'Not specified'
   const dateStr = doc.patientInfo?.date || formatPdfUtcDate()
 
   // Row 1: Name (Left), Date (Right)

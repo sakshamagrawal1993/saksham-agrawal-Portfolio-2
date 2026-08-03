@@ -94,15 +94,7 @@ export type LibertyMDReportViewProps = {
   retentionExpiresAt?: string | null
 }
 
-const TRIAGE_BADGE_CLASS: Record<TriageDisplayTier, string> = {
-  home: 'border-libertymd-green-600/30 bg-libertymd-green-sage text-libertymd-green-600',
-  telehealth: 'border-libertymd-blue-600/30 bg-libertymd-blue-50 text-libertymd-blue-700',
-  urgent_care: 'border-amber-500/40 bg-amber-50 text-amber-900',
-  emergency_department: 'border-libertymd-blue-900/40 bg-libertymd-blue-50 text-libertymd-blue-900',
-  call_911: 'border-red-700/40 bg-red-50 text-red-900',
-  crisis_line: 'border-libertymd-indigo/40 bg-libertymd-blue-50 text-libertymd-indigo',
-  unknown: 'border-libertymd-slate-300 bg-libertymd-slate-200 text-libertymd-slate-700',
-}
+
 
 function triageLabelKey(tier: TriageDisplayTier): string {
   return `report.triage.${tier}`
@@ -222,8 +214,6 @@ export function LibertyMDReportView({
   // Sample reports never expose delivery actions, so they do no PDF work.
   const [pdfBusy, setPdfBusy] = useState(!isSample)
   const [pdfError, setPdfError] = useState<string | null>(null)
-  const [readyLinks, setReadyLinks] = useState<PdfReadyLink[]>([])
-  const [soapSecondTap, setSoapSecondTap] = useState<PdfReadyLink | null>(null)
 
   const showTriage = report.triageTier !== 'unknown' || Boolean(report.triageRaw)
   const showDifferentials = report.differentials.length > 0
@@ -541,11 +531,7 @@ export function LibertyMDReportView({
     }
   }
 
-  const onSoapSecondTap = () => {
-    if (!soapSecondTap) return
-    triggerReadyLinkDownload(soapSecondTap)
-    setSoapSecondTap(null)
-  }
+
 
   const differentialTeaser = showDifferentials
     ? t('report.teasers.differential', { count: report.differentials.length })
