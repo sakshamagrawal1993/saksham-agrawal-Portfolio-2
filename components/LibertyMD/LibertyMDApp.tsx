@@ -1959,8 +1959,8 @@ export default function LibertyMDApp() {
             }
             handleSend();
           }}
-          className={`pointer-events-auto mx-auto flex h-16 w-full max-w-[64rem] items-center gap-2 rounded-full border border-white/75 bg-white/[0.58] p-2 pl-5 shadow-[0_22px_65px_rgba(15,23,42,0.18),inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-2xl backdrop-saturate-150 transition-[background-color,box-shadow] hover:bg-white/[0.68] hover:shadow-[0_26px_75px_rgba(15,23,42,0.22),inset_0_1px_0_rgba(255,255,255,0.9)] sm:h-20 sm:pl-8 ${
-            shouldShowFloatingComposer ? '' : 'pointer-events-none'
+          className={`mx-auto flex h-16 w-full max-w-[64rem] items-center gap-2 rounded-full border border-white/75 bg-white/[0.58] p-2 pl-5 shadow-[0_22px_65px_rgba(15,23,42,0.18),inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-2xl backdrop-saturate-150 transition-[background-color,box-shadow] hover:bg-white/[0.68] hover:shadow-[0_26px_75px_rgba(15,23,42,0.22),inset_0_1px_0_rgba(255,255,255,0.9)] sm:h-20 sm:pl-8 ${
+            shouldShowFloatingComposer ? 'pointer-events-auto' : 'pointer-events-none'
           }`}
         >
           <input

@@ -36,6 +36,7 @@ import {
 } from './libertymd-doctor-cta-config'
 import {
   DEFAULT_REPORT_SECTION_OPEN,
+  formatClinicalBullets,
   mergeReportSectionOpen,
   newlyReachedScrollBuckets,
   readReportSections,
