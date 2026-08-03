@@ -191,6 +191,7 @@ export function LibertyMDOverlaySheet({
         aria-describedby={ariaDescribedBy}
         tabIndex={-1}
         data-libertymd-overlay-panel=""
+        data-lenis-prevent
         onMouseDown={(event) => event.stopPropagation()}
         style={
           !isDesktop && dragOffsetY > 0
@@ -219,7 +220,11 @@ export function LibertyMDOverlaySheet({
 
         <div
           data-libertymd-overlay-body=""
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+          data-lenis-prevent
+          data-lenis-prevent-wheel
+          data-lenis-prevent-touch
+          tabIndex={0}
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y focus:outline-none"
           // Stable id hook for tests / future P1-14 mounts; not user-facing.
           id={`libertymd-overlay-body-${generatedId}`}
         >

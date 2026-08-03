@@ -108,7 +108,7 @@ export function LibertyMDSampleReport({
         ref={contentRef}
         data-libertymd-sample-report=""
         data-libertymd-sample-cluster={conditionClusterId}
-        className="flex flex-col"
+        className="flex min-h-full flex-col"
       >
         {/* Persistent example badge — sticky so it remains visible while scrolling (DoD+). */}
         <div
