@@ -14,7 +14,7 @@ async function generateSamplePdf() {
   let y = margin;
 
   // 1. Solid Blue Header Banner (#3B71CA = RGB 59, 113, 202)
-  const bannerHeight = 82;
+  const bannerHeight = 80;
   pdf.setFillColor(59, 113, 202);
   pdf.rect(margin, y, maxWidth, bannerHeight, 'F');
 
@@ -88,20 +88,13 @@ async function generateSamplePdf() {
   pdf.setDrawColor('#CBD5E1');
   pdf.setLineWidth(0.5);
   pdf.line(margin, y, pageWidth - margin, y);
-  y += 16;
-
-  // Legal / Disclaimer Banner
-  pdf.setFont('helvetica', 'normal');
-  pdf.setFontSize(8);
-  pdf.setTextColor('#64748B');
-  pdf.text('Generated: 2026-08-03 · AI-generated clinical summary — not a diagnosis · No licensed clinician review', margin + 4, y);
-  y += 16;
+  y += 18;
 
   // 3. SESSION SUMMARY
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(11);
   pdf.setTextColor('#1E3A8A');
-  pdf.text('SESSION SUMMARY', margin, y);
+  pdf.text('Session Summary', margin, y);
   y += 14;
 
   pdf.setFont('helvetica', 'bold');
@@ -116,7 +109,7 @@ async function generateSamplePdf() {
   pdf.setFont('helvetica', 'bold');
   pdf.text('Primary Differential:', margin + 6, y);
   pdf.setFont('helvetica', 'normal');
-  pdf.text('Influenza / Flu (high confidence). Secondary: COVID-19, Acute Viral Bronchitis.', margin + 110, y);
+  pdf.text('Influenza / Flu (High Confidence). Secondary: COVID-19, Acute Viral Bronchitis.', margin + 110, y);
   y += 14;
 
   pdf.setFont('helvetica', 'bold');
@@ -129,7 +122,7 @@ async function generateSamplePdf() {
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(11);
   pdf.setTextColor('#1E3A8A');
-  pdf.text('PATIENT SUMMARY', margin, y);
+  pdf.text('Patient Summary', margin, y);
   y += 14;
 
   pdf.setFont('helvetica', 'normal');
@@ -139,17 +132,17 @@ async function generateSamplePdf() {
   pdf.text(patLines, margin, y);
   y += patLines.length * 13 + 14;
 
-  // 5. DIFFERENTIAL DIAGNOSIS
+  // 5. DIFFERENTIAL DIAGNOSIS (NO numeric score against confidence!)
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(11);
   pdf.setTextColor('#1E3A8A');
-  pdf.text('DIFFERENTIAL DIAGNOSIS', margin, y);
+  pdf.text('Differential Diagnosis', margin, y);
   y += 14;
 
   const dxItems = [
-    { title: '1. Influenza (Flu)', confidence: 'High Confidence (85%)', desc: 'Acute viral infection with characteristic triad of sudden fever, severe myalgias, and dry cough.' },
-    { title: '2. COVID-19 (SARS-CoV-2)', confidence: 'Medium Confidence (65%)', desc: 'Viral respiratory syndrome presenting with overlapping fever, sore throat, and cough.' },
-    { title: '3. Acute Viral Bronchitis', confidence: 'Low Confidence (45%)', desc: 'Lower respiratory tract inflammation causing prominent cough and low-grade systemic symptoms.' },
+    { title: '1. Influenza (Flu)', confidence: 'High Confidence', desc: 'Acute viral infection with characteristic triad of sudden fever, severe myalgias, and dry cough.' },
+    { title: '2. COVID-19 (SARS-CoV-2)', confidence: 'Medium Confidence', desc: 'Viral respiratory syndrome presenting with overlapping fever, sore throat, and cough.' },
+    { title: '3. Acute Viral Bronchitis', confidence: 'Low Confidence', desc: 'Lower respiratory tract inflammation causing prominent cough and low-grade systemic symptoms.' },
   ];
 
   for (const dx of dxItems) {
@@ -171,18 +164,18 @@ async function generateSamplePdf() {
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(11);
   pdf.setTextColor('#1E3A8A');
-  pdf.text('RECOMMENDED ACTION PLAN', margin, y);
+  pdf.text('Recommended Action Plan', margin, y);
   y += 14;
 
   const planBullets = [
-    '1. Arrange an evaluation with a licensed clinician',
-    '2. Do a test for Covid 19',
-    '3. Avoid contact with ppl outside',
-    '4. Stay at home',
+    '• Arrange an evaluation with a licensed clinician',
+    '• Do a test for Covid 19',
+    '• Avoid contact with ppl outside',
+    '• Stay at home',
   ];
 
   for (const bullet of planBullets) {
-    pdf.setFont('helvetica', 'bold');
+    pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(9.5);
     pdf.setTextColor('#0F172A');
     pdf.text(bullet, margin + 6, y);
@@ -190,11 +183,11 @@ async function generateSamplePdf() {
   }
   y += 10;
 
-  // 7. RED FLAGS TO WATCH
+  // 7. RED FLAGS
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(11);
   pdf.setTextColor('#991B1B');
-  pdf.text('RED FLAGS — WHEN TO SEEK IMMEDIATE CARE', margin, y);
+  pdf.text('Red Flags', margin, y);
   y += 14;
 
   const redFlags = [
@@ -211,8 +204,42 @@ async function generateSamplePdf() {
     pdf.text(rf, margin + 6, y);
     y += 13;
   }
+  y += 10;
 
-  // Save PDF to artifact directory
+  // 8. SOAP NOTE
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(11);
+  pdf.setTextColor('#1E3A8A');
+  pdf.text('SOAP Note', margin, y);
+  y += 14;
+
+  const soapLines = [
+    'Subjective: 34M with 2-day fever (102F), dry cough, myalgias, sore throat. Exposure to sick coworker.',
+    'Objective: T 102F, RR 18, SpO2 98% room air. No respiratory distress.',
+    'Assessment: Likely Influenza A/B vs COVID-19 infection.',
+    'Plan: Clinical evaluation, COVID-19 antigen test, supportive self-care, isolation.',
+  ];
+
+  for (const sLine of soapLines) {
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(9);
+    pdf.setTextColor('#334155');
+    const wrapped = pdf.splitTextToSize(sLine, maxWidth - 10);
+    pdf.text(wrapped, margin + 6, y);
+    y += wrapped.length * 12 + 4;
+  }
+
+  // 9. FOOTER DISCLAIMER AT BOTTOM OF PAGE
+  pdf.setDrawColor('#CBD5E1');
+  pdf.setLineWidth(0.5);
+  pdf.line(margin, pageHeight - 28, pageWidth - margin, pageHeight - 28);
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(7.5);
+  pdf.setTextColor('#64748B');
+  pdf.text('AI-generated clinical summary — not a diagnosis · No licensed clinician review', margin, pageHeight - 16);
+  pdf.text('Page 1', pageWidth - margin, pageHeight - 16, { align: 'right' });
+
+  // Save PDF
   const pdfPath = path.join(artifactDir, 'sample_fever_cough_report.pdf');
   const pdfBuffer = Buffer.from(pdf.output('arraybuffer'));
   fs.writeFileSync(pdfPath, pdfBuffer);

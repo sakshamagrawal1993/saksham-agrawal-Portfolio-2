@@ -183,31 +183,27 @@ export function buildPatientPdfDoc(
 ): LibertyMdPdfDoc {
   const sections: LibertyMdPdfSection[] = []
 
+  // 1. Session Summary
   if (report.headline) {
-    pushSection(sections, copy.patientTitle, [report.headline])
+    pushSection(sections, 'Session Summary', [report.headline])
   }
+
+  // 2. Patient Summary
   if (report.patientSummary) {
-    pushSection(
-      sections,
-      report.headline ? copy.summaryHeading : copy.patientTitle,
-      [report.patientSummary],
-    )
+    pushSection(sections, 'Patient Summary', [report.patientSummary])
   }
-  if (report.triageTier !== 'unknown' || report.triageRaw) {
-    pushSection(sections, copy.sections.triage, [
-      copy.triageLabels[report.triageTier] || copy.triageLabels.unknown,
-    ])
-  }
-  if (report.nextStep) {
-    pushSection(sections, copy.sections.nextStep, [report.nextStep])
-  }
+
+  // 3. Differential Diagnosis (NO numeric percentage scores!)
   if (report.differentials.length > 0) {
     const lines: string[] = []
     for (const item of report.differentials) {
       const bits: string[] = [item.name]
       if (item.ordinal) {
-        const ordinalLabel = copy.ordinal[item.ordinal]
-        bits.push(item.isSerious ? `${ordinalLabel} · ${copy.serious}` : ordinalLabel)
+        const rawLabel = (copy.ordinal[item.ordinal] || item.ordinal).replace(/\s*\(\d+%\)/g, '').replace(/\s*\d+%/g, '').trim()
+        const formattedBand = rawLabel.toLowerCase().includes('confidence')
+          ? rawLabel.replace(/^./, (c) => c.toUpperCase())
+          : `${rawLabel.replace(/^./, (c) => c.toUpperCase())} Confidence`
+        bits.push(item.isSerious ? `${formattedBand} · ${copy.serious}` : formattedBand)
       } else if (item.isSerious) {
         bits.push(copy.serious)
       }
@@ -215,33 +211,50 @@ export function buildPatientPdfDoc(
       if (item.description) lines.push(item.description)
       if (item.reason) lines.push(item.reason)
     }
-    pushSection(sections, copy.sections.differential, lines)
+    pushSection(sections, 'Differential Diagnosis', lines)
   }
+
+  // 4. Recommended Action Plan
   if (report.assessmentAndPlan) {
     const lines: string[] = []
     if (report.assessmentAndPlan.assessment) lines.push(report.assessmentAndPlan.assessment)
     if (report.assessmentAndPlan.plan.length) {
-      lines.push(copy.sections.plan)
+      lines.push('Medical Treatments & Plan:')
       for (const item of report.assessmentAndPlan.plan) lines.push(`• ${item}`)
     }
     if (report.assessmentAndPlan.selfCare.length) {
-      lines.push(copy.sections.selfCare)
+      lines.push('Self-Care & Home Management:')
       for (const item of report.assessmentAndPlan.selfCare) lines.push(`• ${item}`)
     }
-    pushSection(sections, copy.sections.assessmentAndPlan, lines)
+    pushSection(sections, 'Recommended Action Plan', lines)
   }
+
+  // 5. Red Flags
   if (report.redFlags.length > 0) {
     pushSection(
       sections,
-      copy.sections.redFlags,
+      'Red Flags',
       report.redFlags.map((flag) => `• ${flag}`),
     )
+  }
+
+  // 6. SOAP Note
+  if (
+    report.soap &&
+    (report.soap.subjective || report.soap.objective || report.soap.assessment || report.soap.plan)
+  ) {
+    const lines: string[] = []
+    if (report.soap.subjective) lines.push(`Subjective: ${report.soap.subjective}`)
+    if (report.soap.objective) lines.push(`Objective: ${report.soap.objective}`)
+    if (report.soap.assessment) lines.push(`Assessment: ${report.soap.assessment}`)
+    if (report.soap.plan) lines.push(`Plan: ${report.soap.plan}`)
+    pushSection(sections, 'SOAP Note', lines)
   }
 
   return {
     kind: 'patient',
     filename: buildPdfFilename('patient', when),
-    title: copy.patientTitle,
+    title: 'Physician Ready Report',
     patientInfo: report.patientInfo,
     headerLines: buildSharedHeader(copy, when),
     sections,
@@ -375,7 +388,7 @@ export async function renderPdfBlob(
   let logoEmbedded = false
 
   const drawRunningChrome = () => {
-    // Light running chrome only — wordmark + thin rule; no large logo repeat (Q2).
+    // Light running chrome — wordmark + page number + bottom disclaimer footer
     pdf.setFont('helvetica', 'normal')
     pdf.setFontSize(PDF_TYPE_PT.running)
     pdf.setTextColor(PDF_CHROME_COLORS.legal)
@@ -383,8 +396,16 @@ export async function renderPdfBlob(
     pdf.setDrawColor(PDF_CHROME_COLORS.rule)
     pdf.setLineWidth(0.5)
     pdf.line(margin, margin - 10, pageWidth - margin, margin - 10)
-    pdf.setFontSize(PDF_TYPE_PT.running)
-    pdf.text(String(pageIndex), pageWidth - margin, margin - 16, { align: 'right' })
+    pdf.text(`Page ${pageIndex}`, pageWidth - margin, margin - 16, { align: 'right' })
+
+    // Footer Disclaimer at bottom of page
+    pdf.setDrawColor(PDF_CHROME_COLORS.rule)
+    pdf.line(margin, pageHeight - 28, pageWidth - margin, pageHeight - 28)
+    pdf.text(
+      'AI-generated clinical summary — not a diagnosis · No licensed clinician review',
+      margin,
+      pageHeight - 16,
+    )
     pdf.setTextColor(PDF_CHROME_COLORS.ink)
   }
 
@@ -504,25 +525,17 @@ export async function renderPdfBlob(
   pdf.line(margin, y, pageWidth - margin, y)
   y += 16
 
-  // Legal / label tier — smaller type, slate token, not a WARNING banner (Q6).
-  // Meaning retained: AI-generated / not a diagnosis + no licensed clinician. No HIPAA.
-  for (const header of doc.headerLines) {
-    writeWrapped(header, PDF_TYPE_PT.legal, 'normal', PDF_CHROME_COLORS.legal)
-  }
-  pdf.setDrawColor(PDF_CHROME_COLORS.rule)
-  pdf.setLineWidth(0.5)
-  ensureSpace(8)
-  pdf.line(margin, y, pageWidth - margin, y)
-  y += 12
-
   for (const section of doc.sections) {
-    y += 4
+    y += 6
     writeWrapped(section.heading, PDF_TYPE_PT.section, 'bold', PDF_CHROME_COLORS.section)
     y += 2
     for (const line of section.bodyLines) {
       writeWrapped(line, PDF_TYPE_PT.body, 'normal', PDF_CHROME_COLORS.ink)
     }
   }
+
+  // Draw running footer on page 1
+  drawRunningChrome()
 
   return pdf.output('blob')
 }
