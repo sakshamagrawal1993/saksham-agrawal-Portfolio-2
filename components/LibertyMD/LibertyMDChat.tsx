@@ -2514,7 +2514,7 @@ export default function LibertyMDChat() {
       // "still generating" apart from "the interview asked something else" and
       // send the patient back rather than spin. See LibertyMDReportPage.
       navigate(
-        `/liberty-md/report/${encodeURIComponent(consultationId)}?awaiting=${lastTurnCount}`,
+        `/liberty-md/report/${encodeURIComponent(consultationId)}`,
         { replace: true },
       );
       reportRedirectedRef.current = true;

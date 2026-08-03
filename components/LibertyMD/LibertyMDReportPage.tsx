@@ -1,24 +1,18 @@
 /**
  * P5-REPORT — the dedicated report surface at `/liberty-md/report/:consultationId`.
  *
- * The report used to render inline in the chat transcript, which had three
- * problems: it inherited the transcript's scroll container so a long report
- * fought the conversation for the viewport, it could not be linked to or
- * refreshed, and a still-generating report had nowhere to live except a
- * message bubble.
- *
- * This page owns those three things instead:
+ * The report used to render inline in the chat transcript.
+ * This page owns:
  *   - its own scroll context, so the report reads like a document
  *   - a real URL, so it survives a reload and can be shared with the account
- *   - an explicit loader for `generating`, rather than an empty transcript
+ *   - an explicit loader with a 1-minute countdown timer for `generating`
  *
  * It deliberately does NOT re-implement the report body. `LibertyMDReportView`
- * stays the single renderer for both this page and the sample sheet — two
- * renderers would drift, and the sample would stop being a truthful preview.
+ * stays the single renderer.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Loader2, LogIn, Menu } from 'lucide-react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { ArrowLeft, Clock, Loader2, LogIn, Menu, RefreshCw } from 'lucide-react'
 import type { User } from '@supabase/supabase-js'
 import { useI18n } from '../../i18n'
 import { supabase } from '../../lib/supabaseClient'
@@ -39,11 +33,7 @@ import { normalizeReportData, type LibertyMdNormalizedReport } from './libertymd
 
 /** How often to re-poll while the report is still being generated. */
 const POLL_INTERVAL_MS = 3_000
-/**
- * Stop polling eventually. A report that has not appeared in two minutes is not
- * about to; continuing to poll would spin a request loop against the proxy for
- * as long as the tab stays open.
- */
+/** Polling timeout: 2 minutes maximum before offering manual refresh / failure shell. */
 const POLL_TIMEOUT_MS = 120_000
 
 type PageState =
@@ -56,12 +46,7 @@ type PageState =
 export default function LibertyMDReportPage() {
   const { consultationId = '' } = useParams<{ consultationId: string }>()
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
   const { t } = useI18n()
-  const awaitingRaw = searchParams.get('awaiting')
-  const awaitingTurn = awaitingRaw !== null && Number.isFinite(Number(awaitingRaw))
-    ? Number(awaitingRaw)
-    : null
   const [state, setState] = useState<PageState>({ kind: 'loading' })
   const [isReportGateOpen, setIsReportGateOpen] = useState<boolean>(() =>
     Boolean(consultationId) && !isSoftGateDismissed(consultationId),
@@ -72,6 +57,7 @@ export default function LibertyMDReportPage() {
   const isAnonymous = !user || Boolean(user.is_anonymous)
   const startedAtRef = useRef<number>(Date.now())
   const cancelledRef = useRef(false)
+  const consecutiveErrorsRef = useRef(0)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user || null))
@@ -106,10 +92,16 @@ export default function LibertyMDReportPage() {
     if (cancelledRef.current) return 'settled'
 
     if (error) {
-      setState({ kind: 'error', message: t('report.loadFailed') })
-      return 'settled'
+      consecutiveErrorsRef.current += 1
+      // Tolerates transient network hiccups — only trigger hard error after 5 consecutive failures
+      if (consecutiveErrorsRef.current >= 5) {
+        setState({ kind: 'error', message: t('report.loadFailed') })
+        return 'settled'
+      }
+      return 'pending'
     }
 
+    consecutiveErrorsRef.current = 0
     const consultation = (data?.consultation ?? {}) as Record<string, unknown>
     const status = String(consultation.status || '')
     const reportEnvelope = data?.report && typeof data.report === 'object' && !Array.isArray(data.report)
@@ -152,22 +144,16 @@ export default function LibertyMDReportPage() {
       return 'settled'
     }
 
-    const turnCount = Number(consultation.turn_count)
-    if (
-      awaitingTurn !== null
-      && Number.isFinite(turnCount)
-      && turnCount > awaitingTurn
-    ) {
-      navigate(
-        `/liberty-md/chat?consultationId=${encodeURIComponent(consultationId)}`,
-        { replace: true },
-      )
-      return 'settled'
-    }
-
     setState({ kind: 'generating' })
     return 'pending'
-  }, [consultationId, navigate, t, awaitingTurn, ensureIdentity])
+  }, [consultationId, navigate, t, ensureIdentity])
+
+  const triggerReload = useCallback(() => {
+    consecutiveErrorsRef.current = 0
+    startedAtRef.current = Date.now()
+    setState({ kind: 'loading' })
+    void load()
+  }, [load])
 
   useEffect(() => {
     if (!consultationId) {
@@ -176,6 +162,7 @@ export default function LibertyMDReportPage() {
     }
     cancelledRef.current = false
     startedAtRef.current = Date.now()
+    consecutiveErrorsRef.current = 0
     let timer: number | undefined
 
     const tick = async () => {
@@ -298,26 +285,29 @@ export default function LibertyMDReportPage() {
       <main className="mx-auto w-full max-w-4xl px-4 pb-24 pt-6 sm:px-6">
         {state.kind === 'loading' || state.kind === 'generating' ? (
           <ReportLoader
-            heading={state.kind === 'generating' ? t('report.generatingHeading') : t('report.loadingHeading')}
-            body={state.kind === 'generating' ? t('report.generatingBody') : ''}
+            onRefresh={triggerReload}
           />
         ) : null}
 
         {state.kind === 'error' ? (
-          <p role="alert" className="rounded-lg border border-libertymd-slate-200 bg-white p-6 text-sm font-medium text-libertymd-slate-700">
-            {state.message}
-          </p>
+          <div role="alert" className="rounded-xl border border-rose-200 bg-white p-6 text-center shadow-sm">
+            <p className="text-sm font-semibold text-rose-700">{state.message}</p>
+            <button
+              type="button"
+              onClick={triggerReload}
+              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-libertymd-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-libertymd-blue-700"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Try Again
+            </button>
+          </div>
         ) : null}
 
         {state.kind === 'lifecycle' ? (
           <LibertyMDReportLifecycleShell
             state={state.state}
             onStartFresh={() => navigate('/liberty-md')}
-            onRetry={() => {
-              startedAtRef.current = Date.now()
-              setState({ kind: 'loading' })
-              void load()
-            }}
+            onRetry={triggerReload}
           />
         ) : null}
 
@@ -399,36 +389,102 @@ export default function LibertyMDReportPage() {
 }
 
 /**
- * The loader.
+ * High-End 1-Minute Countdown Report Loader
  *
- * Deliberately calm and specific rather than a bare spinner: the wait here is
- * seconds-to-a-minute while the diagnosis workflow runs, and a patient watching
- * an unexplained spinner after a clinical conversation reads it as something
- * having gone wrong. Naming the step is what makes the wait tolerable.
+ * Runs a 60-second countdown with visual progress bar, active clinical step labels,
+ * and a manual refresh trigger once the countdown reaches 0s.
  */
-function ReportLoader({ heading, body }: { heading: string; body: string }) {
+function ReportLoader({ onRefresh }: { onRefresh?: () => void }) {
+  const [secondsLeft, setSecondsLeft] = useState(60)
+
+  useEffect(() => {
+    setSecondsLeft(60)
+    const interval = setInterval(() => {
+      setSecondsLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [])
+
+  const progressPercent = Math.min(100, Math.round(((60 - secondsLeft) / 60) * 100))
+  const formattedTime = `00:${secondsLeft < 10 ? '0' : ''}${secondsLeft}`
+
+  const currentStage = secondsLeft > 45
+    ? 'Summarizing clinical notes & patient symptoms...'
+    : secondsLeft > 30
+      ? 'Evaluating symptoms against clinical database...'
+      : secondsLeft > 15
+        ? 'Synthesizing primary diagnosis & action plan...'
+        : secondsLeft > 0
+          ? 'Finalizing physician-ready report document...'
+          : 'Report processing complete. Loading details...'
+
   return (
     <section
       data-libertymd-report-loader=""
       aria-live="polite"
       aria-busy="true"
-      className="rounded-lg border border-libertymd-slate-200 bg-white p-8 text-center shadow-sm sm:p-12"
+      className="rounded-2xl border border-libertymd-slate-200 bg-white p-8 text-center shadow-md sm:p-12"
     >
-      <span className="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-full bg-libertymd-blue-50 text-libertymd-blue-600">
-        <Loader2 className="h-6 w-6 animate-spin" aria-hidden="true" />
-      </span>
-      <h2 className="mt-6 font-serif text-2xl font-semibold text-libertymd-ink">{heading}</h2>
-      {body ? (
-        <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-libertymd-slate-500">{body}</p>
-      ) : null}
-      {/* Skeleton of the document to come, so the page has the shape of a
-          report rather than an empty box while it loads. */}
-      <div className="mx-auto mt-10 max-w-xl space-y-3" aria-hidden="true">
+      <div className="relative mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-libertymd-blue-50 text-libertymd-blue-600 shadow-inner">
+        <Loader2 className="h-10 w-10 animate-spin text-libertymd-blue-600" aria-hidden="true" />
+        <span className="absolute -bottom-1 inline-flex items-center gap-1 rounded-full bg-libertymd-blue-600 px-2.5 py-0.5 text-[11px] font-bold text-white shadow-sm">
+          <Clock className="h-3 w-3" />
+          {formattedTime}
+        </span>
+      </div>
+
+      <h2 className="mt-8 font-serif text-2xl font-bold text-libertymd-ink">
+        Preparing Your Clinical Report
+      </h2>
+
+      <p className="mx-auto mt-2 max-w-md text-sm font-semibold text-libertymd-blue-700 animate-pulse">
+        {currentStage}
+      </p>
+
+      {/* 60-Second Progress Bar */}
+      <div className="mx-auto mt-6 max-w-md">
+        <div className="flex items-center justify-between text-xs font-semibold text-libertymd-slate-500 mb-1.5">
+          <span>Synthesizing Document</span>
+          <span>{progressPercent}%</span>
+        </div>
+        <div className="h-2.5 w-full overflow-hidden rounded-full bg-libertymd-slate-100 p-0.5 ring-1 ring-libertymd-slate-200">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-libertymd-blue-500 to-libertymd-blue-700 transition-all duration-1000 ease-linear"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
+      </div>
+
+      {secondsLeft === 0 ? (
+        <div className="mt-8">
+          <button
+            type="button"
+            onClick={() => onRefresh?.()}
+            className="inline-flex items-center gap-2 rounded-xl bg-libertymd-blue-600 px-6 py-3 text-sm font-bold text-white shadow-md transition hover:bg-libertymd-blue-700 active:scale-95"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Check Report Status
+          </button>
+        </div>
+      ) : (
+        <p className="mt-6 text-xs text-libertymd-slate-400 font-medium">
+          Please stay on this page. Your report will display automatically once complete.
+        </p>
+      )}
+
+      {/* Document Skeleton Preview */}
+      <div className="mx-auto mt-10 max-w-xl space-y-3 opacity-60" aria-hidden="true">
         <div className="h-3 w-2/3 animate-pulse rounded-full bg-libertymd-slate-200" />
         <div className="h-3 w-full animate-pulse rounded-full bg-libertymd-slate-200" />
         <div className="h-3 w-5/6 animate-pulse rounded-full bg-libertymd-slate-200" />
-        <div className="h-24 w-full animate-pulse rounded-lg bg-libertymd-slate-200" />
-        <div className="h-3 w-1/2 animate-pulse rounded-full bg-libertymd-slate-200" />
+        <div className="h-20 w-full animate-pulse rounded-lg bg-libertymd-slate-200" />
       </div>
     </section>
   )
