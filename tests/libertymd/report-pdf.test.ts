@@ -52,7 +52,7 @@ const PDF_COPY: LibertyMdPdfCopy = {
   soapTitle: 'Physician SOAP note',
   summaryHeading: 'Summary',
   aiGenerated: 'AI-generated — not a diagnosis.',
-  noClinicianReview: 'No licensed clinician has reviewed this document.',
+  noClinicianReview: 'For licensed clinician review.',
   generatedLabel: 'Generated',
   sections: {
     triage: 'Recommended care setting',

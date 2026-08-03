@@ -80,7 +80,7 @@
       "soapTitle": "Physician SOAP note",
       "summaryHeading": "Summary",
       "aiGenerated": "AI-generated — not a diagnosis.",
-      "noClinicianReview": "No licensed clinician has reviewed this document.",
+      "noClinicianReview": "For licensed clinician review.",
       "generatedLabel": "Generated",
       "plan": "Plan",
       "chooserLabel": "Choose which report to download",

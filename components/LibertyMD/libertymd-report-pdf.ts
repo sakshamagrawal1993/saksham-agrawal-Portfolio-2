@@ -402,7 +402,7 @@ export async function renderPdfBlob(
     pdf.setDrawColor(PDF_CHROME_COLORS.rule)
     pdf.line(margin, pageHeight - 28, pageWidth - margin, pageHeight - 28)
     pdf.text(
-      'AI-generated clinical summary — not a diagnosis · No licensed clinician review',
+      'AI-generated clinical summary — not a diagnosis · For licensed clinician review',
       margin,
       pageHeight - 16,
     )
@@ -523,12 +523,16 @@ export async function renderPdfBlob(
   pdf.setDrawColor('#CBD5E1')
   pdf.setLineWidth(0.5)
   pdf.line(margin, y, pageWidth - margin, y)
-  y += 16
 
-  for (const section of doc.sections) {
-    y += 6
+  // Constant 18pt section spacing
+  const SECTION_SPACING_PT = 18
+
+  for (let i = 0; i < doc.sections.length; i++) {
+    const section = doc.sections[i]
+    y += SECTION_SPACING_PT
+    ensureSpace(PDF_TYPE_PT.section + 14)
     writeWrapped(section.heading, PDF_TYPE_PT.section, 'bold', PDF_CHROME_COLORS.section)
-    y += 2
+    y += 4
     for (const line of section.bodyLines) {
       writeWrapped(line, PDF_TYPE_PT.body, 'normal', PDF_CHROME_COLORS.ink)
     }

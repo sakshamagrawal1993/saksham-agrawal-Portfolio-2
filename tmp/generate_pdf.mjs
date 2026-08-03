@@ -88,9 +88,11 @@ async function generateSamplePdf() {
   pdf.setDrawColor('#CBD5E1');
   pdf.setLineWidth(0.5);
   pdf.line(margin, y, pageWidth - margin, y);
-  y += 18;
+
+  const SECTION_SPACING_PT = 18;
 
   // 3. SESSION SUMMARY
+  y += SECTION_SPACING_PT;
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(11);
   pdf.setTextColor('#1E3A8A');
@@ -116,9 +118,10 @@ async function generateSamplePdf() {
   pdf.text('Further Investigations:', margin + 6, y);
   pdf.setFont('helvetica', 'normal');
   pdf.text('Rapid Influenza & COVID-19 Antigen Test; Complete Blood Count (CBC).', margin + 120, y);
-  y += 20;
+  y += 6;
 
   // 4. PATIENT SUMMARY
+  y += SECTION_SPACING_PT;
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(11);
   pdf.setTextColor('#1E3A8A');
@@ -130,9 +133,10 @@ async function generateSamplePdf() {
   pdf.setTextColor('#334155');
   const patLines = pdf.splitTextToSize('The patient is a 34-year-old male presenting with a 2-day history of acute onset high fever (102 F), non-productive cough, intense generalized myalgias, severe fatigue, and sore throat. Reports recent close contact with an ill coworker. Denies shortness of breath, chest tightness, or neck stiffness.', maxWidth);
   pdf.text(patLines, margin, y);
-  y += patLines.length * 13 + 14;
+  y += patLines.length * 13 + 6;
 
   // 5. DIFFERENTIAL DIAGNOSIS (NO numeric score against confidence!)
+  y += SECTION_SPACING_PT;
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(11);
   pdf.setTextColor('#1E3A8A');
@@ -158,9 +162,9 @@ async function generateSamplePdf() {
     pdf.text(dLines, margin + 10, y);
     y += dLines.length * 12 + 6;
   }
-  y += 10;
 
   // 6. RECOMMENDED ACTION PLAN
+  y += SECTION_SPACING_PT;
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(11);
   pdf.setTextColor('#1E3A8A');
@@ -181,9 +185,9 @@ async function generateSamplePdf() {
     pdf.text(bullet, margin + 6, y);
     y += 14;
   }
-  y += 10;
 
   // 7. RED FLAGS
+  y += SECTION_SPACING_PT;
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(11);
   pdf.setTextColor('#991B1B');
@@ -204,9 +208,9 @@ async function generateSamplePdf() {
     pdf.text(rf, margin + 6, y);
     y += 13;
   }
-  y += 10;
 
   // 8. SOAP NOTE
+  y += SECTION_SPACING_PT;
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(11);
   pdf.setTextColor('#1E3A8A');
@@ -236,7 +240,7 @@ async function generateSamplePdf() {
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(7.5);
   pdf.setTextColor('#64748B');
-  pdf.text('AI-generated clinical summary — not a diagnosis · No licensed clinician review', margin, pageHeight - 16);
+  pdf.text('AI-generated clinical summary — not a diagnosis · For licensed clinician review', margin, pageHeight - 16);
   pdf.text('Page 1', pageWidth - margin, pageHeight - 16, { align: 'right' });
 
   // Save PDF
