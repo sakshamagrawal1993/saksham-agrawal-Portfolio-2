@@ -623,34 +623,34 @@ export function LibertyMDReportView({
         </div>
       </div>
 
-      {/* 2. Patient Metadata Bar */}
-      <div className="border-b border-libertymd-slate-200 bg-libertymd-slate-50/60 px-6 py-4 sm:px-8 text-left text-xs sm:text-sm text-libertymd-slate-700">
+      {/* 2. Patient Metadata Bar (Flat Document Layout) */}
+      <div className="relative z-10 border-b border-libertymd-slate-200/80 px-6 py-4 sm:px-8 text-left text-xs sm:text-sm text-libertymd-slate-700">
         <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
             <p className="text-libertymd-ink">
               <span className="font-bold uppercase text-[11px] tracking-wider text-libertymd-slate-500">Patient Name:</span>{' '}
-              <span className="font-semibold text-libertymd-ink">{displayPatientName}</span>
+              <span className="font-bold text-libertymd-ink">{displayPatientName}</span>
             </p>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-6">
               <p>
                 <span className="font-bold uppercase text-[11px] tracking-wider text-libertymd-slate-500">Gender:</span>{' '}
-                <span className="font-medium text-libertymd-slate-800 capitalize">{displayPatientSex}</span>
+                <span className="font-semibold text-libertymd-slate-800 capitalize">{displayPatientSex}</span>
               </p>
               <p>
                 <span className="font-bold uppercase text-[11px] tracking-wider text-libertymd-slate-500">Age:</span>{' '}
-                <span className="font-medium text-libertymd-slate-800">{displayPatientAge}</span>
+                <span className="font-semibold text-libertymd-slate-800">{displayPatientAge}</span>
               </p>
             </div>
           </div>
           <div className="space-y-1 sm:text-right">
             <p>
               <span className="font-bold uppercase text-[11px] tracking-wider text-libertymd-slate-500">Date:</span>{' '}
-              <span className="font-medium text-libertymd-slate-800">{displayReportDate}</span>
+              <span className="font-semibold text-libertymd-slate-800">{displayReportDate}</span>
             </p>
             {consultationId ? (
               <p>
                 <span className="font-bold uppercase text-[11px] tracking-wider text-libertymd-slate-500">Ref No.:</span>{' '}
-                <span className="font-mono text-xs font-semibold text-libertymd-blue-700">[{consultationId.slice(0, 8)}]</span>
+                <span className="font-mono text-xs font-bold text-libertymd-blue-700">[{consultationId.slice(0, 8)}]</span>
               </p>
             ) : null}
           </div>
