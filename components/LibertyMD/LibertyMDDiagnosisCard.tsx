@@ -75,17 +75,11 @@ export function LibertyMDDiagnosisCard({
       }
       className="rounded-md border border-libertymd-slate-200 bg-white px-4 py-3 shadow-xs"
     >
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <p className="libertymd-type-body-small font-bold text-libertymd-ink sm:text-base">
-            {item.name}
-          </p>
-          {why ? (
-            <p className="libertymd-type-body-small mt-1 text-libertymd-slate-500" data-diagnosis-why>
-              {why}
-            </p>
-          ) : null}
-        </div>
+      {/* Top Header Row: Disease Name (Left) + Confidence Badges (Right) */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="libertymd-type-body-small font-bold text-libertymd-ink sm:text-base">
+          {item.name}
+        </p>
 
         <div className="flex flex-wrap items-center justify-end gap-1.5 shrink-0" data-confidence-container>
           {(isSerious || seriousPair || seriousOnly || composedHighSerious) ? (
@@ -108,6 +102,13 @@ export function LibertyMDDiagnosisCard({
           ) : null}
         </div>
       </div>
+
+      {/* Full-Width Explanation Paragraph */}
+      {why ? (
+        <p className="libertymd-type-body-small mt-2.5 w-full text-libertymd-slate-600 leading-relaxed" data-diagnosis-why>
+          {why}
+        </p>
+      ) : null}
 
       <div className="mt-[var(--libertymd-space-sm)]">
         <button
