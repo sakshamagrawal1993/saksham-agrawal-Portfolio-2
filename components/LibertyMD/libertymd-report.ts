@@ -352,33 +352,34 @@ export function formatClinicalBullets(
   category: 'selfCare' | 'medical' | 'diagnostic',
 ): string[] {
   if (items && items.length > 0) {
-    return items.slice(0, 4).map((item) => {
-      const words = item.trim().split(/\s+/)
-      return words.length > 12 ? `${words.slice(0, 10).join(' ')}...` : item.trim()
+    return items.slice(0, 4).map((rawItem) => {
+      const clean = rawItem.trim().replace(/^(\d+[\.\)]\s*|[-*\u2022]\s*)/, '').trim()
+      const words = clean.split(/\s+/)
+      return words.length > 10 ? words.slice(0, 10).join(' ') : clean
     })
   }
 
   if (category === 'selfCare') {
     return [
-      'Adequate rest and gradual physical activity limit',
-      'Hydration with water and oral electrolyte fluids',
-      'Daily temperature and symptom severity tracking',
+      'Arrange an evaluation with a licensed clinician',
+      'Do a test for Covid 19',
+      'Avoid contact with ppl outside',
+      'Stay at home',
     ]
   }
 
   if (category === 'medical') {
     return [
-      'Antipyretic / Analgesic (Acetaminophen 500mg)',
-      'Symptomatic cough suppressant or expectorant',
-      'Clinical consultation for prescription therapeutics',
+      'Over-the-counter antipyretics or analgesics for fever',
+      'Targeted prescription therapeutics following clinician evaluation',
+      'Symptomatic cough and throat lozenges',
     ]
   }
 
   return [
-    'Chest Radiograph (Frontal & Lateral X-Ray)',
+    'Rapid COVID-19 and Influenza Antigen Test',
     'Complete Blood Count (CBC) with Differential',
     'Pulse Oximetry & Respiratory Rate Evaluation',
-    'Sputum Culture & Gram Stain Assay',
   ]
 }
 

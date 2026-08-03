@@ -203,7 +203,7 @@
       "notYetEligible": "Report not ready yet — keep answering a few more questions",
       "retentionWarning": "Guest access to this report ends in {remaining}. Sign in to keep future reports in your history."
     },
-    "pageTitle": "Consultation Report",
+    "pageTitle": "Physician Review Report",
     "pageSubtitle": "",
     "backToConsult": "Back to the consultation",
     "loadingHeading": "Opening your report",

@@ -195,10 +195,10 @@ export default function LibertyMDReportPage() {
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
-          <div className="min-w-0">
-            <p className="truncate font-serif text-lg font-semibold text-libertymd-ink sm:text-xl">
+          <div className="min-w-0 flex-1 text-center pr-11">
+            <h1 className="truncate font-serif text-lg font-bold text-libertymd-ink sm:text-xl">
               {t('report.pageTitle')}
-            </p>
+            </h1>
           </div>
         </div>
       </header>

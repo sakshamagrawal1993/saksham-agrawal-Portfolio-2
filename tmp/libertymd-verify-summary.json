@@ -1,0 +1,402 @@
+[
+  {
+    "at": "2026-08-03T13:00:09.549Z",
+    "step": "open_homepage",
+    "url": "http://localhost:5173/liberty-md"
+  },
+  {
+    "at": "2026-08-03T13:00:13.460Z",
+    "step": "screenshot",
+    "file": "/Users/sakshamagrawal/Documents/Projects/saksham-agrawal-Portfolio-2/tmp/libertymd-01-homepage.png"
+  },
+  {
+    "at": "2026-08-03T13:00:13.461Z",
+    "step": "sample_entry_geometry",
+    "btnText": "See a sample report",
+    "btnTop": 826.796875,
+    "floatingPe": "none",
+    "floatingTop": 838,
+    "topTag": "BUTTON",
+    "topIsSample": true,
+    "coveredByFloating": false
+  },
+  {
+    "at": "2026-08-03T13:00:13.779Z",
+    "step": "sample_clicked",
+    "clicked": true
+  },
+  {
+    "at": "2026-08-03T13:00:14.682Z",
+    "step": "sample_overlay_state",
+    "open": true,
+    "text": "SAMPLE DOCTOR-READY REPORT\n\nEXAMPLE — NOT YOUR REPORT\n\nSynthetic example for illustration. Not a real patient case and not clinician-reviewed.\n\nSESSION SUMMARY\n\nPatient Symptoms: Likely a viral upper respiratory infection\nPrimary Differential: Common cold (medium confidence). Secondary Consideration(s): Hay fever, Sinus infection.\nFurther Investigations: Supportive care for 3–5 days; Follow up if symptoms worsen.\n\nPATIENT SUMMARY\n\nYou described several days of mild sore throat and congestion without red-flag symptoms.\n\nHome care\n\nSeek care sooner if you develop trouble breathing, chest pain, or confusion.\n\nDifferential diagnosis\n\nCommon cold\n\nAcute mild URI symptoms without focal bacterial signs.\n\nMedium confidence\nShow details\n\nHay fever\n\nCongestion can overlap; itch/sneezing less prominent here.\n\nLow confidence\nShow details\n\nSinus infection\n\nThis can cause congestion, but the short duration and lack of persistent fever or focal facial pain make it less likely.\n\nMinimal confidence\nShow details\nRecommended Action Plan\n\nSELF-CARE & HOME MANAGEMENT\n\nRest\nOral fluids\nSaline rinses\n\nMEDICAL TREATMENTS & THERAPEUTICS\n\nSupportive care for 3–5 days\nFollow up if symptoms worsen\n\nDIAGNOSTIC INVESTIGATIONS & WORKUP\n\nChest Radiograph (Frontal & Lateral X-Ray)\nComplete Blood Count (CBC) with Differential\nPulse Oximetry & Respiratory Rate Evaluation\nSputum Culture & Gram Stain Assay\nRed fla",
+    "hasHeadline": true,
+    "hasBadge": true
+  },
+  {
+    "at": "2026-08-03T13:00:14.808Z",
+    "step": "screenshot",
+    "file": "/Users/sakshamagrawal/Documents/Projects/saksham-agrawal-Portfolio-2/tmp/libertymd-03-sample-overlay.png"
+  },
+  {
+    "at": "2026-08-03T13:00:15.242Z",
+    "step": "screenshot",
+    "file": "/Users/sakshamagrawal/Documents/Projects/saksham-agrawal-Portfolio-2/tmp/libertymd-03b-sample-report-body.png"
+  },
+  {
+    "at": "2026-08-03T13:00:15.650Z",
+    "step": "backend_generate_start"
+  },
+  {
+    "at": "2026-08-03T13:00:16.256Z",
+    "step": "backend_auth",
+    "userId": "375362d7-58de-45b3-be83-a9c7217e5abf"
+  },
+  {
+    "at": "2026-08-03T13:00:24.531Z",
+    "step": "backend_start",
+    "consultationId": "fdb6dbba-c6b9-4461-a17b-ce01756d884e",
+    "state": "awaiting_demographics"
+  },
+  {
+    "at": "2026-08-03T13:00:29.640Z",
+    "step": "backend_demographics",
+    "state": "high_risk",
+    "hasQuestion": true,
+    "comprehension": false
+  },
+  {
+    "at": "2026-08-03T13:00:29.640Z",
+    "step": "backend_send",
+    "turn": 1,
+    "answer": "About a 3 out of 10 — mild discomfort, not severe.",
+    "question": "I understand. On a scale of 1 to 10, how severe is your sore throat?"
+  },
+  {
+    "at": "2026-08-03T13:00:33.840Z",
+    "step": "backend_reply",
+    "turn": 1,
+    "report_ready": false,
+    "hasReport": false,
+    "state": "interviewing",
+    "comprehension": false,
+    "question": "Do you have any other symptoms, such as a cough, headache, or swollen glands?"
+  },
+  {
+    "at": "2026-08-03T13:00:33.841Z",
+    "step": "backend_send",
+    "turn": 2,
+    "answer": "No cough, no headache, no ear pain, and no body aches. Just mild sore throat and runny nose.",
+    "question": "Do you have any other symptoms, such as a cough, headache, or swollen glands?"
+  },
+  {
+    "at": "2026-08-03T13:00:38.917Z",
+    "step": "backend_reply",
+    "turn": 2,
+    "report_ready": false,
+    "hasReport": false,
+    "state": "interviewing",
+    "comprehension": false,
+    "question": "Have you noticed any swollen glands in your neck or jaw area?"
+  },
+  {
+    "at": "2026-08-03T13:00:38.917Z",
+    "step": "backend_send",
+    "turn": 3,
+    "answer": "No difficulty swallowing, no neck stiffness, and no neck swelling.",
+    "question": "Have you noticed any swollen glands in your neck or jaw area?"
+  },
+  {
+    "at": "2026-08-03T13:00:44.979Z",
+    "step": "backend_reply",
+    "turn": 3,
+    "report_ready": false,
+    "hasReport": false,
+    "state": "interviewing",
+    "comprehension": false,
+    "question": "Do you have any known medical conditions, or are you taking any regular medications?"
+  },
+  {
+    "at": "2026-08-03T13:00:44.980Z",
+    "step": "backend_send",
+    "turn": 4,
+    "answer": "No significant past medical history and I take no regular medications.",
+    "question": "Do you have any known medical conditions, or are you taking any regular medications?"
+  },
+  {
+    "at": "2026-08-03T13:00:49.297Z",
+    "step": "backend_reply",
+    "turn": 4,
+    "report_ready": false,
+    "hasReport": false,
+    "state": "interviewing",
+    "comprehension": false,
+    "question": "To clarify, when exactly did your sore throat and runny nose start?"
+  },
+  {
+    "at": "2026-08-03T13:00:49.297Z",
+    "step": "backend_send",
+    "turn": 5,
+    "answer": "It started about 3 days ago and has lasted continuously since then.",
+    "question": "To clarify, when exactly did your sore throat and runny nose start?"
+  },
+  {
+    "at": "2026-08-03T13:00:53.744Z",
+    "step": "backend_reply",
+    "turn": 5,
+    "report_ready": false,
+    "hasReport": false,
+    "state": "interviewing",
+    "comprehension": false,
+    "question": "Do you have any known allergies, or have you recently been around anyone who has been sick?"
+  },
+  {
+    "at": "2026-08-03T13:00:53.744Z",
+    "step": "backend_send",
+    "turn": 6,
+    "answer": "No known medication allergies.",
+    "question": "Do you have any known allergies, or have you recently been around anyone who has been sick?"
+  },
+  {
+    "at": "2026-08-03T13:00:58.134Z",
+    "step": "backend_reply",
+    "turn": 6,
+    "report_ready": false,
+    "hasReport": false,
+    "state": "interviewing",
+    "comprehension": false,
+    "question": "Have you recently been around anyone who has been sick?"
+  },
+  {
+    "at": "2026-08-03T13:00:58.134Z",
+    "step": "backend_send",
+    "turn": 7,
+    "answer": "Mild sore throat and congestion for about 3 days, no other concerning symptoms.",
+    "question": "Have you recently been around anyone who has been sick?"
+  },
+  {
+    "at": "2026-08-03T13:01:02.073Z",
+    "step": "backend_reply",
+    "turn": 7,
+    "report_ready": false,
+    "hasReport": false,
+    "state": "interviewing",
+    "comprehension": true,
+    "question": "I have summarised what you have shared so far. Please check the summary."
+  },
+  {
+    "at": "2026-08-03T13:01:02.073Z",
+    "step": "backend_comprehension_ack",
+    "turn": 7
+  },
+  {
+    "at": "2026-08-03T13:01:29.633Z",
+    "step": "backend_reply",
+    "turn": 8,
+    "report_ready": false,
+    "hasReport": false,
+    "state": "interviewing",
+    "comprehension": false,
+    "question": "Have you recently been around anyone who has been sick?"
+  },
+  {
+    "at": "2026-08-03T13:01:29.648Z",
+    "step": "backend_send",
+    "turn": 9,
+    "answer": "Mild sore throat and congestion for about 3 days, no other concerning symptoms.",
+    "question": "Have you recently been around anyone who has been sick?"
+  },
+  {
+    "at": "2026-08-03T13:01:35.249Z",
+    "step": "backend_reply",
+    "turn": 9,
+    "report_ready": false,
+    "hasReport": false,
+    "state": "interviewing",
+    "comprehension": false,
+    "question": "I understand. To help me narrow this down, have you recently been around anyone who has been sick?"
+  },
+  {
+    "at": "2026-08-03T13:01:35.249Z",
+    "step": "backend_send",
+    "turn": 10,
+    "answer": "Mild sore throat and congestion for about 3 days, no other concerning symptoms.",
+    "question": "I understand. To help me narrow this down, have you recently been around anyone who has been sick?"
+  },
+  {
+    "at": "2026-08-03T13:01:39.564Z",
+    "step": "backend_reply",
+    "turn": 10,
+    "report_ready": false,
+    "hasReport": false,
+    "state": "interviewing",
+    "comprehension": false,
+    "question": "I understand you have had symptoms for 3 days. To help clarify, have you recently been in contact with anyone who is cur"
+  },
+  {
+    "at": "2026-08-03T13:01:39.564Z",
+    "step": "backend_send",
+    "turn": 11,
+    "answer": "Mild sore throat and congestion for about 3 days, no other concerning symptoms.",
+    "question": "I understand you have had symptoms for 3 days. To help clarify, have you recently been in contact wi"
+  },
+  {
+    "at": "2026-08-03T13:01:45.499Z",
+    "step": "backend_reply",
+    "turn": 11,
+    "report_ready": false,
+    "hasReport": false,
+    "state": "interviewing",
+    "comprehension": false,
+    "question": "Let's stay focused on your health so I can help. Please answer about your symptoms.\n\nI understand you have had symptoms "
+  },
+  {
+    "at": "2026-08-03T13:01:45.499Z",
+    "step": "backend_send",
+    "turn": 12,
+    "answer": "Mild sore throat and congestion for about 3 days, no other concerning symptoms.",
+    "question": "Let's stay focused on your health so I can help. Please answer about your symptoms.\n\nI understand yo"
+  },
+  {
+    "at": "2026-08-03T13:01:55.577Z",
+    "step": "backend_reply",
+    "turn": 12,
+    "report_ready": false,
+    "hasReport": false,
+    "state": "interviewing",
+    "comprehension": false,
+    "question": "Let's stay focused on your health so I can help. Please answer about your symptoms.\n\nI understand you have had symptoms "
+  },
+  {
+    "at": "2026-08-03T13:01:55.577Z",
+    "step": "backend_send",
+    "turn": 13,
+    "answer": "Mild sore throat and congestion for about 3 days, no other concerning symptoms.",
+    "question": "Let's stay focused on your health so I can help. Please answer about your symptoms.\n\nI understand yo"
+  },
+  {
+    "at": "2026-08-03T13:02:09.957Z",
+    "step": "backend_reply",
+    "turn": 13,
+    "report_ready": false,
+    "hasReport": false,
+    "state": "interviewing",
+    "comprehension": false,
+    "question": "Let's stay focused on your health so I can help. Please answer about your symptoms.\n\nI understand you have had symptoms "
+  },
+  {
+    "at": "2026-08-03T13:02:09.957Z",
+    "step": "backend_send",
+    "turn": 14,
+    "answer": "Mild sore throat and congestion for about 3 days, no other concerning symptoms.",
+    "question": "Let's stay focused on your health so I can help. Please answer about your symptoms.\n\nI understand yo"
+  },
+  {
+    "at": "2026-08-03T13:02:39.204Z",
+    "step": "backend_holding_retry",
+    "turn": 14
+  },
+  {
+    "at": "2026-08-03T13:03:23.532Z",
+    "step": "backend_reply",
+    "turn": 14,
+    "report_ready": true,
+    "hasReport": true,
+    "state": "report_pending_auth",
+    "auth_required": true,
+    "comprehension": false,
+    "question": ""
+  },
+  {
+    "at": "2026-08-03T13:03:23.533Z",
+    "step": "backend_report_ready",
+    "turn": 14
+  },
+  {
+    "at": "2026-08-03T13:03:28.316Z",
+    "step": "backend_stored",
+    "consultationId": "fdb6dbba-c6b9-4461-a17b-ce01756d884e",
+    "status": "report_pending_auth",
+    "hasReportBody": true,
+    "retention_expires_at": "2026-09-02T13:03:21.373+00:00",
+    "headline": "Mild upper-respiratory symptoms are most consistent with a common cold"
+  },
+  {
+    "at": "2026-08-03T13:03:28.316Z",
+    "step": "backend_generate_done",
+    "consultationId": "fdb6dbba-c6b9-4461-a17b-ce01756d884e",
+    "reportReady": true,
+    "hasBody": true
+  },
+  {
+    "at": "2026-08-03T13:03:35.602Z",
+    "step": "open_report_page",
+    "reportUrl": "http://localhost:5173/liberty-md/report/fdb6dbba-c6b9-4461-a17b-ce01756d884e"
+  },
+  {
+    "at": "2026-08-03T13:03:44.599Z",
+    "step": "report_page_poll",
+    "hasReportBody": false,
+    "generating": false,
+    "error": false
+  },
+  {
+    "at": "2026-08-03T13:03:51.965Z",
+    "step": "report_page_poll",
+    "hasReportBody": false,
+    "generating": false,
+    "error": false
+  },
+  {
+    "at": "2026-08-03T13:03:57.980Z",
+    "step": "report_page_poll",
+    "hasReportBody": false,
+    "generating": false,
+    "error": false
+  },
+  {
+    "at": "2026-08-03T13:04:04.099Z",
+    "step": "report_page_poll",
+    "hasReportBody": false,
+    "generating": false,
+    "error": false
+  },
+  {
+    "at": "2026-08-03T13:04:10.569Z",
+    "step": "report_page_poll",
+    "hasReportBody": false,
+    "generating": false,
+    "error": false
+  },
+  {
+    "at": "2026-08-03T13:04:18.231Z",
+    "step": "report_page_poll",
+    "hasReportBody": true,
+    "generating": false,
+    "error": false
+  },
+  {
+    "at": "2026-08-03T13:04:18.232Z",
+    "step": "report_page_state",
+    "url": "http://localhost:5173/liberty-md/report/fdb6dbba-c6b9-4461-a17b-ce01756d884e?lang=en",
+    "hasReportBody": true,
+    "generating": false,
+    "error": false,
+    "snippet": "Consultation Report\n\nGuest access to this report ends in about 30 days. Sign in to keep future reports in your history.\nSign in\nSESSION SUMMARY\n\nPatient Symptoms: Mild upper-respiratory symptoms are most consistent with a common cold\nPrimary Differential: Common cold (high confidence). Secondary Consideration(s): Allergies or nasal irritation, Strep throat.\nFurther Investigations: Continue supportive care and monitor symptoms over the next several days.; Consider a COVID-19 test if you have had a possible exposure, if testing is available, or if symptoms change, since no respiratory-virus testing has been performed..\n\nPATIENT SUMMARY\n\nThe patient has had a mild sore throat and runny nose or congestion continuously for about 3 days, with throat discomfort rated 3/10. The patient reports no fever, cough, shortness of breath, chest pain, headache, ear pain, body aches, difficulty swallowing, neck stiffness, or neck swelling. The patient has no significant medical history, take no regular medications, and have no known medication allergies. No physical examination, vital signs, laboratory results, or photo evidence are available, and recent sick-contact exposure was not clearly established.\n\nHome care\n\nSeek urgent medical care immediately for breathing difficulty, chest pain, inability to swallow fluids, drooling, rapidly worsening swelling, or confusion. Contact a clinician promptly if a fever develops, symptoms worsen substantially, or symptoms are not improving after about 7 to 10 days.\n\nDifferential diagnosis\n\nCommon cold\n\nThe combination of mild acute sore throat and nasal"
+  },
+  {
+    "at": "2026-08-03T13:04:18.550Z",
+    "step": "screenshot",
+    "file": "/Users/sakshamagrawal/Documents/Projects/saksham-agrawal-Portfolio-2/tmp/libertymd-07-report-page.png"
+  },
+  {
+    "at": "2026-08-03T13:04:19.681Z",
+    "step": "screenshot",
+    "file": "/Users/sakshamagrawal/Documents/Projects/saksham-agrawal-Portfolio-2/tmp/libertymd-07b-report-page-scrolled.png"
+  },
+  {
+    "at": "2026-08-03T13:04:19.682Z",
+    "step": "console_errors",
+    "errors": []
+  }
+]

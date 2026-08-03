@@ -170,6 +170,31 @@ function initialSectionOpen(
   return mergeReportSectionOpen(readReportSections(consultationId, window.localStorage))
 }
 
+function renderFormattedSessionSummary(headline: string) {
+  const lines = headline.split('\n').filter((l) => l.trim())
+  return (
+    <div className="mt-1.5 space-y-1.5">
+      {lines.map((line, idx) => {
+        const colonMatch = line.match(/^(\*\*.*?\*\*|[A-Za-z0-9\s()\/_-]+:)(.*)$/)
+        if (colonMatch) {
+          const headerRaw = colonMatch[1].replace(/^\*\*|\*\*$|:$/g, '').trim()
+          const bodyText = colonMatch[2].replace(/^:\s*/, ' ')
+          return (
+            <p key={idx} className="libertymd-type-body-small font-normal text-libertymd-slate-700 leading-relaxed">
+              <strong className="font-bold text-libertymd-ink">{headerRaw}:</strong>{bodyText}
+            </p>
+          )
+        }
+        return (
+          <p key={idx} className="libertymd-type-body-small font-normal text-libertymd-slate-700 leading-relaxed">
+            {line}
+          </p>
+        )
+      })}
+    </div>
+  )
+}
+
 export function LibertyMDReportView({
   report,
   saved,
@@ -554,6 +579,13 @@ export function LibertyMDReportView({
       data-libertymd-retention-expires-at={retentionExpiresAt || undefined}
       className="mt-[var(--libertymd-space-md)] max-w-full rounded-lg border border-libertymd-slate-200 bg-white shadow-[0_20px_65px_rgba(23,50,95,0.09)]"
     >
+      {/* Central Title of the Report */}
+      <div className="border-b border-libertymd-slate-200 px-[var(--libertymd-space-lg)] py-4 text-center bg-libertymd-slate-50/60 rounded-t-lg">
+        <h2 className="font-serif text-xl font-bold text-libertymd-ink sm:text-2xl tracking-tight">
+          Physician Review Report
+        </h2>
+      </div>
+
       {/* Consultation Report Framing: Session Summary → Patient Summary. */}
       <div className="border-b border-libertymd-slate-200 px-[var(--libertymd-space-lg)] py-[var(--libertymd-space-lg)] text-left sm:px-[var(--libertymd-space-xl)] space-y-6">
         {report.headline ? (
@@ -561,9 +593,7 @@ export function LibertyMDReportView({
             <h3 className="libertymd-type-label font-bold uppercase tracking-wide text-libertymd-slate-500">
               {t('report.sections.sessionSummary')}
             </h3>
-            <p className="libertymd-type-body-small mt-1.5 whitespace-pre-line font-normal text-libertymd-slate-700 leading-relaxed">
-              {report.headline}
-            </p>
+            {renderFormattedSessionSummary(report.headline)}
           </div>
         ) : null}
         {report.patientSummary ? (
