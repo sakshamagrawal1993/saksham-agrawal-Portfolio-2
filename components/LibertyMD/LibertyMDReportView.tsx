@@ -48,6 +48,7 @@ import {
   type ReportSectionId,
   type TriageDisplayTier,
 } from './libertymd-report'
+import { SAMPLE_REPORT_PDF_URL } from './LibertyMDSampleReport'
 import {
   buildPatientPdfDoc,
   buildSoapPdfDoc,
@@ -891,7 +892,20 @@ export function LibertyMDReportView({
               </div>
             ) : null}
           </div>
-        ) : null}
+        ) : (
+          <div className="mt-8 flex flex-col gap-3 rounded-md border border-libertymd-slate-200 bg-libertymd-blue-50/60 p-4">
+            <a
+              href={SAMPLE_REPORT_PDF_URL}
+              download="LibertyMD_Sample_Report.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="libertymd-type-body-small inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-libertymd-blue-600 px-4 py-2 font-semibold text-white shadow-xs hover:bg-libertymd-blue-700 transition-colors"
+            >
+              <Download className="h-4 w-4 shrink-0" aria-hidden />
+              Download Sample Report PDF
+            </a>
+          </div>
+        )}
 
         {/* P2-10 — feedback adjacent to saved/guest note; outside delivery-actions and doctor CTA slot */}
         {consultationId && !isSample ? (

@@ -12,7 +12,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Check, Clock, Loader2, LogIn, Menu, RefreshCw } from 'lucide-react'
+import { ArrowLeft, LogIn, Menu, RefreshCw } from 'lucide-react'
 import type { User } from '@supabase/supabase-js'
 import { useI18n } from '../../i18n'
 import { supabase } from '../../lib/supabaseClient'
