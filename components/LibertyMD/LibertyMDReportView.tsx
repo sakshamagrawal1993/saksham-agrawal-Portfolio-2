@@ -585,15 +585,15 @@ export function LibertyMDReportView({
       data-libertymd-retention-expires-at={retentionExpiresAt || undefined}
       className="relative overflow-hidden mt-[var(--libertymd-space-md)] max-w-full rounded-2xl border border-libertymd-blue-200/70 bg-gradient-to-b from-[#F2F7FF] via-[#F8FAFE] to-[#E6F0FC] shadow-[0_20px_65px_rgba(23,50,95,0.09)]"
     >
-      {/* Background Rod of Asclepius Watermark Emblem */}
+      {/* Background Rod of Asclepius / Hippocratic Oath Watermark Emblem */}
       <div
-        className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center overflow-hidden opacity-[0.05] select-none"
+        className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center overflow-hidden opacity-[0.08] select-none"
         aria-hidden="true"
       >
         <img
-          src="/images/asclepius-watermark.svg"
+          src="/images/asclepius-watermark.png"
           alt=""
-          className="h-[480px] w-auto max-w-none object-contain"
+          className="h-[520px] w-auto max-w-none object-contain"
         />
       </div>
 
