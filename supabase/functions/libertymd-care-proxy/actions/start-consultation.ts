@@ -444,7 +444,18 @@ export async function handleStartConsultation(ctx: ProxyContext, payload: Reques
     })
   }
 
-  const prompt = acknowledgement(message, guardrail, isAnonymous ? null : firstName(user))
+  // Use the selected patient's first name for the greeting, not the auth user's name.
+  // When the patient is a dependent/other (e.g. "John Snow"), greeting should say "John",
+  // not the account holder's name. Fall back to firstName(user) only when the patient
+  // has no display_label (anonymous / self with no label set).
+  const patientGreetingName = (() => {
+    if (isAnonymous) return null
+    const label = typeof patient.display_label === 'string' ? patient.display_label.trim() : ''
+    if (label) return label.split(/\s+/)[0]
+    return firstName(user) || null
+  })()
+  const prompt = acknowledgement(message, guardrail, patientGreetingName)
+
   const assistantPersistenceTiming = await timed(() => Promise.all([
     addMessage(ctx, consultation.id, 'assistant', prompt, {
       message_type: willSkip ? 'normal' : 'demographics',
