@@ -604,9 +604,6 @@ export function LibertyMDReportView({
             <h1 className="font-sans text-2xl sm:text-3xl font-bold tracking-tight text-white">
               Liberty MD
             </h1>
-            <p className="font-sans text-xs sm:text-sm text-white/90 mt-0.5 font-medium">
-              LibertyMD.ai
-            </p>
           </div>
           <div className="shrink-0">
             <img

@@ -193,7 +193,7 @@ export function buildPatientPdfDoc(
     pushSection(sections, 'Patient Summary', [report.patientSummary])
   }
 
-  // 3. Differential Diagnosis (NO numeric percentage scores!)
+  // 3. Primary Diagnosis (NO numeric percentage scores!)
   if (report.differentials.length > 0) {
     const lines: string[] = []
     for (const item of report.differentials) {
@@ -207,11 +207,12 @@ export function buildPatientPdfDoc(
       } else if (item.isSerious) {
         bits.push(copy.serious)
       }
-      lines.push(bits.join(' — '))
+      // Prefix disease name lines with '**' so the renderer bolds them
+      lines.push(`**${bits.join(' — ')}**`)
       if (item.description) lines.push(item.description)
       if (item.reason) lines.push(item.reason)
     }
-    pushSection(sections, 'Differential Diagnosis', lines)
+    pushSection(sections, 'Primary Diagnosis', lines)
   }
 
   // 4. Recommended Action Plan
@@ -219,11 +220,11 @@ export function buildPatientPdfDoc(
     const lines: string[] = []
     if (report.assessmentAndPlan.assessment) lines.push(report.assessmentAndPlan.assessment)
     if (report.assessmentAndPlan.plan.length) {
-      lines.push('Medical Treatments & Plan:')
+      lines.push('**Medical Treatments & Plan:**')
       for (const item of report.assessmentAndPlan.plan) lines.push(`• ${item}`)
     }
     if (report.assessmentAndPlan.selfCare.length) {
-      lines.push('Self-Care & Home Management:')
+      lines.push('**Self-Care & Home Management:**')
       for (const item of report.assessmentAndPlan.selfCare) lines.push(`• ${item}`)
     }
     pushSection(sections, 'Recommended Action Plan', lines)
@@ -489,6 +490,43 @@ export async function renderPdfBlob(
     pdf.setTextColor(PDF_CHROME_COLORS.ink)
   }
 
+  /**
+   * Renders a line that starts with a bold label before a colon:
+   *   "Patient Symptoms: High fever, cough..."
+   * The label portion is drawn bold, the value portion in normal weight.
+   * Falls back to writeWrapped if no colon pattern is found.
+   */
+  const writeInlineLabeled = (text: string, fontSize: number) => {
+    const colonMatch = text.match(/^(\*\*.*?\*\*|[A-Za-z0-9\s()/_-]+:)(.*)$/)
+    if (!colonMatch) {
+      writeWrapped(text, fontSize, 'normal', PDF_CHROME_COLORS.ink)
+      return
+    }
+    const labelRaw = colonMatch[1].replace(/^\*\*|\*\*$|:$/g, '').trim()
+    const valueText = colonMatch[2].replace(/^:\s*/, ' ')
+    const labelStr = labelRaw + ':'
+    // Measure label width so we can place value inline
+    pdf.setFont('helvetica', 'bold')
+    pdf.setFontSize(fontSize)
+    const labelW = pdf.getTextWidth(labelStr) + 3
+    // Write label bold
+    ensureSpace(fontSize + 4)
+    pdf.setTextColor(PDF_CHROME_COLORS.ink)
+    pdf.text(labelStr, margin, y)
+    // Write remaining value normal — wrap within remaining width
+    pdf.setFont('helvetica', 'normal')
+    const valueLines = pdf.splitTextToSize(valueText.trim(), maxWidth - labelW) as string[]
+    pdf.text(valueLines[0] ?? '', margin + labelW, y)
+    y += fontSize + 4
+    // Continuation lines for wrapped value
+    for (let vi = 1; vi < valueLines.length; vi++) {
+      ensureSpace(fontSize + 4)
+      pdf.text(valueLines[vi], margin + labelW, y)
+      y += fontSize + 4
+    }
+    pdf.setTextColor(PDF_CHROME_COLORS.ink)
+  }
+
   // —— Page 1 Header Banner (Solid Blue Box with Logo & Physician Ready Report Title) ——
   const logoBytes = await resolvePdfLogoBytes(options)
   const bannerHeight = 78
@@ -497,15 +535,11 @@ export async function renderPdfBlob(
   pdf.setFillColor(59, 113, 202)
   pdf.rect(margin, y, maxWidth, bannerHeight, 'F')
 
-  // Top Left: Liberty MD & LibertyMD.ai
+  // Top Left: Liberty MD
   pdf.setFont('helvetica', 'bold')
   pdf.setFontSize(20)
   pdf.setTextColor(255, 255, 255)
   pdf.text('Liberty MD', margin + 14, y + 26)
-  pdf.setFont('helvetica', 'normal')
-  pdf.setFontSize(9)
-  pdf.setTextColor(230, 240, 255)
-  pdf.text('LibertyMD.ai', margin + 14, y + 38)
 
   // Top Right: Logo Mark
   if (logoBytes && logoBytes.byteLength > 0) {
@@ -587,7 +621,14 @@ export async function renderPdfBlob(
     writeWrapped(section.heading, PDF_TYPE_PT.section, 'bold', PDF_CHROME_COLORS.section)
     y += 4
     for (const line of section.bodyLines) {
-      writeWrapped(line, PDF_TYPE_PT.body, 'normal', PDF_CHROME_COLORS.ink)
+      // Lines wrapped in ** are fully bold (disease names, subsection labels)
+      const boldMatch = line.match(/^\*\*(.*?)\*\*$/)
+      if (boldMatch) {
+        writeWrapped(boldMatch[1], PDF_TYPE_PT.body, 'bold', PDF_CHROME_COLORS.ink)
+      } else {
+        // Use inline labeling so "Label: value" lines bold just the label part
+        writeInlineLabeled(line, PDF_TYPE_PT.body)
+      }
     }
   }
 

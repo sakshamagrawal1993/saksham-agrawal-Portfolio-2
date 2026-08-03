@@ -2719,8 +2719,7 @@ export default function LibertyMDChat() {
               className="h-9 w-9 shrink-0 object-contain"
             />
             <div className="min-w-0">
-              <p className="truncate font-serif text-lg font-semibold leading-5 text-libertymd-ink sm:text-xl">LibertyMD</p>
-              <p className="mt-0.5 truncate text-[11px] font-semibold text-libertymd-slate-500">{t('chatx.privateConsult')}</p>
+              <p className="truncate font-serif text-lg font-semibold leading-5 text-libertymd-ink sm:text-xl">LibertyMD Consultation</p>
             </div>
           </div>
 
