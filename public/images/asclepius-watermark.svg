@@ -1,0 +1,23 @@
+<svg viewBox="0 0 400 500" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Central Staff & Sphere -->
+  <circle cx="200" cy="32" r="14" fill="#3B71CA" />
+  <rect x="195" y="32" width="10" height="430" rx="5" fill="#3B71CA" />
+  
+  <!-- Left Wing -->
+  <path d="M195 65 C150 45, 90 35, 40 60 C75 92, 120 98, 195 92 Z" fill="#3B71CA" />
+  <path d="M195 82 C145 72, 100 68, 60 92 C90 112, 135 112, 195 105 Z" fill="#3B71CA" />
+  <path d="M195 98 C155 92, 120 92, 85 112 C110 128, 145 122, 195 115 Z" fill="#3B71CA" />
+
+  <!-- Right Wing -->
+  <path d="M205 65 C250 45, 310 35, 360 60 C325 92, 280 98, 205 92 Z" fill="#3B71CA" />
+  <path d="M205 82 C255 72, 300 68, 340 92 C310 112, 265 112, 205 105 Z" fill="#3B71CA" />
+  <path d="M205 98 C245 92, 280 92, 315 112 C290 128, 255 122, 205 115 Z" fill="#3B71CA" />
+
+  <!-- Dual Serpents Coils -->
+  <path d="M200 120 C130 145, 130 200, 200 220 C270 240, 270 295, 200 315 C130 335, 130 390, 200 410 C245 425, 240 450, 210 460" stroke="#3B71CA" stroke-width="12" stroke-linecap="round" fill="none" />
+  <path d="M200 120 C270 145, 270 200, 200 220 C130 240, 130 295, 200 315 C270 335, 270 390, 200 410 C155 425, 160 450, 190 460" stroke="#3B71CA" stroke-width="12" stroke-linecap="round" fill="none" />
+
+  <!-- Snake Heads -->
+  <path d="M195 118 C182 102, 165 102, 172 122 Z" fill="#3B71CA" />
+  <path d="M205 118 C218 102, 235 102, 228 122 Z" fill="#3B71CA" />
+</svg>

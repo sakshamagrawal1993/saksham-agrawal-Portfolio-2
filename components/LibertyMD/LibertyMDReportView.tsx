@@ -583,8 +583,20 @@ export function LibertyMDReportView({
       data-libertymd-report-variant={variant}
       data-libertymd-report-lifecycle="ready"
       data-libertymd-retention-expires-at={retentionExpiresAt || undefined}
-      className="mt-[var(--libertymd-space-md)] max-w-full rounded-lg border border-libertymd-slate-200 bg-white shadow-[0_20px_65px_rgba(23,50,95,0.09)]"
+      className="relative overflow-hidden mt-[var(--libertymd-space-md)] max-w-full rounded-lg border border-libertymd-blue-200/80 bg-gradient-to-b from-[#F0F6FF]/70 via-[#F8FAFC] to-[#EFF6FF]/60 shadow-[0_20px_65px_rgba(23,50,95,0.09)]"
     >
+      {/* Background Rod of Asclepius Watermark Emblem */}
+      <div
+        className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center overflow-hidden opacity-[0.05] select-none"
+        aria-hidden="true"
+      >
+        <img
+          src="/images/asclepius-watermark.svg"
+          alt=""
+          className="h-[480px] w-auto max-w-none object-contain"
+        />
+      </div>
+
       {/* 1. Header Banner (Solid Blue Box with Logo & Title) */}
       <div className="relative overflow-hidden rounded-t-lg bg-[#3B71CA] px-6 py-6 sm:px-8 sm:py-7 text-white shadow-md">
         <div className="flex items-start justify-between">

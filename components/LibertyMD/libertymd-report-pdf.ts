@@ -364,6 +364,19 @@ export function planPdfLogoEmbed(
   }
 }
 
+export const PDF_WATERMARK_ASSET_PATH = '/images/asclepius-watermark.png'
+
+export async function resolvePdfWatermarkBytes(): Promise<Uint8Array | null> {
+  if (typeof fetch !== 'function') return null
+  try {
+    const res = await fetch(PDF_WATERMARK_ASSET_PATH)
+    if (!res.ok) return null
+    return new Uint8Array(await res.arrayBuffer())
+  } catch {
+    return null
+  }
+}
+
 /**
  * Serialize a structured doc to PDF Blob bytes via jsPDF (dynamic import).
  * Call from a user gesture. Never upload the Blob to Storage / proxy.
@@ -386,6 +399,37 @@ export async function renderPdfBlob(
   let y = margin
   let pageIndex = 1
   let logoEmbedded = false
+
+  const watermarkBytes = await resolvePdfWatermarkBytes()
+
+  const drawPageBackground = () => {
+    // Soft bluish hue background
+    pdf.setFillColor(243, 247, 253)
+    pdf.rect(0, 0, pageWidth, pageHeight, 'F')
+
+    // Rod of Asclepius Watermark
+    if (watermarkBytes && watermarkBytes.byteLength > 0) {
+      try {
+        pdf.setGState(new pdf.GState({ opacity: 0.05 }))
+        const wmHeight = 420
+        const wmWidth = 336
+        pdf.addImage(
+          watermarkBytes,
+          'PNG',
+          (pageWidth - wmWidth) / 2,
+          (pageHeight - wmHeight) / 2 + 10,
+          wmWidth,
+          wmHeight,
+        )
+        pdf.setGState(new pdf.GState({ opacity: 1.0 }))
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  // Draw Page 1 background hue + watermark
+  drawPageBackground()
 
   const drawRunningChrome = () => {
     // Light running chrome — wordmark + page number + bottom disclaimer footer
@@ -413,6 +457,7 @@ export async function renderPdfBlob(
     if (y + needed > bottomLimit) {
       pdf.addPage()
       pageIndex += 1
+      drawPageBackground()
       drawRunningChrome()
       y = margin
     }
