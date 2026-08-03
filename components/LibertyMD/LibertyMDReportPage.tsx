@@ -414,15 +414,15 @@ export default function LibertyMDReportPage() {
 }
 
 /**
- * Clean & Crisp Clinical Countdown Loader
+ * Unboxed Clinical Loader with Dynamic WebGL Ribbon
  *
- * - Background: Dynamic WebGL Silk Ribbon from LibertyMDFooterRibbon
+ * - Background: WebGL Silk Ribbon from LibertyMDFooterRibbon (occupies full container, unboxed)
  * - Header: "Creating report..."
- * - Center logo encircled by a circular SVG countdown progress ring (02:00 -> 00:00)
- * - 4 Stepper stages: Symptoms, Differential, SOAP Note, Finalizing
+ * - Center logo encircled by SVG circular progress ring (drains from 100% Full to 0% Empty over 1 min, no numeric countdown text)
+ * - 4 Stage items with active verbs (Analyzing Symptoms, Evaluating Differential, Synthesizing SOAP Note, Finalizing Clinical Report)
  */
 function ReportLoader({ onRefresh }: { onRefresh?: () => void }) {
-  const TOTAL_SECONDS = 120
+  const TOTAL_SECONDS = 60
   const [secondsLeft, setSecondsLeft] = useState(TOTAL_SECONDS)
 
   useEffect(() => {
@@ -440,54 +440,47 @@ function ReportLoader({ onRefresh }: { onRefresh?: () => void }) {
     return () => clearInterval(interval)
   }, [])
 
-  const progressPercent = Math.min(100, Math.round(((TOTAL_SECONDS - secondsLeft) / TOTAL_SECONDS) * 100))
-  const minutes = Math.floor(secondsLeft / 60)
-  const remSeconds = secondsLeft % 60
-  const formattedTime = `0${minutes}:${remSeconds < 10 ? '0' : ''}${remSeconds}`
+  // Full (100%) at 60s down to Empty (0%) at 0s over 1 minute
+  const progressRatio = secondsLeft / TOTAL_SECONDS
 
   // SVG Circle Progress calculation (radius 56 -> circumference ~351.86)
   const radius = 56
   const circumference = 2 * Math.PI * radius
-  const strokeDashoffset = circumference - (progressPercent / 100) * circumference
+  // Full ring at 60s (offset 0), Empty ring at 0s (offset circumference)
+  const strokeDashoffset = circumference * (1 - progressRatio)
 
-  // 4 Stepper stages over 120s
-  const stepIndex = secondsLeft > 90 ? 0 : secondsLeft > 60 ? 1 : secondsLeft > 30 ? 2 : 3
-
-  const stages = [
-    { title: 'Symptoms', label: 'Summarizing patient symptoms & intake...' },
-    { title: 'Differential', label: 'Evaluating clinical probabilities...' },
-    { title: 'SOAP Note', label: 'Structuring subjective & objective plan...' },
-    { title: 'Finalizing', label: 'Finalizing physician report document...' },
+  // 4 Stage items with verbs over 60s (15s each)
+  const stageItems = [
+    { id: 'symptoms', verb: 'Analyzing Symptoms', desc: 'Parsing patient symptoms & intake...' },
+    { id: 'differential', verb: 'Evaluating Differential', desc: 'Cross-referencing medical database probabilities...' },
+    { id: 'soap', verb: 'Synthesizing SOAP Note', desc: 'Structuring subjective & objective clinical plan...' },
+    { id: 'finalizing', verb: 'Finalizing Clinical Report', desc: 'Preparing physician-ready summary document...' },
   ]
 
-  const activeStageLabel = stages[stepIndex]?.label ?? 'Finalizing report...'
+  const activeIndex = secondsLeft > 45 ? 0 : secondsLeft > 30 ? 1 : secondsLeft > 15 ? 2 : 3
+  const activeItem = stageItems[activeIndex] || stageItems[3]
 
   return (
-    <div className="relative min-h-[580px] w-full overflow-hidden rounded-3xl border border-libertymd-slate-200/80 bg-[#FAFBFD] p-6 sm:p-12 shadow-lg flex flex-col items-center justify-center text-center">
-      {/* Dynamic 3D WebGL Ribbon in Background */}
-      <div className="pointer-events-none absolute inset-0 z-0 opacity-60 overflow-hidden" aria-hidden="true">
+    <div className="relative min-h-[580px] w-full overflow-hidden rounded-3xl border border-libertymd-slate-200/80 bg-[#FAFBFD] p-6 sm:p-12 shadow-sm flex flex-col items-center justify-center text-center">
+      {/* Dynamic 3D WebGL Ribbon Occupies Whole Container Background (Unboxed) */}
+      <div className="pointer-events-none absolute inset-0 z-0 opacity-75 overflow-hidden" aria-hidden="true">
         <LibertyMDFooterRibbon />
       </div>
 
-      {/* Main Glass Card Overlay */}
+      {/* Unboxed Content Floating Directly On Top (No Inner Card Enclosure) */}
       <section
         data-libertymd-report-loader=""
         aria-live="polite"
         aria-busy="true"
-        className="relative z-10 w-full max-w-lg rounded-2xl border border-libertymd-blue-100 bg-white/90 p-8 sm:p-12 text-center backdrop-blur-md shadow-[0_15px_45px_rgba(37,99,235,0.08)] flex flex-col items-center"
+        className="relative z-10 flex flex-col items-center max-w-lg w-full text-center px-4"
       >
         {/* Header */}
         <h2 className="font-serif text-3xl sm:text-4xl font-bold tracking-tight text-libertymd-ink">
           Creating report...
         </h2>
 
-        {/* Subtitle / Active Stage */}
-        <p className="mt-2 text-sm font-medium text-libertymd-blue-700 animate-pulse">
-          {activeStageLabel}
-        </p>
-
-        {/* Center Logo Encircled by Circular Progress Ring */}
-        <div className="relative mt-8 mb-4 flex h-36 w-36 items-center justify-center">
+        {/* Center Logo Encircled by Circular SVG Countdown Ring (Full to Empty over 1 min, no numeric countdown text) */}
+        <div className="relative mt-10 mb-8 flex h-36 w-36 items-center justify-center">
           {/* SVG Circular Progress Ring */}
           <svg className="absolute inset-0 h-full w-full -rotate-90 transform" viewBox="0 0 128 128">
             {/* Background Track Circle */}
@@ -495,17 +488,17 @@ function ReportLoader({ onRefresh }: { onRefresh?: () => void }) {
               cx="64"
               cy="64"
               r={radius}
-              className="stroke-libertymd-blue-50"
-              strokeWidth="6"
+              className="stroke-libertymd-blue-100/60"
+              strokeWidth="5"
               fill="transparent"
             />
-            {/* Animated Progress Circle */}
+            {/* Animated Progress Circle (Starts Full, Drains to Empty) */}
             <circle
               cx="64"
               cy="64"
               r={radius}
               className="stroke-libertymd-blue-600 transition-all duration-1000 ease-linear"
-              strokeWidth="6"
+              strokeWidth="5"
               strokeDasharray={circumference}
               strokeDashoffset={strokeDashoffset}
               strokeLinecap="round"
@@ -513,51 +506,24 @@ function ReportLoader({ onRefresh }: { onRefresh?: () => void }) {
             />
           </svg>
 
-          {/* Logo & Timer in Center */}
-          <div className="relative z-10 flex flex-col items-center justify-center text-center">
+          {/* Logo Mark in Center (No numeric countdown text visible) */}
+          <div className="relative z-10 flex items-center justify-center">
             <img
               src="/images/libertymd-logo-mark.svg"
               alt="LibertyMD Logo"
-              className="h-10 w-10 object-contain mb-1"
+              className="h-12 w-12 object-contain filter drop-shadow-xs"
             />
-            <span className="font-mono text-sm font-bold text-libertymd-ink tracking-tight">
-              {formattedTime}
-            </span>
           </div>
         </div>
 
-        {/* 4 Clinical Steps */}
-        <div className="mt-6 w-full grid grid-cols-4 gap-2 pt-6 border-t border-libertymd-slate-100">
-          {stages.map((st, idx) => {
-            const isCompleted = idx < stepIndex
-            const isCurrent = idx === stepIndex
-            return (
-              <div key={st.title} className="flex flex-col items-center text-center">
-                <div
-                  className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-all duration-300 ${
-                    isCompleted
-                      ? 'bg-libertymd-blue-600 text-white shadow-xs'
-                      : isCurrent
-                        ? 'bg-libertymd-blue-50 text-libertymd-blue-700 ring-2 ring-libertymd-blue-600'
-                        : 'bg-libertymd-slate-100 text-libertymd-slate-400'
-                  }`}
-                >
-                  {isCompleted ? <Check className="h-3.5 w-3.5 stroke-[3]" /> : idx + 1}
-                </div>
-                <span
-                  className={`mt-2 text-[11px] font-semibold leading-snug ${
-                    isCurrent
-                      ? 'text-libertymd-blue-700 font-bold'
-                      : isCompleted
-                        ? 'text-libertymd-ink'
-                        : 'text-libertymd-slate-400'
-                  }`}
-                >
-                  {st.title}
-                </span>
-              </div>
-            )
-          })}
+        {/* Active Stage Verb Item - Dynamic stage item that comes and goes */}
+        <div className="min-h-[72px] flex flex-col items-center justify-center transition-all duration-500">
+          <h3 className="font-sans text-xl font-bold text-libertymd-blue-700 tracking-tight transition-all duration-500">
+            {activeItem.verb}
+          </h3>
+          <p className="mt-1 text-xs font-medium text-libertymd-slate-500">
+            {activeItem.desc}
+          </p>
         </div>
 
         {secondsLeft === 0 ? (
@@ -572,7 +538,7 @@ function ReportLoader({ onRefresh }: { onRefresh?: () => void }) {
             </button>
           </div>
         ) : (
-          <p className="mt-6 text-xs text-libertymd-slate-400 font-medium">
+          <p className="mt-8 text-xs text-libertymd-slate-400 font-medium">
             Please stay on this page. Your report will display automatically once complete.
           </p>
         )}
