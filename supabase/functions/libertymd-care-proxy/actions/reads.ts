@@ -57,11 +57,34 @@ export async function handleGetConsultation(ctx: ProxyContext, payload: RequestP
     .limit(1)
     .maybeSingle()
 
+  // Fetch patient profile details so report renders patient name, age, and sex_at_birth
+  let patient: Record<string, unknown> | null = null
+  if (consultation.patient_id) {
+    const { data: p } = await ctx.db
+      .from('libertymd_patients')
+      .select('id, relationship, display_label, age, sex_at_birth, gender_identity')
+      .eq('id', consultation.patient_id)
+      .maybeSingle()
+    if (p) {
+      patient = {
+        id: p.id,
+        relationship: p.relationship,
+        name: p.display_label || null,
+        display_name: p.display_label || null,
+        display_label: p.display_label || null,
+        age: p.age,
+        sex_at_birth: p.sex_at_birth,
+        gender: p.sex_at_birth,
+      }
+    }
+  }
+
   // P2-13 L6 — return retention ISO + omit hint; body still omitted after expiry.
   const lifecycle = reportReadLifecycleMeta(report)
   const mediaEvidence = await listMediaEvidence(ctx, consultation)
   const response: Record<string, unknown> = {
     consultation,
+    patient,
     messages,
     report: lifecycle.report,
     confidence_score: lifecycle.report != null ? (report?.confidence_score || null) : null,

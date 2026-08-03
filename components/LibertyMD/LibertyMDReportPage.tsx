@@ -123,9 +123,15 @@ export default function LibertyMDReportPage() {
 
     if (rawReport) {
       const isSaved = status === 'completed'
+      const reportPayload = typeof rawReport === 'object' && rawReport !== null
+        ? {
+            ...(rawReport as Record<string, unknown>),
+            patient: (rawReport as Record<string, unknown>).patient || data?.patient || (consultation?.patient as unknown) || null,
+          }
+        : rawReport
       setState({
         kind: 'ready',
-        report: normalizeReportData(rawReport),
+        report: normalizeReportData(reportPayload),
         saved: isSaved,
         retentionExpiresAt,
       })

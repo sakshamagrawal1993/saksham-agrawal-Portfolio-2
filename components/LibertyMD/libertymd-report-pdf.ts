@@ -245,10 +245,22 @@ export function buildPatientPdfDoc(
     (report.soap.subjective || report.soap.objective || report.soap.assessment || report.soap.plan)
   ) {
     const lines: string[] = []
-    if (report.soap.subjective) lines.push(`Subjective: ${report.soap.subjective}`)
-    if (report.soap.objective) lines.push(`Objective: ${report.soap.objective}`)
-    if (report.soap.assessment) lines.push(`Assessment: ${report.soap.assessment}`)
-    if (report.soap.plan) lines.push(`Plan: ${report.soap.plan}`)
+    if (report.soap.subjective) {
+      lines.push('**Subjective**')
+      lines.push(report.soap.subjective)
+    }
+    if (report.soap.objective) {
+      lines.push('**Objective**')
+      lines.push(report.soap.objective)
+    }
+    if (report.soap.assessment) {
+      lines.push('**Assessment**')
+      lines.push(report.soap.assessment)
+    }
+    if (report.soap.plan) {
+      lines.push('**Plan**')
+      lines.push(report.soap.plan)
+    }
     pushSection(sections, 'SOAP Note', lines)
   }
 
