@@ -294,6 +294,8 @@ export async function replayCompletedTurn(ctx: ProxyContext, consultation: Consu
       .eq('consultation_id', consultation.id)
       .eq('user_id', user.id)
       .in('access_status', ['saved', 'guest_released', 'withheld'])
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle()
     if (error) throw error
     report = data

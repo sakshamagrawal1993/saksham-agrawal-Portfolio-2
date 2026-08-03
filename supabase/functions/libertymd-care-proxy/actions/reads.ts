@@ -43,6 +43,8 @@ export async function handleGetConsultation(ctx: ProxyContext, payload: RequestP
     .eq('consultation_id', consultation.id)
     .eq('user_id', ctx.user.id)
     .in('access_status', ['saved', 'guest_released', 'withheld'])
+    .order('created_at', { ascending: false })
+    .limit(1)
     .maybeSingle()
 
   // Latest terminal safety classification (Q5): highest turn_count, then newest.

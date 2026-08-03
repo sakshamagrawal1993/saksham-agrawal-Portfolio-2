@@ -33,8 +33,8 @@ import { normalizeReportData, type LibertyMdNormalizedReport } from './libertymd
 
 /** How often to re-poll while the report is still being generated. */
 const POLL_INTERVAL_MS = 3_000
-/** Polling timeout: 2 minutes maximum before offering manual refresh / failure shell. */
-const POLL_TIMEOUT_MS = 120_000
+/** Polling timeout: 1 minute (60,000 ms) before auto-triggering report generation retry. */
+const POLL_TIMEOUT_MS = 60_000
 
 type PageState =
   | { kind: 'loading' }
@@ -170,11 +170,26 @@ export default function LibertyMDReportPage() {
     startedAtRef.current = Date.now()
     consecutiveErrorsRef.current = 0
     let timer: number | undefined
+    let hasRegenerated = false
 
     const tick = async () => {
       const outcome = await load()
       if (cancelledRef.current || outcome === 'settled') return
       if (Date.now() - startedAtRef.current > POLL_TIMEOUT_MS) {
+        if (!hasRegenerated) {
+          hasRegenerated = true
+          startedAtRef.current = Date.now()
+          try {
+            await ensureIdentity()
+            await supabase.functions.invoke('libertymd-care-proxy', {
+              body: { action: 'release_report', consultation_id: consultationId, mode: 'skip' },
+            })
+          } catch {
+            // ignore
+          }
+          timer = window.setTimeout(tick, POLL_INTERVAL_MS)
+          return
+        }
         setState({ kind: 'lifecycle', state: 'generation_failed' })
         return
       }

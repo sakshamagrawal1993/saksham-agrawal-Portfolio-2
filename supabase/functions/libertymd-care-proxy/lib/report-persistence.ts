@@ -61,6 +61,8 @@ export async function findOwnedReport(
     .select(REPORT_SELECT)
     .eq('consultation_id', consultationId)
     .eq('user_id', ctx.user.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
     .maybeSingle()
   if (error) throw error
   return (data as StoredReportRow | null) ?? null
