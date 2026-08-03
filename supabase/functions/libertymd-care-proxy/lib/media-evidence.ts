@@ -221,29 +221,36 @@ export function suggestedMediaFollowupQuestions(
 ): string[] {
   const spanish = language.trim().toLowerCase() === 'es'
   if (kind === 'photo') {
+    const obsList = (Array.isArray(analysis.observations) ? analysis.observations : [])
+      .map((item: any) => cleanMessage(item?.description || item?.feature || ''))
+      .filter(Boolean)
+    const primaryObs = obsList[0] || ''
+    const subject = primaryObs
+      ? `the visual finding (${primaryObs.slice(0, 80).toLowerCase()})`
+      : 'the visual features in this image'
+
     if (spanish) {
       return [
-        '¿Cuándo apareció por primera vez el cambio que se ve en la foto, y ha cambiado o se ha extendido?',
-        '¿La zona duele, pica, está caliente o hinchada, o sale algún líquido?',
+        `Con respecto a los hallazgos visuales observados en la imagen, ¿qué síntomas específicos (como dolor, picazón, ardor o molestias) estás experimentando?`,
+        '¿Has notado alguna evolución o desencadenante particular relacionado con estas características visuales?',
       ]
     }
-    const region = cleanMessage(analysis.body_region).slice(0, 80)
-    const subject = region ? `the change on your ${region}` : 'the change shown in the photo'
+
     return [
-      `When did ${subject} first appear, and has it changed or spread?`,
-      'Is the area painful, itchy, warm, swollen, or leaking any fluid?',
+      `Regarding ${subject}, what specific clinical symptoms or sensations (such as pain, itching, warmth, or tenderness) are you experiencing?`,
+      'How do these visual features correspond to your physical symptoms, and do any triggers make them worse or better?',
     ]
   }
   if (spanish) {
     return [
-      '¿Qué motivó este análisis y qué síntomas tenías cuando te tomaron la muestra?',
-      '¿Estabas en ayunas, habías estado enfermo recientemente o tomabas algún medicamento nuevo?',
+      '¿Qué síntomas o hallazgos clínicos específicos te llevaron a realizar este análisis?',
+      '¿Los resultados de este laboratorio coinciden con cambios recientes en tus síntomas o estado de salud?',
     ]
   }
   const panel = cleanMessage(analysis.panel_name).slice(0, 100)
   return [
-    `What prompted ${panel ? `this ${panel} test` : 'this lab test'}, and what symptoms were you having at the time?`,
-    'Were you fasting, recently ill, or taking any new medicines when the sample was taken?',
+    `Regarding ${panel ? `the ${panel}` : 'the lab results'} shown, what specific clinical symptoms prompted this testing?`,
+    'How do these laboratory findings compare with any changes or treatments you have experienced recently?',
   ]
 }
 

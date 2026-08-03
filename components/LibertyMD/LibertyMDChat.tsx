@@ -8,6 +8,7 @@ import {
   FileText,
   Menu,
   Send,
+  LogIn,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { useI18n, chromeCodeForClinicalLanguage } from '../../i18n';
@@ -712,14 +713,14 @@ export default function LibertyMDChat() {
           : 'processing',
         followups_remaining: remaining(packet),
       }));
-    setPhotoChips((current) => [
+    setPhotoChips((current) => uniqueEvidenceChips([
       ...serverPhotos,
       ...current.filter((chip) => chip.object_uuid.startsWith('local-photo-')),
-    ]);
-    setLabChips((current) => [
+    ]));
+    setLabChips((current) => uniqueEvidenceChips([
       ...serverLabs,
       ...current.filter((chip) => chip.object_uuid.startsWith('local-lab-')),
-    ]);
+    ]));
   };
 
   const hasProcessingMedia = photoChips.some((chip) => chip.analysis_status === 'processing')
@@ -2103,6 +2104,32 @@ export default function LibertyMDChat() {
     };
   }, [consultationId, clientPersistHydrated]);
 
+  /**
+   * Header Sign In button — uses signInWithOAuth (always redirects to Google).
+   * Does not require an existing consultation or anonymous session.
+   */
+  const startGoogleSignIn = async () => {
+    setIsAuthBusy(true);
+    setError('');
+    try {
+      const query = new URLSearchParams({ auth: 'complete' });
+      if (consultationId) query.set('consultationId', consultationId);
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: consultationId
+            ? `${window.location.origin}/liberty-md/chat?${query.toString()}`
+            : `${window.location.origin}/liberty-md?${query.toString()}`,
+          queryParams: { prompt: 'select_account' },
+        },
+      });
+      if (oauthError) throw oauthError;
+    } catch (oauthError) {
+      setError(patientFacingTechnicalMessage(oauthError, 'Unable to start Google sign in.'));
+      setIsAuthBusy(false);
+    }
+  };
+
   const startGoogleLink = async () => {
     if (!consultationId) return;
     setIsAuthBusy(true);
@@ -2696,6 +2723,19 @@ export default function LibertyMDChat() {
 
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             <LibertyMDLanguageSwitcher clinicalLock={clinicalLanguage} />
+            {isAnonymous && (
+              <button
+                id="libertymd-chat-signin-btn"
+                type="button"
+                aria-label="Sign in with Google"
+                disabled={isAuthBusy}
+                onClick={() => { void startGoogleSignIn(); }}
+                className="inline-flex items-center gap-1.5 rounded-full border border-libertymd-blue-600/30 bg-libertymd-blue-600/5 px-2.5 py-1.5 text-xs font-semibold text-libertymd-blue-600 transition-colors hover:bg-libertymd-blue-600 hover:text-white sm:px-4 sm:text-sm"
+              >
+                <LogIn className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Sign in</span>
+              </button>
+            )}
             {/* BO 2026-08-01 — "+ New chat" removed from the consult header.
                 Starting over mid-consult is still reachable from the menu; it
                 does not belong next to an in-progress clinical conversation. */}
@@ -3312,6 +3352,7 @@ export default function LibertyMDChat() {
         onClose={() => setIsMenuOpen(false)}
         onSelectConsultation={selectConsultation}
         onCareForSomeoneElse={isAnonymous ? () => void attemptAddProfile('drawer') : undefined}
+        onGoogle={isAnonymous ? startGoogleSignIn : undefined}
         onStartOver={() => void startOver()}
         profileManagement={profileManagementHandlers}
       />

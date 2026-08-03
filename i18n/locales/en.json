@@ -132,16 +132,16 @@
         "minimal": "Minimal confidence",
         "high_serious": "High confidence · Serious"
       },
-      "serious": "Serious",
-      "furtherInvestigations": "Further investigations",
-      "symptomaticTreatment": "Symptom relief",
-      "supportiveTreatment": "Supportive care",
+      "serious": "Serious Condition",
+      "furtherInvestigations": "Diagnostic Investigations & Workup",
+      "symptomaticTreatment": "Medical Treatments & Therapeutics",
+      "supportiveTreatment": "Self-Care & Home Management",
       "treatmentGuidance": "General guidance only — not a prescription.",
       "doctorCta": "Notify me when doctors are available",
       "showDetail": "Show details",
       "hideDetail": "Hide details"
     },
-    "viewTitle": "Report for Physician Review",
+    "viewTitle": "Consultation Report",
     "emailDelivery": {
       "cta": "Email me my report",
       "title": "Email your report",
@@ -203,8 +203,8 @@
       "notYetEligible": "Report not ready yet — keep answering a few more questions",
       "retentionWarning": "Guest access to this report ends in {remaining}. Sign in to keep future reports in your history."
     },
-    "pageTitle": "Your doctor-ready report",
-    "pageSubtitle": "Prepared from your consultation",
+    "pageTitle": "Consultation Report",
+    "pageSubtitle": "",
     "backToConsult": "Back to the consultation",
     "loadingHeading": "Opening your report",
     "generatingHeading": "Preparing your report",

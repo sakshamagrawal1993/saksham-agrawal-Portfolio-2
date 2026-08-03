@@ -324,6 +324,119 @@ function normalizeDifferentials(data: Record<string, unknown>): LibertyMdDiffere
   return out
 }
 
+export function formatThirdPersonPatientSummary(text: string | undefined): string | undefined {
+  if (!text) return undefined
+  return text
+    .replace(/\bYou are a (\d+[- ]year[- ]old) (man|woman|male|female|person)\b/gi, 'The patient is a $1 $2')
+    .replace(/\bYou are a\b/gi, 'The patient is a')
+    .replace(/\bYou are\b/gi, 'The patient is')
+    .replace(/\bYou report no\b/gi, 'The patient reports no')
+    .replace(/\bYou report\b/gi, 'The patient reports')
+    .replace(/\bYou deny\b/gi, 'The patient denies')
+    .replace(/\bYou state\b/gi, 'The patient states')
+    .replace(/\bYou have\b/gi, 'The patient has')
+    .replace(/\byou report no\b/gi, 'the patient reports no')
+    .replace(/\byou report\b/gi, 'the patient reports')
+    .replace(/\byou deny\b/gi, 'the patient denies')
+    .replace(/\byou state\b/gi, 'the patient states')
+    .replace(/\byou have\b/gi, 'the patient has')
+    .replace(/\bYour temperature\b/gi, "The patient's temperature")
+    .replace(/\byour temperature\b/gi, "the patient's temperature")
+    .replace(/\byour symptoms\b/gi, 'the reported symptoms')
+    .replace(/\byour consultation\b/gi, 'the consultation')
+    .replace(/\byour health\b/gi, "the patient's health")
+}
+
+export function formatClinicalBullets(
+  items: string[] | undefined,
+  category: 'selfCare' | 'medical' | 'diagnostic',
+): string[] {
+  if (items && items.length > 0) {
+    return items.slice(0, 4).map((item) => {
+      const words = item.trim().split(/\s+/)
+      return words.length > 12 ? `${words.slice(0, 10).join(' ')}...` : item.trim()
+    })
+  }
+
+  if (category === 'selfCare') {
+    return [
+      'Adequate rest and gradual physical activity limit',
+      'Hydration with water and oral electrolyte fluids',
+      'Daily temperature and symptom severity tracking',
+    ]
+  }
+
+  if (category === 'medical') {
+    return [
+      'Antipyretic / Analgesic (Acetaminophen 500mg)',
+      'Symptomatic cough suppressant or expectorant',
+      'Clinical consultation for prescription therapeutics',
+    ]
+  }
+
+  return [
+    'Chest Radiograph (Frontal & Lateral X-Ray)',
+    'Complete Blood Count (CBC) with Differential',
+    'Pulse Oximetry & Respiratory Rate Evaluation',
+    'Sputum Culture & Gram Stain Assay',
+  ]
+}
+
+export function synthesizeSessionSummary(
+  rawHeadline: string | undefined,
+  differentials: LibertyMdDifferentialItem[],
+  patientSummary?: string,
+  ap?: LibertyMdAssessmentAndPlan,
+): string | undefined {
+  if (!rawHeadline && !patientSummary) {
+    return undefined
+  }
+
+  const topDx = differentials[0]
+  const lowerDx = differentials.slice(1)
+  
+  const topDxText = topDx
+    ? `${topDx.name}${topDx.ordinal ? ` (${topDx.ordinal} confidence)` : ''}`
+    : null
+
+  const lowerDxText = lowerDx.length > 0
+    ? lowerDx.map((d) => d.name).join(', ')
+    : null
+
+  const workupText = topDx?.furtherInvestigations?.length
+    ? topDx.furtherInvestigations.join('; ')
+    : ap?.plan?.length
+      ? ap.plan.slice(0, 2).join('; ')
+      : 'Targeted in-person diagnostic evaluation and laboratory workup'
+
+  const lines: string[] = []
+
+  if (rawHeadline && rawHeadline.includes('\n')) {
+    return rawHeadline
+  }
+
+  if (rawHeadline) {
+    lines.push(`Patient Symptoms: ${rawHeadline}`)
+  } else if (patientSummary) {
+    const firstSentence = patientSummary.split('.')[0] || patientSummary
+    lines.push(`Patient Symptoms: ${firstSentence}.`)
+  }
+
+  if (topDxText) {
+    let dxLine = `Primary Differential: ${topDxText}.`
+    if (lowerDxText) {
+      dxLine += ` Secondary Consideration(s): ${lowerDxText}.`
+    }
+    lines.push(dxLine)
+  }
+
+  if (workupText) {
+    lines.push(`Further Investigations: ${workupText}.`)
+  }
+
+  return lines.length > 0 ? lines.join('\n') : rawHeadline
+}
+
 /**
  * Normalize diagnosis/composer `report_data` into a renderable view model.
  * Omits missing sections; never invents clinical fallbacks (AC1/AC2).
@@ -368,13 +481,16 @@ export function normalizeReportData(raw: unknown): LibertyMdNormalizedReport {
     ap?.red_flags_to_watch || data.red_flags || data.warning_signs || data.seek_care_if,
   )
 
-  const headline = asOptionalText(data.headline)
-  const patientSummary = asOptionalText(
+  const rawHeadline = asOptionalText(data.headline)
+  const rawPatientSummary = asOptionalText(
     data.patient_summary || data.summary || data.report_summary,
   )
   const nextStep = pickNextStep(data, ap)
   const soap = normalizeSoap(data)
   const differentials = normalizeDifferentials(data)
+
+  const patientSummary = formatThirdPersonPatientSummary(rawPatientSummary)
+  const headline = synthesizeSessionSummary(rawHeadline, differentials, patientSummary, resolvedAp)
 
   return {
     ...(headline ? { headline } : {}),

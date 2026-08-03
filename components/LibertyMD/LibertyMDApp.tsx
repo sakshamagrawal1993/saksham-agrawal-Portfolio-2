@@ -21,6 +21,7 @@ import {
   Loader2,
   Menu,
   RotateCcw,
+  LogIn,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import LibertyMDFooterRibbon from './LibertyMDFooterRibbon';
@@ -1016,6 +1017,32 @@ export default function LibertyMDApp() {
     }
   };
 
+  /**
+   * Header Sign In — uses signInWithOAuth (proven to redirect).
+   * The linkIdentity approach works for the in-consultation drawer (where
+   * an anonymous session is already established), but silently fails on the
+   * landing page before any consultation has started.
+   */
+  const startGoogleSignIn = async () => {
+    setIsAuthBusy(true);
+    setError('');
+    try {
+      const query = new URLSearchParams({ auth: 'complete' });
+      if (sessionId) query.set('consultation', sessionId);
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/liberty-md?${query.toString()}`,
+          queryParams: { prompt: 'select_account' },
+        },
+      });
+      if (oauthError) throw oauthError;
+    } catch (oauthError) {
+      setError(patientFacingTechnicalMessage(oauthError, 'Unable to start Google sign in.'));
+      setIsAuthBusy(false);
+    }
+  };
+
   /** P1-04 Q4A — tap → create_patient → offer on reject. */
   const attemptAddProfile = async (source: 'drawer' | 'unified_entry') => {
     setIsMenuOpen(false);
@@ -1225,9 +1252,22 @@ export default function LibertyMDApp() {
               LibertyMD
             </a>
 
-            <div className="flex items-center gap-3 text-sm font-semibold text-libertymd-slate-700 sm:gap-5">
+            <div className="flex items-center gap-2 text-sm font-semibold text-libertymd-slate-700 sm:gap-3">
               {!isAnonymous && greetingName && <span className="hidden sm:inline">Hi, {greetingName}</span>}
               <LibertyMDLanguageSwitcher />
+              {isAnonymous && (
+                <button
+                  id="libertymd-homepage-signin-btn"
+                  type="button"
+                  aria-label="Sign in with Google"
+                  disabled={isAuthBusy}
+                  onClick={() => { void startGoogleSignIn(); }}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-libertymd-blue-600/30 bg-libertymd-blue-600/5 px-2.5 py-1.5 text-xs font-semibold text-libertymd-blue-600 transition-colors hover:bg-libertymd-blue-600 hover:text-white sm:px-4 sm:text-sm"
+                >
+                  <LogIn className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
+                  <span className="hidden sm:inline">Sign in</span>
+                </button>
+              )}
               <button
                 type="button"
                 aria-label="Open profile and consultation history"
@@ -1887,6 +1927,7 @@ export default function LibertyMDApp() {
         onClose={() => setIsMenuOpen(false)}
         onSelectConsultation={loadConsultation}
         onCareForSomeoneElse={isAnonymous ? () => void attemptAddProfile('drawer') : undefined}
+        onGoogle={isAnonymous ? startGoogleSignIn : undefined}
         profileManagement={profileManagementHandlers}
       />
 

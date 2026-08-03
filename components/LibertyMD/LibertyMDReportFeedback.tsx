@@ -1,12 +1,5 @@
-/**
- * P2-10 — one-tap “was this helpful?” + always-visible optional free-text.
- *
- * Mounted from shared ReportView near the saved/guest note — not in footerSlot,
- * not soft-gate chrome, not email/PDF delivery CTAs.
- * Clinical persist via proxy only; Mixpanel gets helpful + has_comment only.
- */
 import { useState } from 'react'
-import { Loader2 } from 'lucide-react'
+import { Loader2, X } from 'lucide-react'
 import { useI18n } from '../../i18n'
 import { supabase } from '../../lib/supabaseClient'
 import { emitFeedbackSubmitted } from './libertymd-analytics'
@@ -21,21 +14,25 @@ export type LibertyMDReportFeedbackProps = {
   consultationId: string
 }
 
-type FeedbackPhase = 'idle' | 'submitting' | 'thanks' | 'error'
+type FeedbackPhase = 'idle' | 'submitting' | 'thanks' | 'error' | 'dismissed'
 
 export function LibertyMDReportFeedback({ consultationId }: LibertyMDReportFeedbackProps) {
   const { t } = useI18n()
+  const [rating, setRating] = useState<number | null>(null)
   const [comment, setComment] = useState('')
   const [phase, setPhase] = useState<FeedbackPhase>('idle')
-  const [lastHelpful, setLastHelpful] = useState<boolean | null>(null)
+
+  if (phase === 'dismissed') {
+    return null
+  }
 
   const locked = phase === 'thanks' || phase === 'submitting'
 
-  async function submit(helpful: boolean) {
+  async function submit(selectedRating: number | null) {
     if (locked || !consultationId) return
-    setLastHelpful(helpful)
     setPhase('submitting')
 
+    const helpful = selectedRating !== null ? selectedRating >= 7 : true
     const trimmed = comment.trim()
     const body = submitReportFeedbackBody({
       consultation_id: consultationId,
@@ -49,7 +46,6 @@ export function LibertyMDReportFeedback({ consultationId }: LibertyMDReportFeedb
       })
 
       const status = statusFromFunctionsError(functionError)
-      // 409 already-submitted → treat as success lock (no nag / no change-of-mind).
       if (status === 409) {
         setPhase('thanks')
         return
@@ -74,11 +70,14 @@ export function LibertyMDReportFeedback({ consultationId }: LibertyMDReportFeedb
     return (
       <div
         data-libertymd-report-feedback="thanks"
-        className="border-t border-libertymd-slate-200 pt-[var(--libertymd-space-lg)]"
+        className="rounded-xl border border-libertymd-slate-200 bg-white p-6 shadow-xs text-left"
         role="status"
       >
-        <p className="libertymd-type-body-small font-semibold text-libertymd-slate-700">
+        <p className="libertymd-type-body font-semibold text-libertymd-ink">
           {t('report.feedback.thanks')}
+        </p>
+        <p className="mt-1 text-sm text-libertymd-slate-500">
+          Thank you for helping us improve LibertyMD!
         </p>
       </div>
     )
@@ -87,87 +86,121 @@ export function LibertyMDReportFeedback({ consultationId }: LibertyMDReportFeedb
   return (
     <div
       data-libertymd-report-feedback="form"
-      className="border-t border-libertymd-slate-200 pt-[var(--libertymd-space-lg)]"
+      className="relative rounded-2xl border border-libertymd-slate-200 bg-white p-6 shadow-sm text-left"
     >
-      <p
-        id="libertymd-report-feedback-prompt"
-        className="libertymd-type-body font-bold text-libertymd-ink"
+      <button
+        type="button"
+        onClick={() => setPhase('dismissed')}
+        aria-label="Close feedback"
+        className="absolute right-4 top-4 rounded-full p-1 text-libertymd-slate-400 hover:bg-libertymd-slate-100 hover:text-libertymd-slate-600"
       >
-        {t('report.feedback.prompt')}
+        <X className="h-5 w-5" />
+      </button>
+
+      <h3
+        id="libertymd-report-feedback-prompt"
+        className="pr-8 font-serif text-lg font-semibold text-libertymd-ink sm:text-xl"
+      >
+        On a scale from 0 to 10, how likely are you to recommend LibertyMD to a friend or colleague?
+      </h3>
+      <p className="mt-1 text-xs text-libertymd-slate-500">
+        Your feedback helps us improve our service
       </p>
 
-      <div
-        className="mt-[var(--libertymd-space-sm)] flex flex-wrap gap-[var(--libertymd-space-sm)]"
-        role="group"
-        aria-labelledby="libertymd-report-feedback-prompt"
-      >
+      {/* 0 to 10 Rating Buttons */}
+      <div className="mt-5">
+        <div
+          className="grid grid-cols-11 gap-1 sm:gap-2"
+          role="group"
+          aria-labelledby="libertymd-report-feedback-prompt"
+        >
+          {Array.from({ length: 11 }, (_, i) => i).map((score) => {
+            const isSelected = rating === score
+            return (
+              <button
+                key={score}
+                type="button"
+                data-libertymd-feedback-score={score}
+                disabled={locked}
+                aria-pressed={isSelected}
+                onClick={() => setRating(score)}
+                className={`flex h-10 w-full items-center justify-center rounded-lg text-sm font-semibold transition ${
+                  isSelected
+                    ? 'bg-libertymd-blue-600 text-white shadow-xs'
+                    : 'bg-libertymd-slate-100 text-libertymd-slate-700 hover:bg-libertymd-blue-50 hover:text-libertymd-blue-700'
+                }`}
+              >
+                {score}
+              </button>
+            )
+          })}
+        </div>
+        <div className="mt-2 flex items-center justify-between text-xs text-libertymd-slate-400 font-medium">
+          <span>Not likely</span>
+          <span>Very likely</span>
+        </div>
+      </div>
+
+      {/* Optional Free-text Comment */}
+      <div className="mt-5">
+        <label
+          htmlFor="libertymd-report-feedback-comment"
+          className="block text-xs font-semibold text-libertymd-slate-700"
+        >
+          Tell us more about your experience (optional)
+        </label>
+        <textarea
+          id="libertymd-report-feedback-comment"
+          data-libertymd-report-feedback-comment=""
+          rows={3}
+          maxLength={REPORT_FEEDBACK_COMMENT_MAX}
+          value={comment}
+          disabled={locked}
+          onChange={(e) => setComment(e.target.value.slice(0, REPORT_FEEDBACK_COMMENT_MAX))}
+          className="mt-1.5 w-full rounded-lg border border-libertymd-slate-200 bg-white p-3 text-sm text-libertymd-ink placeholder:text-libertymd-slate-400 focus:border-libertymd-blue-600 focus:outline-none focus:ring-2 focus:ring-libertymd-blue-600/20 disabled:opacity-50"
+          placeholder="What could we improve? What do you love most?"
+        />
+      </div>
+
+      {/* Action Buttons */}
+      <div className="mt-5 flex items-center justify-end gap-3 border-t border-libertymd-slate-100 pt-4">
         <button
           type="button"
-          data-libertymd-report-feedback-yes=""
           disabled={locked}
-          aria-pressed={lastHelpful === true}
-          onClick={() => void submit(true)}
-          className="inline-flex min-h-11 items-center justify-center rounded-full border border-libertymd-blue-600 bg-white px-[var(--libertymd-space-lg)] libertymd-type-body-small font-bold text-libertymd-blue-700 transition hover:bg-libertymd-blue-50 disabled:opacity-50"
+          onClick={() => setPhase('dismissed')}
+          className="px-4 py-2 text-sm font-medium text-libertymd-slate-500 hover:text-libertymd-slate-800 disabled:opacity-50"
         >
-          {phase === 'submitting' && lastHelpful === true ? (
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-          ) : (
-            t('report.feedback.yes')
-          )}
+          Skip
         </button>
         <button
           type="button"
-          data-libertymd-report-feedback-no=""
+          data-libertymd-report-feedback-submit=""
           disabled={locked}
-          aria-pressed={lastHelpful === false}
-          onClick={() => void submit(false)}
-          className="inline-flex min-h-11 items-center justify-center rounded-full border border-libertymd-slate-300 bg-white px-[var(--libertymd-space-lg)] libertymd-type-body-small font-bold text-libertymd-slate-700 transition hover:bg-libertymd-slate-100 disabled:opacity-50"
+          onClick={() => void submit(rating)}
+          className="inline-flex items-center gap-2 rounded-lg bg-libertymd-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-xs hover:bg-libertymd-blue-700 disabled:opacity-50"
         >
-          {phase === 'submitting' && lastHelpful === false ? (
+          {phase === 'submitting' ? (
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           ) : (
-            t('report.feedback.no')
+            'Submit'
           )}
         </button>
       </div>
 
-      <label
-        htmlFor="libertymd-report-feedback-comment"
-        className="libertymd-type-label mt-[var(--libertymd-space-md)] block font-semibold text-libertymd-slate-500"
-      >
-        {t('report.feedback.commentOptional')}
-      </label>
-      <input
-        id="libertymd-report-feedback-comment"
-        data-libertymd-report-feedback-comment=""
-        type="text"
-        inputMode="text"
-        autoComplete="off"
-        maxLength={REPORT_FEEDBACK_COMMENT_MAX}
-        value={comment}
-        disabled={locked}
-        onChange={(e) => setComment(e.target.value.slice(0, REPORT_FEEDBACK_COMMENT_MAX))}
-        className="mt-[var(--libertymd-space-xs)] w-full min-h-11 rounded-lg border border-libertymd-slate-300 bg-white px-[var(--libertymd-space-md)] libertymd-type-body-small text-libertymd-ink placeholder:text-libertymd-slate-500 focus:border-libertymd-blue-600 focus:outline-none focus:ring-2 focus:ring-libertymd-blue-600/20 disabled:opacity-50"
-        placeholder={t('report.feedback.commentOptional')}
-      />
-
       {phase === 'error' ? (
         <div
           data-libertymd-report-feedback-error=""
-          className="mt-[var(--libertymd-space-sm)] rounded-lg border border-libertymd-slate-300 bg-libertymd-slate-100 p-[var(--libertymd-space-sm)]"
+          className="mt-3 rounded-lg border border-rose-200 bg-rose-50/60 p-3"
           role="alert"
         >
-          <p className="libertymd-type-body-small text-libertymd-slate-700">
+          <p className="text-xs text-rose-700 font-medium">
             {t('report.feedback.error')}
           </p>
           <button
             type="button"
             data-libertymd-report-feedback-retry=""
-            className="mt-[var(--libertymd-space-xs)] libertymd-type-label font-bold text-libertymd-blue-700 underline"
-            onClick={() => {
-              setPhase('idle')
-              if (lastHelpful !== null) void submit(lastHelpful)
-            }}
+            className="mt-1 text-xs font-bold text-rose-800 underline"
+            onClick={() => setPhase('idle')}
           >
             {t('report.feedback.retry')}
           </button>

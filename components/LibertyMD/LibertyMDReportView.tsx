@@ -20,7 +20,7 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react'
-import { ChevronDown, Download, FileText, ShieldCheck } from 'lucide-react'
+import { ChevronDown, Download, ShieldCheck } from 'lucide-react'
 import { useI18n } from '../../i18n'
 import { LibertyMDDiagnosisCard } from './LibertyMDDiagnosisCard'
 import { LibertyMDReportEmailDelivery } from './LibertyMDReportEmailDelivery'
@@ -36,7 +36,6 @@ import {
 } from './libertymd-doctor-cta-config'
 import {
   DEFAULT_REPORT_SECTION_OPEN,
-  isEmergencyTriageTier,
   mergeReportSectionOpen,
   newlyReachedScrollBuckets,
   readReportSections,
@@ -554,34 +553,24 @@ export function LibertyMDReportView({
       data-libertymd-retention-expires-at={retentionExpiresAt || undefined}
       className="mt-[var(--libertymd-space-md)] max-w-full rounded-lg border border-libertymd-slate-200 bg-white shadow-[0_20px_65px_rgba(23,50,95,0.09)]"
     >
-      {/* Physician-review framing → title → session summary → patient summary. */}
-      <div className="overflow-hidden rounded-t-lg border-b border-libertymd-slate-200 bg-gradient-to-br from-libertymd-blue-50 to-libertymd-green-sage/40 px-[var(--libertymd-space-lg)] py-[var(--libertymd-space-md)] sm:px-[var(--libertymd-space-xl)]">
-        <div className="libertymd-type-label flex items-center gap-2 font-bold uppercase text-libertymd-blue-600">
-          <FileText className="h-4 w-4 shrink-0" aria-hidden />
-          {t('report.eyebrow')}
-        </div>
-        <p className="libertymd-type-label mt-[var(--libertymd-space-xs)] font-semibold text-libertymd-slate-500">
-          {t('report.aiFraming')}
-        </p>
-        <h2 className="libertymd-type-lead mt-[var(--libertymd-space-sm)] font-serif font-semibold text-libertymd-ink">
-          {t('report.viewTitle')}
-        </h2>
+      {/* Consultation Report Framing: Session Summary → Patient Summary. */}
+      <div className="border-b border-libertymd-slate-200 px-[var(--libertymd-space-lg)] py-[var(--libertymd-space-lg)] text-left sm:px-[var(--libertymd-space-xl)] space-y-6">
         {report.headline ? (
-          <div className="mt-[var(--libertymd-space-md)]" data-libertymd-report-session-summary>
+          <div data-libertymd-report-session-summary>
             <h3 className="libertymd-type-label font-bold uppercase tracking-wide text-libertymd-slate-500">
               {t('report.sections.sessionSummary')}
             </h3>
-            <p className="libertymd-type-body-small mt-[var(--libertymd-space-xs)] font-semibold text-libertymd-ink">
+            <p className="libertymd-type-body-small mt-1.5 whitespace-pre-line font-normal text-libertymd-slate-700 leading-relaxed">
               {report.headline}
             </p>
           </div>
         ) : null}
         {report.patientSummary ? (
-          <div className="mt-[var(--libertymd-space-md)]" data-libertymd-report-patient-summary>
+          <div data-libertymd-report-patient-summary>
             <h3 className="libertymd-type-label font-bold uppercase tracking-wide text-libertymd-slate-500">
               {t('report.sections.patientSummary')}
             </h3>
-            <p className="libertymd-type-body-small mt-[var(--libertymd-space-xs)] text-libertymd-slate-700">
+            <p className="libertymd-type-body-small mt-1.5 font-normal text-libertymd-slate-700 leading-relaxed">
               {report.patientSummary}
             </p>
           </div>
@@ -627,148 +616,14 @@ export function LibertyMDReportView({
         />
       ) : null}
 
-      <div className="space-y-[var(--libertymd-space-lg)] px-[var(--libertymd-space-lg)] py-[var(--libertymd-space-xl)] sm:px-[var(--libertymd-space-xl)]">
+      <div className="space-y-[var(--libertymd-space-lg)] px-[var(--libertymd-space-lg)] py-[var(--libertymd-space-xl)] sm:px-[var(--libertymd-space-xl)] text-left">
         {/* Q5: footerSlot at body start (before differential) so triage+next-step clear the fold. */}
         {/* P2-11: hide handoff on emergency / crisis_line. */}
         {footerSlot && showDoctorHandoff ? (
           <div data-libertymd-report-footer-slot>{footerSlot}</div>
         ) : null}
 
-        {/* P2-08/P2-09 · shared delivery-actions slot. Hidden entirely in sample mode (P3-02). */}
-        {!isSample ? (
-        <div
-          data-libertymd-report-delivery-actions
-          className="flex flex-col gap-[var(--libertymd-space-sm)] rounded-md border border-libertymd-slate-200 bg-libertymd-slate-50/60 px-[var(--libertymd-space-md)] py-[var(--libertymd-space-sm)]"
-        >
-          {emailDelivery ? (
-            <LibertyMDReportEmailDelivery
-              consultationId={emailDelivery.consultationId}
-              prefillEmail={emailDelivery.prefillEmail}
-              onRequest={emailDelivery.onRequest}
-              consultScroller={scrollParentRef?.current ?? null}
-            />
-          ) : null}
-
-          <div className="flex flex-wrap items-center gap-[var(--libertymd-space-sm)]">
-            <button
-              type="button"
-              data-libertymd-report-download
-              className="libertymd-type-body-small inline-flex min-h-11 items-center gap-2 rounded-md border border-libertymd-blue-600 bg-white px-[var(--libertymd-space-md)] font-semibold text-libertymd-blue-700"
-              aria-expanded={chooserOpen}
-              aria-controls="libertymd-report-pdf-chooser"
-              disabled={pdfBusy}
-              onClick={() => {
-                setPdfError(null)
-                setChooserOpen((open) => !open)
-              }}
-            >
-              <Download className="h-4 w-4 shrink-0" aria-hidden />
-              {t('report.download')}
-            </button>
-          </div>
-
-          {chooserOpen ? (
-            <div
-              id="libertymd-report-pdf-chooser"
-              data-libertymd-report-pdf-chooser
-              className="flex flex-col gap-[var(--libertymd-space-xs)]"
-              role="group"
-              aria-label={t('report.pdf.chooserLabel')}
-            >
-              <button
-                type="button"
-                data-libertymd-report-pdf-choice="patient"
-                className="libertymd-type-body-small min-h-11 rounded-md border border-libertymd-slate-200 bg-white px-[var(--libertymd-space-md)] text-left font-semibold text-libertymd-ink disabled:opacity-60"
-                disabled={pdfBusy}
-                onClick={() => void runPdfDownload('patient')}
-              >
-                {t('report.pdf.choicePatient')}
-              </button>
-              <button
-                type="button"
-                data-libertymd-report-pdf-choice="soap"
-                className="libertymd-type-body-small min-h-11 rounded-md border border-libertymd-slate-200 bg-white px-[var(--libertymd-space-md)] text-left font-semibold text-libertymd-ink disabled:opacity-60"
-                disabled={pdfBusy}
-                onClick={() => void runPdfDownload('soap')}
-              >
-                {t('report.pdf.choiceSoap')}
-              </button>
-              <button
-                type="button"
-                data-libertymd-report-pdf-choice="both"
-                className="libertymd-type-body-small min-h-11 rounded-md border border-libertymd-slate-200 bg-white px-[var(--libertymd-space-md)] text-left font-semibold text-libertymd-ink disabled:opacity-60"
-                disabled={pdfBusy}
-                onClick={() => void runPdfDownload('both')}
-              >
-                {t('report.pdf.choiceBoth')}
-              </button>
-              <p className="libertymd-type-label text-libertymd-slate-500">
-                {t('report.pdf.bothHint')}
-              </p>
-            </div>
-          ) : null}
-
-          {pdfBusy ? (
-            <p className="libertymd-type-label text-libertymd-slate-500" data-libertymd-report-pdf-busy>
-              {t('report.pdf.generating')}
-            </p>
-          ) : null}
-
-          {pdfError ? (
-            <div
-              data-libertymd-report-pdf-error
-              className="libertymd-type-body-small rounded-md border border-libertymd-slate-300 bg-white px-[var(--libertymd-space-md)] py-[var(--libertymd-space-sm)] text-libertymd-slate-700"
-              role="status"
-            >
-              <p>{pdfError}</p>
-              <button
-                type="button"
-                className="mt-[var(--libertymd-space-xs)] font-semibold text-libertymd-blue-700 underline"
-                onClick={() => {
-                  setPdfError(null)
-                  setChooserOpen(true)
-                }}
-              >
-                {t('report.pdf.retry')}
-              </button>
-            </div>
-          ) : null}
-
-          {soapSecondTap ? (
-            <button
-              type="button"
-              data-libertymd-report-pdf-soap-second-tap
-              className="libertymd-type-body-small inline-flex min-h-11 items-center justify-center rounded-md border border-libertymd-blue-600 bg-libertymd-blue-50 px-[var(--libertymd-space-md)] font-semibold text-libertymd-blue-700"
-              onClick={onSoapSecondTap}
-            >
-              {t('report.pdf.downloadSoapReady')}
-            </button>
-          ) : null}
-
-          {readyLinks.length > 0 ? (
-            <ul
-              data-libertymd-report-pdf-ready-links
-              className="libertymd-type-body-small flex flex-col gap-[var(--libertymd-space-xs)]"
-            >
-              {readyLinks.map((link) => (
-                <li key={link.kind}>
-                  <a
-                    href={link.objectUrl}
-                    download={link.filename}
-                    className="font-semibold text-libertymd-blue-700 underline"
-                    data-libertymd-report-pdf-ready={link.kind}
-                  >
-                    {link.kind === 'patient'
-                      ? t('report.pdf.readyPatient')
-                      : t('report.pdf.readySoap')}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
-        ) : null}
-
+        {/* 1. Differential Diagnosis section directly follows Patient Summary */}
         {showDifferentials ? (
           <ReportCollapsible
             sectionId="differential"
@@ -794,78 +649,69 @@ export function LibertyMDReportView({
           </ReportCollapsible>
         ) : null}
 
+        {/* 2. Recommended Action Plan for Highest Confidence Disease (3 subsections) */}
         {showAp ? (
           <ReportCollapsible
             sectionId="assessment_and_plan"
-            title={t('report.sections.assessmentAndPlan')}
+            title="Recommended Action Plan"
             teaser={apTeaser}
             open={sectionOpen.assessment_and_plan}
             onToggle={() => onExpand('assessment_and_plan', sectionOpen.assessment_and_plan)}
           >
-            <div className="libertymd-type-body-small space-y-3 text-libertymd-slate-700">
-              {showTriage ? (
-                <div data-libertymd-report-triage>
-                  <p className="libertymd-type-label font-bold uppercase text-libertymd-slate-500">
-                    {t('report.sections.triage')}
-                  </p>
-                  <span
-                    className={`libertymd-type-card-title mt-1 inline-flex max-w-full flex-wrap items-center rounded-md border px-3 py-1.5 font-bold ${TRIAGE_BADGE_CLASS[report.triageTier]}`}
-                    data-triage-tier={report.triageTier}
-                    data-emergency-tier={isEmergencyTriageTier(report.triageTier) ? 'true' : 'false'}
-                  >
-                    {t(triageLabelKey(report.triageTier))}
-                  </span>
-                </div>
-              ) : null}
-              {report.nextStep ? (
-                <div
-                  className="rounded-md border border-libertymd-slate-200 bg-libertymd-blue-50/50 px-3 py-3"
-                  data-libertymd-report-next-step
-                >
-                  <h3 className="libertymd-type-label font-bold uppercase tracking-wide text-libertymd-slate-500">
-                    {t('report.sections.nextStep')}
-                  </h3>
-                  <p className="libertymd-type-lead mt-[var(--libertymd-space-xs)] font-bold text-libertymd-ink">
-                    {report.nextStep}
-                  </p>
-                </div>
-              ) : null}
-              {report.assessmentAndPlan?.assessment ? (
-                <div>
-                  <p className="libertymd-type-label font-bold uppercase text-libertymd-slate-500">
-                    {t('report.teasers.assessmentChip')}
-                  </p>
-                  <p className="mt-1">{report.assessmentAndPlan.assessment}</p>
-                </div>
-              ) : null}
-              {report.assessmentAndPlan && report.assessmentAndPlan.plan.length > 0 ? (
-                <div>
-                  <p className="libertymd-type-label font-bold uppercase text-libertymd-slate-500">
-                    {t('report.pdf.plan')}
-                  </p>
-                  <ul className="mt-1 list-disc space-y-1 pl-5">
-                    {report.assessmentAndPlan.plan.map((item, index) => (
-                      <li key={`plan-${index}`}>{item}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-              {report.assessmentAndPlan && report.assessmentAndPlan.selfCare.length > 0 ? (
-                <div>
-                  <p className="libertymd-type-label font-bold uppercase text-libertymd-slate-500">
-                    {t('report.selfCare')}
-                  </p>
-                  <ul className="mt-1 list-disc space-y-1 pl-5">
-                    {report.assessmentAndPlan.selfCare.map((item, index) => (
-                      <li key={`self-${index}`}>{item}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
+            <div className="libertymd-type-body-small space-y-4 text-libertymd-slate-700">
+              {/* 10.1 Self-Care & Home Management */}
+              <div>
+                <p className="libertymd-type-label font-bold uppercase text-libertymd-slate-500">
+                  {t('report.card.supportiveTreatment')}
+                </p>
+                <ul className="mt-1 list-disc space-y-1 pl-5">
+                  {formatClinicalBullets(
+                    report.assessmentAndPlan?.selfCare?.length
+                      ? report.assessmentAndPlan.selfCare
+                      : report.differentials[0]?.supportiveTreatment,
+                    'selfCare',
+                  ).map((item, index) => (
+                    <li key={`self-${index}`}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* 10.2 Medical Treatments & Therapeutics */}
+              <div>
+                <p className="libertymd-type-label font-bold uppercase text-libertymd-slate-500">
+                  {t('report.card.symptomaticTreatment')}
+                </p>
+                <ul className="mt-1 list-disc space-y-1 pl-5">
+                  {formatClinicalBullets(
+                    report.assessmentAndPlan?.plan?.length
+                      ? report.assessmentAndPlan.plan
+                      : report.differentials[0]?.symptomaticTreatment,
+                    'medical',
+                  ).map((item, index) => (
+                    <li key={`plan-${index}`}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* 10.3 Diagnostic Investigations & Workup */}
+              <div>
+                <p className="libertymd-type-label font-bold uppercase text-libertymd-slate-500">
+                  {t('report.card.furtherInvestigations')}
+                </p>
+                <ul className="mt-1 list-disc space-y-1 pl-5">
+                  {formatClinicalBullets(
+                    report.differentials[0]?.furtherInvestigations,
+                    'diagnostic',
+                  ).map((item, index) => (
+                    <li key={`workup-${index}`}>{item}</li>
+                  ))}
+                </ul>
+              </div>
             </div>
           </ReportCollapsible>
         ) : null}
 
+        {/* 3. Red Flags section */}
         {showRedFlags ? (
           <ReportCollapsible
             sectionId="red_flags"
@@ -910,6 +756,65 @@ export function LibertyMDReportView({
               ))}
             </div>
           </ReportCollapsible>
+        ) : null}
+
+        {/* 4. Download Report and Email Me My Report at the very bottom, right before Was It Helpful */}
+        {!isSample ? (
+          <div
+            data-libertymd-report-delivery-actions
+            className="flex flex-col gap-3 rounded-md border border-libertymd-slate-200 bg-libertymd-slate-50/60 p-4 mt-8"
+          >
+            {emailDelivery ? (
+              <LibertyMDReportEmailDelivery
+                consultationId={emailDelivery.consultationId}
+                prefillEmail={emailDelivery.prefillEmail}
+                onRequest={emailDelivery.onRequest}
+                consultScroller={scrollParentRef?.current ?? null}
+              />
+            ) : null}
+
+            <button
+              type="button"
+              data-libertymd-report-download
+              className="libertymd-type-body-small inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-libertymd-blue-600 bg-white px-4 py-2 font-semibold text-libertymd-blue-700 shadow-xs hover:bg-libertymd-blue-50"
+              aria-expanded={chooserOpen}
+              aria-controls="libertymd-report-pdf-chooser"
+              disabled={pdfBusy}
+              onClick={() => {
+                setPdfError(null)
+                void runPdfDownload('patient')
+              }}
+            >
+              <Download className="h-4 w-4 shrink-0" aria-hidden />
+              {t('report.download')}
+            </button>
+
+            {pdfBusy ? (
+              <p className="libertymd-type-label text-libertymd-slate-500" data-libertymd-report-pdf-busy>
+                {t('report.pdf.generating')}
+              </p>
+            ) : null}
+
+            {pdfError ? (
+              <div
+                data-libertymd-report-pdf-error
+                className="libertymd-type-body-small rounded-md border border-libertymd-slate-300 bg-white px-[var(--libertymd-space-md)] py-[var(--libertymd-space-sm)] text-libertymd-slate-700"
+                role="status"
+              >
+                <p>{pdfError}</p>
+                <button
+                  type="button"
+                  className="mt-[var(--libertymd-space-xs)] font-semibold text-libertymd-blue-700 underline"
+                  onClick={() => {
+                    setPdfError(null)
+                    void runPdfDownload('patient')
+                  }}
+                >
+                  {t('report.pdf.retry')}
+                </button>
+              </div>
+            ) : null}
+          </div>
         ) : null}
 
         {/* P2-10 — feedback adjacent to saved/guest note; outside delivery-actions and doctor CTA slot */}

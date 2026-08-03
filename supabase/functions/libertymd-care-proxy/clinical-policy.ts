@@ -132,6 +132,14 @@ export function classifyResponseRelevance(message: string): ResponseRelevance {
   const acceptedShortAnswers = /^(yes|no|none|nope|better|worse|same|today|yesterday|unknown|unsure|not sure|\d{1,3}(?:\/10)?)$/
   if (acceptedShortAnswers.test(text)) return 'clinical'
 
+  // Recognized medical vitals & measurements (temperatures, blood pressure, oxygen saturation, ranges with units)
+  const isMedicalMeasurement = /^[\d\s\.\,\/\-–—°%fFcC()degdegreesbpmoxspo2]+$/.test(text)
+    || /\b\d{1,3}(?:\.\d{1,2})?\s*(?:°|deg|degrees)?\s*[fc]\b/i.test(text)
+    || /\b\d{2,3}\s*[-–—]\s*\d{2,3}\s*(?:°|deg|degrees)?\s*[fc]?\b/i.test(text)
+    || /\b\d{2,3}\/\d{2,3}\b/.test(text)
+
+  if (isMedicalMeasurement) return 'clinical'
+
   const offTopic = /\b(football|cricket|sports?|who won (the )?game|stock market|bitcoin|weather forecast|tell me a joke|write (me )?a poem|banana|pineapple|movie|celebrity|politics|recipe|homework|random answer|not medical|asdf|qwerty|qwrty|zxcv|hjkl)\b/
   if (offTopic.test(text)) return 'off_topic'
 
@@ -139,8 +147,10 @@ export function classifyResponseRelevance(message: string): ResponseRelevance {
   const alphaRatio = letters / Math.max(text.length, 1)
   const words = text.match(/[a-z]+/g) || []
   const hasVowelWord = words.some((word) => /[aeiou]/.test(word))
-  if (text.length >= 4 && (alphaRatio < 0.35 || !hasVowelWord)) return 'off_topic'
-  if (words.length === 1 && words[0].length <= 2) return 'unclear'
+  const hasNumbers = /\d/.test(text)
+
+  if (text.length >= 4 && !hasNumbers && (alphaRatio < 0.35 || !hasVowelWord)) return 'off_topic'
+  if (words.length === 1 && words[0].length <= 2 && !hasNumbers) return 'unclear'
 
   return 'clinical'
 }

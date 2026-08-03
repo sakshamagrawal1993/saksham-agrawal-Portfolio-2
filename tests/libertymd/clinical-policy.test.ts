@@ -78,7 +78,7 @@ Deno.test('all non-medical fixtures classify off topic', () => {
 })
 
 Deno.test('short clinical answers remain accepted', () => {
-  for (const message of ['yes', 'no', 'yesterday', '3/10', 'not sure']) {
+  for (const message of ['yes', 'no', 'yesterday', '3/10', 'not sure', '101-102 F (38-39 C)', '101.5 F', '38-39 C', '120/80', '98%']) {
     assertEquals(classifyResponseRelevance(message), 'clinical', `Expected clinical: ${message}`)
   }
 })

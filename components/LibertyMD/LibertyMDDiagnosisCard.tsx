@@ -8,7 +8,11 @@ import { ChevronDown } from 'lucide-react'
 import { useI18n } from '../../i18n'
 import { LibertyMDDoctorHandoffCta } from './LibertyMDDoctorHandoffCta'
 import type { DoctorHandoffProminence } from './libertymd-doctor-cta-config'
-import type { LibertyMdDifferentialItem, TriageDisplayTier } from './libertymd-report'
+import {
+  formatClinicalBullets,
+  type LibertyMdDifferentialItem,
+  type TriageDisplayTier,
+} from './libertymd-report'
 
 export type LibertyMDDiagnosisCardProps = {
   item: LibertyMdDifferentialItem
@@ -21,18 +25,17 @@ export type LibertyMDDiagnosisCardProps = {
   sessionKey?: string
 }
 
-// Four bands, visually ordered so the badge reads as a scale rather than a
-// set of unrelated colours: filled blue → tinted slate → outlined → faint.
+// Color coded confidence badges (right aligned): green for high, amber for medium, slate for low/minimal
 const ORDINAL_BADGE_CLASS: Record<string, string> = {
-  high: 'border-libertymd-blue-600/30 bg-libertymd-blue-50 text-libertymd-blue-700',
-  medium: 'border-libertymd-slate-300 bg-libertymd-slate-200 text-libertymd-slate-700',
-  low: 'border-libertymd-slate-300 bg-white text-libertymd-slate-700',
+  high: 'border-emerald-600/30 bg-emerald-50 text-emerald-800',
+  medium: 'border-amber-500/40 bg-amber-50 text-amber-900',
+  low: 'border-libertymd-slate-300 bg-libertymd-slate-100 text-libertymd-slate-700',
   minimal: 'border-libertymd-slate-200 bg-white text-libertymd-slate-500',
-  high_serious: 'border-amber-500/40 bg-amber-50 text-amber-900',
+  high_serious: 'border-rose-500/40 bg-rose-50 text-rose-900',
 }
 
 const SERIOUS_BADGE_CLASS =
-  'border-amber-500/40 bg-amber-50 text-amber-900'
+  'border-rose-500/40 bg-rose-50 text-rose-900 font-bold'
 
 export function LibertyMDDiagnosisCard({
   item,
@@ -50,8 +53,6 @@ export function LibertyMDDiagnosisCard({
   const hasFurther = Boolean(item.furtherInvestigations?.length)
   const hasSymptomatic = Boolean(item.symptomaticTreatment?.length)
   const hasSupportive = Boolean(item.supportiveTreatment?.length)
-  const hasTreatmentSlots = hasFurther || hasSymptomatic || hasSupportive
-  const hasAnyTreatmentBody = hasSymptomatic || hasSupportive
 
   const ordinal = item.ordinal
   const isSerious = Boolean(item.isSerious)
@@ -72,104 +73,81 @@ export function LibertyMDDiagnosisCard({
             ? 'serious-lower-band'
             : 'none'
       }
-      className="rounded-md border border-libertymd-slate-200 bg-white px-3 py-3"
+      className="rounded-md border border-libertymd-slate-200 bg-white px-4 py-3 shadow-xs"
     >
-      <div className="flex flex-wrap items-center gap-2">
-        {composedHighSerious ? (
-          <span
-            data-ordinal-badge="high_serious"
-            data-confidence-badge="high_serious"
-            className={`libertymd-type-label inline-flex max-w-full rounded-md border px-2 py-0.5 font-bold ${ORDINAL_BADGE_CLASS.high_serious}`}
-          >
-            {t('report.card.ordinal.high_serious')}
-          </span>
-        ) : null}
-
-        {!composedHighSerious && ordinal ? (
-          <span
-            data-ordinal-badge={ordinal}
-            data-confidence-badge={ordinal}
-            className={`libertymd-type-label inline-flex max-w-full rounded-md border px-2 py-0.5 font-bold ${ORDINAL_BADGE_CLASS[ordinal]}`}
-          >
-            {t(`report.card.ordinal.${ordinal}`)}
-          </span>
-        ) : null}
-
-        {(seriousPair || seriousOnly) ? (
-          <span
-            data-serious-badge
-            className={`libertymd-type-label inline-flex max-w-full rounded-md border px-2 py-0.5 font-bold ${SERIOUS_BADGE_CLASS}`}
-          >
-            {t('report.card.serious')}
-          </span>
-        ) : null}
-      </div>
-
-      <p className="libertymd-type-body-small mt-[var(--libertymd-space-xs)] font-bold text-libertymd-ink">
-        {item.name}
-      </p>
-
-      {why ? (
-        <p className="libertymd-type-body-small mt-1 text-libertymd-slate-500" data-diagnosis-why>
-          {why}
-        </p>
-      ) : null}
-
-      {hasTreatmentSlots ? (
-        <div className="mt-[var(--libertymd-space-sm)]">
-          <button
-            type="button"
-            className="libertymd-type-label flex min-h-11 w-full items-center justify-between gap-2 text-left font-semibold text-libertymd-blue-700"
-            aria-expanded={detailOpen}
-            aria-controls={detailPanelId}
-            data-diagnosis-detail-toggle
-            onClick={() => setDetailOpen((open) => !open)}
-          >
-            <span>{detailOpen ? t('report.card.hideDetail') : t('report.card.showDetail')}</span>
-            <ChevronDown
-              className={`h-4 w-4 shrink-0 transition-transform ${detailOpen ? 'rotate-180' : ''}`}
-              aria-hidden
-            />
-          </button>
-          {detailOpen ? (
-            <div
-              id={detailPanelId}
-              data-diagnosis-detail
-              className="mt-[var(--libertymd-space-xs)] space-y-3 border-t border-libertymd-slate-200 pt-[var(--libertymd-space-sm)]"
-            >
-              {hasAnyTreatmentBody ? (
-                <p
-                  className="libertymd-type-label font-semibold text-libertymd-slate-500"
-                  data-treatment-guidance
-                >
-                  {t('report.card.treatmentGuidance')}
-                </p>
-              ) : null}
-              {hasFurther ? (
-                <SlotList
-                  label={t('report.card.furtherInvestigations')}
-                  items={item.furtherInvestigations!}
-                  slot="further_investigations"
-                />
-              ) : null}
-              {hasSymptomatic ? (
-                <SlotList
-                  label={t('report.card.symptomaticTreatment')}
-                  items={item.symptomaticTreatment!}
-                  slot="symptomatic_treatment"
-                />
-              ) : null}
-              {hasSupportive ? (
-                <SlotList
-                  label={t('report.card.supportiveTreatment')}
-                  items={item.supportiveTreatment!}
-                  slot="supportive_treatment"
-                />
-              ) : null}
-            </div>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="libertymd-type-body-small font-bold text-libertymd-ink sm:text-base">
+            {item.name}
+          </p>
+          {why ? (
+            <p className="libertymd-type-body-small mt-1 text-libertymd-slate-500" data-diagnosis-why>
+              {why}
+            </p>
           ) : null}
         </div>
-      ) : null}
+
+        <div className="flex flex-wrap items-center justify-end gap-1.5 shrink-0" data-confidence-container>
+          {(isSerious || seriousPair || seriousOnly || composedHighSerious) ? (
+            <span
+              data-serious-badge
+              className={`libertymd-type-label inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-bold ${SERIOUS_BADGE_CLASS}`}
+            >
+              {t('report.card.serious')}
+            </span>
+          ) : null}
+
+          {ordinal ? (
+            <span
+              data-ordinal-badge={ordinal}
+              data-confidence-badge={ordinal}
+              className={`libertymd-type-label inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-bold ${ORDINAL_BADGE_CLASS[ordinal]}`}
+            >
+              {t(`report.card.ordinal.${ordinal}`)}
+            </span>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mt-[var(--libertymd-space-sm)]">
+        <button
+          type="button"
+          className="libertymd-type-label flex min-h-11 w-full items-center justify-between gap-2 rounded-md bg-libertymd-slate-50 px-3 py-2 text-left font-semibold text-libertymd-blue-700 hover:bg-libertymd-blue-50/60"
+          aria-expanded={detailOpen}
+          aria-controls={detailPanelId}
+          data-diagnosis-detail-toggle
+          onClick={() => setDetailOpen((open) => !open)}
+        >
+          <span>{detailOpen ? t('report.card.hideDetail') : t('report.card.showDetail')}</span>
+          <ChevronDown
+            className={`h-4 w-4 shrink-0 transition-transform ${detailOpen ? 'rotate-180' : ''}`}
+            aria-hidden
+          />
+        </button>
+        {detailOpen ? (
+          <div
+            id={detailPanelId}
+            data-diagnosis-detail
+            className="mt-[var(--libertymd-space-xs)] space-y-4 border-t border-libertymd-slate-200 pt-[var(--libertymd-space-sm)]"
+          >
+            <SlotList
+              label={t('report.card.supportiveTreatment')}
+              items={formatClinicalBullets(item.supportiveTreatment, 'selfCare')}
+              slot="supportive_treatment"
+            />
+            <SlotList
+              label={t('report.card.symptomaticTreatment')}
+              items={formatClinicalBullets(item.symptomaticTreatment, 'medical')}
+              slot="symptomatic_treatment"
+            />
+            <SlotList
+              label={t('report.card.furtherInvestigations')}
+              items={formatClinicalBullets(item.furtherInvestigations, 'diagnostic')}
+              slot="further_investigations"
+            />
+          </div>
+        ) : null}
+      </div>
 
       {renderCta ? (
         <LibertyMDDoctorHandoffCta

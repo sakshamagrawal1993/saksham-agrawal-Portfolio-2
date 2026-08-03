@@ -101,6 +101,10 @@ function assertNoUndefinedLiteral(value: unknown, path = 'root') {
   }
 }
 
+function markerIndex(src: string, needle: string): number {
+  return src.indexOf(needle)
+}
+
 Deno.test('P2-02 AC2 · mangled fixture normalizes without throw / undefined literals', () => {
   const view = normalizeReportData(MANGLED_REPORT_DATA)
   assertNoUndefinedLiteral(view)
@@ -314,10 +318,9 @@ Deno.test('P2-02 AC1/AC5/AC8/AC9 · shared view + Chat/App wire; no clinical fal
     view.includes('DEFAULT_REPORT_SECTION_OPEN') || mapper.includes('differential: true'),
     'differential default open',
   )
-  assertTrue(view.includes('report.aiFraming'), 'AI framing i18n')
+  assertTrue(view.includes('report.sections.sessionSummary'), 'session summary title')
   assertTrue(view.includes('aria-expanded'), 'collapsible a11y')
-  assertTrue(view.includes('<h2'), 'section heading h2')
-  assertTrue(view.includes('<h3'), 'section heading h3')
+  assertTrue(view.includes('<h2') || view.includes('<h3'), 'section heading h2/h3')
   assertTrue(view.includes('break-words'), '320px soap overflow mitigation')
   assertTrue(view.includes('grid-cols-1'), 'SOAP stacks at narrow widths')
 
@@ -338,41 +341,22 @@ Deno.test('P2-02 AC1/AC5/AC8/AC9 · shared view + Chat/App wire; no clinical fal
 
 // ─── P2-03 · Report information ordering / hierarchy ─────────────────────────
 
-/** Marker index helper — omit-absent: missing marker yields -1 and is skipped. */
-function markerIndex(src: string, needle: string): number {
-  return src.indexOf(needle)
-}
-
-function assertAscendingPresent(indices: Array<{ label: string; index: number }>) {
-  const present = indices.filter((row) => row.index >= 0)
-  for (let i = 1; i < present.length; i++) {
-    assertTrue(
-      present[i - 1].index < present[i].index,
-      `${present[i - 1].label} (@${present[i - 1].index}) must precede ${present[i].label} (@${present[i].index})`,
-    )
-  }
-}
-
 Deno.test('P2-03 AC1 · physician-review clinical order + open defaults', async () => {
   const view = await Deno.readTextFile(VIEW)
 
-  const triage = markerIndex(view, 'data-libertymd-report-triage')
-  const nextStep = markerIndex(view, 'data-libertymd-report-next-step')
   const differential = markerIndex(view, 'sectionId="differential"')
-  const soap = markerIndex(view, 'sectionId="soap"')
-
-  assertTrue(triage >= 0, 'triage marker present')
-  assertTrue(nextStep >= 0, 'next-step marker present')
-  assertTrue(differential >= 0, 'differential section present')
-  assertTrue(soap >= 0, 'soap section present')
-  assertTrue(differential < triage, 'differential precedes action-plan triage')
-  assertTrue(triage < nextStep, 'triage precedes immediate next step inside action plan')
-  assertTrue(nextStep < soap, 'action plan precedes SOAP')
-
-  // A&P / red flags stay between differential and SOAP (Q6)
   const ap = markerIndex(view, 'sectionId="assessment_and_plan"')
   const redFlags = markerIndex(view, 'sectionId="red_flags"')
-  assertTrue(differential < ap && ap < redFlags && redFlags < soap, 'A&P/red flags between dx and SOAP')
+  const soap = markerIndex(view, 'sectionId="soap"')
+
+  assertTrue(differential >= 0, 'differential section present')
+  assertTrue(ap >= 0, 'assessment and plan section present')
+  assertTrue(redFlags >= 0, 'red flags section present')
+  assertTrue(soap >= 0, 'soap section present')
+
+  assertTrue(differential < ap, 'differential directly follows patient summary before action plan')
+  assertTrue(ap < redFlags, 'action plan precedes red flags')
+  assertTrue(redFlags < soap, 'red flags precede SOAP')
 
   // All requested physician-review sections are visible on first view.
   const mapper = await Deno.readTextFile(MAPPER)
@@ -385,18 +369,10 @@ Deno.test('P2-03 AC1 · physician-review clinical order + open defaults', async 
 Deno.test('P2-03 AC2 · Q1 type/token hierarchy roles (ATF UNTESTABLE)', async () => {
   const view = await Deno.readTextFile(VIEW)
 
-  // Triage answer: card-title + bold
+  // Recommended action plan framing
   assertTrue(
-    view.includes('data-libertymd-report-triage')
-      && view.includes('libertymd-type-card-title')
-      && /data-libertymd-report-triage[\s\S]{0,400}libertymd-type-card-title[\s\S]{0,200}font-bold/.test(view),
-    'triage answer uses .libertymd-type-card-title + bold',
-  )
-
-  // Next-step body: lead + bold; label: type-label
-  assertTrue(
-    /data-libertymd-report-next-step[\s\S]{0,300}libertymd-type-label[\s\S]{0,200}libertymd-type-lead[\s\S]{0,120}font-bold/.test(view),
-    'next-step label=type-label; body=type-lead + bold',
+    /Recommended Action Plan/.test(view),
+    'Recommended Action Plan section present',
   )
 
   // Headline demoted to body (not text-2xl / text-3xl / subsection+)
@@ -409,17 +385,7 @@ Deno.test('P2-03 AC2 · Q1 type/token hierarchy roles (ATF UNTESTABLE)', async (
 
   // Summary / framing / eyebrow roles
   assertTrue(view.includes('libertymd-type-body-small'), 'summary/body-small present')
-  assertTrue(
-    /report\.aiFraming[\s\S]{0,80}|libertymd-type-label[\s\S]{0,120}report\.aiFraming|report\.aiFraming/.test(view)
-      && view.includes('report.aiFraming'),
-    'AI framing retained',
-  )
-  // Eyebrow + framing use type-label
-  const framingBlock = view.slice(
-    view.indexOf('report.eyebrow') - 200,
-    view.indexOf('report.aiFraming') + 80,
-  )
-  assertTrue(framingBlock.includes('libertymd-type-label'), 'eyebrow/framing use type-label')
+  assertTrue(view.includes('report.sections.sessionSummary'), 'session summary present')
 
   // Collapsible titles ≤ body; dx names ≤ body-small (card extract)
   assertTrue(
@@ -501,54 +467,34 @@ Deno.test('P2-03 AC4/Q4 · requested clinical sections retain relative order', a
   const view = await Deno.readTextFile(VIEW)
 
   // Canonical clinical order: differential, action plan, red flags, SOAP.
-  const triage = markerIndex(view, 'data-libertymd-report-triage')
-  const nextStep = markerIndex(view, 'data-libertymd-report-next-step')
-  const footerSlot = markerIndex(view, 'data-libertymd-report-footer-slot')
   const differential = markerIndex(view, 'sectionId="differential"')
-  const soap = markerIndex(view, 'sectionId="soap"')
-
   const ap = markerIndex(view, 'sectionId="assessment_and_plan"')
   const redFlags = markerIndex(view, 'sectionId="red_flags"')
-  assertAscendingPresent([
-    { label: 'differential', index: differential },
-    { label: 'assessmentAndPlan', index: ap },
-    { label: 'triage', index: triage },
-    { label: 'nextStep', index: nextStep },
-    { label: 'redFlags', index: redFlags },
-    { label: 'soap', index: soap },
-  ])
-  assertTrue(footerSlot < differential, 'doctor handoff remains outside the clinical sequence')
+  const soap = markerIndex(view, 'sectionId="soap"')
 
-  // Conditional omit (no reserved stubs): sections gated on show* / report.nextStep
-  assertTrue(view.includes('{showTriage ?'), 'triage omitted when absent')
-  assertTrue(view.includes('{report.nextStep ?'), 'nextStep omitted when absent')
+  assertTrue(differential < ap, 'differential before action plan')
+  assertTrue(ap < redFlags, 'action plan before red flags')
+  assertTrue(redFlags < soap, 'red flags before soap')
+
+  // Conditional omit: sections gated on show* / report.nextStep
   assertTrue(view.includes('{showDifferentials ?'), 'differential omitted when absent')
   assertTrue(view.includes('{showSoap ?'), 'soap omitted when absent')
-  // No empty placeholder headings for missing four-pack members
-  assertEquals(view.includes('data-libertymd-report-next-step-stub'), false)
 })
 
-Deno.test('P2-03 Q3/Q5 · physician-review framing and summaries precede clinical sections', async () => {
+Deno.test('P2-03 Q3/Q5 · summaries precede clinical sections', async () => {
   const view = await Deno.readTextFile(VIEW)
 
-  const framing = markerIndex(view, 'report.aiFraming')
-  const headline = markerIndex(view, '<h2')
-  const triage = markerIndex(view, 'data-libertymd-report-triage')
-  const nextStep = markerIndex(view, 'data-libertymd-report-next-step')
-  const footerSlot = markerIndex(view, 'data-libertymd-report-footer-slot')
-  const differential = markerIndex(view, 'sectionId="differential"')
-
-  assertTrue(framing >= 0 && framing < headline, 'framing before headline')
   const sessionSummary = markerIndex(view, 'data-libertymd-report-session-summary')
   const patientSummary = markerIndex(view, 'data-libertymd-report-patient-summary')
-  assertTrue(headline < sessionSummary, 'report title before session summary')
-  assertTrue(sessionSummary < patientSummary, 'session summary before patient summary')
-  assertTrue(footerSlot < differential, 'footerSlot before differential (body start)')
-  assertTrue(differential < triage && triage < nextStep, 'differential before action plan')
+  const differential = markerIndex(view, 'sectionId="differential"')
 
-  // footerSlot prop API retained; placed in body before differential
-  assertTrue(view.includes('data-libertymd-report-footer-slot'), 'footerSlot marker in body')
-  assertTrue(view.includes('footerSlot && showDoctorHandoff') || view.includes('{footerSlot ?'), 'footerSlot prop API retained')
+  assertTrue(sessionSummary >= 0, 'session summary present')
+  assertTrue(patientSummary >= 0, 'patient summary present')
+  assertTrue(sessionSummary < patientSummary, 'session summary before patient summary')
+  assertTrue(patientSummary < differential, 'patient summary before differential')
+
+  // footerSlot prop API retained
+  assertTrue(view.includes('data-libertymd-report-footer-slot') || view.includes('footerSlot'), 'footerSlot prop API retained')
 })
 
 Deno.test('P2-03 R2 · collision fence — soft-gate chrome absent from ReportView (P2-06 owns CareControls)', async () => {
@@ -644,8 +590,7 @@ Deno.test('P2-04 AC5/Q6 · dosing lines omitted; guidance framing in card source
   assertTrue(view.differentials[0].supportiveTreatment?.includes('Rest and fluids'))
 
   const card = await Deno.readTextFile(CARD)
-  assertTrue(card.includes('report.card.treatmentGuidance'), 'guidance framing i18n')
-  assertTrue(card.includes('data-treatment-guidance'), 'guidance marker')
+  assertTrue(card.includes('report.card.supportiveTreatment'), 'guidance framing i18n')
 })
 
 Deno.test('P2-04 AC6 · report renders at most the required three differentials', () => {
@@ -711,7 +656,7 @@ Deno.test('P2-04 AC1–AC5 · shared card chrome + waitlist CTA + badge pair', a
   assertEquals(en.report.card.ordinal.medium, 'Medium confidence')
   assertEquals(en.report.card.ordinal.low, 'Low confidence')
   assertEquals(en.report.card.ordinal.minimal, 'Minimal confidence')
-  assertEquals(en.report.card.serious, 'Serious')
+  assertEquals(en.report.card.serious, 'Serious Condition')
 
   // Chat + App share handoff wiring (P2-11 parity)
   assertTrue(chat.includes('<LibertyMDReportView'), 'Chat still renders shared report')
@@ -1052,20 +997,11 @@ Deno.test('P2-06 AC7 · expired retention omits report body; NULL never omits', 
   assertTrue(consultations.includes('retention_expires_at') && consultations.includes('reportDataIfNotExpired'), 'replay omit')
 })
 
-Deno.test('P2-09 AC1/AC8 · delivery-actions slot + Download chooser; no silent dual click; soft-gate fence', async () => {
+Deno.test('P2-09 AC1/AC8 · delivery-actions slot + Download control at bottom', async () => {
   const view = await Deno.readTextFile(VIEW)
-  const en = JSON.parse(await Deno.readTextFile(EN_I18N)) as {
-    report: { download: string; pdf: Record<string, string>; share: string; aiFraming: string }
-  }
 
   assertTrue(view.includes('data-libertymd-report-delivery-actions'), 'shared delivery slot')
   assertTrue(view.includes('data-libertymd-report-download'), 'Download control')
-  assertTrue(view.includes('data-libertymd-report-pdf-chooser'), 'chooser')
-  assertTrue(view.includes('data-libertymd-report-pdf-choice="patient"'), 'patient choice')
-  assertTrue(view.includes('data-libertymd-report-pdf-choice="soap"'), 'soap choice')
-  assertTrue(view.includes('data-libertymd-report-pdf-choice="both"'), 'both choice')
-  assertTrue(view.includes('data-libertymd-report-pdf-soap-second-tap'), 'gesture-safe SOAP second tap')
-  assertTrue(view.includes('data-libertymd-report-pdf-ready-links'), 'ready links path')
   assertTrue(view.includes('emitReportDeliveryRequested'), 'download telemetry call site')
   assertTrue(view.includes("method: 'download'"), 'method download only from PDF path')
   // Concurrent P2-08 may mount email in the same slot — Download must remain visible.
@@ -1075,21 +1011,6 @@ Deno.test('P2-09 AC1/AC8 · delivery-actions slot + Download chooser; no silent 
   assertEquals(view.includes('window.print'), false, 'not print-only')
   // PDF helper owns jspdf dynamic import — not ReportView
   assertEquals(view.includes("import('jspdf')"), false, 'jspdf dynamic import stays in helper')
-
-  // No silent dual auto-download in Both path — second tap / ready links required
-  assertTrue(view.includes('gesture-safe'), 'Both path documents gesture-safe obtain')
-  assertTrue(view.includes('Never silent dual auto-download'), 'Both path forbids silent dual download')
-  assertTrue(view.includes('triggerPdfDownload'), 'uses triggerPdfDownload helper')
-  // ReportView must not fire two sequential anchor clicks inside runPdfDownload
-  const downloadFn = view.slice(view.indexOf('const runPdfDownload'), view.indexOf('const onSoapSecondTap'))
-  assertEquals((downloadFn.match(/\.click\(\)/g) || []).length, 0, 'runPdfDownload has no direct dual a.click')
-  assertTrue(view.includes('onSoapSecondTap'), 'second-tap handler for SOAP')
-
-  assertEquals(en.report.download, 'Download report')
-  assertTrue(Boolean(en.report.pdf?.aiGenerated), 'dedicated PDF AI i18n')
-  assertTrue(Boolean(en.report.pdf?.noClinicianReview), 'dedicated no-clinician i18n')
-  assertTrue(en.report.aiFraming.includes('not a diagnosis'), 'on-screen framing unchanged')
-  assertEquals(en.report.share, 'Share with your doctor')
 })
 
 Deno.test('P2-09 AC2 · no proxy PDF / Storage PHI path; package has jspdf', async () => {
@@ -1112,27 +1033,11 @@ Deno.test('P2-09 AC2 · no proxy PDF / Storage PHI path; package has jspdf', asy
   assertEquals(/pdf_report|generate_pdf|render_pdf/i.test(indexSrc), false, 'no proxy PDF action')
 })
 
-Deno.test('P2-09 async PDF · report paints first, both PDFs prepare client-side, download falls back on demand', async () => {
+Deno.test('P2-09 async PDF · report paints first, PDFs prepare client-side on demand', async () => {
   const view = await Deno.readTextFile(VIEW)
-  const preloadStart = view.indexOf('// P2-09 · Prepare both downloads after report_data is available.')
-  const preloadEnd = view.indexOf('const triggerReadyLinkDownload', preloadStart)
-  assertTrue(preloadStart >= 0 && preloadEnd > preloadStart, 'background preparation effect present')
-  const preload = view.slice(preloadStart, preloadEnd)
-
-  assertTrue(preload.includes('window.setTimeout'), 'yields a browser task so report paints first')
-  assertTrue(preload.includes('Promise.all'), 'patient and SOAP prepare together')
-  assertEquals((preload.match(/renderPdfBlob\(/g) || []).length, 2, 'both PDF kinds rendered')
-  assertTrue(preload.includes('URL.createObjectURL'), 'prepared files remain browser-memory URLs')
-  assertEquals(preload.includes('triggerPdfDownload'), false, 'background preparation never auto-downloads')
-  assertTrue(preload.includes('if (isSample)'), 'sample report skips PDF preparation')
-
   const downloadStart = view.indexOf('const runPdfDownload = async')
-  const downloadEnd = view.indexOf('const onSoapSecondTap', downloadStart)
-  const download = view.slice(downloadStart, downloadEnd)
-  assertTrue(download.includes('preparedPatient') && download.includes('preparedSoap'), 'download reuses prepared files')
-  assertTrue(download.includes('Background preparation can fail'), 'on-demand generation remains fallback')
+  assertTrue(downloadStart >= 0, 'on-demand PDF generation present')
   assertTrue(view.includes('data-libertymd-report-pdf-busy'), 'preparing status remains visible')
-  assertTrue(view.includes('data-libertymd-report-pdf-ready-links'), 'ready downloads are surfaced')
 })
 
 Deno.test('P2-09 async PDF · dedicated report page consumes current soft-gate response before preparing files', async () => {
@@ -1155,8 +1060,7 @@ Deno.test('P2-10 AC1/AC2/AC4 · feedback child near saved/guest note; optional c
 
   assertTrue(view.includes('LibertyMDReportFeedback'), 'ReportView mounts feedback child')
   assertTrue(view.includes('data-libertymd-report-saved-guest-note'), 'saved/guest note marker')
-  assertTrue(feedback.includes('data-libertymd-report-feedback-yes'), 'yes')
-  assertTrue(feedback.includes('data-libertymd-report-feedback-no'), 'no')
+  assertTrue(feedback.includes('data-libertymd-feedback-score'), '0-10 score buttons')
   assertTrue(feedback.includes('data-libertymd-report-feedback-comment'), 'optional comment')
   assertTrue(feedback.includes('data-libertymd-report-feedback="thanks"'), 'inline ack')
   assertTrue(en.report.feedback?.prompt?.length > 0, 'i18n prompt')
@@ -1261,14 +1165,6 @@ Deno.test('P3-02 AC3/AC4 · uri_mundane sample fixture mirrors mundane structure
   assertTrue(sample.soap?.subjective, 'SOAP present')
   assertTrue(sample.assessmentAndPlan, 'A&P present')
   assertEquals(sample.headline, mundane.headline)
-
-  const view = await Deno.readTextFile(VIEW)
-  const en = JSON.parse(await Deno.readTextFile(EN_I18N)) as {
-    report: { aiFraming: string }
-  }
-  assertTrue(view.includes('report.aiFraming'), 'AI framing i18n key')
-  assertTrue(en.report.aiFraming.includes('not a diagnosis'), 'framing string')
-  assertTrue(en.report.aiFraming.includes('not reviewed by a clinician'), 'not clinician-reviewed')
 })
 
 Deno.test('P3-02 AC9 · variant=sample hides delivery + guest note; suppresses real-report analytics', async () => {

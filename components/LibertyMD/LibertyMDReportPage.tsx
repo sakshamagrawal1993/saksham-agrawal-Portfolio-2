@@ -199,9 +199,6 @@ export default function LibertyMDReportPage() {
             <p className="truncate font-serif text-lg font-semibold text-libertymd-ink sm:text-xl">
               {t('report.pageTitle')}
             </p>
-            <p className="truncate text-xs font-medium text-libertymd-slate-500">
-              {t('report.pageSubtitle')}
-            </p>
           </div>
         </div>
       </header>
@@ -237,6 +234,7 @@ export default function LibertyMDReportPage() {
             {!state.saved && state.retentionExpiresAt ? (
               <LibertyMDGuestRetentionWarning
                 remainingLabel={formatRetentionRemaining(state.retentionExpiresAt)}
+                onSignIn={() => navigate('/liberty-md')}
                 className="mb-4"
               />
             ) : null}
@@ -258,6 +256,25 @@ export default function LibertyMDReportPage() {
           </>
         ) : null}
       </main>
+
+      {/* Sticky viewport bottom bar for Consult a Doctor (Mobile + Desktop) */}
+      <div
+        data-libertymd-sticky-doctor-bar=""
+        className="fixed bottom-0 inset-x-0 z-40 border-t border-libertymd-slate-200 bg-white/95 px-4 py-3 shadow-lg backdrop-blur-md"
+      >
+        <div className="mx-auto flex max-w-4xl items-center justify-between gap-4">
+          <p className="hidden text-sm font-semibold text-libertymd-slate-700 sm:block">
+            Need a professional medical evaluation?
+          </p>
+          <button
+            type="button"
+            onClick={backToChat}
+            className="w-full rounded-md bg-libertymd-blue-600 px-6 py-3 font-serif text-base font-semibold text-white shadow-md transition hover:bg-libertymd-blue-700 sm:w-auto"
+          >
+            Consult a Doctor
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
