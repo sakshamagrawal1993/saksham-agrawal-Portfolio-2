@@ -198,8 +198,6 @@ export default function LibertyMDReportPage() {
       }
       timer = window.setTimeout(tick, POLL_INTERVAL_MS)
     }
-      timer = window.setTimeout(tick, POLL_INTERVAL_MS)
-    }
     void tick()
 
     return () => {
