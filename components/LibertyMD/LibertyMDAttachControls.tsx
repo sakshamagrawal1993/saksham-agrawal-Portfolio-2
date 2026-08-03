@@ -31,7 +31,7 @@ export interface LibertyMDAttachControlsProps {
    * buttons rather than the whole component.
    */
   hideTriggers?: boolean;
-  /** Same locks as send — intake composer usable. */
+  /** Same phase gate as attach — intake only; not tied to send/busy. */
   disabled: boolean;
   uploading?: boolean;
   labUploading?: boolean;

@@ -1567,8 +1567,8 @@ export default function LibertyMDChat() {
    * send_message / the interview continuum. No native dialogs; no clinical clothing.
    */
   const uploadPhoto = async (file: File) => {
-    // Same locks as send — intake composer usable (never during emergency / non-intake).
-    if (!consultationId || isBusy || holdingLocked || phase !== 'intake' || photoUploading || labUploading) return;
+    // Attach is allowed anytime during intake (including while the assistant is busy).
+    if (!consultationId || phase !== 'intake' || photoUploading || labUploading) return;
 
     const localGate = validatePhotoFileClient(file);
     if (!localGate.ok) {
@@ -1665,7 +1665,7 @@ export default function LibertyMDChat() {
    * Failures are technical and never block send_message. Soft gate untouched.
    */
   const openLabAttribution = async () => {
-    if (!consultationId || isBusy || holdingLocked || phase !== 'intake' || isAnonymous) return;
+    if (!consultationId || phase !== 'intake' || isAnonymous || photoUploading || labUploading) return;
     setPhotoNotice(null);
     try {
       const [owned, consult] = await Promise.all([
@@ -1711,7 +1711,7 @@ export default function LibertyMDChat() {
   };
 
   const uploadLab = async (file: File, patientId: string) => {
-    if (!consultationId || isBusy || holdingLocked || phase !== 'intake' || photoUploading || labUploading) return;
+    if (!consultationId || phase !== 'intake' || photoUploading || labUploading) return;
     if (isAnonymous) {
       setPhotoNotice(copyForLabUploadCode('sign_in_required'));
       return;
@@ -2610,6 +2610,9 @@ export default function LibertyMDChat() {
   };
 
   const composerSendLocked = isBusy || holdingLocked || phase !== 'intake';
+  // Attach stays available throughout intake — including while the assistant is
+  // thinking or the turn is held. Send still uses composerSendLocked above.
+  const composerAttachLocked = !consultationId || phase !== 'intake' || photoUploading || labUploading;
   // P1-07 AC4 / Q6 — during isBusy intake (not holding), draft field stays editable.
   const composerInputLocked = holdingLocked || phase !== 'intake';
   // P0-21 Q1 B1: continuation slot owns the footer for resume / report-gate-open CTA.
@@ -3093,7 +3096,7 @@ export default function LibertyMDChat() {
             <>
               <LibertyMDAttachControls
                 hideTriggers
-                disabled={composerSendLocked}
+                disabled={composerAttachLocked}
                 uploading={photoUploading}
                 labUploading={labUploading}
                 chips={photoChips}
@@ -3157,7 +3160,7 @@ export default function LibertyMDChat() {
                   aria-haspopup="dialog"
                   aria-expanded={attachSheetOpen}
                   aria-label={t('attach.title')}
-                  disabled={composerSendLocked}
+                  disabled={composerAttachLocked}
                   onClick={() => setAttachSheetOpen((open) => !open)}
                   className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full text-libertymd-slate-500 transition hover:bg-libertymd-blue-50 hover:text-libertymd-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-libertymd-blue-600 disabled:opacity-40"
                 >
