@@ -404,7 +404,7 @@ export async function renderPdfBlob(
 ): Promise<Blob> {
   const mod = await import('jspdf')
   const JsPDF = mod.jsPDF
-  const pdf = new JsPDF({ unit: 'pt', format: 'letter' })
+  const pdf = new JsPDF({ unit: 'pt', format: 'letter', compress: true })
   const margin = PDF_MARGIN_PT
   const pageWidth = pdf.internal.pageSize.getWidth()
   const pageHeight = pdf.internal.pageSize.getHeight()
@@ -417,17 +417,13 @@ export async function renderPdfBlob(
   const watermarkBytes = await resolvePdfWatermarkBytes()
 
   const drawPageBackground = () => {
-    // High-End Professional Linear Vertical Gradient Fill
-    const steps = 120
-    const stepHeight = pageHeight / steps
-    for (let i = 0; i < steps; i++) {
-      const ratio = i / steps
-      const r = Math.round(242 + ratio * (228 - 242))
-      const g = Math.round(247 + ratio * (238 - 247))
-      const b = Math.round(255 + ratio * (250 - 255))
-      pdf.setFillColor(r, g, b)
-      pdf.rect(0, i * stepHeight, pageWidth, stepHeight + 0.5, 'F')
-    }
+    // Subtle background tint (single rect for minimal PDF payload size)
+    pdf.setFillColor(248, 250, 252)
+    pdf.rect(0, 0, pageWidth, pageHeight, 'F')
+
+    // Top brand accent rule
+    pdf.setFillColor(37, 99, 235)
+    pdf.rect(0, 0, pageWidth, 4, 'F')
 
     // Rod of Asclepius Watermark
     if (watermarkBytes && watermarkBytes.byteLength > 0) {
@@ -443,6 +439,8 @@ export async function renderPdfBlob(
           (pageHeight - wmHeight) / 2 + 10,
           wmWidth,
           wmHeight,
+          undefined,
+          'FAST',
         )
         pdf.setGState(new GStateConstructor({ opacity: 1.0 }))
       } catch {
