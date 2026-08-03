@@ -145,9 +145,10 @@ function buildPdfCopy(t: TranslateFn): LibertyMdPdfCopy {
       soapPlan: t('report.teasers.soapPlan'),
     },
     ordinal: {
-      most_likely: t('report.card.ordinal.most_likely'),
-      possible: t('report.card.ordinal.possible'),
-      less_likely: t('report.card.ordinal.less_likely'),
+      high: t('report.card.ordinal.high'),
+      medium: t('report.card.ordinal.medium'),
+      low: t('report.card.ordinal.low'),
+      minimal: t('report.card.ordinal.minimal'),
     },
     serious: t('report.card.serious'),
     triageLabels,

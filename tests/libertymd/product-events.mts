@@ -325,8 +325,8 @@ Deno.test('P1-15 AC1 / Q5 · send-message report path buckets gate + emits repor
         valid_report: true,
         confidence_score: 82,
         differential_diagnosis: [
-          { name: 'tension headache', likelihood: 'most_likely' },
-          { name: 'migraine', likelihood: 'possible' },
+          { name: 'tension headache', likelihood: 'high' },
+          { name: 'migraine', likelihood: 'low' },
         ],
         soap_note: { subjective: 'x', objective: 'x', assessment: 'x', plan: 'x' },
         model_metadata: {},

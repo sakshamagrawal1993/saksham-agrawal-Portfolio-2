@@ -119,10 +119,11 @@
     "viewTitle": "Bericht zur ärztlichen Überprüfung",
     "card": {
       "ordinal": {
-        "most_likely": "Hohe Sicherheit",
-        "possible": "Mittlere Sicherheit",
-        "less_likely": "Geringe Sicherheit",
-        "most_likely_serious": "Hohe Sicherheit · Ernst"
+        "high": "Hohe Sicherheit",
+        "medium": "Medium confidence",
+        "low": "Geringe Sicherheit",
+        "minimal": "Minimal confidence",
+        "high_serious": "Hohe Sicherheit · Ernst"
       },
       "serious": "Ernst",
       "furtherInvestigations": "Weitere Untersuchungen",

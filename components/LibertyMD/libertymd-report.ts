@@ -27,8 +27,32 @@ export type TriageDisplayTier =
   | 'crisis_line'
   | 'unknown'
 
-/** Patient-facing confidence bands. Never paint raw percentages. */
-export type DifferentialOrdinal = 'most_likely' | 'possible' | 'less_likely'
+/**
+ * Patient-facing confidence bands. Never paint raw percentages.
+ *
+ * BO 2026-08-02 — four bands, fixed cut points:
+ *   >= 80  high      60-79  medium      40-59  low      < 40  minimal
+ *
+ * The band is a *label*, never a gate: a minimal-confidence differential is
+ * still shown. The three-band scheme this replaces put 40-69 in one bucket,
+ * which merged "we have a reasonable idea" with "this is a guess" — the exact
+ * distinction a reader needs when the report is going to a clinician.
+ */
+export type DifferentialOrdinal = 'high' | 'medium' | 'low' | 'minimal'
+
+/** Fixed cut points, shared by every surface that labels a confidence. */
+export const CONFIDENCE_BANDS = [
+  { min: 80, band: 'high' as const },
+  { min: 60, band: 'medium' as const },
+  { min: 40, band: 'low' as const },
+  { min: 0, band: 'minimal' as const },
+]
+
+/** Score → band. Used for both differential items and the report headline. */
+export function confidenceBand(score: number): DifferentialOrdinal {
+  const clamped = Math.max(0, Math.min(100, score))
+  return (CONFIDENCE_BANDS.find((entry) => clamped >= entry.min) || CONFIDENCE_BANDS[3]).band
+}
 
 export type LibertyMdDifferentialItem = {
   name: string
@@ -186,16 +210,15 @@ export function mapDifferentialOrdinal(input: {
   confidence?: unknown
 }): DifferentialOrdinal | undefined {
   const score = parseConfidenceScore(input.confidence)
-  if (score !== undefined) {
-    if (score >= 70) return 'most_likely'
-    if (score >= 40) return 'possible'
-    return 'less_likely'
-  }
+  if (score !== undefined) return confidenceBand(score)
+  // Rank is a compatibility fallback for older stored reports that carry no
+  // score. Rank is an ordering, not a probability, so it cannot distinguish
+  // high from medium — map conservatively rather than inventing certainty.
   const rank = parseRank(input.rank)
   if (rank !== undefined && rank >= 1 && rank <= 3) {
-    if (rank === 1) return 'most_likely'
-    if (rank === 2) return 'possible'
-    return 'less_likely'
+    if (rank === 1) return 'medium'
+    if (rank === 2) return 'low'
+    return 'minimal'
   }
   return undefined
 }

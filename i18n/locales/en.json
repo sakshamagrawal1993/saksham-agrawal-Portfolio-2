@@ -126,10 +126,11 @@
     },
     "card": {
       "ordinal": {
-        "most_likely": "High confidence",
-        "possible": "Moderate confidence",
-        "less_likely": "Low confidence",
-        "most_likely_serious": "High confidence · Serious"
+        "high": "High confidence",
+        "medium": "Medium confidence",
+        "low": "Low confidence",
+        "minimal": "Minimal confidence",
+        "high_serious": "High confidence · Serious"
       },
       "serious": "Serious",
       "furtherInvestigations": "Further investigations",

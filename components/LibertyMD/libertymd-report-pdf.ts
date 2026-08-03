@@ -42,9 +42,10 @@ export type LibertyMdPdfCopy = {
     soapPlan: string
   }
   ordinal: {
-    most_likely: string
-    possible: string
-    less_likely: string
+    high: string
+    medium: string
+    low: string
+    minimal: string
   }
   serious: string
   triageLabels: Record<TriageDisplayTier, string>

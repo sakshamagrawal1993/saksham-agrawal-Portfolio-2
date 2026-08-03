@@ -119,10 +119,11 @@
     "viewTitle": "Rapport pour examen médical",
     "card": {
       "ordinal": {
-        "most_likely": "Confiance élevée",
-        "possible": "Confiance modérée",
-        "less_likely": "Confiance faible",
-        "most_likely_serious": "Confiance élevée · Grave"
+        "high": "Confiance élevée",
+        "medium": "Medium confidence",
+        "low": "Confiance faible",
+        "minimal": "Minimal confidence",
+        "high_serious": "Confiance élevée · Grave"
       },
       "serious": "Grave",
       "furtherInvestigations": "Examens complémentaires",

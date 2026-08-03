@@ -21,11 +21,14 @@ export type LibertyMDDiagnosisCardProps = {
   sessionKey?: string
 }
 
+// Four bands, visually ordered so the badge reads as a scale rather than a
+// set of unrelated colours: filled blue → tinted slate → outlined → faint.
 const ORDINAL_BADGE_CLASS: Record<string, string> = {
-  most_likely: 'border-libertymd-blue-600/30 bg-libertymd-blue-50 text-libertymd-blue-700',
-  possible: 'border-libertymd-slate-300 bg-libertymd-slate-200 text-libertymd-slate-700',
-  less_likely: 'border-libertymd-slate-300 bg-white text-libertymd-slate-500',
-  most_likely_serious: 'border-amber-500/40 bg-amber-50 text-amber-900',
+  high: 'border-libertymd-blue-600/30 bg-libertymd-blue-50 text-libertymd-blue-700',
+  medium: 'border-libertymd-slate-300 bg-libertymd-slate-200 text-libertymd-slate-700',
+  low: 'border-libertymd-slate-300 bg-white text-libertymd-slate-700',
+  minimal: 'border-libertymd-slate-200 bg-white text-libertymd-slate-500',
+  high_serious: 'border-amber-500/40 bg-amber-50 text-amber-900',
 }
 
 const SERIOUS_BADGE_CLASS =
@@ -52,8 +55,8 @@ export function LibertyMDDiagnosisCard({
 
   const ordinal = item.ordinal
   const isSerious = Boolean(item.isSerious)
-  const composedMostLikelySerious = isSerious && ordinal === 'most_likely'
-  const seriousPair = isSerious && ordinal !== undefined && ordinal !== 'most_likely'
+  const composedHighSerious = isSerious && ordinal === 'high'
+  const seriousPair = isSerious && ordinal !== undefined && ordinal !== 'high'
   const seriousOnly = isSerious && ordinal === undefined
   const renderCta = showDoctorCta && Boolean(onDoctorCta)
 
@@ -63,26 +66,26 @@ export function LibertyMDDiagnosisCard({
       data-ordinal={ordinal ?? 'none'}
       data-serious={isSerious ? 'true' : 'false'}
       data-badge-pair={
-        composedMostLikelySerious
-          ? 'most-likely-serious'
+        composedHighSerious
+          ? 'high-serious'
           : seriousPair
-            ? 'serious-less-likely'
+            ? 'serious-lower-band'
             : 'none'
       }
       className="rounded-md border border-libertymd-slate-200 bg-white px-3 py-3"
     >
       <div className="flex flex-wrap items-center gap-2">
-        {composedMostLikelySerious ? (
+        {composedHighSerious ? (
           <span
-            data-ordinal-badge="most_likely_serious"
-            data-confidence-badge="most_likely_serious"
-            className={`libertymd-type-label inline-flex max-w-full rounded-md border px-2 py-0.5 font-bold ${ORDINAL_BADGE_CLASS.most_likely_serious}`}
+            data-ordinal-badge="high_serious"
+            data-confidence-badge="high_serious"
+            className={`libertymd-type-label inline-flex max-w-full rounded-md border px-2 py-0.5 font-bold ${ORDINAL_BADGE_CLASS.high_serious}`}
           >
-            {t('report.card.ordinal.most_likely_serious')}
+            {t('report.card.ordinal.high_serious')}
           </span>
         ) : null}
 
-        {!composedMostLikelySerious && ordinal ? (
+        {!composedHighSerious && ordinal ? (
           <span
             data-ordinal-badge={ordinal}
             data-confidence-badge={ordinal}

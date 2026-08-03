@@ -119,10 +119,11 @@
     "viewTitle": "Relatório para revisão médica",
     "card": {
       "ordinal": {
-        "most_likely": "Confiança alta",
-        "possible": "Confiança moderada",
-        "less_likely": "Confiança baixa",
-        "most_likely_serious": "Confiança alta · Grave"
+        "high": "Confiança alta",
+        "medium": "Medium confidence",
+        "low": "Confiança baixa",
+        "minimal": "Minimal confidence",
+        "high_serious": "Confiança alta · Grave"
       },
       "serious": "Grave",
       "furtherInvestigations": "Investigações adicionais",

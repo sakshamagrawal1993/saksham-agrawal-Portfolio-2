@@ -126,9 +126,9 @@ Deno.test('P2-02 DoD+ · mundane full report maps all major sections; no patient
   assertEquals(view.differentials.length, 3)
   // P2-04 Q7 · common_name first
   assertEquals(view.differentials[0].name, 'Common cold')
-  assertEquals(view.differentials[0].ordinal, 'most_likely')
+  assertEquals(view.differentials[0].ordinal, 'medium')
   assertEquals(view.differentials[1].name, 'Hay fever')
-  assertEquals(view.differentials[1].ordinal, 'possible')
+  assertEquals(view.differentials[1].ordinal, 'low')
   assertEquals(view.redFlags.length, 4)
   assertTrue(view.soap?.subjective)
   const blob = JSON.stringify(view)
@@ -570,18 +570,30 @@ const FORBIDDEN_CTA_SUBSTRINGS = [
   ' mins',
 ]
 
-Deno.test('P2-04 Q1 · mapDifferentialOrdinal rank / confidence / omit', () => {
-  assertEquals(mapDifferentialOrdinal({ rank: 1 }), 'most_likely')
-  assertEquals(mapDifferentialOrdinal({ rank: 2 }), 'possible')
-  assertEquals(mapDifferentialOrdinal({ rank: 3 }), 'less_likely')
+Deno.test('BO 2026-08-02 · four confidence bands at the agreed cut points', () => {
+  // >= 80 high · 60-79 medium · 40-59 low · < 40 minimal.
+  // Boundaries asserted from both sides — an off-by-one here silently
+  // relabels a clinician-facing confidence.
+  assertEquals(mapDifferentialOrdinal({ confidence: 100 }), 'high')
+  assertEquals(mapDifferentialOrdinal({ confidence: 80 }), 'high')
+  assertEquals(mapDifferentialOrdinal({ confidence: 79 }), 'medium')
+  assertEquals(mapDifferentialOrdinal({ confidence: 60 }), 'medium')
+  assertEquals(mapDifferentialOrdinal({ confidence: 59 }), 'low')
+  assertEquals(mapDifferentialOrdinal({ confidence: 40 }), 'low')
+  assertEquals(mapDifferentialOrdinal({ confidence: 39 }), 'minimal')
+  assertEquals(mapDifferentialOrdinal({ confidence: 0 }), 'minimal')
+  assertEquals(mapDifferentialOrdinal({ confidence: '70%' }), 'medium')
+
+  // Confidence wins over rank, so a low-confidence rank 1 is labelled honestly.
+  assertEquals(mapDifferentialOrdinal({ rank: 1, confidence: 0 }), 'minimal')
+  assertEquals(mapDifferentialOrdinal({ rank: 2, confidence: 90 }), 'high')
+
+  // Rank alone is an ordering, not a probability: it can never claim `high`.
+  assertEquals(mapDifferentialOrdinal({ rank: 1 }), 'medium')
+  assertEquals(mapDifferentialOrdinal({ rank: 2 }), 'low')
+  assertEquals(mapDifferentialOrdinal({ rank: 3 }), 'minimal')
   assertEquals(mapDifferentialOrdinal({ rank: 4 }), undefined)
-  // Confidence wins over rank so low-confidence rank 1 is labelled honestly.
-  assertEquals(mapDifferentialOrdinal({ rank: 2, confidence: 90 }), 'most_likely')
-  assertEquals(mapDifferentialOrdinal({ confidence: 70 }), 'most_likely')
-  assertEquals(mapDifferentialOrdinal({ confidence: '70%' }), 'most_likely')
-  assertEquals(mapDifferentialOrdinal({ confidence: 40 }), 'possible')
-  assertEquals(mapDifferentialOrdinal({ confidence: 39 }), 'less_likely')
-  assertEquals(mapDifferentialOrdinal({ rank: 1, confidence: 0 }), 'less_likely')
+
   assertEquals(mapDifferentialOrdinal({ confidence: 'not-a-score' }), undefined)
   assertEquals(mapDifferentialOrdinal({}), undefined)
   assertEquals(parseConfidenceScore('70%'), 70)
@@ -593,13 +605,13 @@ Deno.test('P2-04 AC1/AC2/AC3/Q7 · full+serious / reason-only / name-only mapper
   const full = normalizeReportData(CARD_FULL_SERIOUS_REPORT_DATA)
   assertEquals(full.differentials.length, 2)
   assertEquals(full.differentials[0].name, 'Common cold')
-  assertEquals(full.differentials[0].ordinal, 'most_likely')
+  assertEquals(full.differentials[0].ordinal, 'medium')
   assertEquals(full.differentials[0].isSerious, undefined)
   assertTrue(full.differentials[0].furtherInvestigations?.length)
   assertTrue(full.differentials[0].symptomaticTreatment?.length)
   assertTrue(full.differentials[0].supportiveTreatment?.length)
   assertEquals(full.differentials[1].name, 'Sinus infection')
-  assertEquals(full.differentials[1].ordinal, 'less_likely')
+  assertEquals(full.differentials[1].ordinal, 'minimal')
   assertEquals(full.differentials[1].isSerious, true)
   const blob = JSON.stringify(full.differentials)
   assertEquals(blob.includes('78'), false)
@@ -608,7 +620,7 @@ Deno.test('P2-04 AC1/AC2/AC3/Q7 · full+serious / reason-only / name-only mapper
   const reasonOnly = normalizeReportData(CARD_REASON_ONLY_REPORT_DATA)
   assertEquals(reasonOnly.differentials.length, 1)
   assertEquals(reasonOnly.differentials[0].name, 'Tension headache')
-  assertEquals(reasonOnly.differentials[0].ordinal, 'possible')
+  assertEquals(reasonOnly.differentials[0].ordinal, 'low')
   assertEquals(reasonOnly.differentials[0].reason?.includes('consistent'), true)
   assertEquals(reasonOnly.differentials[0].furtherInvestigations, undefined)
   assertEquals(reasonOnly.differentials[0].symptomaticTreatment, undefined)
@@ -639,14 +651,14 @@ Deno.test('P2-04 AC5/Q6 · dosing lines omitted; guidance framing in card source
 Deno.test('P2-04 AC6 · report renders at most the required three differentials', () => {
   const one = normalizeReportData(CARD_LENGTH_ONE_REPORT_DATA)
   assertEquals(one.differentials.length, 1)
-  assertEquals(one.differentials[0].ordinal, 'most_likely')
+  assertEquals(one.differentials[0].ordinal, 'high')
 
   const five = normalizeReportData(CARD_LENGTH_FIVE_REPORT_DATA)
   assertEquals(five.differentials.length, 3)
   assertEquals(five.differentials.map((d) => d.name).includes('Cause six dropped'), false)
-  assertEquals(five.differentials[0].ordinal, 'most_likely')
-  assertEquals(five.differentials[1].ordinal, 'possible')
-  assertEquals(five.differentials[2].ordinal, 'possible')
+  assertEquals(five.differentials[0].ordinal, 'medium')
+  assertEquals(five.differentials[1].ordinal, 'low')
+  assertEquals(five.differentials[2].ordinal, 'low')
 })
 
 Deno.test('P2-04 AC1–AC5 · shared card chrome + waitlist CTA + badge pair', async () => {
@@ -673,8 +685,8 @@ Deno.test('P2-04 AC1–AC5 · shared card chrome + waitlist CTA + badge pair', a
   assertTrue(card.includes('data-confidence-badge'), 'confidence-badge alias for AC2')
   assertTrue(card.includes('data-serious-badge'), 'serious badge')
   assertTrue(card.includes("data-badge-pair={"), 'badge pair attribute')
-  assertTrue(card.includes("'most-likely-serious'"), 'composed most-likely-serious')
-  assertTrue(card.includes("'serious-less-likely'"), 'serious-less-likely pair')
+  assertTrue(card.includes("'high-serious'"), 'composed high-serious')
+  assertTrue(card.includes("'serious-lower-band'"), 'serious + lower-band pair')
   assertTrue(card.includes('LibertyMDDoctorHandoffCta'), 'card uses shared doctor handoff CTA')
   assertTrue(handoffCta.includes('data-diagnosis-doctor-cta'), 'per-card doctor CTA marker on shared CTA')
   assertTrue(card.includes('useState(false)'), 'detail default collapsed')
@@ -695,9 +707,10 @@ Deno.test('P2-04 AC1–AC5 · shared card chrome + waitlist CTA + badge pair', a
       `card source must not include "${forbidden}"`,
     )
   }
-  assertEquals(en.report.card.ordinal.most_likely, 'High confidence')
-  assertEquals(en.report.card.ordinal.possible, 'Moderate confidence')
-  assertEquals(en.report.card.ordinal.less_likely, 'Low confidence')
+  assertEquals(en.report.card.ordinal.high, 'High confidence')
+  assertEquals(en.report.card.ordinal.medium, 'Medium confidence')
+  assertEquals(en.report.card.ordinal.low, 'Low confidence')
+  assertEquals(en.report.card.ordinal.minimal, 'Minimal confidence')
   assertEquals(en.report.card.serious, 'Serious')
 
   // Chat + App share handoff wiring (P2-11 parity)

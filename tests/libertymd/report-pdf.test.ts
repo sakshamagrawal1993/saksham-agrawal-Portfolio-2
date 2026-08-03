@@ -68,9 +68,9 @@ const PDF_COPY: LibertyMdPdfCopy = {
     soapPlan: 'Plan',
   },
   ordinal: {
-    most_likely: 'Most likely',
-    possible: 'Possible',
-    less_likely: 'Less likely',
+    high: 'Most likely',
+    low: 'Possible',
+    minimal: 'Less likely',
   },
   serious: 'Serious',
   triageLabels: {

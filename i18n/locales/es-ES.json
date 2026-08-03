@@ -174,10 +174,11 @@
     "viewTitle": "Informe para revisión médica",
     "card": {
       "ordinal": {
-        "most_likely": "Confianza alta",
-        "possible": "Confianza moderada",
-        "less_likely": "Confianza baja",
-        "most_likely_serious": "Confianza alta · Grave"
+        "high": "Confianza alta",
+        "medium": "Medium confidence",
+        "low": "Confianza baja",
+        "minimal": "Minimal confidence",
+        "high_serious": "Confianza alta · Grave"
       },
       "serious": "Grave",
       "furtherInvestigations": "Estudios adicionales",

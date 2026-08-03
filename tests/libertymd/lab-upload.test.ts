@@ -59,6 +59,21 @@ const CONSULT = 'a0000000-0000-4000-8000-000000000004'
 const OBJECT = 'e0000000-0000-4000-8000-000000000002'
 const PATIENT = 'b0000000-0000-4000-8000-000000000001'
 
+/**
+ * Resolve a migration by its descriptive suffix rather than its timestamp.
+ * Migrations get renumbered when ordering changes; a hardcoded timestamp turns
+ * that routine reshuffle into a test failure that looks like a product break.
+ */
+async function readMigrationBySuffix(suffix: string): Promise<string> {
+  const dir = new URL('../../supabase/migrations/', import.meta.url)
+  for await (const entry of Deno.readDir(dir)) {
+    if (entry.isFile && entry.name.endsWith(suffix)) {
+      return await Deno.readTextFile(new URL(entry.name, dir))
+    }
+  }
+  throw new Error(`no migration ending in ${suffix}`)
+}
+
 Deno.test('P4-07 path · lab kind builds {consultation_id}/lab/{uuid}', () => {
   const path = buildLibertyMdCarePath(CONSULT, 'lab', OBJECT)
   assertEquals(path, `${CONSULT}/lab/${OBJECT}`)
@@ -275,18 +290,22 @@ Deno.test('P4-07 source · login gate + user-linked standardized rows + zero raw
   assertTrue(/user_id uuid not null references auth\.users/.test(analysisMigration))
   assertTrue(/raw_deleted_at/.test(analysisMigration))
 
-  const dictionaryMigration = await Deno.readTextFile(
-    new URL('../../supabase/migrations/20260801140000_libertymd_parameter_definitions.sql', import.meta.url),
-  )
+  const dictionaryMigration = await readMigrationBySuffix('_libertymd_parameter_definitions.sql')
   assertTrue(/create table if not exists public\.libertymd_health_parameter_definitions/.test(dictionaryMigration))
-  assertTrue(/references public\.libertymd_health_parameter_definitions\(id\)/.test(dictionaryMigration))
-  assertTrue(/drop constraint if exists libertymd_lab_results_parameter_id_fkey/.test(dictionaryMigration))
   assertEquals((dictionaryMigration.match(/^  \('/gm) || []).length, 192, 'portable dictionary row count')
+  // The dictionary migration now runs BEFORE the one that creates
+  // `libertymd_lab_results`, so the foreign key is declared inline at table
+  // creation rather than retrofitted afterwards. Assert the constraint where it
+  // actually lives; there is no longer a `drop constraint ... _fkey` retrofit
+  // to find, and asserting on its absence-by-design would be asserting on a
+  // migration ordering accident rather than on the schema contract.
+  assertTrue(
+    /references public\.libertymd_health_parameter_definitions\(id\)/.test(analysisMigration),
+    'lab_results.parameter_id references the dictionary',
+  )
   assertFalse(/(?:insert into|from|references) public\.health_parameter_definitions/i.test(dictionaryMigration), 'portable seed has no shared-table dependency')
 
-  const dictionaryVerification = await Deno.readTextFile(
-    new URL('../../supabase/migrations/20260801141000_libertymd_parameter_dictionary_verify.sql', import.meta.url),
-  )
+  const dictionaryVerification = await readMigrationBySuffix('_libertymd_parameter_dictionary_verify.sql')
   assertTrue(/definition_count <> 192/.test(dictionaryVerification), 'replay verifies complete snapshot')
   assertTrue(/target_table\.relname = 'libertymd_health_parameter_definitions'/.test(dictionaryVerification))
   assertTrue(/still depends on the shared parameter dictionary/.test(dictionaryVerification))

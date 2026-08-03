@@ -542,7 +542,26 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
       // P1-10 Q6A: last non-off-topic clinical ask (skip prior redirects), not nested warm copy.
       const clinicalAsk = selectLastClinicalAsk(history, interview.next_question)
       const replayOptions = Array.isArray(clinicalAsk.options) ? clinicalAsk.options : interview.options
-      const shouldStop = provisionalEvidence.present.length === 0 && (
+      // BO 2026-08-02 — "no health information" must mean no *clinical*
+      // information.
+      //
+      // The opening message is stored as `chief_complaint` whatever it says. If
+      // the patient opened off-topic ("Who won the game last night?"), that text
+      // becomes a filled slot, `present` is non-empty, and this stop can never
+      // fire — for precisely the patient it exists to protect. Verified live:
+      // six consecutive off-topic messages, `non_clinical_response_count` 5 and
+      // `consecutive_non_clinical_response_count` 5 (both past threshold), and
+      // the consultation still sat in `interviewing` replaying the same redirect.
+      //
+      // A chief_complaint that itself classifies as off-topic is not evidence.
+      const mergedSlots = { ...consultation.filled_slots, ...interview.slot_updates }
+      const chiefComplaintText = String((mergedSlots as JsonObject)?.chief_complaint ?? '').trim()
+      const chiefComplaintIsClinical = chiefComplaintText.length > 0
+        && classifyResponseRelevance(chiefComplaintText) === 'clinical'
+      const clinicalPresent = provisionalEvidence.present.filter((slot) =>
+        slot !== 'chief_complaint' || chiefComplaintIsClinical)
+
+      const shouldStop = clinicalPresent.length === 0 && (
         turnCount >= MAX_TURNS
         || consecutiveNonClinicalResponseCount >= 3
         || nonClinicalResponseCount >= 5
@@ -768,7 +787,24 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
     }
 
     // Ack / correction after a pending sheet must reach Diagnosis even on an odd turn.
-    const shouldRunDiagnosis = (gateOpen || completingComprehension) && !mediaBlocksCompletion
+    // BO 2026-08-02 — the final turn always attempts a diagnosis.
+    //
+    // `decideReportOutcome` promises that at the cap "any usable health
+    // information plus a structurally valid three-item differential is
+    // released, even when confidence is low". That promise was unreachable:
+    // diagnosis only ran once the mini-differential gate opened (>= 75), so a
+    // consult whose differential stayed low never attempted one and
+    // `turn_limit_report` could never fire. Verified live — three corpus cases
+    // reached turn 15 with differentials of 40, 25 and null, recorded ZERO
+    // `diagnosis_attempted` events, and closed `insufficient_clinical_
+    // information`: a technical non-attempt wearing clinical clothing.
+    //
+    // Low confidence is precisely what the physician-review report is for.
+    // Attempt it on the last turn and let the policy decide; the band labels
+    // the result. Media still blocks — unresolved evidence is a real reason to
+    // wait, unlike a differential that simply never got confident.
+    const shouldRunDiagnosis =
+      (gateOpen || completingComprehension || turnCount >= MAX_TURNS) && !mediaBlocksCompletion
     let diagnosis: DiagnosisResult | null = null
     let diagnosticRunId: string | null = null
     let servedFromSpeculativeCache = false
@@ -869,6 +905,7 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
       readyForReport: interview.ready_for_report,
       evidence,
       nonClinicalResponseCount,
+      comprehensionConfirmed: completingComprehension,
     })
 
     // A failed report attempt after the patient shared health information is a

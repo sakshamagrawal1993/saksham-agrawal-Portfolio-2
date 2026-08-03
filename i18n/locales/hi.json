@@ -119,10 +119,11 @@
     "viewTitle": "चिकित्सक की समीक्षा के लिए रिपोर्ट",
     "card": {
       "ordinal": {
-        "most_likely": "उच्च विश्वास",
-        "possible": "मध्यम विश्वास",
-        "less_likely": "कम विश्वास",
-        "most_likely_serious": "उच्च विश्वास · गंभीर"
+        "high": "उच्च विश्वास",
+        "medium": "Medium confidence",
+        "low": "कम विश्वास",
+        "minimal": "Minimal confidence",
+        "high_serious": "उच्च विश्वास · गंभीर"
       },
       "serious": "Serious",
       "furtherInvestigations": "Further investigations",

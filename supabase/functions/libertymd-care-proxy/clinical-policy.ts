@@ -22,10 +22,16 @@ export interface ReportDecisionInput {
   readyForReport: boolean
   evidence: EvidenceAssessment
   nonClinicalResponseCount: number
+  /**
+   * The patient has seen the comprehension summary and confirmed it is right.
+   * That is an explicit "I am done answering", and it is the strongest signal
+   * available that the interview should end.
+   */
+  comprehensionConfirmed?: boolean
 }
 
 export type ReportDecision =
-  | { outcome: 'complete'; reason: 'high_confidence' | 'workflow_ready' | 'turn_limit_report' }
+  | { outcome: 'complete'; reason: 'high_confidence' | 'workflow_ready' | 'turn_limit_report' | 'comprehension_confirmed' }
   | { outcome: 'continue'; reason: 'collect_more_evidence' | 'raise_confidence' | 'retry_report_generation' }
   | { outcome: 'review'; reason: 'no_health_information' }
 
@@ -153,6 +159,22 @@ export function decideReportOutcome(input: ReportDecisionInput): ReportDecision 
       return { outcome: 'continue', reason: 'collect_more_evidence' }
     }
     if (input.confidence >= 80) return { outcome: 'complete', reason: 'high_confidence' }
+    // BO 2026-08-02 — a confirmed comprehension summary ends the interview.
+    //
+    // The comprehension check opens on the MINI-DIFFERENTIAL's confidence
+    // (>= 75), while release below the cap needed the REPORT COMPOSER's (>= 80).
+    // Those are different models on different scales, so a consult would show
+    // the patient "here is everything I understood — ready?", take their yes,
+    // generate a perfectly valid report, discard it, and ask several more
+    // questions. Observed on five corpus cases at turns 8-13, each with a
+    // `valid` diagnosis and evidence 100.
+    //
+    // Confidence still governs the report's *wording* through the four bands
+    // (high / medium / low / minimal); it no longer decides whether a patient
+    // who said they were finished receives one.
+    if (input.comprehensionConfirmed) {
+      return { outcome: 'complete', reason: 'comprehension_confirmed' }
+    }
     if (input.readyForReport) return { outcome: 'complete', reason: 'workflow_ready' }
   }
 
