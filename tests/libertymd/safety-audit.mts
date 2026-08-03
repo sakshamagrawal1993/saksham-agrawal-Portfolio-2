@@ -170,6 +170,71 @@ Deno.test('P0-14c AC8 · n8n webhook transcript fields are stripped before persi
   }
 })
 
+Deno.test('guardrail specificity · bare shortness of breath plus fever cannot force-end', async () => {
+  const fetchLog = stubFetch((url) => {
+    if (url === GUARDRAIL_WEBHOOK) {
+      return okResponse({
+        status: 'force_end',
+        risk_level: 'high',
+        crisis_type: 'respiratory_distress',
+        force_end: true,
+        is_emergency: true,
+        care_setting: 'emergency_department',
+        message: 'Go to the emergency department now.',
+        red_flags: ['shortness of breath', 'four-day fever'],
+        source: 'llm',
+      })
+    }
+    return failUpstream(url)
+  })
+  try {
+    const verdict = await runGuardrail('No, that is all', [
+      { role: 'user', content: 'I have had a fever for four days.' },
+      { role: 'user', content: 'Shortness of breath' },
+      { role: 'assistant', content: 'Are you gasping, blue around the lips, or unable to speak?' },
+      { role: 'user', content: 'No, I have not traveled' },
+    ], {}, {})
+
+    assertEquals(verdict.status, 'high_risk_continue', 'ambiguous respiratory symptom must stay in interview')
+    assertEquals(verdict.force_end, false, 'no patient-stated severe respiratory feature')
+    assertEquals(verdict.is_emergency, false, 'not an emergency stop')
+    assertEquals(verdict.care_setting, 'urgent_care', 'concerning symptom remains clinically cautious')
+    assertEquals(verdict.source, 'llm_specificity_backstop', 'server boundary recorded for audit')
+  } finally {
+    fetchLog.restore()
+  }
+})
+
+Deno.test('guardrail specificity · patient-stated gasping and inability to speak can force-end', async () => {
+  const fetchLog = stubFetch((url) => {
+    if (url === GUARDRAIL_WEBHOOK) {
+      return okResponse({
+        status: 'force_end',
+        risk_level: 'emergency',
+        crisis_type: 'respiratory_distress',
+        force_end: true,
+        is_emergency: true,
+        care_setting: 'call_911',
+        message: 'Call emergency services now.',
+        red_flags: ['gasping', 'cannot speak'],
+        source: 'llm',
+      })
+    }
+    return failUpstream(url)
+  })
+  try {
+    const verdict = await runGuardrail('It is getting worse', [
+      { role: 'user', content: 'I am gasping for air and cannot speak a full sentence.' },
+    ], {}, {})
+
+    assertEquals(verdict.status, 'force_end', 'high-specificity patient evidence remains terminal')
+    assertEquals(verdict.force_end, true, 'true emergency is not downgraded')
+    assertEquals(verdict.source, 'llm', 'original verdict source retained')
+  } finally {
+    fetchLog.restore()
+  }
+})
+
 function failUpstream(url: string): Response {
   throw new Error(`unexpected fetch in P0-14c test: ${url}`)
 }

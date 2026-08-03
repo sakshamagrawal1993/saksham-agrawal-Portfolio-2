@@ -126,9 +126,17 @@ Deno.test('P5-DDX stop rule: below the turn floor never stops', () => {
 
 Deno.test('P5-DDX stop rule: below the confidence floor never stops', () => {
   withFlag(true, () => {
-    const decision = decideDifferentialStop(stored({ topConfidence: 74 }), 9)
+    const decision = decideDifferentialStop(stored({ topConfidence: 79 }), 9)
     assertEquals(decision.stop, false)
     assertEquals(decision.reason, 'below_confidence')
+  })
+})
+
+Deno.test('P5-DDX stop rule: 80 percent meets the confidence floor', () => {
+  withFlag(true, () => {
+    const decision = decideDifferentialStop(stored({ topConfidence: 80 }), 9)
+    assertEquals(decision.stop, true)
+    assertEquals(decision.reason, 'confidence_met')
   })
 })
 

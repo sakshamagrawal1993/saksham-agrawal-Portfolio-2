@@ -162,7 +162,7 @@ export function decideReportOutcome(input: ReportDecisionInput): ReportDecision 
     // BO 2026-08-02 — a confirmed comprehension summary ends the interview.
     //
     // The comprehension check opens on the MINI-DIFFERENTIAL's confidence
-    // (>= 75), while release below the cap needed the REPORT COMPOSER's (>= 80).
+    // (now >= 80), while release below the cap needed the REPORT COMPOSER's (>= 80).
     // Those are different models on different scales, so a consult would show
     // the patient "here is everything I understood — ready?", take their yes,
     // generate a perfectly valid report, discard it, and ask several more

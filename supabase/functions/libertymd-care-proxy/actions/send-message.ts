@@ -698,7 +698,7 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
     // P5-DDX T6 — the stop rule.
     //
     // With the flag on, the mini-differential decides when the interview may
-    // end: turn >= 6 AND confidence >= 75 AND no outstanding red flags AND not
+    // end: turn >= 6 AND confidence >= 80 AND no outstanding red flags AND not
     // stale. All four are evaluated here, from stored state, so neither the
     // interview nor the differential workflow gets a vote — a model cannot talk
     // its way past a rule it does not execute.
@@ -792,7 +792,7 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
     // `decideReportOutcome` promises that at the cap "any usable health
     // information plus a structurally valid three-item differential is
     // released, even when confidence is low". That promise was unreachable:
-    // diagnosis only ran once the mini-differential gate opened (>= 75), so a
+    // diagnosis only ran once the mini-differential gate opened (now >= 80), so a
     // consult whose differential stayed low never attempted one and
     // `turn_limit_report` could never fire. Verified live — three corpus cases
     // reached turn 15 with differentials of 40, 25 and null, recorded ZERO

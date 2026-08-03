@@ -244,9 +244,9 @@ export function getDifferentialStartTurn(): number {
   return envInt('LIBERTYMD_DIFFERENTIAL_START_TURN', 6, 1, MAX_TURNS)
 }
 
-/** P5-DDX — top_confidence needed to stop early (BO 2026-08-01: 75). */
+/** P5-DDX — top_confidence needed to stop early (BO 2026-08-03: 80). */
 export function getDifferentialStopConfidence(): number {
-  return envInt('LIBERTYMD_DIFFERENTIAL_STOP_CONFIDENCE', 75, 1, 100)
+  return envInt('LIBERTYMD_DIFFERENTIAL_STOP_CONFIDENCE', 80, 1, 100)
 }
 
 /**

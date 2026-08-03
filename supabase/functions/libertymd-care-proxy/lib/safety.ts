@@ -40,6 +40,7 @@ import {
   N8N_TIMEOUT_MS,
 } from './config.ts'
 import { guardrailTransportFailureResult } from './errors.ts'
+import { enforceCardioRespiratoryEmergencySpecificity } from './emergency-specificity.ts'
 import { normalizeObject, postJson, revokeStageSuccessAsFailure } from './n8n-client.ts'
 import { severityForSafetySignal } from './types.ts'
 import { limitConsultationMessage } from './utils.ts'
@@ -448,28 +449,29 @@ export async function runGuardrail(
       revokeStageSuccessAsFailure('guardrail')
       return guardrailTransportFailureResult('malformed_payload') satisfies GuardrailResult
     }
-    const forceEnd = Boolean(webhookRaw.force_end || webhookRaw.is_emergency || webhookRaw.status === 'force_end')
+    const screenedRaw = enforceCardioRespiratoryEmergencySpecificity(webhookRaw, message, history)
+    const forceEnd = Boolean(screenedRaw.force_end || screenedRaw.is_emergency || screenedRaw.status === 'force_end')
     const status: GuardrailResult['status'] = forceEnd
       ? 'force_end'
-      : webhookRaw.status === 'high_risk_continue'
+      : screenedRaw.status === 'high_risk_continue'
         ? 'high_risk_continue'
         : 'pass'
     const core = {
       status,
-      risk_level: String(webhookRaw.risk_level || (forceEnd ? 'emergency' : status === 'high_risk_continue' ? 'high' : 'low')) as GuardrailResult['risk_level'],
-      crisis_type: String(webhookRaw.crisis_type || 'none'),
+      risk_level: String(screenedRaw.risk_level || (forceEnd ? 'emergency' : status === 'high_risk_continue' ? 'high' : 'low')) as GuardrailResult['risk_level'],
+      crisis_type: String(screenedRaw.crisis_type || 'none'),
       force_end: forceEnd,
       is_emergency: forceEnd,
-      care_setting: String(webhookRaw.care_setting || (forceEnd ? 'call_911' : 'home')),
-      message: limitConsultationMessage(webhookRaw.message || (forceEnd ? 'Please seek emergency care now.' : 'No emergency detected.')),
-      red_flags: Array.isArray(webhookRaw.red_flags) ? webhookRaw.red_flags.map(String).slice(0, 12) : [],
-      source: String(webhookRaw.source || 'n8n'),
+      care_setting: String(screenedRaw.care_setting || (forceEnd ? 'call_911' : 'home')),
+      message: limitConsultationMessage(screenedRaw.message || (forceEnd ? 'Please seek emergency care now.' : 'No emergency detected.')),
+      red_flags: Array.isArray(screenedRaw.red_flags) ? screenedRaw.red_flags.map(String).slice(0, 12) : [],
+      source: String(screenedRaw.source || 'n8n'),
     }
     const result = {
       ...core,
       severity: severityForSafetySignal({ status, source: core.source }),
       // Allow-list before assign/persist — drop n8n transcript echo (AC8).
-      raw: allowListGuardrailRaw({ ...webhookRaw, ...verdictRawFromResult(core) }),
+      raw: allowListGuardrailRaw({ ...screenedRaw, ...verdictRawFromResult(core) }),
     } satisfies GuardrailResult
     // P0-17 / P3-08: overwrite model-authored force_end messages with catalog/fixture.
     return forceEnd ? await canonicalizeForceEnd(result, resolveOpts) : result
