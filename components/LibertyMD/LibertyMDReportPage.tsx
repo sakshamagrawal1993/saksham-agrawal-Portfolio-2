@@ -12,7 +12,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Clock, Loader2, LogIn, Menu, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Check, Clock, Loader2, LogIn, Menu, RefreshCw } from 'lucide-react'
 import type { User } from '@supabase/supabase-js'
 import { useI18n } from '../../i18n'
 import { supabase } from '../../lib/supabaseClient'
@@ -413,10 +413,14 @@ export default function LibertyMDReportPage() {
 }
 
 /**
- * High-End 2-Minute Countdown Report Loader
+ * High-End 2-Minute Silk Wave Glassmorphic Loader
  *
- * Runs a 120-second (2-minute) countdown with visual progress bar, active clinical step labels,
- * and a manual refresh trigger once the countdown reaches 0s.
+ * Inspired by LibertyMD Homepage Footer ribbon aesthetics:
+ * - Deep cobalt to electric azure background mesh
+ * - Frosted glassmorphic card with ambient glow
+ * - Asclepius emblem with pulsing aura
+ * - Glowing countdown pill ("02:00")
+ * - 4-Stage clinical progress stepper with active checkmarks
  */
 function ReportLoader({ onRefresh }: { onRefresh?: () => void }) {
   const TOTAL_SECONDS = 120
@@ -442,77 +446,117 @@ function ReportLoader({ onRefresh }: { onRefresh?: () => void }) {
   const remSeconds = secondsLeft % 60
   const formattedTime = `0${minutes}:${remSeconds < 10 ? '0' : ''}${remSeconds}`
 
-  const currentStage = secondsLeft > 90
-    ? 'Summarizing clinical notes & patient symptoms...'
-    : secondsLeft > 60
-      ? 'Evaluating symptoms against clinical database...'
-      : secondsLeft > 30
-        ? 'Synthesizing primary diagnosis & action plan...'
-        : secondsLeft > 0
-          ? 'Finalizing physician-ready report document...'
-          : 'Report processing complete. Loading details...'
+  // 4 Stepper stages over 120s
+  const stepIndex = secondsLeft > 90 ? 0 : secondsLeft > 60 ? 1 : secondsLeft > 30 ? 2 : 3
+
+  const stages = [
+    { title: '1. Symptoms', label: 'Summarizing clinical notes & symptoms...' },
+    { title: '2. Differential', label: 'Evaluating symptoms against clinical database...' },
+    { title: '3. SOAP Note', label: 'Synthesizing primary diagnosis & action plan...' },
+    { title: '4. Finalizing', label: 'Finalizing physician-ready report document...' },
+  ]
+
+  const activeStageLabel = stages[stepIndex]?.label ?? 'Loading details...'
 
   return (
-    <section
-      data-libertymd-report-loader=""
-      aria-live="polite"
-      aria-busy="true"
-      className="rounded-2xl border border-libertymd-slate-200 bg-white p-8 text-center shadow-md sm:p-12"
-    >
-      <div className="relative mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-libertymd-blue-50 text-libertymd-blue-600 shadow-inner">
-        <Loader2 className="h-10 w-10 animate-spin text-libertymd-blue-600" aria-hidden="true" />
-        <span className="absolute -bottom-1 inline-flex items-center gap-1 rounded-full bg-libertymd-blue-600 px-2.5 py-0.5 text-[11px] font-bold text-white shadow-sm">
-          <Clock className="h-3 w-3" />
-          {formattedTime}
-        </span>
+    <div className="relative min-h-[560px] w-full overflow-hidden rounded-3xl bg-gradient-to-b from-[#09152C] via-[#102447] to-[#1E3B70] p-6 sm:p-12 shadow-2xl flex items-center justify-center">
+      {/* Background Ambient Fluid Mesh Glow */}
+      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden="true">
+        <div className="absolute -top-24 left-1/2 h-[380px] w-[500px] -translate-x-1/2 rounded-full bg-blue-600/30 blur-[90px] animate-pulse" />
+        <div className="absolute top-1/3 -left-20 h-64 w-64 rounded-full bg-sky-500/20 blur-[80px]" />
+        <div className="absolute bottom-0 -right-20 h-72 w-72 rounded-full bg-indigo-500/25 blur-[90px]" />
       </div>
 
-      <h2 className="mt-8 font-serif text-2xl font-bold text-libertymd-ink">
-        Preparing Your Clinical Report
-      </h2>
-
-      <p className="mx-auto mt-2 max-w-md text-sm font-semibold text-libertymd-blue-700 animate-pulse">
-        {currentStage}
-      </p>
-
-      {/* 60-Second Progress Bar */}
-      <div className="mx-auto mt-6 max-w-md">
-        <div className="flex items-center justify-between text-xs font-semibold text-libertymd-slate-500 mb-1.5">
-          <span>Synthesizing Document</span>
-          <span>{progressPercent}%</span>
-        </div>
-        <div className="h-2.5 w-full overflow-hidden rounded-full bg-libertymd-slate-100 p-0.5 ring-1 ring-libertymd-slate-200">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-libertymd-blue-500 to-libertymd-blue-700 transition-all duration-1000 ease-linear"
-            style={{ width: `${progressPercent}%` }}
+      {/* Main Frosted Glassmorphic Container */}
+      <section
+        data-libertymd-report-loader=""
+        aria-live="polite"
+        aria-busy="true"
+        className="relative z-10 w-full max-w-xl rounded-2xl border border-white/20 bg-white/10 p-8 sm:p-10 text-center text-white backdrop-blur-xl shadow-[0_20px_60px_rgba(0,0,0,0.4)]"
+      >
+        {/* Asclepius Emblem with Pulsing Aura */}
+        <div className="relative mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-blue-600/20 border border-blue-400/30 shadow-[0_0_35px_rgba(37,99,235,0.4)]">
+          <img
+            src="/images/libertymd-logo-mark.svg"
+            alt="LibertyMD Crest"
+            className="h-14 w-14 object-contain filter drop-shadow-[0_0_12px_rgba(147,197,253,0.8)] animate-pulse"
           />
         </div>
-      </div>
 
-      {secondsLeft === 0 ? (
-        <div className="mt-8">
-          <button
-            type="button"
-            onClick={() => onRefresh?.()}
-            className="inline-flex items-center gap-2 rounded-xl bg-libertymd-blue-600 px-6 py-3 text-sm font-bold text-white shadow-md transition hover:bg-libertymd-blue-700 active:scale-95"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Check Report Status
-          </button>
-        </div>
-      ) : (
-        <p className="mt-6 text-xs text-libertymd-slate-400 font-medium">
-          Please stay on this page. Your report will display automatically once complete.
+        <h2 className="mt-6 font-sans text-2xl font-bold tracking-tight text-white sm:text-3xl">
+          Liberty<span className="text-sky-400">MD</span>
+        </h2>
+        <p className="text-xs font-semibold uppercase tracking-widest text-sky-200/80 mt-0.5">
+          Clinical Synthesis In Progress
         </p>
-      )}
 
-      {/* Document Skeleton Preview */}
-      <div className="mx-auto mt-10 max-w-xl space-y-3 opacity-60" aria-hidden="true">
-        <div className="h-3 w-2/3 animate-pulse rounded-full bg-libertymd-slate-200" />
-        <div className="h-3 w-full animate-pulse rounded-full bg-libertymd-slate-200" />
-        <div className="h-3 w-5/6 animate-pulse rounded-full bg-libertymd-slate-200" />
-        <div className="h-20 w-full animate-pulse rounded-lg bg-libertymd-slate-200" />
-      </div>
-    </section>
+        {/* Countdown Pill Badge */}
+        <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-sky-400/30 bg-sky-950/60 px-4 py-1.5 text-xs font-mono font-bold text-sky-200 shadow-[0_0_15px_rgba(56,189,248,0.25)]">
+          <Clock className="h-3.5 w-3.5 text-sky-400" />
+          <span>TIME REMAINING: {formattedTime}</span>
+        </div>
+
+        {/* Liquid Progress Bar */}
+        <div className="mx-auto mt-8 w-full">
+          <div className="flex items-center justify-between text-xs font-semibold text-sky-200/90 mb-2">
+            <span className="truncate max-w-[280px] sm:max-w-none">{activeStageLabel}</span>
+            <span className="font-mono text-sky-300 font-bold ml-2">{progressPercent}%</span>
+          </div>
+          <div className="h-3 w-full overflow-hidden rounded-full bg-slate-950/60 p-0.5 border border-white/10 shadow-inner">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-blue-600 via-sky-400 to-indigo-400 transition-all duration-1000 ease-linear shadow-[0_0_18px_rgba(56,189,248,0.8)]"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+        </div>
+
+        {/* 4 Clinical Stepper Nodes */}
+        <div className="mt-8 grid grid-cols-4 gap-2 pt-2 border-t border-white/10">
+          {stages.map((st, idx) => {
+            const isCompleted = idx < stepIndex
+            const isCurrent = idx === stepIndex
+            return (
+              <div key={st.title} className="flex flex-col items-center text-center">
+                <div
+                  className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition-all duration-500 ${
+                    isCompleted
+                      ? 'bg-sky-400 text-slate-950 shadow-[0_0_12px_rgba(56,189,248,0.6)]'
+                      : isCurrent
+                        ? 'bg-blue-600 text-white ring-2 ring-sky-300 ring-offset-2 ring-offset-slate-900 animate-pulse'
+                        : 'bg-white/10 text-white/40 border border-white/10'
+                  }`}
+                >
+                  {isCompleted ? <Check className="h-4 w-4 stroke-[3]" /> : idx + 1}
+                </div>
+                <span
+                  className={`mt-2 text-[11px] font-semibold leading-tight ${
+                    isCurrent ? 'text-sky-300 font-bold' : isCompleted ? 'text-white' : 'text-white/40'
+                  }`}
+                >
+                  {st.title}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+
+        {secondsLeft === 0 ? (
+          <div className="mt-8">
+            <button
+              type="button"
+              onClick={() => onRefresh?.()}
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-sky-500 px-6 py-3 text-sm font-bold text-white shadow-[0_0_20px_rgba(37,99,235,0.5)] transition hover:brightness-110 active:scale-95"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Check Report Status
+            </button>
+          </div>
+        ) : (
+          <p className="mt-6 text-xs text-sky-200/60 font-medium">
+            Please stay on this page. Your report will display automatically once complete.
+          </p>
+        )}
+      </section>
+    </div>
   )
 }
