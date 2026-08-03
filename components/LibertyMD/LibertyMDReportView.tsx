@@ -178,10 +178,11 @@ function renderFormattedSessionSummary(headline: string) {
         const colonMatch = line.match(/^(\*\*.*?\*\*|[A-Za-z0-9\s()\/_-]+:)(.*)$/)
         if (colonMatch) {
           const headerRaw = colonMatch[1].replace(/^\*\*|\*\*$|:$/g, '').trim()
+          const displayHeader = headerRaw.replace(/^Primary Differential$/i, 'Primary Diagnosis')
           const bodyText = colonMatch[2].replace(/^:\s*/, ' ')
           return (
             <p key={idx} className="libertymd-type-body-small font-normal text-libertymd-slate-700 leading-relaxed">
-              <strong className="font-bold text-libertymd-ink">{headerRaw}:</strong>{bodyText}
+              <strong className="font-bold text-libertymd-ink">{displayHeader}:</strong>{bodyText}
             </p>
           )
         }
@@ -604,6 +605,9 @@ export function LibertyMDReportView({
             <h1 className="font-sans text-2xl sm:text-3xl font-bold tracking-tight text-white">
               Liberty MD
             </h1>
+            <p className="font-sans text-xs sm:text-sm text-white/90 mt-0.5 font-medium">
+              LibertyMD.ai
+            </p>
           </div>
           <div className="shrink-0">
             <img

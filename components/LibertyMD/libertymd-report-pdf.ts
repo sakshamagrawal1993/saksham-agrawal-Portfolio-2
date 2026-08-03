@@ -193,7 +193,7 @@ export function buildPatientPdfDoc(
     pushSection(sections, 'Patient Summary', [report.patientSummary])
   }
 
-  // 3. Primary Diagnosis (NO numeric percentage scores!)
+  // 3. Differential Diagnosis (NO numeric percentage scores!)
   if (report.differentials.length > 0) {
     const lines: string[] = []
     for (const item of report.differentials) {
@@ -212,7 +212,7 @@ export function buildPatientPdfDoc(
       if (item.description) lines.push(item.description)
       if (item.reason) lines.push(item.reason)
     }
-    pushSection(sections, 'Primary Diagnosis', lines)
+    pushSection(sections, 'Differential Diagnosis', lines)
   }
 
   // 4. Recommended Action Plan
@@ -502,7 +502,7 @@ export async function renderPdfBlob(
       writeWrapped(text, fontSize, 'normal', PDF_CHROME_COLORS.ink)
       return
     }
-    const labelRaw = colonMatch[1].replace(/^\*\*|\*\*$|:$/g, '').trim()
+    const labelRaw = colonMatch[1].replace(/^\*\*|\*\*$|:$/g, '').trim().replace(/^Primary Differential$/i, 'Primary Diagnosis')
     const valueText = colonMatch[2].replace(/^:\s*/, ' ')
     const labelStr = labelRaw + ':'
     // Measure label width so we can place value inline
@@ -535,11 +535,15 @@ export async function renderPdfBlob(
   pdf.setFillColor(59, 113, 202)
   pdf.rect(margin, y, maxWidth, bannerHeight, 'F')
 
-  // Top Left: Liberty MD
+  // Top Left: Liberty MD & LibertyMD.ai
   pdf.setFont('helvetica', 'bold')
   pdf.setFontSize(20)
   pdf.setTextColor(255, 255, 255)
   pdf.text('Liberty MD', margin + 14, y + 26)
+  pdf.setFont('helvetica', 'normal')
+  pdf.setFontSize(9)
+  pdf.setTextColor(230, 240, 255)
+  pdf.text('LibertyMD.ai', margin + 14, y + 38)
 
   // Top Right: Logo Mark
   if (logoBytes && logoBytes.byteLength > 0) {

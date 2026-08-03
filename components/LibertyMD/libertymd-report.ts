@@ -432,7 +432,7 @@ export function synthesizeSessionSummary(
   }
 
   if (topDxText) {
-    let dxLine = `Primary Differential: ${topDxText}.`
+    let dxLine = `Primary Diagnosis: ${topDxText}.`
     if (lowerDxText) {
       dxLine += ` Secondary Consideration(s): ${lowerDxText}.`
     }

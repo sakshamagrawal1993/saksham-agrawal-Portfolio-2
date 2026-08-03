@@ -100,7 +100,7 @@
       "patientSummary": "Patient summary",
       "triage": "Recommended care setting",
       "nextStep": "What to do now",
-      "differential": "Primary diagnosis",
+      "differential": "Differential diagnosis",
       "assessmentAndPlan": "Recommended action plan",
       "redFlags": "Red flags to watch",
       "soap": "SOAP note"
