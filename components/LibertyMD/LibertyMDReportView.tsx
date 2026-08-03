@@ -599,8 +599,8 @@ export function LibertyMDReportView({
           <div className="shrink-0">
             <img
               src="/images/libertymd-logo-mark.svg"
-              alt="LibertyMD"
-              className="h-14 w-auto sm:h-16 brightness-0 invert drop-shadow-md opacity-95"
+              alt="LibertyMD logo mark"
+              className="h-16 w-auto sm:h-20 drop-shadow-md"
             />
           </div>
         </div>
