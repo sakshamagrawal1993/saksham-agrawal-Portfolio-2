@@ -33,8 +33,10 @@ import { normalizeReportData, type LibertyMdNormalizedReport } from './libertymd
 
 /** How often to re-poll while the report is still being generated. */
 const POLL_INTERVAL_MS = 3_000
-/** Polling timeout: 1 minute (60,000 ms) before auto-triggering report generation retry. */
-const POLL_TIMEOUT_MS = 60_000
+/** Polling timeout: 2 minutes (120,000 ms) before auto-triggering report generation retry. */
+const POLL_TIMEOUT_MS = 120_000
+/** Maximum allowed report regenerations per consultation. */
+const MAX_REGENERATIONS_PER_CONSULTATION = 2
 
 type PageState =
   | { kind: 'loading' }
@@ -170,14 +172,15 @@ export default function LibertyMDReportPage() {
     startedAtRef.current = Date.now()
     consecutiveErrorsRef.current = 0
     let timer: number | undefined
-    let hasRegenerated = false
+    let regenerationCount = 0
 
     const tick = async () => {
       const outcome = await load()
       if (cancelledRef.current || outcome === 'settled') return
       if (Date.now() - startedAtRef.current > POLL_TIMEOUT_MS) {
-        if (!hasRegenerated) {
-          hasRegenerated = true
+        // Upper limit of 2 regenerations per consultation
+        if (regenerationCount < MAX_REGENERATIONS_PER_CONSULTATION) {
+          regenerationCount += 1
           startedAtRef.current = Date.now()
           try {
             await ensureIdentity()
@@ -193,6 +196,8 @@ export default function LibertyMDReportPage() {
         setState({ kind: 'lifecycle', state: 'generation_failed' })
         return
       }
+      timer = window.setTimeout(tick, POLL_INTERVAL_MS)
+    }
       timer = window.setTimeout(tick, POLL_INTERVAL_MS)
     }
     void tick()
@@ -410,16 +415,17 @@ export default function LibertyMDReportPage() {
 }
 
 /**
- * High-End 1-Minute Countdown Report Loader
+ * High-End 2-Minute Countdown Report Loader
  *
- * Runs a 60-second countdown with visual progress bar, active clinical step labels,
+ * Runs a 120-second (2-minute) countdown with visual progress bar, active clinical step labels,
  * and a manual refresh trigger once the countdown reaches 0s.
  */
 function ReportLoader({ onRefresh }: { onRefresh?: () => void }) {
-  const [secondsLeft, setSecondsLeft] = useState(60)
+  const TOTAL_SECONDS = 120
+  const [secondsLeft, setSecondsLeft] = useState(TOTAL_SECONDS)
 
   useEffect(() => {
-    setSecondsLeft(60)
+    setSecondsLeft(TOTAL_SECONDS)
     const interval = setInterval(() => {
       setSecondsLeft((prev) => {
         if (prev <= 1) {
@@ -433,14 +439,16 @@ function ReportLoader({ onRefresh }: { onRefresh?: () => void }) {
     return () => clearInterval(interval)
   }, [])
 
-  const progressPercent = Math.min(100, Math.round(((60 - secondsLeft) / 60) * 100))
-  const formattedTime = `00:${secondsLeft < 10 ? '0' : ''}${secondsLeft}`
+  const progressPercent = Math.min(100, Math.round(((TOTAL_SECONDS - secondsLeft) / TOTAL_SECONDS) * 100))
+  const minutes = Math.floor(secondsLeft / 60)
+  const remSeconds = secondsLeft % 60
+  const formattedTime = `0${minutes}:${remSeconds < 10 ? '0' : ''}${remSeconds}`
 
-  const currentStage = secondsLeft > 45
+  const currentStage = secondsLeft > 90
     ? 'Summarizing clinical notes & patient symptoms...'
-    : secondsLeft > 30
+    : secondsLeft > 60
       ? 'Evaluating symptoms against clinical database...'
-      : secondsLeft > 15
+      : secondsLeft > 30
         ? 'Synthesizing primary diagnosis & action plan...'
         : secondsLeft > 0
           ? 'Finalizing physician-ready report document...'
