@@ -60,6 +60,7 @@ export type LibertyMdPdfDoc = {
   kind: LibertyMdPdfDocKind
   filename: string
   title: string
+  patientInfo?: LibertyMdPatientInfo
   headerLines: string[]
   sections: LibertyMdPdfSection[]
 }
@@ -241,6 +242,7 @@ export function buildPatientPdfDoc(
     kind: 'patient',
     filename: buildPdfFilename('patient', when),
     title: copy.patientTitle,
+    patientInfo: report.patientInfo,
     headerLines: buildSharedHeader(copy, when),
     sections,
   }
@@ -273,6 +275,7 @@ export function buildSoapPdfDoc(
     kind: 'soap',
     filename: buildPdfFilename('soap', when),
     title: copy.soapTitle,
+    patientInfo: report.patientInfo,
     headerLines: buildSharedHeader(copy, when),
     sections,
   }
@@ -412,54 +415,94 @@ export async function renderPdfBlob(
     pdf.setTextColor(PDF_CHROME_COLORS.ink)
   }
 
-  // —— Page 1 brand band: logo (left) + title ——
+  // —— Page 1 Header Banner (Solid Blue Box with Logo & Physician Ready Report Title) ——
   const logoBytes = await resolvePdfLogoBytes(options)
-  const logoMaxH = Math.min(
-    PDF_LOGO_MAX_HEIGHT_PT,
-    pageHeight * PDF_LOGO_MAX_FIRST_PAGE_FRACTION,
-  )
+  const bannerHeight = 78
 
+  // Draw blue header rectangle (#3B71CA = RGB 59, 113, 202)
+  pdf.setFillColor(59, 113, 202)
+  pdf.rect(margin, y, maxWidth, bannerHeight, 'F')
+
+  // Top Left: Liberty MD & LibertyMD.ai
+  pdf.setFont('helvetica', 'bold')
+  pdf.setFontSize(20)
+  pdf.setTextColor(255, 255, 255)
+  pdf.text('Liberty MD', margin + 14, y + 26)
+  pdf.setFont('helvetica', 'normal')
+  pdf.setFontSize(9)
+  pdf.setTextColor(230, 240, 255)
+  pdf.text('LibertyMD.ai', margin + 14, y + 38)
+
+  // Top Right: Logo Mark
   if (logoBytes && logoBytes.byteLength > 0) {
     try {
       const props = pdf.getImageProperties(logoBytes)
       const aspect = props.width / Math.max(1, props.height)
-      const drawH = logoMaxH
+      const drawH = 34
       const drawW = drawH * aspect
-      pdf.addImage(logoBytes, 'PNG', margin, y, drawW, drawH)
+      pdf.addImage(logoBytes, 'PNG', pageWidth - margin - drawW - 14, y + 10, drawW, drawH)
       logoEmbedded = true
-      // Title to the right of the mark when space allows; else below.
-      const titleX = margin + drawW + 12
-      const titleMaxW = pageWidth - margin - titleX
-      if (titleMaxW >= 120) {
-        pdf.setFont('helvetica', 'bold')
-        pdf.setFontSize(PDF_TYPE_PT.title)
-        pdf.setTextColor(PDF_CHROME_COLORS.accent)
-        const titleLines = pdf.splitTextToSize(doc.title, titleMaxW) as string[]
-        let titleY = y + Math.min(drawH, PDF_TYPE_PT.title + 2)
-        for (const line of titleLines) {
-          pdf.text(line, titleX, titleY)
-          titleY += PDF_TYPE_PT.title + 2
-        }
-        y = Math.max(y + drawH, titleY) + 8
-      } else {
-        y += drawH + 8
-        writeWrapped(doc.title, PDF_TYPE_PT.title, 'bold', PDF_CHROME_COLORS.accent)
-      }
     } catch {
       logoEmbedded = false
-      writeWrapped(doc.title, PDF_TYPE_PT.title, 'bold', PDF_CHROME_COLORS.accent)
     }
-  } else {
-    writeWrapped(doc.title, PDF_TYPE_PT.title, 'bold', PDF_CHROME_COLORS.accent)
   }
 
-  options?.onLogoEmbed?.({ logoEmbedded, kind: doc.kind })
+  // Bottom Center: Physician Ready Report Title
+  pdf.setFont('helvetica', 'bold')
+  pdf.setFontSize(16)
+  pdf.setTextColor(255, 255, 255)
+  pdf.text('Physician Ready Report', margin + maxWidth / 2, y + 62, { align: 'center' })
 
-  // Accent hairline under brand band
-  pdf.setDrawColor(PDF_CHROME_COLORS.accent)
-  pdf.setLineWidth(1)
+  options?.onLogoEmbed?.({ logoEmbedded, kind: doc.kind })
+  y += bannerHeight + 12
+
+  // —— Patient Metadata Block ——
+  pdf.setDrawColor('#CBD5E1')
+  pdf.setLineWidth(0.5)
   pdf.line(margin, y, pageWidth - margin, y)
-  y += 10
+  y += 12
+
+  const nameStr = doc.patientInfo?.name || 'Anonymous Guest'
+  const ageStr = doc.patientInfo?.age ? String(doc.patientInfo.age) : 'Not specified'
+  const rawSexStr = doc.patientInfo?.sexAtBirth
+  const sexStr = rawSexStr ? rawSexStr.split('_').join(' ').replace(/^./, (c) => c.toUpperCase()) : 'Not specified'
+  const dateStr = doc.patientInfo?.date || formatPdfUtcDate()
+
+  // Row 1: Name (Left), Date (Right)
+  pdf.setFont('helvetica', 'bold')
+  pdf.setFontSize(9)
+  pdf.setTextColor('#475569')
+  pdf.text('PATIENT NAME:', margin + 4, y)
+  pdf.setFont('helvetica', 'normal')
+  pdf.setTextColor('#111827')
+  pdf.text(nameStr, margin + 92, y)
+
+  pdf.setFont('helvetica', 'bold')
+  pdf.setTextColor('#475569')
+  pdf.text(`DATE:  ${dateStr}`, pageWidth - margin - 4, y, { align: 'right' })
+  y += 14
+
+  // Row 2: Gender & Age (Left)
+  pdf.setFont('helvetica', 'bold')
+  pdf.setTextColor('#475569')
+  pdf.text('GENDER:', margin + 4, y)
+  pdf.setFont('helvetica', 'normal')
+  pdf.setTextColor('#111827')
+  pdf.text(sexStr, margin + 54, y)
+
+  pdf.setFont('helvetica', 'bold')
+  pdf.setTextColor('#475569')
+  pdf.text('AGE:', margin + 140, y)
+  pdf.setFont('helvetica', 'normal')
+  pdf.setTextColor('#111827')
+  pdf.text(ageStr, margin + 168, y)
+  y += 12
+
+  // Hairline bottom rule
+  pdf.setDrawColor('#CBD5E1')
+  pdf.setLineWidth(0.5)
+  pdf.line(margin, y, pageWidth - margin, y)
+  y += 16
 
   // Legal / label tier — smaller type, slate token, not a WARNING banner (Q6).
   // Meaning retained: AI-generated / not a diagnosis + no licensed clinician. No HIPAA.

@@ -570,6 +570,12 @@ export function LibertyMDReportView({
   if (report.soap?.plan) soapChips.push(t('report.teasers.soapPlan'))
   const soapTeaser = showSoap && soapChips.length > 0 ? soapChips.join(' · ') : undefined
 
+  const displayPatientName = report.patientInfo?.name || 'Anonymous Guest'
+  const displayPatientAge = report.patientInfo?.age ? String(report.patientInfo.age) : 'Not specified'
+  const rawSex = report.patientInfo?.sexAtBirth
+  const displayPatientSex = rawSex ? rawSex.split('_').join(' ').replace(/^./, (c: string) => c.toUpperCase()) : 'Not specified'
+  const displayReportDate = report.patientInfo?.date || new Date().toISOString().split('T')[0]
+
   return (
     <section
       ref={rootRef}
@@ -579,11 +585,64 @@ export function LibertyMDReportView({
       data-libertymd-retention-expires-at={retentionExpiresAt || undefined}
       className="mt-[var(--libertymd-space-md)] max-w-full rounded-lg border border-libertymd-slate-200 bg-white shadow-[0_20px_65px_rgba(23,50,95,0.09)]"
     >
-      {/* Central Title of the Report */}
-      <div className="border-b border-libertymd-slate-200 px-[var(--libertymd-space-lg)] py-4 text-center bg-libertymd-slate-50/60 rounded-t-lg">
-        <h2 className="font-serif text-xl font-bold text-libertymd-ink sm:text-2xl tracking-tight">
-          Physician Review Report
-        </h2>
+      {/* 1. Header Banner (Solid Blue Box with Logo & Title) */}
+      <div className="relative overflow-hidden rounded-t-lg bg-[#3B71CA] px-6 py-6 sm:px-8 sm:py-7 text-white shadow-md">
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="font-sans text-2xl sm:text-3xl font-bold tracking-tight text-white">
+              Liberty MD
+            </h1>
+            <p className="font-sans text-xs sm:text-sm text-white/90 mt-0.5 font-medium">
+              LibertyMD.ai
+            </p>
+          </div>
+          <div className="shrink-0">
+            <img
+              src="/images/libertymd-logo-mark.svg"
+              alt="LibertyMD"
+              className="h-14 w-auto sm:h-16 brightness-0 invert drop-shadow-md opacity-95"
+            />
+          </div>
+        </div>
+        <div className="mt-5 text-center">
+          <h2 className="font-serif text-2xl sm:text-3xl font-bold tracking-wide text-white">
+            Physician Ready Report
+          </h2>
+        </div>
+      </div>
+
+      {/* 2. Patient Metadata Bar */}
+      <div className="border-b border-libertymd-slate-200 bg-libertymd-slate-50/60 px-6 py-4 sm:px-8 text-left text-xs sm:text-sm text-libertymd-slate-700">
+        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1">
+            <p className="text-libertymd-ink">
+              <span className="font-bold uppercase text-[11px] tracking-wider text-libertymd-slate-500">Patient Name:</span>{' '}
+              <span className="font-semibold text-libertymd-ink">{displayPatientName}</span>
+            </p>
+            <div className="flex items-center gap-4">
+              <p>
+                <span className="font-bold uppercase text-[11px] tracking-wider text-libertymd-slate-500">Gender:</span>{' '}
+                <span className="font-medium text-libertymd-slate-800 capitalize">{displayPatientSex}</span>
+              </p>
+              <p>
+                <span className="font-bold uppercase text-[11px] tracking-wider text-libertymd-slate-500">Age:</span>{' '}
+                <span className="font-medium text-libertymd-slate-800">{displayPatientAge}</span>
+              </p>
+            </div>
+          </div>
+          <div className="space-y-1 sm:text-right">
+            <p>
+              <span className="font-bold uppercase text-[11px] tracking-wider text-libertymd-slate-500">Date:</span>{' '}
+              <span className="font-medium text-libertymd-slate-800">{displayReportDate}</span>
+            </p>
+            {consultationId ? (
+              <p>
+                <span className="font-bold uppercase text-[11px] tracking-wider text-libertymd-slate-500">Ref No.:</span>{' '}
+                <span className="font-mono text-xs font-semibold text-libertymd-blue-700">[{consultationId.slice(0, 8)}]</span>
+              </p>
+            ) : null}
+          </div>
+        </div>
       </div>
 
       {/* Consultation Report Framing: Session Summary → Patient Summary. */}

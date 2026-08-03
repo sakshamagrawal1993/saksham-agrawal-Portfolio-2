@@ -80,7 +80,15 @@ export type LibertyMdAssessmentAndPlan = {
   selfCare: string[]
 }
 
+export type LibertyMdPatientInfo = {
+  name?: string
+  age?: number | string
+  sexAtBirth?: string
+  date?: string
+}
+
 export type LibertyMdNormalizedReport = {
+  patientInfo?: LibertyMdPatientInfo
   headline?: string
   patientSummary?: string
   triageTier: TriageDisplayTier
@@ -490,10 +498,26 @@ export function normalizeReportData(raw: unknown): LibertyMdNormalizedReport {
   const soap = normalizeSoap(data)
   const differentials = normalizeDifferentials(data)
 
+  const rawPatient = data.patient && typeof data.patient === 'object' && !Array.isArray(data.patient) ? (data.patient as Record<string, unknown>) : null
+  const rawProfile = data.profile && typeof data.profile === 'object' && !Array.isArray(data.profile) ? (data.profile as Record<string, unknown>) : null
+
+  const patientName = asOptionalText(rawPatient?.name || rawPatient?.display_name || rawProfile?.display_name || data.patient_name || data.display_name)
+  const patientAge = rawPatient?.age || rawProfile?.age || data.age || data.patient_age
+  const patientSex = asOptionalText(rawPatient?.sex_at_birth || rawPatient?.gender || rawProfile?.sex_at_birth || data.sex_at_birth || data.gender)
+  const reportDate = asOptionalText(data.date || data.created_at || data.generated_at)
+
+  const patientInfo: LibertyMdPatientInfo = {
+    ...(patientName ? { name: patientName } : {}),
+    ...(patientAge ? { age: Number(patientAge) || String(patientAge) } : {}),
+    ...(patientSex ? { sexAtBirth: String(patientSex) } : {}),
+    ...(reportDate ? { date: String(reportDate) } : {}),
+  }
+
   const patientSummary = formatThirdPersonPatientSummary(rawPatientSummary)
   const headline = synthesizeSessionSummary(rawHeadline, differentials, patientSummary, resolvedAp)
 
   return {
+    ...(Object.keys(patientInfo).length > 0 ? { patientInfo } : {}),
     ...(headline ? { headline } : {}),
     ...(patientSummary ? { patientSummary } : {}),
     triageTier,
