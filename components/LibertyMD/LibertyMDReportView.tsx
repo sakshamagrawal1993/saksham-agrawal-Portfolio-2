@@ -583,7 +583,7 @@ export function LibertyMDReportView({
       data-libertymd-report-variant={variant}
       data-libertymd-report-lifecycle="ready"
       data-libertymd-retention-expires-at={retentionExpiresAt || undefined}
-      className="relative overflow-hidden mt-[var(--libertymd-space-md)] max-w-full rounded-lg border border-libertymd-blue-200/80 bg-gradient-to-b from-[#F0F6FF]/70 via-[#F8FAFC] to-[#EFF6FF]/60 shadow-[0_20px_65px_rgba(23,50,95,0.09)]"
+      className="relative overflow-hidden mt-[var(--libertymd-space-md)] max-w-full rounded-2xl border border-libertymd-blue-200/70 bg-gradient-to-b from-[#F2F7FF] via-[#F8FAFE] to-[#E6F0FC] shadow-[0_20px_65px_rgba(23,50,95,0.09)]"
     >
       {/* Background Rod of Asclepius Watermark Emblem */}
       <div
@@ -679,44 +679,7 @@ export function LibertyMDReportView({
         ) : null}
       </div>
 
-      {/* P2-05 · condensed sticky twin — in-scroller sticky; aria-hidden decorative duplicate. */}
-      {stickyEnabled ? (
-        <div
-          ref={stickyRef}
-          data-libertymd-report-sticky
-          aria-hidden="true"
-          className="sticky top-0 z-10 border-b border-libertymd-slate-200 bg-white/95 px-[var(--libertymd-space-lg)] py-[var(--libertymd-space-sm)] shadow-sm backdrop-blur-sm sm:px-[var(--libertymd-space-xl)]"
-        >
-          <div className="flex flex-col gap-[var(--libertymd-space-xs)]">
-            {showTriage ? (
-              <span
-                className={`libertymd-type-label inline-flex max-w-full flex-wrap items-center self-start rounded-md border px-2 py-1 font-bold ${TRIAGE_BADGE_CLASS[report.triageTier]}`}
-                data-libertymd-report-sticky-triage
-                data-triage-tier={report.triageTier}
-              >
-                {t(triageLabelKey(report.triageTier))}
-              </span>
-            ) : null}
-            {report.nextStep ? (
-              <p
-                className="libertymd-type-body-small line-clamp-2 font-bold text-libertymd-ink"
-                data-libertymd-report-sticky-next-step
-              >
-                {report.nextStep}
-              </p>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
 
-      {/* AC2 clearance marker when sticky enabled (scroll-padding-top set on scroller). */}
-      {stickyEnabled ? (
-        <div
-          data-libertymd-report-sticky-clearance
-          className="pointer-events-none h-0"
-          aria-hidden
-        />
-      ) : null}
 
       <div className="space-y-[var(--libertymd-space-lg)] px-[var(--libertymd-space-lg)] py-[var(--libertymd-space-xl)] sm:px-[var(--libertymd-space-xl)] text-left">
         {/* Q5: footerSlot at body start (before differential) so triage+next-step clear the fold. */}

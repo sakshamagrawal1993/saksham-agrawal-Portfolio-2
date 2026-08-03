@@ -403,9 +403,17 @@ export async function renderPdfBlob(
   const watermarkBytes = await resolvePdfWatermarkBytes()
 
   const drawPageBackground = () => {
-    // Soft bluish hue background
-    pdf.setFillColor(243, 247, 253)
-    pdf.rect(0, 0, pageWidth, pageHeight, 'F')
+    // High-End Professional Linear Vertical Gradient Fill
+    const steps = 120
+    const stepHeight = pageHeight / steps
+    for (let i = 0; i < steps; i++) {
+      const ratio = i / steps
+      const r = Math.round(242 + ratio * (228 - 242))
+      const g = Math.round(247 + ratio * (238 - 247))
+      const b = Math.round(255 + ratio * (250 - 255))
+      pdf.setFillColor(r, g, b)
+      pdf.rect(0, i * stepHeight, pageWidth, stepHeight + 0.5, 'F')
+    }
 
     // Rod of Asclepius Watermark
     if (watermarkBytes && watermarkBytes.byteLength > 0) {
