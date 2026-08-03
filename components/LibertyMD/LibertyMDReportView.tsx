@@ -214,6 +214,8 @@ export function LibertyMDReportView({
   // Sample reports never expose delivery actions, so they do no PDF work.
   const [pdfBusy, setPdfBusy] = useState(!isSample)
   const [pdfError, setPdfError] = useState<string | null>(null)
+  const [readyLinks, setReadyLinks] = useState<PdfReadyLink[]>([])
+  const [soapSecondTap, setSoapSecondTap] = useState<PdfReadyLink | null>(null)
 
   const showTriage = report.triageTier !== 'unknown' || Boolean(report.triageRaw)
   const showDifferentials = report.differentials.length > 0
@@ -531,6 +533,12 @@ export function LibertyMDReportView({
     }
   }
 
+  const onSoapSecondTap = () => {
+    if (!soapSecondTap) return
+    triggerReadyLinkDownload(soapSecondTap)
+    setSoapSecondTap(null)
+  }
+
 
 
   const differentialTeaser = showDifferentials
@@ -840,6 +848,22 @@ export function LibertyMDReportView({
               <Download className="h-4 w-4 shrink-0" aria-hidden />
               {t('report.download')}
             </button>
+
+            {soapSecondTap ? (
+              <button
+                type="button"
+                data-libertymd-report-soap-download
+                className="libertymd-type-body-small inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-libertymd-blue-600 bg-libertymd-blue-50 px-4 py-2 font-semibold text-libertymd-blue-700 shadow-xs hover:bg-libertymd-blue-100 transition-colors"
+                onClick={onSoapSecondTap}
+              >
+                <Download className="h-4 w-4 shrink-0" aria-hidden />
+                Download Physician SOAP Note PDF
+              </button>
+            ) : null}
+
+            {readyLinks.length > 0 && !pdfBusy ? (
+              <span className="sr-only">PDF documents ready ({readyLinks.length} files)</span>
+            ) : null}
 
             {pdfBusy ? (
               <p className="libertymd-type-label text-libertymd-slate-500" data-libertymd-report-pdf-busy>

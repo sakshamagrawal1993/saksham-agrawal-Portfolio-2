@@ -85,7 +85,7 @@ export function LibertyMDReportEmailDelivery({
         type="button"
         data-libertymd-email-delivery-cta
         onClick={openSheet}
-        className="libertymd-type-body inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-libertymd-blue-600 bg-white px-[var(--libertymd-space-lg)] py-[var(--libertymd-space-sm)] font-semibold text-libertymd-blue-700 transition hover:bg-libertymd-blue-50"
+        className="libertymd-type-body-small inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-libertymd-blue-600 bg-white px-4 py-2 font-semibold text-libertymd-blue-700 transition hover:bg-libertymd-blue-50"
       >
         <Mail className="h-4 w-4 shrink-0" aria-hidden />
         {t('report.emailDelivery.cta')}
