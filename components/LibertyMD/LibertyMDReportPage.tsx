@@ -18,7 +18,8 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Loader2 } from 'lucide-react'
+import { ArrowLeft, Loader2, LogIn, Menu } from 'lucide-react'
+import type { User } from '@supabase/supabase-js'
 import { useI18n } from '../../i18n'
 import { supabase } from '../../lib/supabaseClient'
 import { LibertyMDReportView } from './LibertyMDReportView'
@@ -26,7 +27,8 @@ import {
   LibertyMDGuestRetentionWarning,
   LibertyMDReportLifecycleShell,
 } from './LibertyMDReportLifecycleShell'
-import { LibertyMDReportGate } from './LibertyMDCareControls'
+import LibertyMDLanguageSwitcher from './LibertyMDLanguageSwitcher'
+import { LibertyMDAccountDrawer, LibertyMDReportGate } from './LibertyMDCareControls'
 import { isSoftGateDismissed, markSoftGateDismissed } from './libertymd-soft-gate'
 import {
   formatRetentionRemaining,
@@ -65,8 +67,21 @@ export default function LibertyMDReportPage() {
     Boolean(consultationId) && !isSoftGateDismissed(consultationId),
   )
   const [isAuthBusy, setIsAuthBusy] = useState(false)
+  const [user, setUser] = useState<User | null>(null)
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const isAnonymous = !user || Boolean(user.is_anonymous)
   const startedAtRef = useRef<number>(Date.now())
   const cancelledRef = useRef(false)
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUser(data.user || null))
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user || null)
+    })
+    return () => {
+      authListener.subscription.unsubscribe()
+    }
+  }, [])
 
   const ensureIdentity = useCallback(async () => {
     const { data: sessionData } = await supabase.auth.getSession()
@@ -239,19 +254,43 @@ export default function LibertyMDReportPage() {
       className="min-h-screen w-full bg-libertymd-blue-50/30"
     >
       <header className="sticky top-0 z-30 border-b border-libertymd-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-4xl items-center gap-3 px-4 py-3 sm:px-6">
-          <button
-            type="button"
-            onClick={backToChat}
-            aria-label={t('report.backToConsult')}
-            className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full text-libertymd-slate-500 transition hover:bg-libertymd-blue-50 hover:text-libertymd-blue-600"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <div className="min-w-0 flex-1 text-center pr-11">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <button
+              type="button"
+              onClick={backToChat}
+              aria-label={t('report.backToConsult')}
+              className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full text-libertymd-slate-500 transition hover:bg-libertymd-blue-50 hover:text-libertymd-blue-600"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
             <h1 className="truncate font-serif text-lg font-bold text-libertymd-ink sm:text-xl">
               {t('report.pageTitle')}
             </h1>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
+            <LibertyMDLanguageSwitcher />
+            {isAnonymous && (
+              <button
+                type="button"
+                aria-label="Sign in with Google"
+                disabled={isAuthBusy}
+                onClick={startGoogleLink}
+                className="inline-flex items-center gap-1.5 rounded-full border border-libertymd-blue-600/30 bg-libertymd-blue-600/5 px-2.5 py-1.5 text-xs font-semibold text-libertymd-blue-600 transition-colors hover:bg-libertymd-blue-600 hover:text-white sm:px-4 sm:text-sm"
+              >
+                <LogIn className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Sign in</span>
+              </button>
+            )}
+            <button
+              type="button"
+              aria-label="Open profile and consultation history"
+              onClick={() => setIsMenuOpen(true)}
+              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-libertymd-ink transition hover:bg-libertymd-blue-50 hover:text-libertymd-blue-600"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
           </div>
         </div>
       </header>
@@ -337,6 +376,24 @@ export default function LibertyMDReportPage() {
           onClose={dismissReportGate}
         />
       )}
+
+      <LibertyMDAccountDrawer
+        open={isMenuOpen}
+        isAnonymous={isAnonymous}
+        displayName={user?.user_metadata?.full_name || user?.email}
+        email={user?.email}
+        avatarUrl={user?.user_metadata?.avatar_url}
+        onClose={() => setIsMenuOpen(false)}
+        onSelectConsultation={(id) => {
+          setIsMenuOpen(false)
+          navigate(`/liberty-md/report/${encodeURIComponent(id)}`)
+        }}
+        onGoogle={isAnonymous ? startGoogleLink : undefined}
+        onStartOver={() => {
+          setIsMenuOpen(false)
+          navigate('/liberty-md')
+        }}
+      />
     </div>
   )
 }
