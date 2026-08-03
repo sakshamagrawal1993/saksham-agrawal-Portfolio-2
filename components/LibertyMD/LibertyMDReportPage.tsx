@@ -26,6 +26,8 @@ import {
   LibertyMDGuestRetentionWarning,
   LibertyMDReportLifecycleShell,
 } from './LibertyMDReportLifecycleShell'
+import { LibertyMDReportGate } from './LibertyMDCareControls'
+import { isSoftGateDismissed, markSoftGateDismissed } from './libertymd-soft-gate'
 import {
   formatRetentionRemaining,
   isRetentionExpired,
@@ -54,18 +56,35 @@ export default function LibertyMDReportPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { t } = useI18n()
-  // Turn index the consult was on when the chat handed over. Absent for a
-  // direct link or a refresh, in which case there is nothing to compare and the
-  // page simply waits.
   const awaitingRaw = searchParams.get('awaiting')
   const awaitingTurn = awaitingRaw !== null && Number.isFinite(Number(awaitingRaw))
     ? Number(awaitingRaw)
     : null
   const [state, setState] = useState<PageState>({ kind: 'loading' })
+  const [isReportGateOpen, setIsReportGateOpen] = useState<boolean>(() =>
+    Boolean(consultationId) && !isSoftGateDismissed(consultationId),
+  )
+  const [isAuthBusy, setIsAuthBusy] = useState(false)
   const startedAtRef = useRef<number>(Date.now())
   const cancelledRef = useRef(false)
 
+  const ensureIdentity = useCallback(async () => {
+    const { data: sessionData } = await supabase.auth.getSession()
+    if (sessionData.session) return sessionData.session
+    const { data, error } = await supabase.auth.signInAnonymously()
+    if (error || !data.session) {
+      throw error || new Error('Unable to create a private session.')
+    }
+    return data.session
+  }, [])
+
   const load = useCallback(async (): Promise<'settled' | 'pending'> => {
+    try {
+      await ensureIdentity()
+    } catch {
+      // Fall through to invoke attempt
+    }
+
     const { data, error } = await supabase.functions.invoke('libertymd-care-proxy', {
       body: { action: 'get_consultation', consultation_id: consultationId },
     })
@@ -78,9 +97,6 @@ export default function LibertyMDReportPage() {
 
     const consultation = (data?.consultation ?? {}) as Record<string, unknown>
     const status = String(consultation.status || '')
-    // Current get_consultation returns report_data directly as `report` and
-    // retention metadata at the top level. Keep the nested reads for older
-    // deployed proxy responses during rollout, but do not require that envelope.
     const reportEnvelope = data?.report && typeof data.report === 'object' && !Array.isArray(data.report)
       ? data.report as Record<string, unknown>
       : null
@@ -93,23 +109,22 @@ export default function LibertyMDReportPage() {
       ?? null
     ) as string | null
 
-    // Retention wins over content: an expired guest report must not render even
-    // if the body is still sitting in the row.
     if (retentionExpiresAt && isRetentionExpired(retentionExpiresAt)) {
       setState({ kind: 'lifecycle', state: 'guest_expired' })
       return 'settled'
     }
 
     if (rawReport) {
+      const isSaved = status === 'completed'
       setState({
         kind: 'ready',
         report: normalizeReportData(rawReport),
-        // Linked and guest-released reports settle at completed. The withheld
-        // anonymous soft-gate remains report_pending_auth and must retain guest
-        // treatment even though get_consultation has no top-level is_anonymous.
-        saved: status === 'completed',
+        saved: isSaved,
         retentionExpiresAt,
       })
+      if (isSaved) {
+        setIsReportGateOpen(false)
+      }
       return 'settled'
     }
 
@@ -118,20 +133,10 @@ export default function LibertyMDReportPage() {
       return 'settled'
     }
     if (status === 'emergency_stopped') {
-      // An emergency consult has no report by design. Send the reader back to
-      // the conversation, where the terminal guidance is pinned.
       navigate(`/liberty-md/chat?consultationId=${encodeURIComponent(consultationId)}`, { replace: true })
       return 'settled'
     }
 
-    // No report yet. Two very different situations look identical from the
-    // status alone, because the row stays `interviewing` while diagnosis runs:
-    // the report is being generated, or the interview asked another question.
-    //
-    // The turn index separates them. If it has moved past the turn we left on,
-    // the consultation carried on and the patient belongs back in it — spinning
-    // here until the two-minute timeout would strand them in front of a loader
-    // for something that is not coming.
     const turnCount = Number(consultation.turn_count)
     if (
       awaitingTurn !== null
@@ -145,10 +150,9 @@ export default function LibertyMDReportPage() {
       return 'settled'
     }
 
-    // Mid-diagnosis: keep waiting.
     setState({ kind: 'generating' })
     return 'pending'
-  }, [consultationId, navigate, t, awaitingTurn])
+  }, [consultationId, navigate, t, awaitingTurn, ensureIdentity])
 
   useEffect(() => {
     if (!consultationId) {
@@ -176,9 +180,58 @@ export default function LibertyMDReportPage() {
     }
   }, [consultationId, load, navigate])
 
+  const startGoogleLink = async () => {
+    if (!consultationId) return
+    setIsAuthBusy(true)
+    try {
+      await ensureIdentity()
+      const { data: transfer, error: transferError } = await supabase.functions.invoke('libertymd-care-proxy', {
+        body: { action: 'prepare_account_merge', consultation_id: consultationId },
+      })
+      if (transferError || !transfer?.transfer_token) {
+        throw transferError || new Error('Unable to prepare secure Google linking.')
+      }
+      window.sessionStorage.setItem(`libertymd-transfer:${consultationId}`, String(transfer.transfer_token))
+      const query = new URLSearchParams({ consultationId, auth: 'complete' })
+      const { error: linkError } = await supabase.auth.linkIdentity({
+        provider: 'google',
+        options: { redirectTo: `${window.location.origin}/liberty-md/report/${encodeURIComponent(consultationId)}?${query.toString()}` },
+      })
+      if (linkError) throw linkError
+    } catch (err) {
+      console.error('Report gate Google link failed:', err)
+      setIsAuthBusy(false)
+    }
+  }
+
+  const skipReportGate = async () => {
+    if (!consultationId) return
+    setIsAuthBusy(true)
+    try {
+      await ensureIdentity()
+      await supabase.functions.invoke('libertymd-care-proxy', {
+        body: { action: 'release_report', consultation_id: consultationId, mode: 'skip' },
+      })
+      markSoftGateDismissed(consultationId)
+      setIsReportGateOpen(false)
+      void load()
+    } catch (err) {
+      console.error('Report gate skip failed:', err)
+    } finally {
+      setIsAuthBusy(false)
+    }
+  }
+
+  const dismissReportGate = () => {
+    if (consultationId) markSoftGateDismissed(consultationId)
+    setIsReportGateOpen(false)
+  }
+
   const backToChat = () => {
     navigate(`/liberty-md/chat?consultationId=${encodeURIComponent(consultationId)}`)
   }
+
+  const showGate = isReportGateOpen && (state.kind === 'loading' || state.kind === 'generating' || (state.kind === 'ready' && !state.saved))
 
   return (
     <div
@@ -275,6 +328,15 @@ export default function LibertyMDReportPage() {
           </button>
         </div>
       </div>
+
+      {showGate && (
+        <LibertyMDReportGate
+          loading={isAuthBusy}
+          onGoogle={startGoogleLink}
+          onSkip={skipReportGate}
+          onClose={dismissReportGate}
+        />
+      )}
     </div>
   )
 }
