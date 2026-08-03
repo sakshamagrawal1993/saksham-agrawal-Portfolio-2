@@ -22,6 +22,7 @@ import {
   LibertyMDReportLifecycleShell,
 } from './LibertyMDReportLifecycleShell'
 import LibertyMDLanguageSwitcher from './LibertyMDLanguageSwitcher'
+import LibertyMDFooterRibbon from './LibertyMDFooterRibbon'
 import { LibertyMDAccountDrawer, LibertyMDReportGate } from './LibertyMDCareControls'
 import { isSoftGateDismissed, markSoftGateDismissed } from './libertymd-soft-gate'
 import {
@@ -413,14 +414,12 @@ export default function LibertyMDReportPage() {
 }
 
 /**
- * High-End 2-Minute Silk Wave Glassmorphic Loader
+ * Clean & Crisp Clinical Countdown Loader
  *
- * Inspired by LibertyMD Homepage Footer ribbon aesthetics:
- * - Deep cobalt to electric azure background mesh
- * - Frosted glassmorphic card with ambient glow
- * - Asclepius emblem with pulsing aura
- * - Glowing countdown pill ("02:00")
- * - 4-Stage clinical progress stepper with active checkmarks
+ * - Background: Dynamic WebGL Silk Ribbon from LibertyMDFooterRibbon
+ * - Header: "Creating report..."
+ * - Center logo encircled by a circular SVG countdown progress ring (02:00 -> 00:00)
+ * - 4 Stepper stages: Symptoms, Differential, SOAP Note, Finalizing
  */
 function ReportLoader({ onRefresh }: { onRefresh?: () => void }) {
   const TOTAL_SECONDS = 120
@@ -446,91 +445,112 @@ function ReportLoader({ onRefresh }: { onRefresh?: () => void }) {
   const remSeconds = secondsLeft % 60
   const formattedTime = `0${minutes}:${remSeconds < 10 ? '0' : ''}${remSeconds}`
 
+  // SVG Circle Progress calculation (radius 56 -> circumference ~351.86)
+  const radius = 56
+  const circumference = 2 * Math.PI * radius
+  const strokeDashoffset = circumference - (progressPercent / 100) * circumference
+
   // 4 Stepper stages over 120s
   const stepIndex = secondsLeft > 90 ? 0 : secondsLeft > 60 ? 1 : secondsLeft > 30 ? 2 : 3
 
   const stages = [
-    { title: '1. Symptoms', label: 'Summarizing clinical notes & symptoms...' },
-    { title: '2. Differential', label: 'Evaluating symptoms against clinical database...' },
-    { title: '3. SOAP Note', label: 'Synthesizing primary diagnosis & action plan...' },
-    { title: '4. Finalizing', label: 'Finalizing physician-ready report document...' },
+    { title: 'Symptoms', label: 'Summarizing patient symptoms & intake...' },
+    { title: 'Differential', label: 'Evaluating clinical probabilities...' },
+    { title: 'SOAP Note', label: 'Structuring subjective & objective plan...' },
+    { title: 'Finalizing', label: 'Finalizing physician report document...' },
   ]
 
-  const activeStageLabel = stages[stepIndex]?.label ?? 'Loading details...'
+  const activeStageLabel = stages[stepIndex]?.label ?? 'Finalizing report...'
 
   return (
-    <div className="relative min-h-[560px] w-full overflow-hidden rounded-3xl bg-gradient-to-b from-[#09152C] via-[#102447] to-[#1E3B70] p-6 sm:p-12 shadow-2xl flex items-center justify-center">
-      {/* Background Ambient Fluid Mesh Glow */}
-      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden="true">
-        <div className="absolute -top-24 left-1/2 h-[380px] w-[500px] -translate-x-1/2 rounded-full bg-blue-600/30 blur-[90px] animate-pulse" />
-        <div className="absolute top-1/3 -left-20 h-64 w-64 rounded-full bg-sky-500/20 blur-[80px]" />
-        <div className="absolute bottom-0 -right-20 h-72 w-72 rounded-full bg-indigo-500/25 blur-[90px]" />
+    <div className="relative min-h-[580px] w-full overflow-hidden rounded-3xl border border-libertymd-slate-200/80 bg-[#FAFBFD] p-6 sm:p-12 shadow-lg flex flex-col items-center justify-center text-center">
+      {/* Dynamic 3D WebGL Ribbon in Background */}
+      <div className="pointer-events-none absolute inset-0 z-0 opacity-60 overflow-hidden" aria-hidden="true">
+        <LibertyMDFooterRibbon />
       </div>
 
-      {/* Main Frosted Glassmorphic Container */}
+      {/* Main Glass Card Overlay */}
       <section
         data-libertymd-report-loader=""
         aria-live="polite"
         aria-busy="true"
-        className="relative z-10 w-full max-w-xl rounded-2xl border border-white/20 bg-white/10 p-8 sm:p-10 text-center text-white backdrop-blur-xl shadow-[0_20px_60px_rgba(0,0,0,0.4)]"
+        className="relative z-10 w-full max-w-lg rounded-2xl border border-libertymd-blue-100 bg-white/90 p-8 sm:p-12 text-center backdrop-blur-md shadow-[0_15px_45px_rgba(37,99,235,0.08)] flex flex-col items-center"
       >
-        {/* Asclepius Emblem with Pulsing Aura */}
-        <div className="relative mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-blue-600/20 border border-blue-400/30 shadow-[0_0_35px_rgba(37,99,235,0.4)]">
-          <img
-            src="/images/libertymd-logo-mark.svg"
-            alt="LibertyMD Crest"
-            className="h-14 w-14 object-contain filter drop-shadow-[0_0_12px_rgba(147,197,253,0.8)] animate-pulse"
-          />
-        </div>
-
-        <h2 className="mt-6 font-sans text-2xl font-bold tracking-tight text-white sm:text-3xl">
-          Liberty<span className="text-sky-400">MD</span>
+        {/* Header */}
+        <h2 className="font-serif text-3xl sm:text-4xl font-bold tracking-tight text-libertymd-ink">
+          Creating report...
         </h2>
-        <p className="text-xs font-semibold uppercase tracking-widest text-sky-200/80 mt-0.5">
-          Clinical Synthesis In Progress
+
+        {/* Subtitle / Active Stage */}
+        <p className="mt-2 text-sm font-medium text-libertymd-blue-700 animate-pulse">
+          {activeStageLabel}
         </p>
 
-        {/* Countdown Pill Badge */}
-        <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-sky-400/30 bg-sky-950/60 px-4 py-1.5 text-xs font-mono font-bold text-sky-200 shadow-[0_0_15px_rgba(56,189,248,0.25)]">
-          <Clock className="h-3.5 w-3.5 text-sky-400" />
-          <span>TIME REMAINING: {formattedTime}</span>
-        </div>
-
-        {/* Liquid Progress Bar */}
-        <div className="mx-auto mt-8 w-full">
-          <div className="flex items-center justify-between text-xs font-semibold text-sky-200/90 mb-2">
-            <span className="truncate max-w-[280px] sm:max-w-none">{activeStageLabel}</span>
-            <span className="font-mono text-sky-300 font-bold ml-2">{progressPercent}%</span>
-          </div>
-          <div className="h-3 w-full overflow-hidden rounded-full bg-slate-950/60 p-0.5 border border-white/10 shadow-inner">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-blue-600 via-sky-400 to-indigo-400 transition-all duration-1000 ease-linear shadow-[0_0_18px_rgba(56,189,248,0.8)]"
-              style={{ width: `${progressPercent}%` }}
+        {/* Center Logo Encircled by Circular Progress Ring */}
+        <div className="relative mt-8 mb-4 flex h-36 w-36 items-center justify-center">
+          {/* SVG Circular Progress Ring */}
+          <svg className="absolute inset-0 h-full w-full -rotate-90 transform" viewBox="0 0 128 128">
+            {/* Background Track Circle */}
+            <circle
+              cx="64"
+              cy="64"
+              r={radius}
+              className="stroke-libertymd-blue-50"
+              strokeWidth="6"
+              fill="transparent"
             />
+            {/* Animated Progress Circle */}
+            <circle
+              cx="64"
+              cy="64"
+              r={radius}
+              className="stroke-libertymd-blue-600 transition-all duration-1000 ease-linear"
+              strokeWidth="6"
+              strokeDasharray={circumference}
+              strokeDashoffset={strokeDashoffset}
+              strokeLinecap="round"
+              fill="transparent"
+            />
+          </svg>
+
+          {/* Logo & Timer in Center */}
+          <div className="relative z-10 flex flex-col items-center justify-center text-center">
+            <img
+              src="/images/libertymd-logo-mark.svg"
+              alt="LibertyMD Logo"
+              className="h-10 w-10 object-contain mb-1"
+            />
+            <span className="font-mono text-sm font-bold text-libertymd-ink tracking-tight">
+              {formattedTime}
+            </span>
           </div>
         </div>
 
-        {/* 4 Clinical Stepper Nodes */}
-        <div className="mt-8 grid grid-cols-4 gap-2 pt-2 border-t border-white/10">
+        {/* 4 Clinical Steps */}
+        <div className="mt-6 w-full grid grid-cols-4 gap-2 pt-6 border-t border-libertymd-slate-100">
           {stages.map((st, idx) => {
             const isCompleted = idx < stepIndex
             const isCurrent = idx === stepIndex
             return (
               <div key={st.title} className="flex flex-col items-center text-center">
                 <div
-                  className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition-all duration-500 ${
+                  className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-all duration-300 ${
                     isCompleted
-                      ? 'bg-sky-400 text-slate-950 shadow-[0_0_12px_rgba(56,189,248,0.6)]'
+                      ? 'bg-libertymd-blue-600 text-white shadow-xs'
                       : isCurrent
-                        ? 'bg-blue-600 text-white ring-2 ring-sky-300 ring-offset-2 ring-offset-slate-900 animate-pulse'
-                        : 'bg-white/10 text-white/40 border border-white/10'
+                        ? 'bg-libertymd-blue-50 text-libertymd-blue-700 ring-2 ring-libertymd-blue-600'
+                        : 'bg-libertymd-slate-100 text-libertymd-slate-400'
                   }`}
                 >
-                  {isCompleted ? <Check className="h-4 w-4 stroke-[3]" /> : idx + 1}
+                  {isCompleted ? <Check className="h-3.5 w-3.5 stroke-[3]" /> : idx + 1}
                 </div>
                 <span
-                  className={`mt-2 text-[11px] font-semibold leading-tight ${
-                    isCurrent ? 'text-sky-300 font-bold' : isCompleted ? 'text-white' : 'text-white/40'
+                  className={`mt-2 text-[11px] font-semibold leading-snug ${
+                    isCurrent
+                      ? 'text-libertymd-blue-700 font-bold'
+                      : isCompleted
+                        ? 'text-libertymd-ink'
+                        : 'text-libertymd-slate-400'
                   }`}
                 >
                   {st.title}
@@ -545,14 +565,14 @@ function ReportLoader({ onRefresh }: { onRefresh?: () => void }) {
             <button
               type="button"
               onClick={() => onRefresh?.()}
-              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-sky-500 px-6 py-3 text-sm font-bold text-white shadow-[0_0_20px_rgba(37,99,235,0.5)] transition hover:brightness-110 active:scale-95"
+              className="inline-flex items-center gap-2 rounded-xl bg-libertymd-blue-600 px-6 py-3 text-sm font-bold text-white shadow-md transition hover:bg-libertymd-blue-700 active:scale-95"
             >
               <RefreshCw className="h-4 w-4" />
               Check Report Status
             </button>
           </div>
         ) : (
-          <p className="mt-6 text-xs text-sky-200/60 font-medium">
+          <p className="mt-6 text-xs text-libertymd-slate-400 font-medium">
             Please stay on this page. Your report will display automatically once complete.
           </p>
         )}
