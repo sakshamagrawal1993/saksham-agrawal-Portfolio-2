@@ -147,3 +147,88 @@ export function buildConversationTranscript(history: unknown[]): string {
   const turns = formatHistoryForInference(history)
   return turns.map((turn) => `${turn.speaker}: ${turn.text}`).join('\n')
 }
+
+/**
+ * Extract concise Q -> A pairs from history turns for high-density LLM prompts.
+ * Pairs Doctor's question with Patient's chosen option / text response.
+ */
+export function buildQASummary(history: unknown[]): string {
+  if (!Array.isArray(history)) return ''
+
+  const qaPairs: string[] = []
+
+  for (let i = 0; i < history.length; i++) {
+    const item = history[i]
+    if (!item || typeof item !== 'object') continue
+    const msg = item as Record<string, unknown>
+    const role = String(msg.role || '').toLowerCase()
+    const content = String(msg.content || '').trim()
+
+    if (role === 'user' && content) {
+      // Find preceding Doctor question
+      const prevMsg = i > 0 && typeof history[i - 1] === 'object' ? (history[i - 1] as Record<string, unknown>) : null
+      const prevRole = prevMsg ? String(prevMsg.role || '').toLowerCase() : ''
+      const prevQuestion = prevMsg && prevRole === 'assistant' ? String(prevMsg.content || '').trim() : null
+
+      if (prevQuestion) {
+        // Strip multiple choice options if embedded in question text for max information density
+        const cleanQ = prevQuestion.split('\n')[0].replace(/\?.*$/, '?').trim()
+        qaPairs.push(`Q: ${cleanQ} -> A: ${content}`)
+      } else {
+        qaPairs.push(`Patient: ${content}`)
+      }
+    }
+  }
+
+  return qaPairs.join('\n')
+}
+
+/**
+ * Builds a high-information-density context block combining Patient Demographics,
+ * Filled Clinical Slots, and Structured Dialogue.
+ */
+export function buildDenseContext(
+  history: unknown[],
+  patient?: Record<string, unknown> | null,
+  slots?: Record<string, unknown> | null
+): string {
+  const parts: string[] = []
+
+  // Demographics
+  if (patient && typeof patient === 'object') {
+    const age = patient.age || patient.age_years || ''
+    const sex = patient.sex || patient.gender || ''
+    const medHistory = patient.medical_history || patient.relevant_history || ''
+    const demoStr = [
+      age ? `Age: ${age}` : '',
+      sex ? `Sex: ${sex}` : '',
+      medHistory ? `Medical History: ${medHistory}` : '',
+    ].filter(Boolean).join(' | ')
+    if (demoStr) {
+      parts.push(`[PATIENT DEMOGRAPHICS]\n${demoStr}`)
+    }
+  }
+
+  // Filled slots
+  if (slots && typeof slots === 'object') {
+    const activeSlots = Object.entries(slots)
+      .filter(([_, v]) => v !== null && v !== undefined && v !== '')
+      .map(([k, v]) => `- ${k}: ${typeof v === 'object' ? JSON.stringify(v) : String(v)}`)
+    if (activeSlots.length > 0) {
+      parts.push(`[EXTRACTED CLINICAL FINDINGS]\n${activeSlots.join('\n')}`)
+    }
+  }
+
+  // QA Summary & Dialogue Transcript
+  const qa = buildQASummary(history)
+  if (qa) {
+    parts.push(`[QUESTION-ANSWER SUMMARY]\n${qa}`)
+  } else {
+    const transcript = buildConversationTranscript(history)
+    if (transcript) {
+      parts.push(`[CONVERSATION TRANSCRIPT]\n${transcript}`)
+    }
+  }
+
+  return parts.join('\n\n')
+}

@@ -43,7 +43,7 @@ import { guardrailTransportFailureResult } from './errors.ts'
 import { enforceCardioRespiratoryEmergencySpecificity } from './emergency-specificity.ts'
 import { normalizeObject, postJson, revokeStageSuccessAsFailure } from './n8n-client.ts'
 import { severityForSafetySignal } from './types.ts'
-import { buildConversationTranscript, formatHistoryForInference, limitConsultationMessage } from './utils.ts'
+import { buildConversationTranscript, buildDenseContext, buildQASummary, formatHistoryForInference, limitConsultationMessage } from './utils.ts'
 import type { ProxyContext } from './context.ts'
 import type {
   ConsultationRow,
@@ -439,6 +439,8 @@ export async function runGuardrail(
   try {
     const formattedHistory = formatHistoryForInference(history)
     const transcriptText = buildConversationTranscript(history)
+    const qaSummaryText = buildQASummary(history)
+    const denseContextText = buildDenseContext(history, patient, slots)
     const webhookRaw = normalizeObject(await postJson(
       GUARDRAIL_WEBHOOK,
       {
@@ -447,6 +449,8 @@ export async function runGuardrail(
         conversation_transcript: transcriptText,
         transcript: transcriptText,
         history_text: transcriptText,
+        qa_summary: qaSummaryText,
+        dense_context: denseContextText,
         patient,
         filled_slots: slots,
       },

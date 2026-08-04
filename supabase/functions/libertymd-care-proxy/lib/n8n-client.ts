@@ -21,7 +21,7 @@ import {
   WEBHOOK_SECRET,
 } from './config.ts'
 import { calculateMissingSlots, CORE_SLOTS, sanitizeSlotUpdates } from './slots.ts'
-import { buildConversationTranscript, cleanMessage, formatHistoryForInference, limitConsultationMessage } from './utils.ts'
+import { buildConversationTranscript, buildDenseContext, buildQASummary, cleanMessage, formatHistoryForInference, limitConsultationMessage } from './utils.ts'
 import type { ConsultationRow, DifferentialResult, InterviewResult, JsonObject } from './types.ts'
 import type { ResponseRelevance } from '../clinical-policy.ts'
 
@@ -532,11 +532,15 @@ export async function runInterview(
   try {
     const formattedHistory = formatHistoryForInference(history)
     const transcriptText = buildConversationTranscript(history)
+    const qaSummaryText = buildQASummary(history)
+    const denseContextText = buildDenseContext(history, patient, slots)
     const raw = normalizeObject(await postJson(INTERVIEW_WEBHOOK, {
       history: formattedHistory,
       conversation_transcript: transcriptText,
       transcript: transcriptText,
       history_text: transcriptText,
+      qa_summary: qaSummaryText,
+      dense_context: denseContextText,
       patient,
       filled_slots: slots,
       missing_slots: missingSlots,
@@ -651,11 +655,15 @@ export async function runDiagnosis(
   try {
     const formattedHistory = formatHistoryForInference(history)
     const transcriptText = buildConversationTranscript(history)
+    const qaSummaryText = buildQASummary(history)
+    const denseContextText = buildDenseContext(history, patient, slots)
     const parsed = parseDiagnosis(await postJson(DIAGNOSIS_WEBHOOK, {
       history: formattedHistory,
       conversation_transcript: transcriptText,
       transcript: transcriptText,
       history_text: transcriptText,
+      qa_summary: qaSummaryText,
+      dense_context: denseContextText,
       patient,
       filled_slots: slots,
       missing_slots: calculateMissingSlots(slots),
@@ -724,6 +732,8 @@ export async function runDifferential(
   try {
     const formattedHistory = formatHistoryForInference(history)
     const transcriptText = buildConversationTranscript(history)
+    const qaSummaryText = buildQASummary(history)
+    const denseContextText = buildDenseContext(history, patient, slots)
     const raw = normalizeObject(await postJson(
       DIFFERENTIAL_WEBHOOK,
       {
@@ -731,6 +741,8 @@ export async function runDifferential(
         conversation_transcript: transcriptText,
         transcript: transcriptText,
         history_text: transcriptText,
+        qa_summary: qaSummaryText,
+        dense_context: denseContextText,
         patient,
         filled_slots: slots,
         turn_count: turnCount,
