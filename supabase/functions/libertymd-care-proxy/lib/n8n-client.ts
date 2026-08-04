@@ -560,7 +560,37 @@ export async function runInterview(
     }
     const ready = Boolean(raw.ready_for_report)
     const question = limitConsultationMessage(raw.next_question || raw.question)
-    const options = Array.isArray(raw.options) ? raw.options.map(String).filter(Boolean).slice(0, 4) : []
+    
+    // Robust option extractor across array/string/object/choices formats
+    let rawOptions: unknown[] = []
+    if (Array.isArray(raw.options)) {
+      rawOptions = raw.options
+    } else if (typeof raw.options === 'string' && raw.options.trim()) {
+      try {
+        const parsed = JSON.parse(raw.options)
+        if (Array.isArray(parsed)) rawOptions = parsed
+        else rawOptions = raw.options.split(',').map((s) => s.trim())
+      } catch {
+        rawOptions = raw.options.split(',').map((s) => s.trim())
+      }
+    } else if (Array.isArray(raw.choices)) {
+      rawOptions = raw.choices
+    } else if (Array.isArray(raw.suggested_options)) {
+      rawOptions = raw.suggested_options
+    }
+
+    const options = rawOptions
+      .map((opt) => {
+        if (typeof opt === 'string') return opt.trim()
+        if (opt && typeof opt === 'object') {
+          const o = opt as Record<string, unknown>
+          return String(o.text || o.label || o.value || o.option || '').trim()
+        }
+        return String(opt || '').trim()
+      })
+      .filter(Boolean)
+      .slice(0, 4)
+
     const relevance = ['clinical', 'unclear', 'off_topic'].includes(String(raw.input_relevance))
       ? String(raw.input_relevance) as ResponseRelevance
       : 'clinical'
