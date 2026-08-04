@@ -48,6 +48,8 @@ export interface LibertyMDOverlaySheetProps {
   className?: string;
   /** Panel chrome classes (width / padding). */
   panelClassName?: string;
+  /** Optional body container classes (e.g. flex flex-col overflow-hidden for pinned footers). */
+  bodyClassName?: string;
   /** When set, freeze this element's scrollTop; else query consult scroller selector. */
   consultScroller?: HTMLElement | null;
 }
@@ -60,6 +62,7 @@ export function LibertyMDOverlaySheet({
   ariaDescribedBy,
   className,
   panelClassName,
+  bodyClassName,
   consultScroller,
 }: LibertyMDOverlaySheetProps) {
   const layerRef = useRef<HTMLDivElement | null>(null);
@@ -224,7 +227,7 @@ export function LibertyMDOverlaySheet({
           data-lenis-prevent-wheel
           data-lenis-prevent-touch
           tabIndex={0}
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y focus:outline-none"
+          className={bodyClassName ?? "min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y focus:outline-none"}
           // Stable id hook for tests / future P1-14 mounts; not user-facing.
           id={`libertymd-overlay-body-${generatedId}`}
         >

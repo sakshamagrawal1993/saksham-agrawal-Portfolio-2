@@ -610,8 +610,11 @@ export default function LibertyMDChat() {
     if (sessionData.session) {
       // P1-17: stitch device history → anon/linked Supabase id (id-only).
       identifyLibertyMdUser(sessionData.session.user.id);
-      if (typeof sessionData.session.user.email === 'string' && sessionData.session.user.email) {
-        setLinkedEmail(sessionData.session.user.email);
+      const u = sessionData.session.user;
+      const userIsAnon = u.is_anonymous === true || (!u.email && u.app_metadata?.provider === 'anonymous');
+      setIsAnonymous(userIsAnon);
+      if (typeof u.email === 'string' && u.email) {
+        setLinkedEmail(u.email);
       }
       return sessionData.session;
     }

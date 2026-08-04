@@ -57,7 +57,7 @@ export default function LibertyMDReportPage() {
   const [isAuthBusy, setIsAuthBusy] = useState(false)
   const [user, setUser] = useState<User | null>(null)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const isAnonymous = !user || Boolean(user.is_anonymous)
+  const isAnonymous = !user || user.is_anonymous === true || (!user.email && user.app_metadata?.provider === 'anonymous')
   const startedAtRef = useRef<number>(Date.now())
   const cancelledRef = useRef(false)
   const consecutiveErrorsRef = useRef(0)

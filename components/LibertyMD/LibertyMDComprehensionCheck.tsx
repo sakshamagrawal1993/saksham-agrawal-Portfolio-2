@@ -110,15 +110,16 @@ export function LibertyMDComprehensionCheck({
       onClose={onDismiss}
       titleId="libertymd-comprehension-title"
       ariaDescribedBy="libertymd-comprehension-desc"
-      panelClassName="relative flex flex-col max-h-[85dvh]"
+      panelClassName="relative flex flex-col max-h-[85dvh] sm:max-h-[80vh] h-full"
+      bodyClassName="min-h-0 flex-1 flex flex-col overflow-hidden focus:outline-none"
       consultScroller={consultScroller}
     >
       <div
         data-libertymd-comprehension-check=""
-        className="flex flex-1 flex-col overflow-hidden bg-white"
+        className="flex flex-1 flex-col overflow-hidden bg-white min-h-0 h-full"
       >
         {/* Scrollable Summary Body */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-2">
+        <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 pb-4 min-h-0">
           <p className="text-xs font-bold uppercase tracking-wide text-libertymd-blue-600">
             {t('chatx.comprehensionEyebrow')}
           </p>
