@@ -21,7 +21,7 @@ import {
   WEBHOOK_SECRET,
 } from './config.ts'
 import { calculateMissingSlots, CORE_SLOTS, sanitizeSlotUpdates } from './slots.ts'
-import { cleanMessage, formatHistoryForInference, limitConsultationMessage } from './utils.ts'
+import { buildConversationTranscript, cleanMessage, formatHistoryForInference, limitConsultationMessage } from './utils.ts'
 import type { ConsultationRow, DifferentialResult, InterviewResult, JsonObject } from './types.ts'
 import type { ResponseRelevance } from '../clinical-policy.ts'
 
@@ -530,8 +530,13 @@ export async function runInterview(
   assertInferenceAllowed('interview', status, consultationId)
   const clinicalLanguage = String(language || 'en').trim().toLowerCase() === 'es' ? 'es' : 'en'
   try {
+    const formattedHistory = formatHistoryForInference(history)
+    const transcriptText = buildConversationTranscript(history)
     const raw = normalizeObject(await postJson(INTERVIEW_WEBHOOK, {
-      history: formatHistoryForInference(history),
+      history: formattedHistory,
+      conversation_transcript: transcriptText,
+      transcript: transcriptText,
+      history_text: transcriptText,
       patient,
       filled_slots: slots,
       missing_slots: missingSlots,
@@ -644,10 +649,13 @@ export async function runDiagnosis(
   const speculative = Boolean(options.speculative)
   const clinicalLanguage = String(consultation.language || 'en').trim().toLowerCase() === 'es' ? 'es' : 'en'
   try {
-    // Speculative: stage null — isolate from N8N_BREAKER.diagnosis (S1).
-    const stage = speculative ? null : undefined
+    const formattedHistory = formatHistoryForInference(history)
+    const transcriptText = buildConversationTranscript(history)
     const parsed = parseDiagnosis(await postJson(DIAGNOSIS_WEBHOOK, {
-      history: formatHistoryForInference(history),
+      history: formattedHistory,
+      conversation_transcript: transcriptText,
+      transcript: transcriptText,
+      history_text: transcriptText,
       patient,
       filled_slots: slots,
       missing_slots: calculateMissingSlots(slots),
@@ -714,10 +722,15 @@ export async function runDifferential(
   mediaContext: JsonObject[] = [],
 ): Promise<DifferentialResult | null> {
   try {
+    const formattedHistory = formatHistoryForInference(history)
+    const transcriptText = buildConversationTranscript(history)
     const raw = normalizeObject(await postJson(
       DIFFERENTIAL_WEBHOOK,
       {
-        history: formatHistoryForInference(history),
+        history: formattedHistory,
+        conversation_transcript: transcriptText,
+        transcript: transcriptText,
+        history_text: transcriptText,
         patient,
         filled_slots: slots,
         turn_count: turnCount,

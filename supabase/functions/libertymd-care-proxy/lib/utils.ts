@@ -92,17 +92,21 @@ export function patientPayload(profile: JsonObject | PatientRow | null) {
   }
 }
 
+export interface FormattedHistoryTurn {
+  speaker: 'Patient' | 'Doctor'
+  role: 'user' | 'assistant'
+  text: string
+  content: string
+}
+
 /**
- * Formats transcript history into clear Q -> A pairs for n8n inference nodes.
- *
- * Strips unselected options noise from assistant turns so n8n only receives
- * Question + Selected Option chosen by user, preventing option list confusion
- * and repeated questions.
+ * Formats transcript history into clean Patient : {Text} / Doctor : {Text} turns.
+ * Completely strips non-essential metadata (id, created_at, target_slot, message_type, options, etc.).
  */
-export function formatHistoryForInference(history: unknown[]): JsonObject[] {
+export function formatHistoryForInference(history: unknown[]): FormattedHistoryTurn[] {
   if (!Array.isArray(history)) return []
 
-  const formatted: JsonObject[] = []
+  const formatted: FormattedHistoryTurn[] = []
 
   for (let i = 0; i < history.length; i++) {
     const item = history[i]
@@ -110,32 +114,36 @@ export function formatHistoryForInference(history: unknown[]): JsonObject[] {
     const msg = item as Record<string, unknown>
     const role = String(msg.role || '').toLowerCase()
     const content = String(msg.content || '').trim()
+    if (!content) continue
 
     if (role === 'user') {
-      const prevMsg = i > 0 && typeof history[i - 1] === 'object' ? (history[i - 1] as Record<string, unknown>) : null
-      const prevRole = prevMsg ? String(prevMsg.role || '').toLowerCase() : ''
-      const prevQuestion = prevMsg && prevRole === 'assistant' ? String(prevMsg.content || '').trim() : null
-
       formatted.push({
+        speaker: 'Patient',
         role: 'user',
+        text: content,
         content: content,
-        ...(prevQuestion ? { question: prevQuestion } : {}),
-        qa_pair: prevQuestion ? `Q: ${prevQuestion} -> A: ${content}` : `User: ${content}`,
       })
     } else if (role === 'assistant') {
-      // Omit unselected options array from assistant history turn so n8n sees clean question text
       formatted.push({
+        speaker: 'Doctor',
         role: 'assistant',
-        content: content,
-        ...(msg.target_slot ? { target_slot: String(msg.target_slot) } : {}),
-      })
-    } else if (role === 'system') {
-      formatted.push({
-        role: 'system',
+        text: content,
         content: content,
       })
     }
   }
 
   return formatted
+}
+
+/**
+ * Builds a clean multi-line transcript string for direct LLM prompts:
+ * 
+ * Patient: [text]
+ * Doctor: [text]
+ * Patient: [text]
+ */
+export function buildConversationTranscript(history: unknown[]): string {
+  const turns = formatHistoryForInference(history)
+  return turns.map((turn) => `${turn.speaker}: ${turn.text}`).join('\n')
 }
