@@ -630,12 +630,21 @@ export default function LibertyMDChat() {
     return identityPromiseRef.current;
   };
 
-  const invokeCareProxy = async (body: Record<string, unknown>) => {
+  const invokeCareProxy = async (body: Record<string, unknown>, isRetry = false): Promise<any> => {
     await ensureIdentity();
     const { data, error: functionError } = await supabase.functions.invoke('libertymd-care-proxy', {
       body: { region: 'EU', ...body },
     });
     if (functionError) {
+      const errStr = String((functionError as any)?.message || functionError);
+      if (!isRetry && (errStr.includes('UNAUTHORIZED_LEGACY_JWT') || errStr.includes('Invalid JWT') || (functionError as any)?.status === 401)) {
+        const { data: refreshed } = await supabase.auth.refreshSession();
+        if (!refreshed?.session) {
+          identityPromiseRef.current = null;
+          await supabase.auth.signInAnonymously();
+        }
+        return invokeCareProxy(body, true);
+      }
       // P0-12: preserve decoded body (claim_rejection, etc.) when supabase returns both.
       if (data && typeof data === 'object') {
         Object.assign(functionError, { body: data });

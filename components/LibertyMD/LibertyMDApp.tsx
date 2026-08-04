@@ -611,12 +611,21 @@ export default function LibertyMDApp() {
     return identityPromiseRef.current;
   };
 
-  const invokeCareProxy = async (body: Record<string, unknown>) => {
+  const invokeCareProxy = async (body: Record<string, unknown>, isRetry = false): Promise<any> => {
     await ensureIdentity();
     const { data, error: fnError } = await supabase.functions.invoke('libertymd-care-proxy', {
       body: { region, ...body }
     });
     if (fnError) {
+      const errStr = String((fnError as any)?.message || fnError);
+      if (!isRetry && (errStr.includes('UNAUTHORIZED_LEGACY_JWT') || errStr.includes('Invalid JWT') || (fnError as any)?.status === 401)) {
+        const { data: refreshed } = await supabase.auth.refreshSession();
+        if (!refreshed?.session) {
+          identityPromiseRef.current = null;
+          await supabase.auth.signInAnonymously();
+        }
+        return invokeCareProxy(body, true);
+      }
       if (data && typeof data === 'object') {
         Object.assign(fnError, { body: data });
       }
