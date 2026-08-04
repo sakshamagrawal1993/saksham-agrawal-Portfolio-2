@@ -49,7 +49,14 @@ export function sanitizeSlotUpdates(value: unknown): JsonObject {
 }
 
 export function calculateMissingSlots(slots: JsonObject) {
+  const hasOnset = slots.onset != null && String(slots.onset).trim() !== ''
+  const hasDuration = slots.duration != null && String(slots.duration).trim() !== ''
+
   return CORE_SLOTS.filter((slot) => {
+    // If onset is filled, consider duration satisfied (and vice versa) to prevent duplicate duration questions
+    if (slot === 'duration' && (hasDuration || hasOnset)) return false
+    if (slot === 'onset' && (hasOnset || hasDuration)) return false
+
     const value = slots[slot]
     return value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)
   })

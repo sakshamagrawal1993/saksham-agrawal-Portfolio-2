@@ -390,6 +390,7 @@ export default function LibertyMDChat() {
   const [profile, setProfile] = useState<LibertyMDProfile | null>(null);
   const [history, setHistory] = useState<LibertyMDHistoryItem[]>([]);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isLeaveConfirmOpen, setIsLeaveConfirmOpen] = useState(false);
   // P5-CHAT — WhatsApp-style attach chooser behind a single paperclip.
   const [attachSheetOpen, setAttachSheetOpen] = useState(false);
   const photoFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -2706,7 +2707,7 @@ export default function LibertyMDChat() {
           <div className="flex min-w-0 items-center gap-2.5">
             <button
               type="button"
-              onClick={() => { void softLeaveConsult(); }}
+              onClick={() => setIsLeaveConfirmOpen(true)}
               aria-label="Back to LibertyMD"
               className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full text-libertymd-slate-500 transition hover:bg-libertymd-blue-50 hover:text-libertymd-blue-600"
             >
@@ -3332,6 +3333,60 @@ export default function LibertyMDChat() {
           onProceed={() => void proceedComprehensionCheck()}
           onCorrect={(text) => void correctComprehensionCheck(text)}
         />
+      )}
+
+      {/* End Consultation Confirmation Bottom Drawer */}
+      {isLeaveConfirmOpen && (
+        <LibertyMDOverlaySheet
+          onClose={() => setIsLeaveConfirmOpen(false)}
+          titleId="libertymd-end-consult-title"
+          ariaDescribedBy="libertymd-end-consult-desc"
+          panelClassName="relative flex flex-col max-h-[80dvh]"
+          consultScroller={scrollRef.current}
+        >
+          <div
+            data-libertymd-end-consult-drawer=""
+            className="flex flex-col p-5 sm:p-6 text-center"
+          >
+            <h2
+              id="libertymd-end-consult-title"
+              className="font-serif text-2xl font-semibold leading-tight text-libertymd-ink sm:text-3xl"
+            >
+              End Consultation?
+            </h2>
+            <p
+              id="libertymd-end-consult-desc"
+              className="mt-3 text-sm leading-relaxed text-libertymd-slate-600 sm:text-base"
+            >
+              Are you sure you want to end this consultation? Your progress will be saved so you can return anytime.
+            </p>
+
+            <div className="mt-6 flex flex-col items-center gap-3">
+              {/* Primary option: Continue button */}
+              <button
+                type="button"
+                data-libertymd-continue-consult=""
+                onClick={() => setIsLeaveConfirmOpen(false)}
+                className="inline-flex h-12 w-full items-center justify-center rounded-full bg-libertymd-blue-600 px-8 text-base font-bold text-white shadow-md transition hover:bg-libertymd-blue-700 active:scale-[0.99]"
+              >
+                Continue Consultation
+              </button>
+
+              {/* Secondary option: End Consultation text (not a button) */}
+              <button
+                type="button"
+                data-libertymd-end-consult-text=""
+                onClick={() => {
+                  setIsLeaveConfirmOpen(false);
+                  void softLeaveConsult();
+                }}
+                className="py-2 text-sm font-semibold text-libertymd-slate-600 transition hover:text-red-600 hover:underline cursor-pointer"
+              >
+                End Consultation
+              </button>
+            </div>
+          </div>
+        </LibertyMDOverlaySheet>
       )}
 
       <LibertyMDProfileCapabilityOffer

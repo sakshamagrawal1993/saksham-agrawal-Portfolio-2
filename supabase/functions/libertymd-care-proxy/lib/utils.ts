@@ -69,13 +69,73 @@ export function avatarUrl(user: User) {
   return String(metadata.avatar_url || metadata.picture || '').trim() || null
 }
 
-/** The trimmed patient shape sent to n8n. No PHI beyond what inference needs. */
+/** The trimmed patient shape sent to n8n. Supplies complete demographic information. */
 export function patientPayload(profile: JsonObject | PatientRow | null) {
-  if (!profile) return {}
+  if (!profile || typeof profile !== 'object') return {}
   const row = profile as unknown as JsonObject
+
+  const name = String(row.display_label || row.display_name || row.name || row.full_name || '').trim() || undefined
+  const age = typeof row.age === 'number' ? row.age : typeof row.age_years === 'number' ? row.age_years : row.age ? Number(row.age) : undefined
+  const sex = String(row.sex_at_birth || row.gender || row.sex || '').trim().toLowerCase() || undefined
+  const medicalHistory = String(row.medical_history || row.history || row.relevant_history || '').trim() || undefined
+
   return {
-    name: row.display_name || row.display_label || undefined,
-    age: row.age || undefined,
-    sex: row.sex_at_birth || undefined,
+    name: name || 'Patient',
+    display_label: name || 'Patient',
+    age: age || undefined,
+    age_years: age || undefined,
+    sex: sex || undefined,
+    gender: sex || undefined,
+    sex_at_birth: sex || undefined,
+    medical_history: medicalHistory || undefined,
+    relevant_history: medicalHistory || undefined,
   }
+}
+
+/**
+ * Formats transcript history into clear Q -> A pairs for n8n inference nodes.
+ *
+ * Strips unselected options noise from assistant turns so n8n only receives
+ * Question + Selected Option chosen by user, preventing option list confusion
+ * and repeated questions.
+ */
+export function formatHistoryForInference(history: unknown[]): JsonObject[] {
+  if (!Array.isArray(history)) return []
+
+  const formatted: JsonObject[] = []
+
+  for (let i = 0; i < history.length; i++) {
+    const item = history[i]
+    if (!item || typeof item !== 'object') continue
+    const msg = item as Record<string, unknown>
+    const role = String(msg.role || '').toLowerCase()
+    const content = String(msg.content || '').trim()
+
+    if (role === 'user') {
+      const prevMsg = i > 0 && typeof history[i - 1] === 'object' ? (history[i - 1] as Record<string, unknown>) : null
+      const prevRole = prevMsg ? String(prevMsg.role || '').toLowerCase() : ''
+      const prevQuestion = prevMsg && prevRole === 'assistant' ? String(prevMsg.content || '').trim() : null
+
+      formatted.push({
+        role: 'user',
+        content: content,
+        ...(prevQuestion ? { question: prevQuestion } : {}),
+        qa_pair: prevQuestion ? `Q: ${prevQuestion} -> A: ${content}` : `User: ${content}`,
+      })
+    } else if (role === 'assistant') {
+      // Omit unselected options array from assistant history turn so n8n sees clean question text
+      formatted.push({
+        role: 'assistant',
+        content: content,
+        ...(msg.target_slot ? { target_slot: String(msg.target_slot) } : {}),
+      })
+    } else if (role === 'system') {
+      formatted.push({
+        role: 'system',
+        content: content,
+      })
+    }
+  }
+
+  return formatted
 }

@@ -21,7 +21,7 @@ import {
   WEBHOOK_SECRET,
 } from './config.ts'
 import { calculateMissingSlots, CORE_SLOTS, sanitizeSlotUpdates } from './slots.ts'
-import { cleanMessage, limitConsultationMessage } from './utils.ts'
+import { cleanMessage, formatHistoryForInference, limitConsultationMessage } from './utils.ts'
 import type { ConsultationRow, DifferentialResult, InterviewResult, JsonObject } from './types.ts'
 import type { ResponseRelevance } from '../clinical-policy.ts'
 
@@ -531,7 +531,7 @@ export async function runInterview(
   const clinicalLanguage = String(language || 'en').trim().toLowerCase() === 'es' ? 'es' : 'en'
   try {
     const raw = normalizeObject(await postJson(INTERVIEW_WEBHOOK, {
-      history,
+      history: formatHistoryForInference(history),
       patient,
       filled_slots: slots,
       missing_slots: missingSlots,
@@ -647,7 +647,7 @@ export async function runDiagnosis(
     // Speculative: stage null — isolate from N8N_BREAKER.diagnosis (S1).
     const stage = speculative ? null : undefined
     const parsed = parseDiagnosis(await postJson(DIAGNOSIS_WEBHOOK, {
-      history,
+      history: formatHistoryForInference(history),
       patient,
       filled_slots: slots,
       missing_slots: calculateMissingSlots(slots),
@@ -717,7 +717,7 @@ export async function runDifferential(
     const raw = normalizeObject(await postJson(
       DIFFERENTIAL_WEBHOOK,
       {
-        history,
+        history: formatHistoryForInference(history),
         patient,
         filled_slots: slots,
         turn_count: turnCount,

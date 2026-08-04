@@ -254,8 +254,8 @@ export default function LibertyMDReportPage() {
     setIsReportGateOpen(false)
   }
 
-  const backToChat = () => {
-    navigate(`/liberty-md/chat?consultationId=${encodeURIComponent(consultationId)}`)
+  const backToHome = () => {
+    navigate('/liberty-md')
   }
 
   const showGate = isReportGateOpen && (state.kind === 'loading' || state.kind === 'generating' || (state.kind === 'ready' && !state.saved))
@@ -270,8 +270,8 @@ export default function LibertyMDReportPage() {
           <div className="flex items-center gap-2.5 min-w-0">
             <button
               type="button"
-              onClick={backToChat}
-              aria-label={t('report.backToConsult')}
+              onClick={backToHome}
+              aria-label="Back to LibertyMD Home"
               className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full text-libertymd-slate-500 transition hover:bg-libertymd-blue-50 hover:text-libertymd-blue-600"
             >
               <ArrowLeft className="h-5 w-5" />
@@ -375,7 +375,7 @@ export default function LibertyMDReportPage() {
           </p>
           <button
             type="button"
-            onClick={backToChat}
+            onClick={() => navigate('/liberty-md/chat')}
             className="w-full rounded-md bg-libertymd-blue-600 px-6 py-3 font-serif text-base font-semibold text-white shadow-md transition hover:bg-libertymd-blue-700 sm:w-auto"
           >
             Consult a Doctor

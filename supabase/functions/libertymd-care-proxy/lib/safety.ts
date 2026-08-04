@@ -43,7 +43,7 @@ import { guardrailTransportFailureResult } from './errors.ts'
 import { enforceCardioRespiratoryEmergencySpecificity } from './emergency-specificity.ts'
 import { normalizeObject, postJson, revokeStageSuccessAsFailure } from './n8n-client.ts'
 import { severityForSafetySignal } from './types.ts'
-import { limitConsultationMessage } from './utils.ts'
+import { formatHistoryForInference, limitConsultationMessage } from './utils.ts'
 import type { ProxyContext } from './context.ts'
 import type {
   ConsultationRow,
@@ -439,7 +439,7 @@ export async function runGuardrail(
   try {
     const webhookRaw = normalizeObject(await postJson(
       GUARDRAIL_WEBHOOK,
-      { message, history, patient, filled_slots: slots },
+      { message, history: formatHistoryForInference(history), patient, filled_slots: slots },
       timeoutMs,
       undefined,
       { correlationId: correlationId || undefined },
