@@ -51,6 +51,10 @@ High-specificity force_end examples:
 
 Be negation-, temporality-, experiencer-, and context-aware. A symptom in family history, a resolved past episode, a quoted statement, or a denied symptom is not the patient's present emergency.
 
+Fever duration or severity—even four or more days—plus bare shortness of breath is not enough for force_end without one of the high-specificity respiratory-distress findings above.
+
+Only patient/user-authored statements count as clinical evidence. Assistant questions and examples are not evidence. A short yes/no answer applies only to the immediately preceding assistant question; never reinterpret it as confirmation of a different red flag.
+
 status: pass | high_risk_continue | force_end
 risk_level: low | medium | high | emergency
 crisis_type: none | acs_chest_pain | thunderclap_headache | anaphylaxis | surgical_abdomen | respiratory_distress | stroke_fast | suicidal_ideation | other_emergency
@@ -67,20 +71,46 @@ const requestedStatus = String(parsed.status || (parsed.force_end ? 'force_end' 
 const requestedForceEnd = !!(parsed.force_end || requestedStatus === 'force_end');
 const requestedCrisisType = String(parsed.crisis_type || (requestedForceEnd ? 'other_emergency' : 'none'));
 const latest = String(pre.message_text || '').toLowerCase();
+const patientStatements = (Array.isArray(pre.history) ? pre.history : [])
+  .filter((item) => ['user', 'patient'].includes(String(item?.role || item?.sender || item?.author || '').toLowerCase()))
+  .map((item) => String(item?.content ?? item?.text ?? item?.message ?? '').trim().toLowerCase())
+  .filter(Boolean);
+if (latest) patientStatements.push(latest);
+const patientText = patientStatements.join(' ');
+
+function hasUnnegatedPatientMatch(statement, pattern) {
+  const flags = pattern.flags.includes('g') ? pattern.flags : pattern.flags + 'g';
+  const matcher = new RegExp(pattern.source, flags);
+  let match;
+  while ((match = matcher.exec(statement)) !== null) {
+    const before = statement.slice(Math.max(0, match.index - 60), match.index);
+    const clause = before.split(/[;.!?]|\\bbut\\b|\\bhowever\\b|\\balthough\\b|\\bthough\\b/i).pop() || '';
+    const negated = /\\b(no|not|without|denies|denied|never|don'?t have|doesn'?t have)\\b/i.test(clause);
+    const thirdPartyHistory = /\\b(my|his|her|their)\\s+\\w*\\s*(father|mother|dad|mum|mom|brother|sister|friend|husband|wife|son|daughter|uncle|aunt)\\s+(had|has had|used to have)\\b|\\b(family history|history of|hx of)\\b/i.test(before);
+    if (!negated && !thirdPartyHistory) return true;
+    if (match.index === matcher.lastIndex) matcher.lastIndex += 1;
+  }
+  return false;
+}
 
 // A second deterministic boundary protects the two common false-positive
 // families even when the model over-calls them. It does not mark them safe: it
 // downgrades terminal force_end to high_risk_continue so the interview can ask
 // severity, persistence, rest/exertion, radiation, and ability to speak.
-const hasChestOrBreathingSymptom = /\\b(chest (?:only )?(?:pain|discomfort|tightness|hurts?|aches?)|short(?:ness)? of breath|short of breath|breathless|difficulty breathing)\\b/i.test(latest);
-const highSpecificityAcs = /\\b(?:crushing|squeezing|heavy) (?:chest|pressure)\\b|\\bchest (?:pressure|squeezing|heaviness)\\b|\\bchest (?:pain|discomfort).{0,80}(?:radiat(?:es|ing)?|spread(?:s|ing)?).{0,35}(?:arm|jaw|back|neck)\\b|\\bchest (?:pain|discomfort).{0,80}(?:cold sweat|sweating|lightheaded|faint(?:ed|ing)?)\\b|\\b(?:cold sweat|sweating|lightheaded|faint(?:ed|ing)?).{0,80}chest (?:pain|discomfort)\\b|\\bchest (?:pain|discomfort).{0,60}(?:persistent|keeps returning|comes back|lasting (?:more than )?(?:a few|[5-9]|[1-9]\\d) minutes?)\\b/i.test(latest);
-const highSpecificityBreathing = /\\b(?:cannot|can't|unable to) breathe\\b|\\bgasping(?: for air)?\\b|\\bchoking\\b|\\b(?:cannot|can't|unable to) (?:speak|talk|get words out)\\b|\\b(?:blue|grey|gray) (?:lips|skin|face)\\b|\\bnew confusion\\b|\\b(?:collapsed|passed out|unconscious)\\b|\\boxygen (?:sat|saturation)?[^.]{0,12}(?:[0-8]\\d|9[0-2])\\b|\\bsevere (?:shortness of breath|difficulty breathing)\\b|\\b(?:shortness of breath|difficulty breathing).{0,30}(?:at rest|while resting|sitting still)\\b/i.test(latest);
-const cardioRespiratoryCall = ['acs_chest_pain', 'respiratory_distress', 'other_emergency'].includes(requestedCrisisType);
+const hasChestOrBreathingSymptom = /\\b(chest (?:only )?(?:pain|discomfort|tightness|hurts?|aches?)|short(?:ness)? of breath|short of breath|breathless|difficulty breathing)\\b/i.test(patientText);
+const highSpecificityAcs = patientStatements.some((statement) => hasUnnegatedPatientMatch(statement, /\\b(?:crushing|squeezing|heavy) (?:chest|pressure)\\b|\\bchest (?:pressure|squeezing|heaviness)\\b|\\bchest (?:pain|discomfort).{0,80}(?:radiat(?:es|ing)?|spread(?:s|ing)?).{0,35}(?:arm|jaw|back|neck)\\b|\\bchest (?:pain|discomfort).{0,80}(?:cold sweat|sweating|lightheaded|faint(?:ed|ing)?)\\b|\\b(?:cold sweat|sweating|lightheaded|faint(?:ed|ing)?).{0,80}chest (?:pain|discomfort)\\b|\\bchest (?:pain|discomfort).{0,60}(?:persistent|keeps returning|comes back|lasting (?:more than )?(?:a few|[5-9]|[1-9]\\d) minutes?)\\b/i));
+const highSpecificityBreathing = patientStatements.some((statement) => hasUnnegatedPatientMatch(statement, /\\b(?:cannot|can't|unable to) breathe\\b|\\bgasping(?: for air)?\\b|\\bchoking\\b|\\b(?:cannot|can't|unable to) (?:speak|talk|get words out)\\b|\\b(?:blue|grey|gray) (?:lips|skin|face)\\b|\\bnew confusion\\b|\\b(?:collapsed|passed out|unconscious)\\b|\\boxygen (?:sat|saturation)?[^.]{0,12}(?:[0-8]\\d|9[0-2])\\b|\\bsevere (?:shortness of breath|difficulty breathing)\\b|\\b(?:shortness of breath|difficulty breathing).{0,30}(?:at rest|while resting|sitting still)\\b/i));
+const cardioRespiratoryCall = requestedCrisisType === 'acs_chest_pain'
+  || requestedCrisisType === 'respiratory_distress'
+  || (requestedCrisisType === 'other_emergency' && hasChestOrBreathingSymptom);
+const hasRequiredHighSpecificity = requestedCrisisType === 'respiratory_distress'
+  ? highSpecificityBreathing
+  : requestedCrisisType === 'acs_chest_pain'
+    ? highSpecificityAcs
+    : highSpecificityAcs || highSpecificityBreathing;
 const needsClarification = requestedForceEnd
   && cardioRespiratoryCall
-  && hasChestOrBreathingSymptom
-  && !highSpecificityAcs
-  && !highSpecificityBreathing;
+  && !hasRequiredHighSpecificity;
 
 const force_end = requestedForceEnd && !needsClarification;
 const status = needsClarification
@@ -91,15 +121,15 @@ const status = needsClarification
       ? 'high_risk_continue'
       : 'pass';
 const risk_level = needsClarification
-  ? 'high'
+  ? (hasChestOrBreathingSymptom ? 'high' : 'medium')
   : String(parsed.risk_level || (force_end ? 'emergency' : status === 'high_risk_continue' ? 'high' : 'low')).toLowerCase();
 const crisis_type = needsClarification
   ? (requestedCrisisType === 'other_emergency'
-    ? (/chest/.test(latest) ? 'acs_chest_pain' : 'respiratory_distress')
+    ? (/chest/.test(patientText) ? 'acs_chest_pain' : 'respiratory_distress')
     : requestedCrisisType)
   : requestedCrisisType;
 const care_setting = needsClarification
-  ? 'urgent_care'
+  ? (hasChestOrBreathingSymptom ? 'urgent_care' : 'telehealth')
   : String(parsed.care_setting || (force_end ? 'call_911' : status === 'high_risk_continue' ? 'urgent_care' : 'home'));
 const message = needsClarification
   ? 'I need a few more details to judge how urgent this is. Tell me whether it is severe, persistent or present at rest, and whether you can speak normally. If you become unable to breathe, faint, turn blue or grey, or develop heavy chest pressure that spreads, call 911 now.'
@@ -321,15 +351,26 @@ for (const testCase of CASES.normalizer_force_ends || []) {
     risk_level: 'emergency',
     crisis_type: testCase.crisis_type,
     force_end: true,
-    care_setting: 'call_911',
+    care_setting: testCase.care_setting ?? 'call_911',
     message: 'Call emergency services now.',
     red_flags: [testCase.crisis_type],
   })
-  if (normalized.status !== 'force_end' || normalized.force_end !== true) {
+  const expectedCareSetting = testCase.crisis_type === 'suicidal_ideation' ? 'crisis_line' : undefined
+  const careSettingMismatch = expectedCareSetting !== undefined && normalized.care_setting !== expectedCareSetting
+  if (
+    normalized.status !== 'force_end'
+    || normalized.force_end !== true
+    || normalized.is_emergency !== true
+    || careSettingMismatch
+  ) {
     parityFailures.push({
       id: testCase.id,
       expected: 'force_end',
       actual: normalized.status,
+      ...(careSettingMismatch ? {
+        expectedCareSetting,
+        actualCareSetting: normalized.care_setting,
+      } : {}),
     })
   }
 }
