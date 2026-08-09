@@ -1050,6 +1050,7 @@ Deno.test('P2-09 async PDF · report paints first, PDFs prepare client-side on d
   const downloadStart = view.indexOf('const runPdfDownload = async')
   assertTrue(downloadStart >= 0, 'on-demand PDF generation present')
   assertTrue(view.includes('data-libertymd-report-pdf-busy'), 'preparing status remains visible')
+  assertEquals(view.includes('const pdfPreparationKey'), false, 'PDF must not generate before a download action')
 })
 
 Deno.test('P2-09 async PDF · dedicated report page consumes current soft-gate response before preparing files', async () => {

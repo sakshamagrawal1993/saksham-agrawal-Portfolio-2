@@ -48,6 +48,22 @@ Deno.test('REPORT-05 · generation is lease-protected and report-idempotent', as
   assert(reads.includes('is_anonymous: ctx.isAnonymous'), 'report read must return JWT-derived identity')
 })
 
+Deno.test('REPORT-05b · active final turn is pending, never a readiness 409', async () => {
+  const action = await Deno.readTextFile(new URL('supabase/functions/libertymd-care-proxy/actions/generate-report.ts', ROOT))
+  const pendingCheck = action.indexOf("generationPending(consultation.id, 'request_in_progress')")
+  const readinessCheck = action.indexOf("Consultation is not ready for report generation")
+  assert(pendingCheck >= 0, 'active request must return asynchronous pending')
+  assert(pendingCheck < readinessCheck, 'active request must be handled before stale readiness is evaluated')
+})
+
+Deno.test('REPORT-05c · signed-in chrome hydrates from local session without remote getUser wait', async () => {
+  const app = await Deno.readTextFile(new URL('components/LibertyMD/LibertyMDApp.tsx', ROOT))
+  const page = await Deno.readTextFile(new URL('components/LibertyMD/LibertyMDReportPage.tsx', ROOT))
+  assert(app.includes('setIsAnonymous(userIsAnon)'), 'landing header must recognize the local linked session immediately')
+  assert(app.includes('setGreetingName((current) => current || firstName)'), 'landing greeting must not wait for bootstrap')
+  assert(!page.includes('supabase.auth.getUser()'), 'report identity must not add a remote user lookup after local session hydration')
+})
+
 Deno.test('REPORT-06 · diagnosis workflow has structured parsers and strict complete report validation', async () => {
   const raw = await Deno.readTextFile(new URL('../n8n-workflows/definitions/libertymd-diagnosis-workflow__vljapWQv5ug7pFA9.json', ROOT))
   const workflow = JSON.parse(raw) as { nodes: Array<{ name: string; parameters?: Record<string, unknown> }> }

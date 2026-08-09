@@ -66,6 +66,21 @@ export async function handleGenerateReport(ctx: ProxyContext, payload: RequestPa
     })
   }
 
+  // The report route can load before the final chat turn releases its request
+  // lease. That is normal asynchronous progress, not a readiness conflict.
+  // Return 202 before evaluating the still-stale turn/comprehension snapshot.
+  const activeRequestStartedAt = consultation.active_request_started_at
+    ? new Date(consultation.active_request_started_at).getTime()
+    : Number.NaN
+  const hasFreshActiveRequest = Boolean(
+    consultation.active_request_id
+    && Number.isFinite(activeRequestStartedAt)
+    && activeRequestStartedAt > Date.now() - 2 * 60_000,
+  )
+  if (hasFreshActiveRequest) {
+    return generationPending(consultation.id, 'request_in_progress')
+  }
+
   const comprehensionComplete = isComprehensionCompleted(consultation.workflow_versions)
   if (consultation.turn_count < MAX_TURNS && !comprehensionComplete) {
     return jsonResponse({ error: 'Consultation is not ready for report generation' }, 409)

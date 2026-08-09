@@ -78,12 +78,8 @@ export default function LibertyMDReportPage() {
       if (data.session?.user) {
         setUser(data.session.user)
         setIdentityStatus(identityStatusFromUser(data.session.user))
-      }
-    })
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user) {
-        setUser(data.user)
-        setIdentityStatus(identityStatusFromUser(data.user))
+      } else {
+        setIdentityStatus('loading')
       }
     })
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {

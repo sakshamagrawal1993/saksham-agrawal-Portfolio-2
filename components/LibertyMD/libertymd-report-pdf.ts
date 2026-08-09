@@ -78,6 +78,8 @@ export type LibertyMdPdfDoc = {
   kind: LibertyMdPdfDocKind
   filename: string
   title: string
+  /** Localized running chrome needed by the byte renderer. */
+  copy: LibertyMdPdfCopy
   patientInfo?: LibertyMdPatientInfo
   headerLines: string[]
   sections: LibertyMdPdfSection[]
@@ -297,6 +299,7 @@ export function buildPatientPdfDoc(
     kind: 'patient',
     filename: buildPdfFilename('patient', when),
     title: copy.patientTitle,
+    copy,
     patientInfo: report.patientInfo,
     headerLines: buildSharedHeader(copy, when),
     sections,
@@ -330,6 +333,7 @@ export function buildSoapPdfDoc(
     kind: 'soap',
     filename: buildPdfFilename('soap', when),
     title: copy.soapTitle,
+    copy,
     patientInfo: report.patientInfo,
     headerLines: buildSharedHeader(copy, when),
     sections,
@@ -455,6 +459,7 @@ export async function renderPdfBlob(
   doc: LibertyMdPdfDoc,
   options?: LibertyMdPdfRenderOptions,
 ): Promise<Blob> {
+  const copy = doc.copy
   const mod = await import('jspdf')
   const JsPDF = mod.jsPDF
   const pdf = new JsPDF({ unit: 'pt', format: 'letter', compress: true })

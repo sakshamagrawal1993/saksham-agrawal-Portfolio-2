@@ -595,9 +595,20 @@ export default function LibertyMDApp() {
     const { data: sessionData } = await supabase.auth.getSession();
     if (sessionData.session) {
       // P1-17: stitch device history → anon/linked Supabase id (id-only).
-      identifyLibertyMdUser(sessionData.session.user.id);
-      if (typeof sessionData.session.user.email === 'string' && sessionData.session.user.email) {
-        setLinkedEmail(sessionData.session.user.email);
+      const authUser = sessionData.session.user;
+      identifyLibertyMdUser(authUser.id);
+      const userIsAnon = authUser.is_anonymous === true
+        || (!authUser.email && authUser.app_metadata?.provider === 'anonymous');
+      // Local Supabase session state is authoritative enough for immediate
+      // header chrome; bootstrap may enrich it but must not delay recognition.
+      setIsAnonymous(userIsAnon);
+      if (typeof authUser.email === 'string' && authUser.email) {
+        setLinkedEmail(authUser.email);
+      }
+      if (!userIsAnon) {
+        const metadataName = String(authUser.user_metadata?.full_name || authUser.user_metadata?.name || '').trim();
+        const firstName = metadataName.split(/\s+/)[0] || String(authUser.email || '').split('@')[0];
+        if (firstName) setGreetingName((current) => current || firstName);
       }
       return sessionData.session;
     }

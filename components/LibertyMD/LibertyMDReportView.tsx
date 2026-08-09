@@ -217,7 +217,7 @@ export function LibertyMDReportView({
   emailDelivery,
   retentionExpiresAt = null,
 }: LibertyMDReportViewProps) {
-  const { t, language } = useI18n()
+  const { t } = useI18n()
   const isSample = variant === 'sample'
   const rootRef = useRef<HTMLElement | null>(null)
   const stickyRef = useRef<HTMLDivElement | null>(null)
@@ -228,9 +228,9 @@ export function LibertyMDReportView({
   )
   const [stickyEnabled, setStickyEnabled] = useState(false)
   const [chooserOpen, setChooserOpen] = useState(false)
-  // Real reports begin preparing their client-only PDFs after the first paint.
-  // Sample reports never expose delivery actions, so they do no PDF work.
-  const [pdfBusy, setPdfBusy] = useState(!isSample)
+  // PDF generation starts only from the user's download action. This keeps the
+  // clinical report interactive and avoids doing heavy client work speculatively.
+  const [pdfBusy, setPdfBusy] = useState(false)
   const [pdfError, setPdfError] = useState<string | null>(null)
   const [readyLinks, setReadyLinks] = useState<PdfReadyLink[]>([])
   const [soapSecondTap, setSoapSecondTap] = useState<PdfReadyLink | null>(null)
@@ -371,74 +371,6 @@ export function LibertyMDReportView({
     setReadyLinks(next)
   }
 
-  // P2-09 · Prepare both downloads after report_data is available. The report
-  // body has already rendered before this effect runs, so PDF work never gates
-  // diagnosis / plan / red-flag content. Files remain browser-memory Blob URLs;
-  // nothing is uploaded to Storage or the proxy. A failed preload falls back to
-  // the existing on-demand path in runPdfDownload.
-  const pdfPreparationKey = JSON.stringify(report)
-  useEffect(() => {
-    if (isSample) {
-      setPdfBusy(false)
-      return
-    }
-
-    let cancelled = false
-    let timer: number | undefined
-    setPdfBusy(true)
-    setPdfError(null)
-    setChooserOpen(false)
-
-    for (const link of readyLinksRef.current) revokePdfObjectUrl(link.objectUrl)
-    readyLinksRef.current = []
-    setReadyLinks([])
-    setSoapSecondTap(null)
-
-    // Yield one browser task so the clinical report paints before jsPDF loads.
-    timer = window.setTimeout(() => {
-      const copy = buildPdfCopy(t)
-      const when = new Date()
-      const patientDoc = buildPatientPdfDoc(report, copy, when)
-      const soapDoc = buildSoapPdfDoc(report, copy, when)
-
-      void Promise.all([
-        renderPdfBlob(patientDoc),
-        renderPdfBlob(soapDoc),
-      ]).then(([patientBlob, soapBlob]) => {
-        const next: PdfReadyLink[] = [
-          {
-            kind: 'patient',
-            filename: patientDoc.filename,
-            objectUrl: URL.createObjectURL(patientBlob),
-          },
-          {
-            kind: 'soap',
-            filename: soapDoc.filename,
-            objectUrl: URL.createObjectURL(soapBlob),
-          },
-        ]
-        if (cancelled) {
-          for (const link of next) revokePdfObjectUrl(link.objectUrl)
-          return
-        }
-        readyLinksRef.current = next
-        setReadyLinks(next)
-      }).catch(() => {
-        if (!cancelled) setPdfError(t('report.pdf.error'))
-      }).finally(() => {
-        if (!cancelled) setPdfBusy(false)
-      })
-    }, 0)
-
-    return () => {
-      cancelled = true
-      if (timer !== undefined) window.clearTimeout(timer)
-    }
-    // `pdfPreparationKey` provides content equality when a parent recreates the
-    // normalized report object. `language` regenerates localized PDF chrome.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSample, language, pdfPreparationKey])
-
   const triggerReadyLinkDownload = (link: PdfReadyLink) => {
     if (typeof document === 'undefined') return
     const anchor = document.createElement('a')
@@ -493,8 +425,8 @@ export function LibertyMDReportView({
       return
     }
 
-    // Background preparation can fail or be cancelled by a rapid report
-    // transition. Keep the original user-triggered generation as a fallback.
+    // Generate asynchronously from the user action. The clinical report stays
+    // visible and usable while the browser builds the PDF in memory.
     setPdfBusy(true)
     setPdfError(null)
     try {

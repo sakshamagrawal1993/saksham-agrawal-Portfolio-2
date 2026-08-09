@@ -144,6 +144,7 @@ Deno.test('P2-09 AC1/AC3 · two doc kinds + shared AI / no-clinician headers', (
   assertTrue(soap.sections.length > 0, 'soap has SOAP sections')
 
   for (const doc of [patient, soap]) {
+    assertEquals(doc.copy.meta.page, PDF_COPY.meta.page, 'renderer carries localized page chrome')
     const text = flattenPdfDocText(doc)
     assertTrue(text.includes('2026-07-31'), 'date in header')
     assertTrue(text.includes(PDF_COPY.aiGenerated), 'AI-generated header')
