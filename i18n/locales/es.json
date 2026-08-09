@@ -230,12 +230,12 @@
     "loadFailed": "We could not open this report just now. Your consultation is safe — please try again in a moment."
   },
   "sampleReport": {
-    "entry": "See a sample report",
-    "title": "Sample doctor-ready report",
-    "badge": "Example — not your report",
-    "subtitle": "Synthetic example for illustration. Not a real patient case and not clinician-reviewed.",
-    "cta": "Start with a sore throat consult",
-    "ctaOwnSymptoms": "Start with your own symptoms"
+    "entry": "Ver un informe de ejemplo",
+    "title": "Informe de ejemplo para revisión médica",
+    "badge": "Ejemplo — no es tu informe",
+    "subtitle": "Ejemplo sintético solo con fines ilustrativos. No corresponde a un paciente real ni ha sido revisado por un profesional clínico.",
+    "cta": "Iniciar una consulta por dolor de garganta",
+    "ctaOwnSymptoms": "Empezar con mis propios síntomas"
   },
   "safety": {
     "emergencyTitle": "Esto puede ser una emergencia",

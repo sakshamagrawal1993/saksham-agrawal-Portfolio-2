@@ -41,7 +41,7 @@ export function LibertyMDSampleReport({
   onStartConsult,
   conditionClusterId = 'uri_mundane',
 }: LibertyMDSampleReportProps) {
-  const { t } = useI18n()
+  const { t, language } = useI18n()
   const titleId = useId()
   const badgeId = useId()
   const contentRef = useRef<HTMLDivElement | null>(null)
@@ -49,7 +49,7 @@ export function LibertyMDSampleReport({
   const emittedBucketsRef = useRef<Set<ReportScrollBucket>>(new Set())
 
   const [viewMode, setViewMode] = useState<'pdf' | 'interactive'>('pdf')
-  const report = normalizeReportData(getSampleReportData(conditionClusterId))
+  const report = normalizeReportData(getSampleReportData(conditionClusterId, language))
 
   // Open → bucket 0 once; then monotonic newly-reached buckets on scroll host.
   useEffect(() => {
@@ -120,7 +120,7 @@ export function LibertyMDSampleReport({
           data-libertymd-sample-badge-chrome=""
         >
           <h2 id={titleId} className="font-serif text-xl font-bold text-libertymd-ink">
-            Sample Report
+            {t('sampleReport.title')}
           </h2>
           <button
             type="button"

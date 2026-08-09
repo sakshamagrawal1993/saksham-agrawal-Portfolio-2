@@ -230,12 +230,12 @@
     "loadFailed": "We could not open this report just now. Your consultation is safe — please try again in a moment."
   },
   "sampleReport": {
-    "entry": "See a sample report",
-    "title": "Sample doctor-ready report",
-    "badge": "Example — not your report",
-    "subtitle": "Synthetic example for illustration. Not a real patient case and not clinician-reviewed.",
-    "cta": "Start with a sore throat consult",
-    "ctaOwnSymptoms": "Start with your own symptoms"
+    "entry": "नमूना रिपोर्ट देखें",
+    "title": "चिकित्सक समीक्षा के लिए नमूना रिपोर्ट",
+    "badge": "उदाहरण — यह आपकी रिपोर्ट नहीं है",
+    "subtitle": "केवल समझाने के लिए बनाया गया काल्पनिक उदाहरण। यह किसी वास्तविक मरीज का मामला नहीं है और किसी चिकित्सक ने इसकी समीक्षा नहीं की है।",
+    "cta": "गले की खराश पर परामर्श शुरू करें",
+    "ctaOwnSymptoms": "अपने लक्षणों के साथ शुरू करें"
   },
   "safety": {
     "emergencyTitle": "यह आपात स्थिति हो सकती है",

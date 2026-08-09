@@ -12,6 +12,8 @@
  */
 
 /** Allow-listed sample cluster ids for Mixpanel `sample_report_viewed`. */
+import { URI_SAMPLE_REPORT_BY_LANGUAGE } from './libertymd-sample-report-locales'
+
 export const LIBERTYMD_SAMPLE_CLUSTER_IDS = ['uri_mundane'] as const
 
 export type LibertyMdSampleClusterId = (typeof LIBERTYMD_SAMPLE_CLUSTER_IDS)[number]
@@ -41,6 +43,7 @@ export const URI_MUNDANE_SAMPLE_REPORT_DATA = {
       full_name: 'Allergic rhinitis',
       common_name: 'Hay fever',
       confidence: 42,
+      description: 'An allergic inflammation of the nose that can cause congestion and irritation.',
       reason: 'Congestion can overlap; itch/sneezing less prominent here.',
       supporting_evidence: [],
       conflicting_evidence: [],
@@ -50,6 +53,7 @@ export const URI_MUNDANE_SAMPLE_REPORT_DATA = {
       full_name: 'Acute bacterial sinusitis',
       common_name: 'Sinus infection',
       confidence: 18,
+      description: 'A bacterial infection of the sinus cavities that can cause congestion and facial pressure.',
       reason: 'This can cause congestion, but the short duration and lack of persistent fever or focal facial pain make it less likely.',
       supporting_evidence: ['congestion'],
       conflicting_evidence: ['short duration', 'no persistent fever reported'],
@@ -59,6 +63,7 @@ export const URI_MUNDANE_SAMPLE_REPORT_DATA = {
     assessment: 'Mild viral URI without emergency features.',
     plan: ['Supportive care for 3–5 days', 'Follow up if symptoms worsen'],
     self_care: ['Rest', 'Oral fluids', 'Saline rinses'],
+    diagnostic_investigations: ['Primary-care examination', 'COVID-19 test if indicated'],
     when_to_seek_care:
       'Seek care sooner if you develop trouble breathing, chest pain, or confusion.',
     red_flags_to_watch: ['Trouble breathing', 'Chest pain', 'Confusion', 'Fainting'],
@@ -86,6 +91,9 @@ export function isLibertyMdSampleClusterId(value: unknown): value is LibertyMdSa
 }
 
 /** Resolve allow-listed cluster → synthetic report_data. Never hits clinical tables. */
-export function getSampleReportData(clusterId: LibertyMdSampleClusterId) {
+export function getSampleReportData(clusterId: LibertyMdSampleClusterId, language = 'en') {
+  if (clusterId === 'uri_mundane' && URI_SAMPLE_REPORT_BY_LANGUAGE[language]) {
+    return URI_SAMPLE_REPORT_BY_LANGUAGE[language]
+  }
   return SAMPLE_CATALOG[clusterId]
 }

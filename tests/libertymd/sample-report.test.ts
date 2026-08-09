@@ -51,6 +51,28 @@ Deno.test('P3-02 · sample catalog allow-list is uri_mundane only', () => {
   assertEquals(view.differentials.length, 3, 'exactly three differentials present')
 })
 
+Deno.test('FULL-REPORT · public sample is complete in English, Spanish, Hindi, and Hinglish', () => {
+  for (const language of ['en', 'es', 'hi', 'hi-Latn']) {
+    const view = normalizeReportData(getSampleReportData('uri_mundane', language))
+    assertTrue(Boolean(view.headline), `${language}: session summary`)
+    assertTrue(Boolean(view.patientSummary), `${language}: patient summary`)
+    assertEquals(view.differentials.length, 3, `${language}: exactly three differentials`)
+    for (const differential of view.differentials) {
+      assertTrue(Boolean(differential.description), `${language}: differential description`)
+      assertTrue(Boolean(differential.reason), `${language}: differential reasoning`)
+    }
+    assertTrue(Boolean(view.assessmentAndPlan.assessment), `${language}: clinical assessment`)
+    assertTrue(view.assessmentAndPlan.plan.length > 0, `${language}: action plan`)
+    assertTrue(view.assessmentAndPlan.selfCare.length > 0, `${language}: self care`)
+    assertTrue(view.assessmentAndPlan.diagnosticInvestigations.length > 0, `${language}: investigations`)
+    assertTrue(view.redFlags.length > 0, `${language}: red flags`)
+    assertTrue(Boolean(view.soap.subjective), `${language}: SOAP subjective`)
+    assertTrue(Boolean(view.soap.objective), `${language}: SOAP objective`)
+    assertTrue(Boolean(view.soap.assessment), `${language}: SOAP assessment`)
+    assertTrue(Boolean(view.soap.plan), `${language}: SOAP plan`)
+  }
+})
+
 Deno.test('P3-02 · Lexicon promotes sample_report_viewed; EN sample chrome keys', async () => {
   const lexicon = await Deno.readTextFile(LEXICON)
   assertTrue(/`sample_report_viewed`/.test(lexicon), 'event row')

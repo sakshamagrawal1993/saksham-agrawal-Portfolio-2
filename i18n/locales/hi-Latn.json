@@ -179,5 +179,13 @@
       "expiredSignIn": "Future reports ke liye Sign In karein",
       "notYetEligible": "Report abhi ready nahi hai — kuch aur sawaalo ke jawaab dein"
     }
+  },
+  "sampleReport": {
+    "entry": "Sample report dekhein",
+    "title": "Doctor review ke liye sample report",
+    "badge": "Example — yeh aapki report nahi hai",
+    "subtitle": "Sirf samjhane ke liye synthetic example. Yeh kisi real patient ka case nahi hai aur kisi clinician ne review nahi kiya hai.",
+    "cta": "Sore throat consult shuru karein",
+    "ctaOwnSymptoms": "Apne symptoms ke saath shuru karein"
   }
 }
