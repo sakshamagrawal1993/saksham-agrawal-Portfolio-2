@@ -64,6 +64,7 @@
     "benefitFamily": "Familienprofile hinzufügen"
   },
   "report": {
+    "headerTitle": "Bericht zur ärztlichen Überprüfung",
     "title": "Ihr Gesundheitsbericht",
     "likely": "Wahrscheinliche Möglichkeiten",
     "evidence": "Unterstützende Hinweise",

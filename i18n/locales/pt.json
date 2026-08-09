@@ -64,6 +64,7 @@
     "benefitFamily": "Adicionar perfis familiares"
   },
   "report": {
+    "headerTitle": "Relatório para revisão médica",
     "title": "Seu relatório de saúde",
     "likely": "Possibilidades prováveis",
     "evidence": "Evidências a favor",

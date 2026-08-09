@@ -64,6 +64,7 @@
     "benefitFamily": "Ajouter des profils familiaux"
   },
   "report": {
+    "headerTitle": "Rapport pour examen médical",
     "title": "Votre rapport de santé",
     "likely": "Possibilités probables",
     "evidence": "Éléments en faveur",

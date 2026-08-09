@@ -126,6 +126,7 @@
     "profileAtLimitHint": "Elimina un perfil para añadir otro."
   },
   "report": {
+    "headerTitle": "Informe para revisión médica",
     "eyebrow": "Doctor-ready report",
     "title": "Assessment and next steps",
     "aiFraming": "AI-generated guidance — not reviewed by a clinician. This is not a diagnosis.",

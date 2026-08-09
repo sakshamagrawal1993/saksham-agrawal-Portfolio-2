@@ -62,6 +62,7 @@
     "benefitFamily": "Add family profiles"
   },
   "report": {
+    "headerTitle": "Report for Physician Review",
     "title": "Your health report",
     "likely": "Likely possibilities",
     "evidence": "Supporting evidence",

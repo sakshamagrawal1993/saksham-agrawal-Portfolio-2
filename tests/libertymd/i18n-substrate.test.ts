@@ -197,6 +197,7 @@ Deno.test('FULL-REPORT · every supported locale has complete report chrome', ()
     for (const key of ['patientName', 'gender', 'age', 'date', 'anonymous', 'notSpecified', 'page', 'pdfFooter']) {
       assert(report?.meta?.[key], `${code}: report.meta.${key}`)
     }
+    assert(report?.headerTitle, `${code}: report.headerTitle`)
     assert(report?.pdf?.patientTitle, `${code}: report.pdf.patientTitle`)
   }
 })
