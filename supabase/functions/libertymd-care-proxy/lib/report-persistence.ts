@@ -140,6 +140,7 @@ export async function finalizeFromExistingReport(
     currentVersion: number
     evidenceScore?: number
     diagnosisRan?: boolean
+    resolutionReason?: 'turn_limit_report' | 'comprehension_confirmed' | 'high_confidence' | 'workflow_ready'
   },
 ): Promise<Response> {
   const { isAnonymous } = ctx
@@ -158,6 +159,7 @@ export async function finalizeFromExistingReport(
     status,
     report_gate: isAnonymous ? 'withheld' : 'google_linked',
     turn_count: opts.turnCount,
+    ...(opts.resolutionReason ? { resolution_reason: opts.resolutionReason } : {}),
     completed_at: isAnonymous ? null : now,
     last_activity_at: now,
   })

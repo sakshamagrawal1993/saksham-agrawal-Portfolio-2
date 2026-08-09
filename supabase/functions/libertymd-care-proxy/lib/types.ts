@@ -26,6 +26,7 @@ export type ProxyAction =
   | 'resume_consultation'
   | 'save_demographics'
   | 'send_message'
+  | 'generate_report'
   | 'release_report'
   | 'sync_identity'
   | 'record_identity_event'
@@ -86,6 +87,8 @@ export interface RequestPayload extends LandingAttributionFields {
   region?: 'US' | 'EU'
   mode?: 'skip' | 'google'
   client_message_id?: string
+  /** Idempotency/lease token for an asynchronous report-generation attempt. */
+  generation_request_id?: string
   expected_version?: number
   identity_event?: 'google_link_started' | 'google_link_cancelled' | 'google_link_conflict'
   transfer_token?: string

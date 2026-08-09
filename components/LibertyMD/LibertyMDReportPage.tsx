@@ -46,6 +46,14 @@ type PageState =
   | { kind: 'lifecycle'; state: Exclude<ReportLifecycleState, 'ready' | 'generating'> }
   | { kind: 'error'; message: string }
 
+type IdentityStatus = 'loading' | 'anonymous' | 'linked'
+
+function identityStatusFromUser(user: User): Exclude<IdentityStatus, 'loading'> {
+  return user.is_anonymous === true || (!user.email && user.app_metadata?.provider === 'anonymous')
+    ? 'anonymous'
+    : 'linked'
+}
+
 export default function LibertyMDReportPage() {
   const { consultationId = '' } = useParams<{ consultationId: string }>()
   const navigate = useNavigate()
@@ -56,21 +64,31 @@ export default function LibertyMDReportPage() {
   )
   const [isAuthBusy, setIsAuthBusy] = useState(false)
   const [user, setUser] = useState<User | null>(null)
+  const [identityStatus, setIdentityStatus] = useState<IdentityStatus>('loading')
   const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const isAnonymous = !user || user.is_anonymous === true || (!user.email && user.app_metadata?.provider === 'anonymous')
+  const isAnonymous = identityStatus === 'anonymous'
   const startedAtRef = useRef<number>(Date.now())
   const cancelledRef = useRef(false)
   const consecutiveErrorsRef = useRef(0)
+  const generationAttemptsRef = useRef(0)
+  const generationInFlightRef = useRef(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session?.user) setUser(data.session.user)
+      if (data.session?.user) {
+        setUser(data.session.user)
+        setIdentityStatus(identityStatusFromUser(data.session.user))
+      }
     })
     supabase.auth.getUser().then(({ data }) => {
-      if (data.user) setUser(data.user)
+      if (data.user) {
+        setUser(data.user)
+        setIdentityStatus(identityStatusFromUser(data.user))
+      }
     })
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null)
+      setIdentityStatus(session?.user ? identityStatusFromUser(session.user) : 'loading')
     })
     return () => {
       authListener.subscription.unsubscribe()
@@ -110,6 +128,11 @@ export default function LibertyMDReportPage() {
     }
 
     consecutiveErrorsRef.current = 0
+    if (typeof data?.is_anonymous === 'boolean') {
+      // Authoritative on every page load: derived from the JWT by the proxy,
+      // independent of client hydration timing or page-local state.
+      setIdentityStatus(data.is_anonymous ? 'anonymous' : 'linked')
+    }
     const consultation = (data?.consultation ?? {}) as Record<string, unknown>
     const status = String(consultation.status || '')
     const reportEnvelope = data?.report && typeof data.report === 'object' && !Array.isArray(data.report)
@@ -165,10 +188,42 @@ export default function LibertyMDReportPage() {
 
   const triggerReload = useCallback(() => {
     consecutiveErrorsRef.current = 0
+    generationAttemptsRef.current = 0
     startedAtRef.current = Date.now()
     setState({ kind: 'loading' })
     void load()
   }, [load])
+
+  const requestReportGeneration = useCallback(async (): Promise<'ready' | 'pending' | 'failed'> => {
+    if (generationInFlightRef.current) return 'pending'
+    if (generationAttemptsRef.current >= MAX_REGENERATIONS_PER_CONSULTATION) return 'failed'
+    generationInFlightRef.current = true
+    try {
+      await ensureIdentity()
+      const { data, error } = await supabase.functions.invoke('libertymd-care-proxy', {
+        body: {
+          action: 'generate_report',
+          consultation_id: consultationId,
+          generation_request_id: crypto.randomUUID(),
+        },
+      })
+      if (error) {
+        generationAttemptsRef.current += 1
+        return generationAttemptsRef.current >= MAX_REGENERATIONS_PER_CONSULTATION ? 'failed' : 'pending'
+      }
+      if (data?.report_ready) return 'ready'
+      // A live final-chat request or unfinished media owns the lease. Waiting
+      // is not a failed generation attempt and must not consume the retry cap.
+      if (data?.reason === 'request_in_progress' || data?.reason === 'media_processing') return 'pending'
+      if (data?.reason === 'diagnosis_retry_required') generationAttemptsRef.current += 1
+      return generationAttemptsRef.current >= MAX_REGENERATIONS_PER_CONSULTATION ? 'failed' : 'pending'
+    } catch {
+      generationAttemptsRef.current += 1
+      return generationAttemptsRef.current >= MAX_REGENERATIONS_PER_CONSULTATION ? 'failed' : 'pending'
+    } finally {
+      generationInFlightRef.current = false
+    }
+  }, [consultationId, ensureIdentity])
 
   useEffect(() => {
     if (!consultationId) {
@@ -179,27 +234,17 @@ export default function LibertyMDReportPage() {
     startedAtRef.current = Date.now()
     consecutiveErrorsRef.current = 0
     let timer: number | undefined
-    let regenerationCount = 0
 
     const tick = async () => {
       const outcome = await load()
       if (cancelledRef.current || outcome === 'settled') return
-      if (Date.now() - startedAtRef.current > POLL_TIMEOUT_MS) {
-        // Upper limit of 2 regenerations per consultation
-        if (regenerationCount < MAX_REGENERATIONS_PER_CONSULTATION) {
-          regenerationCount += 1
-          startedAtRef.current = Date.now()
-          try {
-            await ensureIdentity()
-            await supabase.functions.invoke('libertymd-care-proxy', {
-              body: { action: 'release_report', consultation_id: consultationId, mode: 'skip' },
-            })
-          } catch {
-            // ignore
-          }
-          timer = window.setTimeout(tick, POLL_INTERVAL_MS)
-          return
-        }
+      const generation = await requestReportGeneration()
+      if (cancelledRef.current) return
+      if (generation === 'ready') {
+        timer = window.setTimeout(tick, 250)
+        return
+      }
+      if (generation === 'failed' || Date.now() - startedAtRef.current > POLL_TIMEOUT_MS) {
         setState({ kind: 'lifecycle', state: 'generation_failed' })
         return
       }
@@ -211,7 +256,7 @@ export default function LibertyMDReportPage() {
       cancelledRef.current = true
       if (timer) window.clearTimeout(timer)
     }
-  }, [consultationId, load, navigate])
+  }, [consultationId, load, navigate, requestReportGeneration])
 
   const startGoogleLink = async () => {
     if (!consultationId) return
@@ -264,7 +309,14 @@ export default function LibertyMDReportPage() {
     navigate('/liberty-md')
   }
 
-  const showGate = isReportGateOpen && (state.kind === 'loading' || state.kind === 'generating' || (state.kind === 'ready' && !state.saved))
+  const showGate = isAnonymous
+    && isReportGateOpen
+    // The copy and Continue-as-guest action both say the report is ready.
+    // Opening this during generation blocks the loader and calls release_report
+    // before a report row exists. Keep generation non-blocking; gate only the
+    // completed anonymous report, which remains dismissible.
+    && state.kind === 'ready'
+    && !state.saved
 
   return (
     <div

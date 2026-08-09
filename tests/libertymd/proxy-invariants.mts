@@ -62,6 +62,28 @@ Deno.test('P0-13 AC2/AC5: post-emergency Interview and Diagnosis calls are rejec
   }
 })
 
+Deno.test('REPORT-01: normal diagnosis reaches n8n and parses a physician-review payload', async () => {
+  const consultation = consultationRow({ status: 'interviewing', turn_count: 15 })
+  const fetchLog = stubFetch(() => okResponse({
+    valid_report: true,
+    confidence_score: 42,
+    differential_diagnosis: [
+      { rank: 1, full_name: 'Diagnosis A', confidence: 42, reason: 'Reason A' },
+      { rank: 2, full_name: 'Diagnosis B', confidence: 28, reason: 'Reason B' },
+      { rank: 3, full_name: 'Diagnosis C', confidence: 15, reason: 'Reason C' },
+    ],
+  }))
+  try {
+    const result = await runDiagnosis([], {}, consultation, { chief_complaint: 'Synthetic symptom' })
+    assertEquals(fetchLog.calls.length, 1, 'normal diagnosis must issue one workflow request')
+    assertEquals(result.valid, true, 'valid workflow response must survive parsing')
+    assertEquals(result.differentials.length, 3, 'three-item differential must reach report persistence')
+    assertEquals(result.failure, null, 'successful workflow response is not a transport failure')
+  } finally {
+    fetchLog.restore()
+  }
+})
+
 Deno.test('P0-13 AC3/AC5: a message_type outside the closed enum is rejected', async () => {
   const { ctx, ops } = createFakeContext()
   await assertRejects(

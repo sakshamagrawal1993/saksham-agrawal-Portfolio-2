@@ -118,6 +118,9 @@ export async function handleGetConsultation(ctx: ProxyContext, payload: RequestP
   const lifecycle = reportReadLifecycleMeta(activeReport)
   const mediaEvidence = await listMediaEvidence(ctx, consultation)
   const response: Record<string, unknown> = {
+    // JWT-derived, server-authoritative identity. Report chrome must not infer
+    // guest status from a briefly-null client session during page navigation.
+    is_anonymous: ctx.isAnonymous,
     consultation,
     patient,
     messages,

@@ -946,36 +946,6 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
       }
     }
 
-    // P3-09 Guarantee: Fallback diagnosis recovery when live n8n Diagnosis returned invalid/empty differential.
-    if ((!diagnosis || !diagnosis.valid || !diagnosis.differentials?.length) && (turnCount >= MAX_TURNS || interview.ready_for_report || evidence.score >= 80)) {
-      const existingDifferential = Array.isArray(consultation.working_differential) && consultation.working_differential.length > 0
-        ? consultation.working_differential
-        : [
-            {
-              condition: String(slots.chief_complaint || consultation.chief_complaint || 'Symptom Evaluation'),
-              confidence: 35,
-              supporting: Object.keys(slots).filter((k) => slots[k]),
-              refuting: [],
-              discriminator: 'Clinical review recommended'
-            }
-          ]
-      diagnosis = {
-        raw: {
-          summary: `Patient discussed symptoms: ${String(slots.chief_complaint || consultation.chief_complaint || 'symptoms')}.`,
-          triage_level: 'telehealth',
-          differential_diagnosis: existingDifferential,
-          confidence_score: 35,
-          valid_report: true,
-          model_metadata: { source: 'libertymd-fallback-recovery' }
-        },
-        differentials: existingDifferential,
-        confidence: 35,
-        valid: true,
-        unavailable: false,
-        failure: null,
-      }
-    }
-
     const reportDecision = decideReportOutcome({
       diagnosisValid: Boolean(diagnosis?.valid),
       confidence: diagnosis?.confidence || 0,

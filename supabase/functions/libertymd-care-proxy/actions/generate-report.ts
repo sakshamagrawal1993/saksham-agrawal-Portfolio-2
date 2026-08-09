@@ -1,0 +1,209 @@
+/**
+ * Idempotent, patient-message-free report generation.
+ *
+ * The chat redirects to the report page as soon as the patient confirms the
+ * consultation summary. That page may therefore outlive the final send_message
+ * request. This action lets it safely resume a failed diagnosis without adding
+ * a fake chat turn, releasing a report that does not exist, or racing the final
+ * request. The consultation request lease and report uniqueness constraint are
+ * the concurrency controls.
+ */
+import { assessClinicalEvidence } from '../clinical-policy.ts'
+import { MAX_TURNS } from '../lib/config.ts'
+import {
+  getHistory,
+  getOwnedConsultation,
+  saveDiagnosticRun,
+} from '../lib/consultations.ts'
+import { isComprehensionCompleted } from '../lib/comprehension-check.ts'
+import { jsonResponse } from '../lib/errors.ts'
+import {
+  listMediaEvidence,
+  mediaCompletionState,
+  mediaContextForAgents,
+} from '../lib/media-evidence.ts'
+import { runDiagnosis } from '../lib/n8n-client.ts'
+import { getOwnedPatient } from '../lib/profiles.ts'
+import {
+  ensureReportInserted,
+  finalizeFromExistingReport,
+  findOwnedReport,
+  isServeEligibleStoredReport,
+} from '../lib/report-persistence.ts'
+import { calculateMissingSlots } from '../lib/slots.ts'
+import { addProductEvent, emitInferenceFailed, scoreBucket } from '../lib/telemetry.ts'
+import { addDays, patientPayload } from '../lib/utils.ts'
+import type { ProxyContext } from '../lib/context.ts'
+import type { RequestPayload } from '../lib/types.ts'
+
+const GENERATION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function generationPending(consultationId: string, reason: string, retryAfterMs = 3_000) {
+  return jsonResponse({
+    consultation_id: consultationId,
+    generation_pending: true,
+    retryable: true,
+    retry_after_ms: retryAfterMs,
+    reason,
+  }, 202)
+}
+
+export async function handleGenerateReport(ctx: ProxyContext, payload: RequestPayload) {
+  if (!payload.consultation_id) return jsonResponse({ error: 'Missing consultation id' }, 400)
+  const requestId = String(payload.generation_request_id || '').trim() || crypto.randomUUID()
+  if (!GENERATION_ID.test(requestId)) return jsonResponse({ error: 'Invalid generation request id' }, 400)
+
+  let consultation = await getOwnedConsultation(ctx, payload.consultation_id)
+  const existing = await findOwnedReport(ctx, consultation.id)
+  if (isServeEligibleStoredReport(existing) && existing) {
+    return finalizeFromExistingReport(ctx, consultation, existing, {
+      turnCount: consultation.turn_count,
+      currentVersion: consultation.version,
+      evidenceScore: consultation.clinical_evidence_score,
+      diagnosisRan: false,
+    })
+  }
+
+  const comprehensionComplete = isComprehensionCompleted(consultation.workflow_versions)
+  if (consultation.turn_count < MAX_TURNS && !comprehensionComplete) {
+    return jsonResponse({ error: 'Consultation is not ready for report generation' }, 409)
+  }
+  if (!['interviewing', 'high_risk'].includes(consultation.status)) {
+    return jsonResponse({ error: `Report generation is unavailable in ${consultation.status}` }, 409)
+  }
+
+  const { data: claims, error: claimError } = await ctx.db.rpc('libertymd_claim_consultation_request', {
+    p_consultation_id: consultation.id,
+    p_user_id: ctx.user.id,
+    p_request_id: requestId,
+    p_expected_version: null,
+  })
+  if (claimError) throw claimError
+  const claim = Array.isArray(claims) ? claims[0] : claims
+  if (!claim?.accepted) return generationPending(consultation.id, 'request_in_progress')
+  const currentVersion = Number(claim.current_version || consultation.version)
+
+  try {
+    consultation = await getOwnedConsultation(ctx, consultation.id)
+    const reportAfterClaim = await findOwnedReport(ctx, consultation.id)
+    if (isServeEligibleStoredReport(reportAfterClaim) && reportAfterClaim) {
+      return finalizeFromExistingReport(ctx, consultation, reportAfterClaim, {
+        turnCount: consultation.turn_count,
+        currentVersion,
+        evidenceScore: consultation.clinical_evidence_score,
+        diagnosisRan: false,
+      })
+    }
+
+    const mediaPackets = await listMediaEvidence(ctx, consultation)
+    const mediaState = mediaCompletionState(mediaPackets)
+    if (mediaState.processing || mediaState.pendingFollowups.length > 0) {
+      return generationPending(consultation.id, 'media_processing')
+    }
+
+    const slots = consultation.filled_slots || {}
+    const evidence = assessClinicalEvidence(slots)
+    if (evidence.present.length === 0) {
+      return jsonResponse({
+        consultation_id: consultation.id,
+        generation_pending: false,
+        no_health_information: true,
+      }, 422)
+    }
+
+    const patient = await getOwnedPatient(ctx, consultation.patient_id)
+    const history = await getHistory(ctx, consultation.id)
+    const mediaContext = mediaContextForAgents(mediaPackets)
+    const diagnosis = await runDiagnosis(
+      history,
+      patientPayload(patient),
+      consultation,
+      slots,
+      requestId,
+      { mediaContext },
+    )
+    await addProductEvent(ctx, 'diagnosis_attempted', consultation.id, {
+      turn_index: consultation.turn_count,
+      evidence_bucket: scoreBucket(evidence.score),
+      outcome: diagnosis.failure
+        ? (diagnosis.unavailable ? 'unavailable' : 'invalid')
+        : (diagnosis.valid ? 'valid' : 'invalid'),
+      was_speculative: false,
+      served_from_cache: false,
+      stop_reason: 'report_recovery',
+    })
+    const diagnosticRunId = await saveDiagnosticRun(
+      ctx,
+      consultation,
+      diagnosis,
+      slots,
+      calculateMissingSlots(slots),
+      evidence.score,
+      consultation.turn_count,
+      { isSpeculative: false, mediaContext },
+    )
+
+    if (!diagnosis.valid || diagnosis.differentials.length !== 3) {
+      await emitInferenceFailed(ctx, consultation.id, {
+        stage: 'diagnosis',
+        error_class: diagnosis.failure === 'timeout'
+          ? 'timeout'
+          : diagnosis.failure === 'http_error'
+            ? 'http_error'
+            : diagnosis.failure === 'breaker_open'
+              ? 'breaker_open'
+              : diagnosis.failure === 'malformed_payload'
+                ? 'malformed_payload'
+                : 'unavailable',
+        outcome: diagnosis.unavailable ? 'holding_candidate' : 'invalid',
+      })
+      return generationPending(consultation.id, 'diagnosis_retry_required', 5_000)
+    }
+
+    const now = new Date().toISOString()
+    const { report, inserted } = await ensureReportInserted(ctx, {
+      consultationId: consultation.id,
+      userId: ctx.user.id,
+      reportData: diagnosis.raw,
+      confidenceScore: diagnosis.confidence,
+      finalDiagnosticRunId: diagnosticRunId,
+      accessStatus: ctx.isAnonymous ? 'withheld' : 'saved',
+      releasedAt: ctx.isAnonymous ? null : now,
+      retentionExpiresAt: ctx.isAnonymous ? addDays(30) : null,
+      modelMetadata: {
+        source: 'libertymd-diagnosis-recovery',
+        turn_count: consultation.turn_count,
+        media_evidence_ids: mediaContext.map((item) => String(item.evidence_id || '')).filter(Boolean),
+      },
+    })
+    if (inserted) {
+      await addProductEvent(ctx, 'report_gate_reached', consultation.id, {
+        confidence_bucket: scoreBucket(diagnosis.confidence),
+        evidence_bucket: scoreBucket(evidence.score),
+        is_anonymous: ctx.isAnonymous,
+      })
+      await addProductEvent(ctx, 'report_ready', consultation.id, {
+        turn_index: consultation.turn_count,
+        confidence_bucket: scoreBucket(diagnosis.confidence),
+        evidence_bucket: scoreBucket(evidence.score),
+        is_anonymous: ctx.isAnonymous,
+      })
+    }
+    return finalizeFromExistingReport(ctx, consultation, report, {
+      turnCount: consultation.turn_count,
+      currentVersion,
+      evidenceScore: evidence.score,
+      diagnosisRan: true,
+      resolutionReason: consultation.turn_count >= MAX_TURNS
+        ? 'turn_limit_report'
+        : 'comprehension_confirmed',
+    })
+  } finally {
+    const { error } = await ctx.db.rpc('libertymd_finish_consultation_request', {
+      p_consultation_id: consultation.id,
+      p_user_id: ctx.user.id,
+      p_request_id: requestId,
+    })
+    if (error) console.error('Unable to clear LibertyMD report-generation lease', error)
+  }
+}

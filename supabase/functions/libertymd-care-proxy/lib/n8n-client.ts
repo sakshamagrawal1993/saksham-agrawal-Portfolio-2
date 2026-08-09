@@ -528,6 +528,7 @@ export async function runInterview(
 ): Promise<InterviewResult> {
   // Thrown, not swallowed: a post-emergency interview attempt is a caller bug,
   // and returning a fallback question would hide it behind a plausible reply.
+  assertInferenceAllowed('interview', status, consultationId)
   const clinicalLanguage = toClinicalCandidate(language)
   try {
     const formattedHistory = formatHistoryForInference(history)
@@ -681,6 +682,11 @@ export async function runDiagnosis(
   // signature change and covers every diagnosis call site by construction.
   assertInferenceAllowed('diagnosis', consultation.status, consultation.id)
   const speculative = Boolean(options.speculative)
+  // Speculative pre-warm deliberately bypasses the acted-upon diagnosis
+  // breaker. A normal run must name the stage explicitly. This value was
+  // previously referenced without being declared, so every report attempt
+  // threw before fetch() and was misclassified as an unavailable workflow.
+  const stage: N8nStage | null = speculative ? null : 'diagnosis'
   const clinicalLanguage = toClinicalCandidate(consultation.language)
   try {
     const formattedHistory = formatHistoryForInference(history)

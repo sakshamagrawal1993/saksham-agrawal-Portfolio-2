@@ -38,6 +38,7 @@ import {
   handleGetPartialOutcome,
 } from './actions/reads.ts'
 import { handleReleaseReport } from './actions/report.ts'
+import { handleGenerateReport } from './actions/generate-report.ts'
 import {
   handleRedeemReportLink,
   handleRequestReportEmail,
@@ -73,6 +74,7 @@ const HANDLERS = new Map<ProxyAction, ActionHandler>([
   ['start_consultation', handleStartConsultation],
   ['save_demographics', handleSaveDemographics],
   ['send_message', handleSendMessage],
+  ['generate_report', handleGenerateReport],
   ['prepare_account_merge', handlePrepareAccountMerge],
   ['complete_account_merge', handleCompleteAccountMerge],
   ['release_report', handleReleaseReport],
