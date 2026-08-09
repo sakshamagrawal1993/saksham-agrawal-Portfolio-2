@@ -43,6 +43,8 @@ jobs:
       - name: Ban Mixpanel pollution from clinical harness
         run: npm run test:libertymd:harness-no-mixpanel
       - name: Validate n8n response contracts
+        env:
+          LIBERTYMD_ALLOW_PAYLOAD_RETENTION: 'true'
         run: node scripts/libertymd-contract-validation.mjs --definitions-dir=n8n-workflows/definitions
       - name: Test deterministic clinical policy
         run: npm run test:libertymd:policy
