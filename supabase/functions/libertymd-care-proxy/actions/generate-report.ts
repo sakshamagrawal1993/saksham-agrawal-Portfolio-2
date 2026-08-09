@@ -28,7 +28,9 @@ import {
   ensureReportInserted,
   finalizeFromExistingReport,
   findOwnedReport,
+  isCompleteStoredReport,
   isServeEligibleStoredReport,
+  repairIncompleteReport,
 } from '../lib/report-persistence.ts'
 import { calculateMissingSlots } from '../lib/slots.ts'
 import { addProductEvent, emitInferenceFailed, scoreBucket } from '../lib/telemetry.ts'
@@ -55,7 +57,7 @@ export async function handleGenerateReport(ctx: ProxyContext, payload: RequestPa
 
   let consultation = await getOwnedConsultation(ctx, payload.consultation_id)
   const existing = await findOwnedReport(ctx, consultation.id)
-  if (isServeEligibleStoredReport(existing) && existing) {
+  if (isCompleteStoredReport(existing) && existing) {
     return finalizeFromExistingReport(ctx, consultation, existing, {
       turnCount: consultation.turn_count,
       currentVersion: consultation.version,
@@ -68,7 +70,9 @@ export async function handleGenerateReport(ctx: ProxyContext, payload: RequestPa
   if (consultation.turn_count < MAX_TURNS && !comprehensionComplete) {
     return jsonResponse({ error: 'Consultation is not ready for report generation' }, 409)
   }
-  if (!['interviewing', 'high_risk'].includes(consultation.status)) {
+  const repairingIncompleteReport = isServeEligibleStoredReport(existing) && !isCompleteStoredReport(existing)
+  if (!['interviewing', 'high_risk'].includes(consultation.status)
+    && !(repairingIncompleteReport && ['completed', 'report_pending_auth', 'clinical_review_needed'].includes(consultation.status))) {
     return jsonResponse({ error: `Report generation is unavailable in ${consultation.status}` }, 409)
   }
 
@@ -86,7 +90,7 @@ export async function handleGenerateReport(ctx: ProxyContext, payload: RequestPa
   try {
     consultation = await getOwnedConsultation(ctx, consultation.id)
     const reportAfterClaim = await findOwnedReport(ctx, consultation.id)
-    if (isServeEligibleStoredReport(reportAfterClaim) && reportAfterClaim) {
+    if (isCompleteStoredReport(reportAfterClaim) && reportAfterClaim) {
       return finalizeFromExistingReport(ctx, consultation, reportAfterClaim, {
         turnCount: consultation.turn_count,
         currentVersion,
@@ -120,7 +124,7 @@ export async function handleGenerateReport(ctx: ProxyContext, payload: RequestPa
       consultation,
       slots,
       requestId,
-      { mediaContext },
+      { mediaContext, allowTerminalReportRepair: repairingIncompleteReport },
     )
     await addProductEvent(ctx, 'diagnosis_attempted', consultation.id, {
       turn_index: consultation.turn_count,
@@ -161,7 +165,7 @@ export async function handleGenerateReport(ctx: ProxyContext, payload: RequestPa
     }
 
     const now = new Date().toISOString()
-    const { report, inserted } = await ensureReportInserted(ctx, {
+    const reportInput = {
       consultationId: consultation.id,
       userId: ctx.user.id,
       reportData: diagnosis.raw,
@@ -175,8 +179,14 @@ export async function handleGenerateReport(ctx: ProxyContext, payload: RequestPa
         turn_count: consultation.turn_count,
         media_evidence_ids: mediaContext.map((item) => String(item.evidence_id || '')).filter(Boolean),
       },
-    })
-    if (inserted) {
+    }
+    const latestStoredReport = await findOwnedReport(ctx, consultation.id)
+    const persisted = latestStoredReport
+      ? await repairIncompleteReport(ctx, reportInput)
+      : await ensureReportInserted(ctx, reportInput)
+    const report = persisted.report
+    const materializedCompleteReport = 'repaired' in persisted ? persisted.repaired : persisted.inserted
+    if (materializedCompleteReport) {
       await addProductEvent(ctx, 'report_gate_reached', consultation.id, {
         confidence_bucket: scoreBucket(diagnosis.confidence),
         evidence_bucket: scoreBucket(evidence.score),

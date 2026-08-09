@@ -4,7 +4,9 @@
  * Clinical body (`report_data`, `confidence_score`, `final_diagnostic_run_id`,
  * `model_metadata`) is written at most once per consultation. Retries and
  * races select the existing row; they never upsert/clobber. Access / retention /
- * ownership updates stay on `actions/report.ts` and identity RPCs.
+ * ownership updates stay on `actions/report.ts` and identity RPCs. The sole
+ * exception is a database-guarded repair of a legacy/incomplete payload: an
+ * incomplete row may be replaced once with a newly validated complete report.
  *
  * Residual honesty: insert then consult-status update is still non-transactional.
  * Orphan recovery short-circuits from the stored row without a second
@@ -72,6 +74,38 @@ export function isServeEligibleStoredReport(report: StoredReportRow | null | und
   return Boolean(report) && Boolean(report?.report_data)
 }
 
+function hasText(value: unknown): boolean {
+  return typeof value === 'string' && value.trim().length > 0
+}
+
+function hasItems(value: unknown, exactLength?: number): boolean {
+  return Array.isArray(value)
+    && (exactLength === undefined ? value.length > 0 : value.length === exactLength)
+}
+
+/** Required physician-review sections shared by reads and report recovery. */
+export function isCompleteReportData(value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const report = value as Record<string, unknown>
+  const plan = report.assessment_and_plan
+  const soap = report.soap_note
+  if (!plan || typeof plan !== 'object' || Array.isArray(plan)) return false
+  if (!soap || typeof soap !== 'object' || Array.isArray(soap)) return false
+  const planData = plan as Record<string, unknown>
+  const soapData = soap as Record<string, unknown>
+  return hasText(report.headline)
+    && hasText(report.patient_summary)
+    && hasItems(report.differential_diagnosis, 3)
+    && hasText(planData.assessment)
+    && hasItems(planData.plan)
+    && hasItems(planData.red_flags_to_watch)
+    && ['subjective', 'objective', 'assessment', 'plan'].every((key) => hasText(soapData[key]))
+}
+
+export function isCompleteStoredReport(report: StoredReportRow | null | undefined): boolean {
+  return Boolean(report) && isCompleteReportData(report?.report_data)
+}
+
 /** Prefer detect-or-skip so orphan recovery does not spam report_gate messages. */
 export async function hasReportGateMessage(
   ctx: ProxyContext,
@@ -123,6 +157,33 @@ export async function ensureReportInserted(
   const existing = await findOwnedReport(ctx, input.consultationId)
   if (!existing) throw error || new Error('Report insert conflict without existing row')
   return { report: existing, inserted: false }
+}
+
+/**
+ * Replace only a report that the database independently confirms is missing a
+ * required physician-review section. The SECURITY DEFINER RPC preserves the
+ * row id and rejects complete-to-complete rewrites, direct client execution,
+ * cross-user repair, and incomplete replacement payloads.
+ */
+export async function repairIncompleteReport(
+  ctx: ProxyContext,
+  input: ReportInsertPayload,
+): Promise<{ report: StoredReportRow; repaired: boolean }> {
+  const { data, error } = await ctx.db.rpc('libertymd_repair_incomplete_report', {
+    p_consultation_id: input.consultationId,
+    p_user_id: input.userId,
+    p_report_data: input.reportData,
+    p_confidence_score: input.confidenceScore,
+    p_final_diagnostic_run_id: input.finalDiagnosticRunId,
+    p_model_metadata: input.modelMetadata,
+  })
+  if (error) throw error
+
+  const report = await findOwnedReport(ctx, input.consultationId)
+  if (!report || !isCompleteStoredReport(report)) {
+    throw new Error('Incomplete report repair did not produce a complete report')
+  }
+  return { report, repaired: data === true }
 }
 
 /**

@@ -84,6 +84,36 @@ Deno.test('REPORT-01: normal diagnosis reaches n8n and parses a physician-review
   }
 })
 
+Deno.test('REPORT-01B: controlled incomplete-report repair may diagnose completed, never emergency', async () => {
+  const completed = consultationRow({ status: 'completed', turn_count: 15 })
+  const emergency = consultationRow({ status: 'emergency_stopped', turn_count: 15 })
+  const fetchLog = stubFetch(() => okResponse({
+    valid_report: true,
+    confidence_score: 42,
+    differential_diagnosis: [
+      { rank: 1, full_name: 'Diagnosis A', confidence: 42, reason: 'Reason A' },
+      { rank: 2, full_name: 'Diagnosis B', confidence: 28, reason: 'Reason B' },
+      { rank: 3, full_name: 'Diagnosis C', confidence: 15, reason: 'Reason C' },
+    ],
+  }))
+  try {
+    const repaired = await runDiagnosis([], {}, completed, { chief_complaint: 'Synthetic symptom' }, null, {
+      allowTerminalReportRepair: true,
+    })
+    assertEquals(repaired.valid, true, 'explicit completed-report repair may reach diagnosis')
+    assertEquals(fetchLog.calls.length, 1, 'repair performs exactly one workflow request')
+
+    await assertRejects(
+      () => runDiagnosis([], {}, emergency, {}, null, { allowTerminalReportRepair: true }),
+      (error) => error instanceof PostEmergencyInferenceError && error.status === 'emergency_stopped',
+      'repair flag must never bypass emergency stop',
+    )
+    assertEquals(fetchLog.calls.length, 1, 'emergency repair attempt issues no workflow request')
+  } finally {
+    fetchLog.restore()
+  }
+})
+
 Deno.test('P0-13 AC3/AC5: a message_type outside the closed enum is rejected', async () => {
   const { ctx, ops } = createFakeContext()
   await assertRejects(

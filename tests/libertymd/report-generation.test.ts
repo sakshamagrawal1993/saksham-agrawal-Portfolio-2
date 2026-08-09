@@ -1,4 +1,6 @@
 /** Regression coverage for signed-in report loading and asynchronous recovery. */
+import { isCompleteReportData } from '../../supabase/functions/libertymd-care-proxy/lib/report-persistence.ts'
+
 declare const Deno: {
   test(name: string, fn: () => void | Promise<void>): void
   readTextFile(path: string | URL): Promise<string>
@@ -56,4 +58,42 @@ Deno.test('REPORT-06 · diagnosis workflow has structured parsers and strict com
   const code = String(validator?.parameters?.jsCode || '')
   assert(code.includes('report_sections_complete'), 'validator must require report sections')
   assert(code.includes('differentials.length === 3'), 'validator must require exactly three differentials')
+})
+
+Deno.test('REPORT-07 · partial stored reports are not treated as ready', async () => {
+  const partial = {
+    headline: 'Possible respiratory illness',
+    patient_summary: 'The patient reported cough and fever.',
+    differential_diagnosis: [{}, {}, {}],
+  }
+  assert(!isCompleteReportData(partial), 'missing plan, red flags, and SOAP must be incomplete')
+
+  const complete = {
+    ...partial,
+    assessment_and_plan: {
+      assessment: 'Outpatient assessment is appropriate.',
+      plan: ['Arrange primary care follow-up'],
+      red_flags_to_watch: ['Difficulty breathing at rest'],
+    },
+    soap_note: {
+      subjective: 'Cough and fever reported.',
+      objective: 'No physical examination performed.',
+      assessment: 'Respiratory infection considered.',
+      plan: 'Supportive care and follow-up.',
+    },
+  }
+  assert(isCompleteReportData(complete), 'all required physician-review sections must be ready')
+})
+
+Deno.test('REPORT-08 · incomplete report repair is server-only and complete reports stay immutable', async () => {
+  const action = await Deno.readTextFile(new URL('supabase/functions/libertymd-care-proxy/actions/generate-report.ts', ROOT))
+  const reads = await Deno.readTextFile(new URL('supabase/functions/libertymd-care-proxy/actions/reads.ts', ROOT))
+  const migration = await Deno.readTextFile(new URL('supabase/migrations/20260809160000_libertymd_incomplete_report_repair.sql', ROOT))
+  assert(action.includes('repairIncompleteReport'), 'generator must repair a stored incomplete report')
+  assert(action.includes('allowTerminalReportRepair: repairingIncompleteReport'), 'completed repair must explicitly unlock diagnosis')
+  assert(reads.includes('reportIncomplete ? null : activeReport'), 'reads must not present an incomplete report as ready')
+  assert(migration.includes('libertymd_report_sections_complete(current_report.report_data)'), 'database rechecks current incompleteness')
+  assert(migration.includes('libertymd_report_sections_complete(p_report_data)'), 'database requires complete replacement')
+  assert(/revoke all on function public\.libertymd_repair_incomplete_report[\s\S]*from public, anon, authenticated/i.test(migration), 'repair RPC must reject direct clients')
+  assert(migration.includes("current_setting('libertymd.allow_incomplete_report_repair', true)"), 'ordinary clinical updates remain rejected')
 })

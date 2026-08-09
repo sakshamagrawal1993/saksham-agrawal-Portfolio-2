@@ -19,6 +19,7 @@ import { jsonResponse } from '../lib/errors.ts'
 import { generatePartialOutcome } from '../lib/partial-outcome.ts'
 import { listMediaEvidence } from '../lib/media-evidence.ts'
 import { ensureProfile, ensureSelfPatient } from '../lib/profiles.ts'
+import { isCompleteReportData } from '../lib/report-persistence.ts'
 import type { ProxyContext } from '../lib/context.ts'
 import type { RequestPayload } from '../lib/types.ts'
 
@@ -115,7 +116,13 @@ export async function handleGetConsultation(ctx: ProxyContext, payload: RequestP
   }
 
   // P2-13 L6 — return retention ISO + omit hint; body still omitted after expiry.
-  const lifecycle = reportReadLifecycleMeta(activeReport)
+  // Legacy repair payloads could contain a headline and differential but omit
+  // the action plan, red flags, or SOAP. Do not present those as finished.
+  // Returning no report keeps the page on its non-blocking generation state;
+  // `generate_report` then repairs the stored row under the request lease.
+  const reportIncomplete = Boolean(activeReport?.report_data)
+    && !isCompleteReportData(activeReport?.report_data)
+  const lifecycle = reportReadLifecycleMeta(reportIncomplete ? null : activeReport)
   const mediaEvidence = await listMediaEvidence(ctx, consultation)
   const response: Record<string, unknown> = {
     // JWT-derived, server-authoritative identity. Report chrome must not infer
@@ -128,6 +135,7 @@ export async function handleGetConsultation(ctx: ProxyContext, payload: RequestP
     confidence_score: lifecycle.report != null ? (activeReport?.confidence_score ?? null) : null,
     retention_expires_at: lifecycle.retention_expires_at,
     report_omitted_reason: lifecycle.report_omitted_reason,
+    report_incomplete: reportIncomplete,
     media_evidence: mediaEvidence,
   }
   if (terminalSafety?.crisis_type) {

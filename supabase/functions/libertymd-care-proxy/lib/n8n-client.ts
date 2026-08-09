@@ -668,6 +668,12 @@ export type RunDiagnosisOptions = {
    */
   speculative?: boolean
   mediaContext?: JsonObject[]
+  /**
+   * A terminal consultation may run diagnosis only to replace a stored report
+   * that the caller and database have both confirmed is incomplete. Emergency
+   * and abandoned consultations remain non-inferable even with this flag.
+   */
+  allowTerminalReportRepair?: boolean
 }
 
 export async function runDiagnosis(
@@ -678,9 +684,14 @@ export async function runDiagnosis(
   correlationId?: string | null,
   options: RunDiagnosisOptions = {},
 ) {
-  // P0-13 AC2. The consultation row is already in hand here, so this needs no
-  // signature change and covers every diagnosis call site by construction.
-  assertInferenceAllowed('diagnosis', consultation.status, consultation.id)
+  // P0-13 AC2. Normal inference remains closed after any terminal state. The
+  // report-repair handler has one explicit exception for non-emergency terminal
+  // states whose persisted report failed required-section validation.
+  const terminalReportRepairAllowed = Boolean(options.allowTerminalReportRepair)
+    && ['completed', 'report_pending_auth', 'clinical_review_needed'].includes(consultation.status)
+  if (!terminalReportRepairAllowed) {
+    assertInferenceAllowed('diagnosis', consultation.status, consultation.id)
+  }
   const speculative = Boolean(options.speculative)
   // Speculative pre-warm deliberately bypasses the acted-upon diagnosis
   // breaker. A normal run must name the stage explicitly. This value was
