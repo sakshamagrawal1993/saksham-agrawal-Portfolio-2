@@ -6,8 +6,8 @@
  * **not** pass scrollParentRef into ReportView (avoids real-consult
  * `report_scroll_depth`). Soft-gate / doctor / email / feedback props omitted.
  */
-import { useEffect, useId, useRef, useState } from 'react'
-import { Download, FileText, X } from 'lucide-react'
+import { useEffect, useId, useRef } from 'react'
+import { Download, X } from 'lucide-react'
 import { useI18n } from '../../i18n'
 import { emitSampleReportViewed } from './libertymd-analytics'
 import { LibertyMDOverlaySheet } from './LibertyMDOverlaySheet'
@@ -48,7 +48,6 @@ export function LibertyMDSampleReport({
   const reportAnchorRef = useRef<HTMLDivElement | null>(null)
   const emittedBucketsRef = useRef<Set<ReportScrollBucket>>(new Set())
 
-  const [viewMode, setViewMode] = useState<'pdf' | 'interactive'>('pdf')
   const report = normalizeReportData(getSampleReportData(conditionClusterId, language))
 
   // Open → bucket 0 once; then monotonic newly-reached buckets on scroll host.
@@ -134,35 +133,25 @@ export function LibertyMDSampleReport({
         </div>
 
         <div ref={reportAnchorRef} className="p-4 sm:p-6 flex-1">
-          {/* Desktop View: Show PDF Document */}
-          <div className="hidden sm:flex sm:flex-col sm:items-center w-full">
-            <iframe
-              src={`${SAMPLE_REPORT_PDF_URL}#toolbar=1&navpanes=0`}
-              title="LibertyMD Sample Report PDF"
-              className="h-[82vh] w-full max-w-5xl rounded-xl border border-libertymd-slate-200 shadow-md bg-white"
-            />
+          <div className="mx-auto mb-4 max-w-5xl rounded-xl border border-libertymd-blue-200/80 bg-libertymd-blue-50 p-4">
+            <p id={badgeId} className="text-xs font-bold uppercase tracking-wider text-libertymd-blue-700">
+              {t('sampleReport.badge')}
+            </p>
+            <p className="mt-1 text-sm text-libertymd-slate-700">{t('sampleReport.subtitle')}</p>
           </div>
 
-          {/* Mobile View: Interactive View for mobile browsers that do not support inline PDF view */}
-          <div className="block sm:hidden space-y-4">
+          <div className="mx-auto max-w-5xl space-y-4">
+            <LibertyMDReportView report={report} saved={false} variant="sample" />
             <a
               href={SAMPLE_REPORT_PDF_URL}
               download="LibertyMD_Sample_Report.pdf"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-between rounded-xl bg-libertymd-blue-50 border border-libertymd-blue-200/80 p-4 text-libertymd-blue-700 shadow-xs transition active:scale-[0.99]"
+              className="inline-flex items-center gap-2 rounded-full border border-libertymd-blue-200 bg-white px-4 py-2 text-sm font-semibold text-libertymd-blue-700 transition hover:bg-libertymd-blue-50"
             >
-              <div className="flex items-center gap-3">
-                <FileText className="h-6 w-6 text-libertymd-blue-600 shrink-0" />
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-libertymd-blue-600">Sample Report PDF</p>
-                  <p className="text-sm font-semibold text-libertymd-ink">Download original medical PDF</p>
-                </div>
-              </div>
-              <Download className="h-5 w-5 text-libertymd-blue-600 shrink-0" />
+              <Download className="h-4 w-4" aria-hidden />
+              {t('report.download')}
             </a>
-
-            <LibertyMDReportView report={report} saved={false} variant="sample" />
           </div>
         </div>
 
