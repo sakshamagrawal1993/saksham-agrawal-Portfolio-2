@@ -29,17 +29,21 @@ function assertEquals<T>(actual: T, expected: T, message: string) {
   assert(Object.is(actual, expected), `${message}: expected ${String(expected)}, got ${String(actual)}`)
 }
 
-Deno.test('P3-07 Q6 · toClinicalCandidate normalizes es / es-* / other→en', () => {
+Deno.test('P3-09 · toClinicalCandidate normalizes es / es-ES / hi / hi-Latn / pt / fr / de', () => {
   assertEquals(toClinicalCandidate('es'), 'es', 'es')
-  assertEquals(toClinicalCandidate('es-ES'), 'es', 'es-ES')
+  assertEquals(toClinicalCandidate('es-ES'), 'es', 'es-ES→es')
   assertEquals(toClinicalCandidate('es_MX'), 'es', 'es_MX')
-  assertEquals(toClinicalCandidate('pt'), 'en', 'pt→en')
-  assertEquals(toClinicalCandidate('hi'), 'en', 'hi→en')
-  assertEquals(toClinicalCandidate('fr'), 'en', 'fr→en')
+  assertEquals(toClinicalCandidate('pt'), 'pt', 'pt')
+  assertEquals(toClinicalCandidate('hi'), 'hi', 'hi')
+  assertEquals(toClinicalCandidate('hi-Latn'), 'hi-Latn', 'hi-Latn')
+  assertEquals(toClinicalCandidate('hinglish'), 'hi-Latn', 'hinglish→hi-Latn')
+  assertEquals(toClinicalCandidate('fr'), 'fr', 'fr')
+  assertEquals(toClinicalCandidate('de'), 'de', 'de')
   assertEquals(toClinicalCandidate('en'), 'en', 'en')
   assertEquals(toClinicalCandidate(''), 'en', 'empty')
   assertEquals(asClinicalLanguage('es'), 'es', 'asClinical es')
-  assertEquals(asClinicalLanguage('pt'), 'en', 'asClinical pt')
+  assertEquals(asClinicalLanguage('hi'), 'hi', 'asClinical hi')
+  assertEquals(asClinicalLanguage('hi-Latn'), 'hi-Latn', 'asClinical hi-Latn')
 })
 
 Deno.test('P3-07 AC6 path(2) · Spanish request blocked→en when gate closed', async () => {

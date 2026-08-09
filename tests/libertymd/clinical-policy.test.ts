@@ -83,6 +83,34 @@ Deno.test('short clinical answers remain accepted', () => {
   }
 })
 
+Deno.test('multilingual short and full clinical answers remain accepted (Spanish, Hindi, Hinglish, etc.)', () => {
+  const multilingualClinical = [
+    'Sí',
+    'si',
+    'No',
+    'Tengo fiebre y dolor de cabeza',
+    'Dolor de estómago desde ayer',
+    'Me duele mucho la garganta',
+    'हाँ',
+    'नहीं',
+    'मुझे सिर दर्द है',
+    'कल से बुखार है',
+    'haan',
+    'nahi',
+    'Mujhe fever aur head pain hai',
+    'Sir dard kal se hai',
+    'oui',
+    'non',
+    'ja',
+    'nein',
+    'sim',
+    'não',
+  ]
+  for (const message of multilingualClinical) {
+    assertEquals(classifyResponseRelevance(message), 'clinical', `Expected clinical for multilingual input: ${message}`)
+  }
+})
+
 Deno.test('mid-consult, sufficient evidence and workflow-ready releases moderate-confidence report', () => {
   const evidence = assessClinicalEvidence(LIBERTYMD_VALIDATION_CASES.lowFever.filledSlots)
   const decision = decideReportOutcome({

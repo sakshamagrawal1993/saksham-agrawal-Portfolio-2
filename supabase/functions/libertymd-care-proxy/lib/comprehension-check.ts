@@ -8,6 +8,7 @@
  * Engineering Done ≠ clinical approval (same posture as P0-17 / P1-09).
  */
 import { CLINICAL_SLOTS } from './slots.ts'
+import { asClinicalLanguage, type ClinicalLanguage } from './journey-locale.ts'
 import type { JsonObject } from './types.ts'
 
 /** Non-open-ended continue fallback — retires Gap 5 "anything else…?" confirm UX. */
@@ -28,21 +29,54 @@ const WORKFLOW_PENDING_KEY = 'comprehension_pending'
  * Provisional echo labels — slots vocabulary only.
  * **REQUIRES EXPERT REVIEW** before clinical release.
  */
-export const COMPREHENSION_SLOT_LABELS: Record<(typeof CLINICAL_SLOTS)[number], string> = {
-  chief_complaint: 'Main concern',
-  onset: 'When it started',
-  duration: 'How long it has lasted',
-  severity: 'How severe it feels',
-  location: 'Where it is',
-  character: 'What it feels like',
-  associated_symptoms: 'Other symptoms',
-  red_flag_negatives: 'Warning signs checked',
-  functional_impact: 'How it affects daily life',
-  relevant_history: 'Relevant history',
-  medications: 'Medications',
-  allergies: 'Allergies',
-  pregnancy_status: 'Pregnancy status',
+type ClinicalSlot = (typeof CLINICAL_SLOTS)[number]
+type ComprehensionSlotLabels = Record<ClinicalSlot, string>
+
+/**
+ * Complete patient-facing labels for every language the clinical journey can
+ * persist. Chrome-only locales are normalized by the journey locale policy and
+ * therefore use the English clinical map until that language is clinically
+ * enabled.
+ */
+export const COMPREHENSION_SLOT_LABELS_BY_LANGUAGE: Record<
+  ClinicalLanguage,
+  ComprehensionSlotLabels
+> = {
+  en: {
+    chief_complaint: 'Main concern',
+    onset: 'When it started',
+    duration: 'How long it has lasted',
+    severity: 'How severe it feels',
+    location: 'Where it is',
+    character: 'What it feels like',
+    associated_symptoms: 'Other symptoms',
+    red_flag_negatives: 'Warning signs checked',
+    functional_impact: 'How it affects daily life',
+    relevant_history: 'Relevant history',
+    medications: 'Medications',
+    allergies: 'Allergies',
+    pregnancy_status: 'Pregnancy status',
+  },
+  es: {
+    chief_complaint: 'Motivo principal de consulta',
+    onset: 'Cuándo comenzó',
+    duration: 'Duración de los síntomas',
+    severity: 'Intensidad / Gravedad',
+    location: 'Ubicación',
+    character: 'Características del síntoma',
+    associated_symptoms: 'Otros síntomas asociados',
+    red_flag_negatives: 'Signos de alarma evaluados',
+    functional_impact: 'Impacto en la vida diaria',
+    relevant_history: 'Antecedentes médicos',
+    medications: 'Medicamentos actuales',
+    allergies: 'Alergias',
+    pregnancy_status: 'Estado de embarazo',
+  },
 }
+
+/** Backwards-compatible aliases for callers/tests that consume one map. */
+export const COMPREHENSION_SLOT_LABELS = COMPREHENSION_SLOT_LABELS_BY_LANGUAGE.en
+export const COMPREHENSION_SLOT_LABELS_ES = COMPREHENSION_SLOT_LABELS_BY_LANGUAGE.es
 
 export interface ComprehensionSummaryLine {
   /** Clinical slot key — categorical; safe for optional telemetry counts. */
@@ -77,7 +111,8 @@ function formatSlotValue(value: unknown): string {
 /**
  * Deterministic slots → summary. Empty optionals are omitted (never "no fever").
  */
-export function buildComprehensionSummary(filledSlots: JsonObject | null | undefined): ComprehensionSummaryLine[] {
+export function buildComprehensionSummary(filledSlots: JsonObject | null | undefined, language?: string): ComprehensionSummaryLine[] {
+  const labels = COMPREHENSION_SLOT_LABELS_BY_LANGUAGE[asClinicalLanguage(language)]
   const slots = filledSlots && typeof filledSlots === 'object' && !Array.isArray(filledSlots)
     ? filledSlots
     : {}
@@ -87,7 +122,7 @@ export function buildComprehensionSummary(filledSlots: JsonObject | null | undef
     if (!hasPresentValue(raw)) continue
     lines.push({
       slot,
-      label: COMPREHENSION_SLOT_LABELS[slot],
+      label: labels[slot],
       value: formatSlotValue(raw).slice(0, 1000),
     })
   }
@@ -96,8 +131,9 @@ export function buildComprehensionSummary(filledSlots: JsonObject | null | undef
 
 export function buildComprehensionCheckPayload(
   filledSlots: JsonObject | null | undefined,
+  language?: string,
 ): ComprehensionCheckPayload {
-  const summary_lines = buildComprehensionSummary(filledSlots)
+  const summary_lines = buildComprehensionSummary(filledSlots, language)
   return {
     summary_lines,
     pending: true,

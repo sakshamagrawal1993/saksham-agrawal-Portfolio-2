@@ -64,6 +64,14 @@
     "benefitFamily": "पारिवारिक प्रोफ़ाइल जोड़ें"
   },
   "report": {
+    "headerTitle": "चिकित्सक-तैयार रिपोर्ट",
+    "meta": {
+      "patientName": "रोगी का नाम:",
+      "gender": "लिंग:",
+      "age": "आयु:",
+      "date": "तिथि:",
+      "refNo": "संदर्भ सं.:"
+    },
     "title": "आपकी स्वास्थ्य रिपोर्ट",
     "likely": "संभावित कारण",
     "evidence": "समर्थन करने वाले संकेत",
@@ -73,10 +81,10 @@
     "careSetting": "सुझाया गया अगला कदम",
     "download": "रिपोर्ट डाउनलोड करें",
     "share": "अपने डॉक्टर के साथ साझा करें",
-    "eyebrow": "Doctor-ready report",
-    "aiFraming": "AI-generated guidance — not reviewed by a clinician. This is not a diagnosis.",
-    "savedNote": "Saved privately to your LibertyMD history.",
-    "guestNote": "Guest access expires after seven days.",
+    "eyebrow": "डॉक्टर-रेडी रिपोर्ट",
+    "aiFraming": "AI-जनित परामर्श — किसी चिकित्सक द्वारा समीक्षा नहीं की गई। यह निदान नहीं है।",
+    "savedNote": "आपकी LibertyMD हिस्ट्री में निजी रूप से सहेजा गया।",
+    "guestNote": "अतिथि पहुंच 7 दिनों के बाद समाप्त हो जाएगी।",
     "pdf": {
       "patientTitle": "रोगी सारांश",
       "soapTitle": "चिकित्सक SOAP नोट",
@@ -93,7 +101,7 @@
       "generating": "आपकी PDF तैयार हो रही है…",
       "error": "PDF तैयार नहीं हो सकी। यह तकनीकी समस्या है — रिपोर्ट स्क्रीन पर है। फिर कोशिश करें।",
       "retry": "फिर कोशिश करें",
-      "downloadSoapReady": "चिकित्सक SOAP डाउनलोड करें",
+      "downloadSoapReady": "चिकित्सक SOAP PDF डाउनलोड करें",
       "readyPatient": "रोगी सारांश PDF तैयार",
       "readySoap": "चिकित्सक SOAP PDF तैयार"
     },
@@ -108,31 +116,32 @@
       "soap": "SOAP नोट"
     },
     "triage": {
-      "home": "Home care",
-      "telehealth": "Telehealth",
-      "urgent_care": "Urgent care",
-      "emergency_department": "Emergency room",
-      "call_911": "Call emergency services",
-      "crisis_line": "Crisis support line",
-      "unknown": "Care setting unavailable"
+      "home": "गृह देखभाल (Home Care)",
+      "telehealth": "टेलीहेल्थ (Telehealth)",
+      "urgent_care": "अर्जेंट केयर (Urgent Care)",
+      "emergency_department": "आपातकालीन कक्ष (Emergency Room)",
+      "call_911": "आपातकालीन सेवा को कॉल करें",
+      "crisis_line": "संकट सहायता हेल्पलाइन",
+      "unknown": "देखभाल का स्तर अनुपलब्ध"
     },
     "viewTitle": "चिकित्सक की समीक्षा के लिए रिपोर्ट",
     "card": {
       "ordinal": {
         "high": "उच्च विश्वास",
-        "medium": "Medium confidence",
+        "medium": "मध्यम विश्वास",
         "low": "कम विश्वास",
-        "minimal": "Minimal confidence",
+        "minimal": "न्यूनतम विश्वास",
         "high_serious": "उच्च विश्वास · गंभीर"
       },
-      "serious": "Serious",
-      "furtherInvestigations": "Further investigations",
-      "symptomaticTreatment": "Symptom relief",
-      "supportiveTreatment": "Supportive care",
-      "treatmentGuidance": "General guidance only — not a prescription.",
-      "doctorCta": "Notify me when doctors are available",
-      "showDetail": "Show details",
-      "hideDetail": "Hide details"
+      "serious": "गंभीर",
+      "clinicalReviewRequired": "चिकित्सक समीक्षा आवश्यक",
+      "furtherInvestigations": "अतिरिक्त जांचें",
+      "symptomaticTreatment": "लक्षण राहत",
+      "supportiveTreatment": "सहायक देखभाल",
+      "treatmentGuidance": "केवल सामान्य परामर्श — यह पर्चा नहीं है।",
+      "doctorCta": "डॉक्टर उपलब्ध होने पर मुझे सूचित करें",
+      "showDetail": "विवरण दिखाएं",
+      "hideDetail": "विवरण छिपाएं"
     },
     "teasers": {
       "differential": "{count} संभावनाएँ",

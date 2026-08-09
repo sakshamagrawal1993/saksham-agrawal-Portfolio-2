@@ -221,13 +221,16 @@ export function suggestedMediaFollowupQuestions(
 ): string[] {
   const spanish = language.trim().toLowerCase() === 'es'
   if (kind === 'photo') {
+    const bodyRegion = cleanMessage(analysis.body_region || analysis.location || '').toLowerCase()
     const obsList = (Array.isArray(analysis.observations) ? analysis.observations : [])
       .map((item: any) => cleanMessage(item?.description || item?.feature || ''))
       .filter(Boolean)
     const primaryObs = obsList[0] || ''
-    const subject = primaryObs
-      ? `the visual finding (${primaryObs.slice(0, 80).toLowerCase()})`
-      : 'the visual features in this image'
+    const subject = bodyRegion
+      ? `the features on your ${bodyRegion}`
+      : primaryObs
+        ? `the visual finding (${primaryObs.slice(0, 80).toLowerCase()})`
+        : 'the visual features in this image'
 
     if (spanish) {
       return [

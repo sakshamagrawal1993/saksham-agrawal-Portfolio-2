@@ -62,6 +62,7 @@ export type LibertyMdDifferentialItem = {
   ordinal?: DifferentialOrdinal
   /** Elevated seriousness signal (Q3). */
   isSerious?: boolean
+  requiresClinicalReview?: boolean
   furtherInvestigations?: string[]
   symptomaticTreatment?: string[]
   supportiveTreatment?: string[]
@@ -302,6 +303,12 @@ function normalizeDifferentials(data: Record<string, unknown>): LibertyMdDiffere
       confidence: record.confidence,
     })
     const isSerious = isDifferentialSerious(record)
+    const requiresClinicalReview = record.requires_clinical_review === true
+      || record.requiresClinicalReview === true
+      || ordinal === 'low'
+      || ordinal === 'minimal'
+      || data.status === 'clinical_review_needed'
+      || data.requires_clinical_review === true
     const furtherInvestigations = pickAliasList(record, [
       'further_investigations',
       'investigations',
@@ -324,6 +331,7 @@ function normalizeDifferentials(data: Record<string, unknown>): LibertyMdDiffere
       ...(reason ? { reason } : {}),
       ...(ordinal ? { ordinal } : {}),
       ...(isSerious ? { isSerious: true } : {}),
+      ...(requiresClinicalReview ? { requiresClinicalReview: true } : {}),
       ...(furtherInvestigations.length ? { furtherInvestigations } : {}),
       ...(symptomaticTreatment.length ? { symptomaticTreatment } : {}),
       ...(supportiveTreatment.length ? { supportiveTreatment } : {}),

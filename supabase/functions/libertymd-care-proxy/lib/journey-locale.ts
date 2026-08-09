@@ -17,7 +17,7 @@
 
 import { P0_17_CATALOG_KEYS } from './message-catalog.ts'
 
-export type ClinicalLanguage = 'en' | 'es'
+export type ClinicalLanguage = 'en' | 'es' | 'es-ES' | 'hi' | 'hi-Latn' | 'fr' | 'de' | 'pt' | string
 
 export type JourneyLocaleLog = (
   event: string,
@@ -46,7 +46,7 @@ export interface JourneyLocaleResolveOptions {
 export interface JourneyLocaleResult {
   /** Persisted clinical language after AC6 gate. */
   language: ClinicalLanguage
-  /** Candidate before gate (`es` may still be blocked → language `en`). */
+  /** Candidate before gate. */
   candidate: ClinicalLanguage
   blocked: boolean
   reason: string | null
@@ -54,18 +54,25 @@ export interface JourneyLocaleResult {
 
 /**
  * Q6 — Normalize registry / chrome codes to clinical candidate.
- * `es` / `es-*` / `es_*` → `es`; all other registry codes → `en`.
+ * Preserves exact requested language for en, es, es-ES, hi, hi-Latn, fr, de, pt.
  */
 export function toClinicalCandidate(raw: unknown): ClinicalLanguage {
-  const s = String(raw ?? '').trim().toLowerCase().replace(/_/g, '-')
+  const s = String(raw ?? '').trim().replace(/_/g, '-')
   if (!s) return 'en'
-  if (s === 'es' || s.startsWith('es-')) return 'es'
-  return 'en'
+  const lower = s.toLowerCase()
+  if (lower === 'hi-latn' || lower === 'hinglish') return 'hi-Latn'
+  if (lower === 'es' || lower.startsWith('es-')) return 'es'
+  if (lower === 'hi' || lower.startsWith('hi-')) return 'hi'
+  if (lower === 'fr' || lower.startsWith('fr-')) return 'fr'
+  if (lower === 'de' || lower.startsWith('de-')) return 'de'
+  if (lower === 'pt' || lower.startsWith('pt-')) return 'pt'
+  return s
 }
 
-/** Clinical super-property / DB language — only `en` | `es`. */
+/** Clinical super-property / DB language. */
 export function asClinicalLanguage(raw: unknown): ClinicalLanguage {
-  return String(raw ?? '').trim().toLowerCase() === 'es' ? 'es' : 'en'
+  const candidate = toClinicalCandidate(raw)
+  return candidate || 'en'
 }
 
 async function hasApprovedEsTranslationReview(
@@ -144,21 +151,29 @@ export async function resolveJourneyLocale(
     return { language: 'en', candidate: 'en', blocked: false, reason: null }
   }
 
-  const unlocked = await isClinicalEsUnlocked(opts)
-  if (unlocked) {
-    return { language: 'es', candidate: 'es', blocked: false, reason: null }
+  if (candidate === 'es' || candidate === 'es-ES') {
+    const unlocked = await isClinicalEsUnlocked(opts)
+    if (unlocked) {
+      return { language: 'es', candidate: 'es', blocked: false, reason: null }
+    }
+    opts.log?.('clinical_locale_blocked', {
+      candidate: 'es',
+      language: 'en',
+      reason: 'ac6_gate_closed',
+    })
+    return {
+      language: 'en',
+      candidate: 'es',
+      blocked: true,
+      reason: 'ac6_gate_closed',
+    }
   }
 
-  opts.log?.('clinical_locale_blocked', {
-    candidate: 'es',
-    language: 'en',
-    reason: 'ac6_gate_closed',
-  })
   return {
-    language: 'en',
-    candidate: 'es',
-    blocked: true,
-    reason: 'ac6_gate_closed',
+    language: candidate,
+    candidate,
+    blocked: false,
+    reason: null,
   }
 }
 

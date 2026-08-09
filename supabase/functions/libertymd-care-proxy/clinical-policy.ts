@@ -129,7 +129,8 @@ export function classifyResponseRelevance(message: string): ResponseRelevance {
   const text = message.trim().toLowerCase()
   if (!text) return 'unclear'
 
-  const acceptedShortAnswers = /^(yes|no|none|nope|better|worse|same|today|yesterday|unknown|unsure|not sure|\d{1,3}(?:\/10)?)$/
+  // Multilingual short answers (English, Spanish, Hindi, Hinglish, French, German, Portuguese)
+  const acceptedShortAnswers = /^(yes|no|none|nope|better|worse|same|today|yesterday|unknown|unsure|not sure|sí|si|nada|ninguno|ninguna|mejor|peor|igual|hoy|ayer|desconocido|हाँ|हां|नहीं|नही|आज|कल|बेहतर|कम|ज्यादा|पता नहीं|haan|ha|hha|nahi|na|nhi|aaj|kal|parso|pata nahi|oui|non|aucun|meilleur|pire|aujourd'hui|hier|ja|nein|keine|besser|schlechter|heute|gestern|sim|não|nao|nenhum|melhor|pior|hoje|ontem|\d{1,3}(?:\/10)?)$/i
   if (acceptedShortAnswers.test(text)) return 'clinical'
 
   // Recognized medical vitals & measurements (temperatures, blood pressure, oxygen saturation, ranges with units)
@@ -143,10 +144,14 @@ export function classifyResponseRelevance(message: string): ResponseRelevance {
   const offTopic = /\b(football|cricket|sports?|who won (the )?game|stock market|bitcoin|weather forecast|tell me a joke|write (me )?a poem|banana|pineapple|movie|celebrity|politics|recipe|homework|random answer|not medical|asdf|qwerty|qwrty|zxcv|hjkl)\b/
   if (offTopic.test(text)) return 'off_topic'
 
-  const letters = (text.match(/[a-z]/g) || []).length
+  // Unicode-aware letter matching (handles Spanish accents, Devanagari Hindi, French/German/Portuguese, etc.)
+  const letters = (text.match(/\p{L}/gu) || []).length
   const alphaRatio = letters / Math.max(text.length, 1)
-  const words = text.match(/[a-z]+/g) || []
-  const hasVowelWord = words.some((word) => /[aeiou]/.test(word))
+  const words = text.match(/\p{L}+/gu) || []
+
+  // Check vowels for Latin-script text; non-Latin script words (e.g. Devanagari) automatically pass
+  const isNonLatin = /[\u0900-\u097F]/u.test(text)
+  const hasVowelWord = isNonLatin || words.some((word) => /[aeiouyáéíóúàèìòùâêîôûäëïöüãõâêô]/i.test(word))
   const hasNumbers = /\d/.test(text)
 
   if (text.length >= 4 && !hasNumbers && (alphaRatio < 0.35 || !hasVowelWord)) return 'off_topic'
@@ -165,26 +170,14 @@ export function decideReportOutcome(input: ReportDecisionInput): ReportDecision 
   // differential is released, even when confidence is low.
   if (input.diagnosisValid && hasHealthInformation) {
     if (input.turnCount >= 15) return { outcome: 'complete', reason: 'turn_limit_report' }
+    // BO 2026-08-02 — a confirmed comprehension summary ends the interview.
+    if (input.comprehensionConfirmed) {
+      return { outcome: 'complete', reason: 'comprehension_confirmed' }
+    }
     if (!input.evidence.sufficient) {
       return { outcome: 'continue', reason: 'collect_more_evidence' }
     }
     if (input.confidence >= 80) return { outcome: 'complete', reason: 'high_confidence' }
-    // BO 2026-08-02 — a confirmed comprehension summary ends the interview.
-    //
-    // The comprehension check opens on the MINI-DIFFERENTIAL's confidence
-    // (now >= 80), while release below the cap needed the REPORT COMPOSER's (>= 80).
-    // Those are different models on different scales, so a consult would show
-    // the patient "here is everything I understood — ready?", take their yes,
-    // generate a perfectly valid report, discard it, and ask several more
-    // questions. Observed on five corpus cases at turns 8-13, each with a
-    // `valid` diagnosis and evidence 100.
-    //
-    // Confidence still governs the report's *wording* through the four bands
-    // (high / medium / low / minimal); it no longer decides whether a patient
-    // who said they were finished receives one.
-    if (input.comprehensionConfirmed) {
-      return { outcome: 'complete', reason: 'comprehension_confirmed' }
-    }
     if (input.readyForReport) return { outcome: 'complete', reason: 'workflow_ready' }
   }
 

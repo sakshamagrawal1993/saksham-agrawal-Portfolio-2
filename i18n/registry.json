@@ -31,6 +31,12 @@
       "flag": "🇮🇳"
     },
     {
+      "code": "hi-Latn",
+      "label": "Hinglish",
+      "nativeLabel": "Hinglish",
+      "flag": "🇮🇳"
+    },
+    {
       "code": "fr",
       "label": "French",
       "nativeLabel": "Français",

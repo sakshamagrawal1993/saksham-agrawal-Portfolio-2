@@ -614,7 +614,7 @@ export function LibertyMDReportView({
         </div>
         <div className="mt-5 text-center">
           <h2 className="font-serif text-2xl sm:text-3xl font-bold tracking-wide text-white">
-            Physician Ready Report
+            {t('report.headerTitle')}
           </h2>
         </div>
       </div>
@@ -624,28 +624,28 @@ export function LibertyMDReportView({
         <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
             <p className="text-libertymd-ink">
-              <span className="font-bold uppercase text-[11px] tracking-wider text-libertymd-slate-500">Patient Name:</span>{' '}
+              <span className="font-bold uppercase text-[11px] tracking-wider text-libertymd-slate-500">{t('report.meta.patientName')}</span>{' '}
               <span className="font-bold text-libertymd-ink">{displayPatientName}</span>
             </p>
             <div className="flex items-center gap-6">
               <p>
-                <span className="font-bold uppercase text-[11px] tracking-wider text-libertymd-slate-500">Gender:</span>{' '}
+                <span className="font-bold uppercase text-[11px] tracking-wider text-libertymd-slate-500">{t('report.meta.gender')}</span>{' '}
                 <span className="font-semibold text-libertymd-slate-800 capitalize">{displayPatientSex}</span>
               </p>
               <p>
-                <span className="font-bold uppercase text-[11px] tracking-wider text-libertymd-slate-500">Age:</span>{' '}
+                <span className="font-bold uppercase text-[11px] tracking-wider text-libertymd-slate-500">{t('report.meta.age')}</span>{' '}
                 <span className="font-semibold text-libertymd-slate-800">{displayPatientAge}</span>
               </p>
             </div>
           </div>
           <div className="space-y-1 sm:text-right">
             <p>
-              <span className="font-bold uppercase text-[11px] tracking-wider text-libertymd-slate-500">Date:</span>{' '}
+              <span className="font-bold uppercase text-[11px] tracking-wider text-libertymd-slate-500">{t('report.meta.date')}</span>{' '}
               <span className="font-semibold text-libertymd-slate-800">{displayReportDate}</span>
             </p>
             {consultationId ? (
               <p>
-                <span className="font-bold uppercase text-[11px] tracking-wider text-libertymd-slate-500">Ref No.:</span>{' '}
+                <span className="font-bold uppercase text-[11px] tracking-wider text-libertymd-slate-500">{t('report.meta.refNo')}</span>{' '}
                 <span className="font-mono text-xs font-bold text-libertymd-blue-700">[{consultationId.slice(0, 8)}]</span>
               </p>
             ) : null}
@@ -714,7 +714,7 @@ export function LibertyMDReportView({
         {showAp ? (
           <ReportCollapsible
             sectionId="assessment_and_plan"
-            title="Recommended Action Plan"
+            title={t('report.sections.assessmentAndPlan')}
             teaser={apTeaser}
             open={sectionOpen.assessment_and_plan}
             onToggle={() => onExpand('assessment_and_plan', sectionOpen.assessment_and_plan)}
@@ -800,10 +800,10 @@ export function LibertyMDReportView({
             <div className="grid max-w-full grid-cols-1 gap-[var(--libertymd-space-lg)]">
               {(
                 [
-                  ['Subjective', report.soap?.subjective],
-                  ['Objective', report.soap?.objective],
-                  ['Assessment', report.soap?.assessment],
-                  ['Plan', report.soap?.plan],
+                  [t('report.teasers.soapSubjective'), report.soap?.subjective],
+                  [t('report.teasers.soapObjective'), report.soap?.objective],
+                  [t('report.teasers.soapAssessment'), report.soap?.assessment],
+                  [t('report.teasers.soapPlan'), report.soap?.plan],
                 ] as const
               ).map(([label, value]) => (
                 value ? (

@@ -429,9 +429,18 @@ export default function LibertyMDChat() {
     setEmergencyCrisisType(null);
     setEmergencyCopyWire(null);
   };
-  /** P3-07 Q1 — sync chrome + Mixpanel clinical locale from stored journey language. */
+  /** P3-07 Q1 — sync chrome + Mixpanel clinical locale from stored journey language.
+   * If raw is null/undefined (new consultation with no stored language yet),
+   * we keep the current chrome language rather than forcing English. */
   const applyClinicalLanguage = (raw: unknown) => {
-    const code = String(raw || 'en').trim().toLowerCase() === 'es' ? 'es' : 'en';
+    // null/undefined means the consultation has no language stored yet — preserve chrome.
+    if (raw == null || raw === '') {
+      const currentCode = language === 'es' ? 'es' : 'en';
+      setClinicalLanguage(currentCode);
+      setClinicalLocaleSuper(currentCode);
+      return;
+    }
+    const code = String(raw).trim().toLowerCase() === 'es' ? 'es' : 'en';
     setClinicalLanguage(code);
     setClinicalLocaleSuper(code);
     const chrome = chromeCodeForClinicalLanguage(code);
@@ -783,7 +792,8 @@ export default function LibertyMDChat() {
   const applyStartConsultationResponse = (data: any, symptom: string) => {
     if (!data?.consultation_id) throw new Error('Unable to start LibertyMD consultation.');
     const nextConsultationId = String(data.consultation_id);
-    applyClinicalLanguage(data.language ?? 'en');
+    // Pass null for new consultations (no language stored) so chrome language is preserved.
+    applyClinicalLanguage(data.language ?? null);
     const nextPhase = phaseFromStatus(String(data.emergency ? 'emergency_stopped' : data.state || 'awaiting_demographics'));
     const acknowledgement = String(data.acknowledgement || data.message || '').trim();
     const nextQuestion = String(data.next_question || '').trim();
@@ -1225,7 +1235,8 @@ export default function LibertyMDChat() {
 
         const data = await invokeCareProxy({ action: 'get_consultation', consultation_id: consultationId });
         if (cancelled) return;
-        applyClinicalLanguage(data?.consultation?.language ?? data?.language ?? 'en');
+        // Pass null when no language stored yet so chrome language is preserved.
+        applyClinicalLanguage(data?.consultation?.language ?? data?.language ?? null);
         const nextPhase = phaseFromStatus(String(data?.consultation?.status || 'interviewing'));
         setConsultationVersion(Number.isInteger(data?.consultation?.version) ? Number(data.consultation.version) : null);
         setResumeChiefComplaint(resolveResumeChiefComplaint(data?.consultation));
@@ -1530,7 +1541,8 @@ export default function LibertyMDChat() {
     if (!consultationId) return;
     try {
       const data = await invokeCareProxy({ action: 'get_consultation', consultation_id: consultationId });
-      applyClinicalLanguage(data?.consultation?.language ?? data?.language ?? 'en');
+      // Pass null when no language stored yet so chrome language is preserved.
+      applyClinicalLanguage(data?.consultation?.language ?? data?.language ?? null);
       const nextPhase = phaseFromStatus(String(data?.consultation?.status || 'interviewing'));
       setConsultationVersion(Number.isInteger(data?.consultation?.version) ? Number(data.consultation.version) : null);
       setResumeChiefComplaint(resolveResumeChiefComplaint(data?.consultation));

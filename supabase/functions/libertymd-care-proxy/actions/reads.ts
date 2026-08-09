@@ -81,15 +81,48 @@ export async function handleGetConsultation(ctx: ProxyContext, payload: RequestP
     }
   }
 
+  let activeReport: { report_data?: unknown; confidence_score?: number | null; retention_expires_at?: string | null } | null = report
+  if (!activeReport) {
+    const { data: latestRun } = await ctx.db
+      .from('libertymd_diagnostic_runs')
+      .select('raw_output, confidence_score')
+      .eq('consultation_id', consultation.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (latestRun?.raw_output) {
+      activeReport = {
+        report_data: latestRun.raw_output as Record<string, unknown>,
+        confidence_score: latestRun.confidence_score || 0,
+        retention_expires_at: null,
+      }
+    } else if (Array.isArray(consultation.intermediate_diagnoses) && consultation.intermediate_diagnoses.length > 0) {
+      const chiefComplaint = String(consultation.filled_slots?.chief_complaint || '').trim()
+      activeReport = {
+        report_data: {
+          headline: chiefComplaint ? `Intake Assessment: ${chiefComplaint}` : 'Consultation Assessment',
+          patient_summary: chiefComplaint ? `The patient presented with: ${chiefComplaint}.` : undefined,
+          differential_diagnosis: consultation.intermediate_diagnoses,
+          care_setting: consultation.care_setting || 'telehealth',
+          requires_clinical_review: true,
+          status: consultation.status,
+        },
+        confidence_score: consultation.clinical_evidence_score || 0,
+        retention_expires_at: null,
+      }
+    }
+  }
+
   // P2-13 L6 — return retention ISO + omit hint; body still omitted after expiry.
-  const lifecycle = reportReadLifecycleMeta(report)
+  const lifecycle = reportReadLifecycleMeta(activeReport)
   const mediaEvidence = await listMediaEvidence(ctx, consultation)
   const response: Record<string, unknown> = {
     consultation,
     patient,
     messages,
     report: lifecycle.report,
-    confidence_score: lifecycle.report != null ? (report?.confidence_score || null) : null,
+    confidence_score: lifecycle.report != null ? (activeReport?.confidence_score ?? null) : null,
     retention_expires_at: lifecycle.retention_expires_at,
     report_omitted_reason: lifecycle.report_omitted_reason,
     media_evidence: mediaEvidence,

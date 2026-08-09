@@ -114,7 +114,13 @@ import {
   waivePendingMediaFollowups,
 } from '../lib/media-evidence.ts'
 import type { ProxyContext } from '../lib/context.ts'
-import type { ConsultationRow, GuardrailResult, JsonObject, RequestPayload } from '../lib/types.ts'
+import type {
+  ConsultationRow,
+  GuardrailResult,
+  InterviewResult,
+  JsonObject,
+  RequestPayload,
+} from '../lib/types.ts'
 
 function guardrailInferenceErrorClass(guardrail: GuardrailResult): InferenceErrorClass | null {
   if (guardrail.source !== 'error_fail_cautious') return null
@@ -128,6 +134,36 @@ function interviewInferenceErrorClass(source: string): InferenceErrorClass | nul
   if (source === 'breaker_open') return 'breaker_open'
   if (source === 'unavailable') return 'unavailable'
   return null
+}
+
+/**
+ * A comprehension acknowledgement closes the patient-facing interview; it is
+ * not another clinical answer that should require the Interview workflow.
+ *
+ * When the summary itself was served on the final allowed turn, the follow-up
+ * acknowledgement arrives while the stored consultation is already at the
+ * cap. This snapshot lets that control action continue into Diagnosis/report
+ * generation without asking another question or incrementing past the cap.
+ */
+function cappedComprehensionAcknowledgement(
+  consultation: ConsultationRow,
+): InterviewResult {
+  return {
+    next_question: '',
+    options: [],
+    ready_for_report: true,
+    target_slot: String(consultation.target_slot || 'none'),
+    slot_updates: {},
+    missing_slots: Array.isArray(consultation.missing_slots)
+      ? consultation.missing_slots.map(String)
+      : [],
+    input_relevance: 'clinical',
+    input_relevance_reason: 'Patient confirmed the comprehension summary',
+    working_differential: [],
+    diagnostic_confidence: 0,
+    stop_reason: 'comprehension_confirmed',
+    source: 'comprehension_ack',
+  }
 }
 
 /**
@@ -417,6 +453,7 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
     // The guardrail runs on every turn including the capped one. Skipping the
     // screen because the interview is over would mean an emergency described in
     // the 16th message goes unread — safety asymmetry, CONTEXT.md §4.
+    const shouldRunInterview = !atCap || (comprehensionCorrection && !comprehensionAck)
     const [guardrail, interview] = await Promise.all([
       runGuardrail(
         message,
@@ -431,22 +468,26 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
           language: consultation.language ?? 'en',
         },
       ),
-      atCap ? Promise.resolve(null) : runInterview(
-        history,
-        patientPayload(patient),
-        consultation.filled_slots,
-        consultation.missing_slots,
-        consultation.target_slot,
-        turnCount,
-        consultation.status,
-        consultation.id,
-        requestId,
-        clinicalLanguage,
-        // P5-DDX T5 — steer WHAT is asked. Null when absent or stale; the agent
-        // then falls back to missing_slots exactly as before.
-        buildDifferentialHint(readStoredDifferential(consultation), turnCount),
-        mediaContext,
-      ),
+      shouldRunInterview
+        ? runInterview(
+          history,
+          patientPayload(patient),
+          consultation.filled_slots,
+          consultation.missing_slots,
+          consultation.target_slot,
+          turnCount,
+          consultation.status,
+          consultation.id,
+          requestId,
+          clinicalLanguage,
+          // P5-DDX T5 — steer WHAT is asked. Null when absent or stale; the agent
+          // then falls back to missing_slots exactly as before.
+          buildDifferentialHint(readStoredDifferential(consultation), turnCount),
+          mediaContext,
+        )
+        : comprehensionAck
+          ? Promise.resolve(cappedComprehensionAcknowledgement(consultation))
+          : Promise.resolve(null),
     ])
     await saveSafetyEvent(ctx, consultation, guardrail, turnCount, {
       message,
@@ -492,9 +533,12 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
       })
     }
 
-    // P0-13 AC1 — the deterministic transition at the cap. Report if one is
-    // already valid, otherwise clinical review. No inference was issued.
-    if (atCap || !interview) {
+    // P0-13 AC1 — ordinary answers at the cap close deterministically. A
+    // comprehension control action is different: the conversation is already
+    // closed, and this request owns the promised post-closure Diagnosis/report
+    // generation. Never require a report to pre-exist before that generation.
+    const postClosureComprehension = atCap && completingComprehension
+    if ((atCap && !postClosureComprehension) || !interview) {
       return await closeAtTurnCap(ctx, consultation, turnCount, currentVersion, allowedMaxTurns)
     }
 
@@ -732,9 +776,13 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
     // P1-14 — Diagnosis-gate short-circuit: slots summary OverlaySheet before Diagnosis.
     // Once-completed via workflow_versions (no new column). Dismiss ≠ proceed (client-only).
     if (gateOpen && !comprehensionDone && !completingComprehension) {
-      const comprehension = buildComprehensionCheckPayload(slots)
+      const comprehension = buildComprehensionCheckPayload(slots, clinicalLanguage)
       const nextStatus = guardrail.status === 'high_risk_continue' ? 'high_risk' : 'interviewing'
-      const bridge = limitConsultationMessage(COMPREHENSION_BRIDGE_MESSAGE)
+      const bridge = limitConsultationMessage(
+        clinicalLanguage === 'es'
+          ? 'He resumido lo que me ha compartido hasta ahora. Por favor revise el resumen.'
+          : COMPREHENSION_BRIDGE_MESSAGE
+      )
       await addMessage(ctx, consultation, 'assistant', bridge, {
         options: [],
         target_slot: interview.target_slot,
@@ -920,7 +968,7 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
       return holdingState(consultation, 'diagnosis', currentVersion, requestId)
     }
 
-    if (!mediaBlocksCompletion && reportDecision.outcome === 'complete' && diagnosis) {
+    if (!mediaBlocksCompletion && (reportDecision.outcome === 'complete' || Boolean(diagnosis?.valid) || Boolean(diagnosis?.differentials?.length)) && diagnosis) {
       const now = new Date().toISOString()
       const accessStatus = isAnonymous ? 'withheld' : 'saved'
       // P2-07 — insert-once clinical body (current-turn diagnosis only; no historical
@@ -952,9 +1000,15 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
         })
       }
 
-      await addMessage(ctx, consultation, 'assistant', isAnonymous
-        ? 'Your LibertyMD report is ready. Link Google to save it and revisit this consult, or continue without saving.'
-        : 'Your LibertyMD report is ready and has been saved to your history.', {
+      const reportGateText = clinicalLanguage === 'es'
+        ? (isAnonymous
+            ? 'Su informe de LibertyMD está listo. Vincule su cuenta de Google para guardarlo y volver a consultar esta consulta, o continúe sin guardar.'
+            : 'Su informe de LibertyMD está listo y ha sido guardado en su historial.')
+        : (isAnonymous
+            ? 'Your LibertyMD report is ready. Link Google to save it and revisit this consult, or continue without saving.'
+            : 'Your LibertyMD report is ready and has been saved to your history.')
+
+      await addMessage(ctx, consultation, 'assistant', reportGateText, {
         message_type: 'report_gate',
       })
       await updateOwnedConsultation(ctx, consultation, {

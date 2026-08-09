@@ -133,6 +133,7 @@
         "high_serious": "High confidence · Serious"
       },
       "serious": "Serious Condition",
+      "clinicalReviewRequired": "Clinical Review Required",
       "furtherInvestigations": "Diagnostic Investigations & Workup",
       "symptomaticTreatment": "Medical Treatments & Therapeutics",
       "supportiveTreatment": "Self-Care & Home Management",

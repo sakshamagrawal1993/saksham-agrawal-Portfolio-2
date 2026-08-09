@@ -12,12 +12,14 @@ declare const Deno: {
 import {
   buildComprehensionCheckPayload,
   buildComprehensionSummary,
+  COMPREHENSION_SLOT_LABELS_BY_LANGUAGE,
   CONTINUE_EMPTY_QUESTION_FALLBACK,
   isComprehensionCompleted,
   readComprehensionFlags,
   withComprehensionCompleted,
   withComprehensionPending,
 } from '../../supabase/functions/libertymd-care-proxy/lib/comprehension-check.ts'
+import { CLINICAL_SLOTS } from '../../supabase/functions/libertymd-care-proxy/lib/slots.ts'
 
 const CHAT = new URL('../../components/LibertyMD/LibertyMDChat.tsx', import.meta.url)
 const SHEET = new URL('../../components/LibertyMD/LibertyMDComprehensionCheck.tsx', import.meta.url)
@@ -63,6 +65,29 @@ Deno.test('P1-14 · payload includes pending + categorical slot_count', () => {
     throw new Error('slot_count must match summary_lines length')
   }
   if (payload.slot_count < 1) throw new Error('non-zero fixture required')
+})
+
+Deno.test('P1-14 · every supported clinical language maps every comprehension slot', () => {
+  const expectedSlots = [...CLINICAL_SLOTS].sort()
+  for (const language of ['en', 'es'] as const) {
+    const labels = COMPREHENSION_SLOT_LABELS_BY_LANGUAGE[language]
+    const mappedSlots = Object.keys(labels).sort()
+    if (JSON.stringify(mappedSlots) !== JSON.stringify(expectedSlots)) {
+      throw new Error(`${language} comprehension labels must cover every clinical slot`)
+    }
+    if (Object.values(labels).some((label) => !label.trim())) {
+      throw new Error(`${language} comprehension labels must not be empty`)
+    }
+  }
+
+  const english = buildComprehensionSummary({ onset: 'yesterday' }, 'en')[0]
+  const spanish = buildComprehensionSummary({ onset: 'ayer' }, 'es')[0]
+  const unsupportedClinicalLocale = buildComprehensionSummary({ onset: 'hier' }, 'fr')[0]
+  if (english?.label !== 'When it started') throw new Error('English map not selected')
+  if (spanish?.label !== 'Cuándo comenzó') throw new Error('Spanish map not selected')
+  if (unsupportedClinicalLocale?.label !== english.label) {
+    throw new Error('chrome-only locale must use the English clinical fallback')
+  }
 })
 
 Deno.test('P1-14 · once-completed / pending workflow_versions helpers', () => {

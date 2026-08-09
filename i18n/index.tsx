@@ -29,18 +29,37 @@ const loadedBundles: Partial<Record<string, Bundle>> = { en };
 const isSupported = (code: string | null | undefined): boolean =>
   !!code && SUPPORTED_LANGUAGES.some(l => l.code === code);
 
-/** Read ?lang= from the URL. Deep links like /liberty-md?lang=es win over everything. */
+/** Read language from the URL query. Deep links like ?lang-es or ?lang=es win over everything. */
 function langFromQuery(): Language | null {
   if (typeof window === 'undefined') return null;
-  const q = new URLSearchParams(window.location.search).get('lang');
-  return isSupported(q) && q ? q : null;
+  const search = window.location.search;
+  const params = new URLSearchParams(search);
+  const q = params.get('lang');
+
+  if (isSupported(q) && q) return q;
+  if (q === 'es' || q === 'lang-es' || params.has('lang-es') || search.includes('lang-es') || search.includes('lang=es')) {
+    return 'es';
+  }
+  return null;
 }
 
-/** Write ?lang= into the URL without adding history entries, preserving other params. */
+/** Write query parameter into the URL without adding history entries, preserving other params. */
 function writeLangToQuery(lang: Language) {
   if (typeof window === 'undefined') return;
   const url = new URL(window.location.href);
-  url.searchParams.set('lang', lang);
+  if (lang === 'es') {
+    url.searchParams.set('lang-es', 'true');
+    url.searchParams.delete('lang');
+  } else if (lang !== 'en') {
+    url.searchParams.set('lang', lang);
+  } else {
+    url.searchParams.delete('lang');
+    url.searchParams.delete('lang-es');
+    if (url.search.includes('lang-es')) {
+      const cleanSearch = url.search.replace(/([?&])lang-es(=[^&]*)?(&|$)/, '$1').replace(/[?&]$/, '');
+      url.search = cleanSearch;
+    }
+  }
   window.history.replaceState(window.history.state, '', url.toString());
 }
 
@@ -53,6 +72,15 @@ const baseOf = (lang: Language): Language | null => {
 /** P3-07 — preferred chrome after exiting a clinically locked surface. */
 const STORAGE_PREFERRED_LANDING_KEY = 'libertymd.lang.preferred';
 
+/**
+ * Detect active language.
+ * Priority order:
+ * 1. URL query (?lang-es, ?lang=es, ?lang=<code>)
+ * 2. Stored preferred landing language in localStorage
+ * 3. Stored active language in localStorage
+ * 4. Browser navigator.language
+ * 5. Fallback: English ('en')
+ */
 export function detectLanguage(): Language {
   const fromQuery = langFromQuery();
   if (fromQuery) return fromQuery;
@@ -60,19 +88,21 @@ export function detectLanguage(): Language {
     ? localStorage.getItem(STORAGE_PREFERRED_LANDING_KEY)
     : null;
   if (isSupported(preferred) && preferred) return preferred;
-  const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('libertymd.lang') : null;
+  const saved = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
   if (isSupported(saved) && saved) return saved;
   const nav = (typeof navigator !== 'undefined' ? navigator.language : 'en');
-  // Exact variant match first (es-ES), then base language (es-MX/es-AR/... -> es)
   if (isSupported(nav)) return nav;
   const base = nav.toLowerCase().split('-')[0];
   return isSupported(base) ? base : 'en';
 }
 
-/** Map clinical DB language (`en` | `es`) onto a chrome registry code. */
 export function chromeCodeForClinicalLanguage(clinical: string | null | undefined): Language {
-  const code = String(clinical || 'en').trim().toLowerCase() === 'es' ? 'es' : 'en';
-  return isSupported(code) ? code : 'en';
+  const s = String(clinical || 'en').trim();
+  if (isSupported(s)) return s;
+  const lower = s.toLowerCase();
+  if (lower === 'hinglish' || lower === 'hi-latn') return 'hi-Latn';
+  if (isSupported(lower)) return lower;
+  return 'en';
 }
 
 export function detectRegion(): Region {
@@ -133,7 +163,10 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   const needsLoad = language !== 'en' && !loadedBundles[language];
 
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, language); } catch { /* private mode */ }
+    try {
+      localStorage.setItem(STORAGE_KEY, language);
+      localStorage.setItem(STORAGE_PREFERRED_LANDING_KEY, language);
+    } catch { /* private mode */ }
     if (typeof document !== 'undefined') document.documentElement.lang = language;
     writeLangToQuery(language);
     const toLoad = [language, baseOf(language)].filter((l): l is Language => !!l && l !== 'en' && !loadedBundles[l]);

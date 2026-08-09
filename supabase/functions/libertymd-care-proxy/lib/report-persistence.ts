@@ -69,7 +69,7 @@ export async function findOwnedReport(
 }
 
 export function isServeEligibleStoredReport(report: StoredReportRow | null | undefined): boolean {
-  return Boolean(report) && Number(report?.confidence_score || 0) > 0
+  return Boolean(report) && Boolean(report?.report_data)
 }
 
 /** Prefer detect-or-skip so orphan recovery does not spam report_gate messages. */

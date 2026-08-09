@@ -13,6 +13,40 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ChatWidgetRenderer } from './ChatWidgets';
 
+/**
+ * Supabase's FunctionsHttpError hides the response body behind `error.context`.
+ * Without unwrapping it, every backend failure (auth, 502 from the agent pipeline,
+ * bad SQL in n8n, timeouts) collapses into the same opaque "FunctionsHttpError".
+ * This pulls out the real `error` / `details` the edge function returned.
+ */
+const extractEdgeFunctionError = async (
+    error: unknown
+): Promise<{ message: string; status?: number; details?: string }> => {
+    const anyError = error as { message?: string; context?: unknown };
+    const context = anyError?.context as Response | undefined;
+
+    if (context && typeof context === 'object' && 'status' in context) {
+        let body: any = null;
+        try {
+            body = await context.clone().json();
+        } catch {
+            try {
+                body = { error: await context.clone().text() };
+            } catch {
+                body = null;
+            }
+        }
+
+        return {
+            message: body?.error || anyError?.message || 'Unknown edge function error',
+            status: context.status,
+            details: typeof body?.details === 'string' ? body.details : undefined,
+        };
+    }
+
+    return { message: anyError?.message || 'Unknown error' };
+};
+
 const CATEGORIES = [
     { id: 'all', label: 'All', icon: LayoutGrid },
     { id: 'activity', label: 'Activity', icon: Activity },
@@ -153,7 +187,12 @@ export const CenterPanel: React.FC = () => {
                 }
             });
 
-            if (error) throw error;
+            if (error) {
+                const { message, status, details } = await extractEdgeFunctionError(error);
+                console.error('chat-completion failed', { status, message, details });
+                const suffix = status ? ` (HTTP ${status})` : '';
+                throw new Error(`${message}${suffix}${details ? ` — ${details}` : ''}`);
+            }
 
             if (!data?.assistant_reply) {
                 console.error("Agent responded but missing assistant_reply payload", data);
@@ -170,10 +209,11 @@ export const CenterPanel: React.FC = () => {
 
         } catch (error) {
             console.error("Error communicating with chat agent:", error);
+            const reason = error instanceof Error ? error.message : String(error);
             addChatMessage({
                 id: crypto.randomUUID(),
                 role: 'system',
-                content: 'There was an error connecting to your Digital Twin agent. Please try again.',
+                content: `There was an error connecting to your Digital Twin agent. Please try again.\n\n**Reason:** ${reason}`,
                 timestamp: new Date()
             });
         } finally {

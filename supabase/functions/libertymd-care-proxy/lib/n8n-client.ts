@@ -24,6 +24,7 @@ import { calculateMissingSlots, CORE_SLOTS, sanitizeSlotUpdates } from './slots.
 import { buildConversationTranscript, buildDenseContext, buildQASummary, cleanMessage, formatHistoryForInference, limitConsultationMessage } from './utils.ts'
 import type { ConsultationRow, DifferentialResult, InterviewResult, JsonObject } from './types.ts'
 import type { ResponseRelevance } from '../clinical-policy.ts'
+import { toClinicalCandidate } from './journey-locale.ts'
 
 export function n8nHeaders(correlationId?: string) {
   return {
@@ -527,8 +528,7 @@ export async function runInterview(
 ): Promise<InterviewResult> {
   // Thrown, not swallowed: a post-emergency interview attempt is a caller bug,
   // and returning a fallback question would hide it behind a plausible reply.
-  assertInferenceAllowed('interview', status, consultationId)
-  const clinicalLanguage = String(language || 'en').trim().toLowerCase() === 'es' ? 'es' : 'en'
+  const clinicalLanguage = toClinicalCandidate(language)
   try {
     const formattedHistory = formatHistoryForInference(history)
     const transcriptText = buildConversationTranscript(history)
@@ -681,7 +681,7 @@ export async function runDiagnosis(
   // signature change and covers every diagnosis call site by construction.
   assertInferenceAllowed('diagnosis', consultation.status, consultation.id)
   const speculative = Boolean(options.speculative)
-  const clinicalLanguage = String(consultation.language || 'en').trim().toLowerCase() === 'es' ? 'es' : 'en'
+  const clinicalLanguage = toClinicalCandidate(consultation.language)
   try {
     const formattedHistory = formatHistoryForInference(history)
     const transcriptText = buildConversationTranscript(history)

@@ -9,6 +9,7 @@ import {
   DIAGNOSIS_WEBHOOK,
   GUARDRAIL_WEBHOOK,
   INTERVIEW_WEBHOOK,
+  MAX_TURNS,
   getDiagnosisEvidenceFloor,
   getDiagnosisTurnFloor,
   isDiagnosisEvenTurnRequired,
@@ -929,4 +930,85 @@ Deno.test('P2-07 AC7 · serve-eligible speculative still first-inserts (no histo
       fetchLog.restore()
     }
   })
+})
+
+Deno.test('P1-14 regression · capped comprehension acknowledgement generates the report after closure', async () => {
+  const fetchLog = stubFetch((url) => {
+    if (url === GUARDRAIL_WEBHOOK) return guardrailPass()
+    if (url === DIAGNOSIS_WEBHOOK) return diagnosisPass()
+    if (url === INTERVIEW_WEBHOOK) {
+      throw new Error('A comprehension acknowledgement must not ask another interview question')
+    }
+    return okResponse({})
+  })
+
+  const { ctx, ops } = createFakeContext({
+    consultation: consultationRow({
+      status: 'interviewing',
+      turn_count: MAX_TURNS,
+      version: MAX_TURNS,
+      filled_slots: HIGH_EVIDENCE_SLOTS,
+      missing_slots: [],
+      target_slot: 'functional_impact',
+      clinical_evidence_score: 100,
+      patient_snapshot: { age: 34, sex_at_birth: 'female' },
+      workflow_versions: { comprehension_pending: true },
+    }),
+    claim: { accepted: true, replayed: false, current_version: MAX_TURNS },
+  })
+
+  try {
+    const response = await handleSendMessage(ctx, {
+      action: 'send_message',
+      consultation_id: 'consultation-1',
+      message: 'Looks good',
+      client_message_id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeee00f1',
+      expected_version: MAX_TURNS,
+      comprehension_ack: true,
+    })
+    await flushMixpanelFanOutForTests()
+
+    const body = await response.json() as {
+      state?: string
+      report_ready?: boolean
+      diagnosis_ran?: boolean
+      turn_count?: number
+    }
+    assertEquals(response.status, 200, 'post-closure report response')
+    assertEquals(body.state, 'report_pending_auth', 'anonymous report reaches soft gate')
+    assertEquals(body.report_ready, true, 'report generated after closure')
+    assertEquals(body.diagnosis_ran, true, 'final diagnosis ran')
+    assertEquals(body.turn_count, MAX_TURNS, 'control acknowledgement does not exceed cap')
+    assertEquals(
+      fetchLog.calls.filter((call) => call.url === INTERVIEW_WEBHOOK).length,
+      0,
+      'no extra interview after conversation closure',
+    )
+    assertEquals(
+      fetchLog.calls.filter((call) => call.url === DIAGNOSIS_WEBHOOK).length,
+      1,
+      'one post-closure diagnosis',
+    )
+    assertEquals(opsFor(ops, 'libertymd_reports', 'insert').length, 1, 'one report insert')
+
+    const consultationUpdates = opsFor(ops, 'libertymd_consultations', 'update')
+      .map((op) => op.payload as Record<string, unknown>)
+    assertTrue(
+      consultationUpdates.some((payload) => payload.status === 'report_pending_auth'),
+      'consultation reaches report terminal state',
+    )
+    assertTrue(
+      !consultationUpdates.some((payload) => payload.status === 'clinical_review_needed'),
+      'missing pre-existing report must not become clinical_review_needed',
+    )
+    assertTrue(
+      consultationUpdates.some((payload) => {
+        const workflow = payload.workflow_versions as Record<string, unknown> | undefined
+        return workflow?.comprehension_completed === true && workflow?.comprehension_pending === false
+      }),
+      'conversation closure is persisted before report generation',
+    )
+  } finally {
+    fetchLog.restore()
+  }
 })

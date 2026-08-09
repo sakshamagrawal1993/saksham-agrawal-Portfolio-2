@@ -63,7 +63,12 @@ export default function LibertyMDReportPage() {
   const consecutiveErrorsRef = useRef(0)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user || null))
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session?.user) setUser(data.session.user)
+    })
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) setUser(data.user)
+    })
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null)
     })
@@ -125,10 +130,11 @@ export default function LibertyMDReportPage() {
     }
 
     if (rawReport) {
-      const isSaved = status === 'completed'
+      const isSaved = status === 'completed' || status === 'clinical_review_needed'
       const reportPayload = typeof rawReport === 'object' && rawReport !== null
         ? {
             ...(rawReport as Record<string, unknown>),
+            status,
             patient: (rawReport as Record<string, unknown>).patient || data?.patient || (consultation?.patient as unknown) || null,
           }
         : rawReport

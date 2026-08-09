@@ -75,6 +75,7 @@ export function LibertyMDReportLifecycleShell({
     return (
       <section
         data-libertymd-report-lifecycle="generation_failed"
+        data-libertymd-severity="technical"
         className={`rounded-2xl border border-rose-200 bg-rose-50/50 p-[var(--libertymd-space-lg)] text-left shadow-sm ${className}`}
         role="alert"
       >

@@ -87,19 +87,28 @@ export function coerceEntryTelemetry(payload: RequestPayload): {
  * greeting. The name is a display token, not clinical content — it is not
  * written into slots, telemetry, or the guardrail payload.
  */
-function acknowledgement(symptom: string, risk: GuardrailResult, name?: string | null) {
-  const condition = /\bfever\b/i.test(symptom) ? 'your fever' : 'your symptoms'
-  const greeting = name ? `${name}, thank you` : 'Thank you'
+function acknowledgement(symptom: string, risk: GuardrailResult, name?: string | null, language?: string) {
+  const isSpanish = String(language || 'en').trim().toLowerCase() === 'es'
+  const condition = isSpanish
+    ? (/\bfiebre\b/i.test(symptom) ? 'su fiebre' : 'sus síntomas')
+    : (/\bfever\b/i.test(symptom) ? 'your fever' : 'your symptoms')
+  const greeting = isSpanish
+    ? (name ? `${name}, gracias` : 'Gracias')
+    : (name ? `${name}, thank you` : 'Thank you')
   // Defect 2 / P0-14f: transport failures still fail-cautious as high_risk_continue,
   // but that must never write a clinical caution sentence into the transcript.
   const genuineClinicalCaution = risk.status === 'high_risk_continue'
     && risk.severity !== 'technical'
     && !isTechnicalSafetySource(risk.source)
   const caution = genuineClinicalCaution
-    ? ' I will keep checking for urgent warning signs.'
+    ? (isSpanish ? ' Continuaré monitoreando signos de alerta urgentes.' : ' I will keep checking for urgent warning signs.')
     : ''
   // P1-01 Q6B — short neutral ack; the clinical question lives in the unified control.
-  return limitConsultationMessage(`${greeting} for reaching out about ${condition}.${caution}`)
+  return limitConsultationMessage(
+    isSpanish
+      ? `${greeting} por comunicarse con nosotros sobre ${condition}.${caution}`
+      : `${greeting} for reaching out about ${condition}.${caution}`
+  )
 }
 
 function patientSnapshot(patient: PatientRow): JsonObject {
@@ -454,7 +463,7 @@ export async function handleStartConsultation(ctx: ProxyContext, payload: Reques
     if (label) return label.split(/\s+/)[0]
     return firstName(user) || null
   })()
-  const prompt = acknowledgement(message, guardrail, patientGreetingName)
+  const prompt = acknowledgement(message, guardrail, patientGreetingName, clinicalLanguage)
 
   const assistantPersistenceTiming = await timed(() => Promise.all([
     addMessage(ctx, consultation.id, 'assistant', prompt, {

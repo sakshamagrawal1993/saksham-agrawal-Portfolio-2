@@ -82,6 +82,15 @@ export function LibertyMDDiagnosisCard({
         </p>
 
         <div className="flex flex-wrap items-center justify-end gap-1.5 shrink-0" data-confidence-container>
+          {item.requiresClinicalReview || ordinal === 'low' || ordinal === 'minimal' ? (
+            <span
+              data-clinical-review-badge
+              className="libertymd-type-label inline-flex items-center rounded-md border border-amber-500/40 bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-900"
+            >
+              {t('report.card.clinicalReviewRequired')}
+            </span>
+          ) : null}
+
           {(isSerious || seriousPair || seriousOnly || composedHighSerious) ? (
             <span
               data-serious-badge
