@@ -127,9 +127,13 @@ Deno.test('P2-02 DoD+ · mundane full report maps all major sections; no patient
   assertEquals(view.triageTier, 'home')
   assertTrue(view.nextStep)
   assertTrue(view.assessmentAndPlan)
+  assertTrue(view.assessmentAndPlan?.assessment, 'clinical assessment narrative')
+  assertEquals(view.assessmentAndPlan?.diagnosticInvestigations.length, 2)
   assertEquals(view.differentials.length, 3)
   // P2-04 Q7 · common_name first
   assertEquals(view.differentials[0].name, 'Common cold')
+  assertTrue(view.differentials[0].description, 'condition description preserved')
+  assertTrue(view.differentials[0].reason, 'case-specific reasoning preserved')
   assertEquals(view.differentials[0].ordinal, 'medium')
   assertEquals(view.differentials[1].name, 'Hay fever')
   assertEquals(view.differentials[1].ordinal, 'low')
@@ -231,7 +235,11 @@ Deno.test('P2-02 AC6 · scroll depth helper + monotonic buckets', () => {
 })
 
 Deno.test('P2-02 AC11 · get_consultation returns withheld report_data', async () => {
-  const reportPayload = { headline: 'Withheld soft-gate report', patient_summary: 'Visible under soft gate.' }
+  const reportPayload = {
+    ...MUNDANE_FULL_REPORT_DATA,
+    headline: 'Withheld soft-gate report',
+    patient_summary: 'Visible under soft gate.',
+  }
   const consultation = consultationRow({
     id: 'consult-withheld-1',
     status: 'report_pending_auth',
@@ -922,7 +930,11 @@ Deno.test('P2-06 AC3/R3 · dismiss-once helper + Chat/App wire; Unlock copy gone
 })
 
 Deno.test('P2-06 AC7 · expired retention omits report body; NULL never omits', async () => {
-  const reportPayload = { headline: 'Expired guest report', patient_summary: 'Should be omitted.' }
+  const reportPayload = {
+    ...MUNDANE_FULL_REPORT_DATA,
+    headline: 'Expired guest report',
+    patient_summary: 'Should be omitted.',
+  }
   const consultation = consultationRow({
     id: 'consult-expired-1',
     status: 'completed',
@@ -1045,7 +1057,7 @@ Deno.test('P2-09 async PDF · dedicated report page consumes current soft-gate r
   assertTrue(page.includes("data?.retention_expires_at"), 'current top-level retention shape consumed')
   assertTrue(page.includes("'report_data' in reportEnvelope"), 'legacy nested report envelope remains compatible')
   assertTrue(page.includes('data?.report ?? data?.report_data'), 'current direct report body consumed')
-  assertTrue(page.includes("saved: status === 'completed'"), 'withheld anonymous report remains guest treatment')
+  assertTrue(page.includes("status === 'completed'") && page.includes("status === 'clinical_review_needed'"), 'withheld anonymous report remains guest treatment')
   assertTrue(page.includes('<LibertyMDReportView'), 'ready body reaches shared async PDF report view')
 })
 
@@ -1098,7 +1110,11 @@ Deno.test('P2-08 AC1/AC6 · email delivery CTA on report surface; sections not g
 // ─── P2-13 · Report lifecycle (matrix hooks + omit honesty) ───────────────────
 
 Deno.test('P2-13 AC3/AC7 · proxy omit returns retention + omit reason; ReportView ready marker', async () => {
-  const reportPayload = { headline: 'Lifecycle guest report', patient_summary: 'Visible until lapse.' }
+  const reportPayload = {
+    ...MUNDANE_FULL_REPORT_DATA,
+    headline: 'Lifecycle guest report',
+    patient_summary: 'Visible until lapse.',
+  }
   const past = new Date(Date.now() - 60_000).toISOString()
   const future = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
   const consult = consultationRow({

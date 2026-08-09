@@ -180,3 +180,23 @@ Deno.test('P3-08 migration · neutralized draft cannot create tables', () => {
   assert(!/'safety\.high_risk_continue'/i.test(mig), 'no high_risk_continue key literal insert')
   assert(!/sakshamagrawal1993@gmail\.com/i.test(mig), 'no email-owner policy')
 })
+
+Deno.test('FULL-REPORT · every supported locale has complete report chrome', () => {
+  const locales = (registry as { locales: Array<{ code: string }> }).locales
+  for (const { code } of locales) {
+    const locale = JSON.parse(Deno.readTextFileSync(
+      new URL(`../../i18n/locales/${code}.json`, import.meta.url).pathname,
+    )) as Record<string, any>
+    const report = locale.report
+    for (const key of ['sessionSummary', 'patientSummary', 'differential', 'assessmentAndPlan', 'redFlags', 'soap']) {
+      assert(report?.sections?.[key], `${code}: report.sections.${key}`)
+    }
+    for (const key of ['aboutCondition', 'whyConsidered', 'clinicalAssessment', 'furtherInvestigations']) {
+      assert(report?.card?.[key], `${code}: report.card.${key}`)
+    }
+    for (const key of ['patientName', 'gender', 'age', 'date', 'anonymous', 'notSpecified', 'page', 'pdfFooter']) {
+      assert(report?.meta?.[key], `${code}: report.meta.${key}`)
+    }
+    assert(report?.pdf?.patientTitle, `${code}: report.pdf.patientTitle`)
+  }
+})

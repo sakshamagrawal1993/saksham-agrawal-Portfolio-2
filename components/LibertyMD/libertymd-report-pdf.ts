@@ -30,13 +30,20 @@ export type LibertyMdPdfCopy = {
   /** Prefix before UTC date, e.g. "Generated". */
   generatedLabel: string
   sections: {
+    sessionSummary: string
+    patientSummary: string
     triage: string
     nextStep: string
     differential: string
     assessmentAndPlan: string
     redFlags: string
+    soap: string
     plan: string
     selfCare: string
+    clinicalAssessment: string
+    investigations: string
+    aboutCondition: string
+    whyConsidered: string
     soapSubjective: string
     soapObjective: string
     soapAssessment: string
@@ -49,6 +56,16 @@ export type LibertyMdPdfCopy = {
     minimal: string
   }
   serious: string
+  meta: {
+    patientName: string
+    gender: string
+    age: string
+    date: string
+    anonymous: string
+    notSpecified: string
+    page: string
+    footer: string
+  }
   triageLabels: Record<TriageDisplayTier, string>
 }
 
@@ -186,12 +203,12 @@ export function buildPatientPdfDoc(
 
   // 1. Session Summary
   if (report.headline) {
-    pushSection(sections, 'Session Summary', [report.headline])
+    pushSection(sections, copy.sections.sessionSummary, [report.headline])
   }
 
   // 2. Patient Summary
   if (report.patientSummary) {
-    pushSection(sections, 'Patient Summary', [report.patientSummary])
+    pushSection(sections, copy.sections.patientSummary, [report.patientSummary])
   }
 
   // 3. Differential Diagnosis (NO numeric percentage scores!)
@@ -201,41 +218,52 @@ export function buildPatientPdfDoc(
       const bits: string[] = [item.name]
       if (item.ordinal) {
         const rawLabel = (copy.ordinal[item.ordinal] || item.ordinal).replace(/\s*\(\d+%\)/g, '').replace(/\s*\d+%/g, '').trim()
-        const formattedBand = rawLabel.toLowerCase().includes('confidence')
-          ? rawLabel.replace(/^./, (c) => c.toUpperCase())
-          : `${rawLabel.replace(/^./, (c) => c.toUpperCase())} Confidence`
+        const formattedBand = rawLabel.replace(/^./, (c) => c.toUpperCase())
         bits.push(item.isSerious ? `${formattedBand} · ${copy.serious}` : formattedBand)
       } else if (item.isSerious) {
         bits.push(copy.serious)
       }
       // Prefix disease name lines with '**' so the renderer bolds them
       lines.push(`**${bits.join(' — ')}**`)
-      if (item.description) lines.push(item.description)
-      if (item.reason) lines.push(item.reason)
+      if (item.description) {
+        lines.push(`**${copy.sections.aboutCondition}:**`)
+        lines.push(item.description)
+      }
+      if (item.reason) {
+        lines.push(`**${copy.sections.whyConsidered}:**`)
+        lines.push(item.reason)
+      }
     }
-    pushSection(sections, 'Differential Diagnosis', lines)
+    pushSection(sections, copy.sections.differential, lines)
   }
 
   // 4. Recommended Action Plan
   if (report.assessmentAndPlan) {
     const lines: string[] = []
-    if (report.assessmentAndPlan.assessment) lines.push(report.assessmentAndPlan.assessment)
+    if (report.assessmentAndPlan.assessment) {
+      lines.push(`**${copy.sections.clinicalAssessment}:**`)
+      lines.push(report.assessmentAndPlan.assessment)
+    }
     if (report.assessmentAndPlan.plan.length) {
-      lines.push('**Medical Treatments & Plan:**')
+      lines.push(`**${copy.sections.plan}:**`)
       for (const item of report.assessmentAndPlan.plan) lines.push(`• ${item}`)
     }
     if (report.assessmentAndPlan.selfCare.length) {
-      lines.push('**Self-Care & Home Management:**')
+      lines.push(`**${copy.sections.selfCare}:**`)
       for (const item of report.assessmentAndPlan.selfCare) lines.push(`• ${item}`)
     }
-    pushSection(sections, 'Recommended Action Plan', lines)
+    if (report.assessmentAndPlan.diagnosticInvestigations.length) {
+      lines.push(`**${copy.sections.investigations}:**`)
+      for (const item of report.assessmentAndPlan.diagnosticInvestigations) lines.push(`• ${item}`)
+    }
+    pushSection(sections, copy.sections.assessmentAndPlan, lines)
   }
 
   // 5. Red Flags
   if (report.redFlags.length > 0) {
     pushSection(
       sections,
-      'Red Flags',
+      copy.sections.redFlags,
       report.redFlags.map((flag) => `• ${flag}`),
     )
   }
@@ -247,28 +275,28 @@ export function buildPatientPdfDoc(
   ) {
     const lines: string[] = []
     if (report.soap.subjective) {
-      lines.push('**Subjective**')
+      lines.push(`**${copy.sections.soapSubjective}**`)
       lines.push(report.soap.subjective)
     }
     if (report.soap.objective) {
-      lines.push('**Objective**')
+      lines.push(`**${copy.sections.soapObjective}**`)
       lines.push(report.soap.objective)
     }
     if (report.soap.assessment) {
-      lines.push('**Assessment**')
+      lines.push(`**${copy.sections.soapAssessment}**`)
       lines.push(report.soap.assessment)
     }
     if (report.soap.plan) {
-      lines.push('**Plan**')
+      lines.push(`**${copy.sections.soapPlan}**`)
       lines.push(report.soap.plan)
     }
-    pushSection(sections, 'SOAP Note', lines)
+    pushSection(sections, copy.sections.soap, lines)
   }
 
   return {
     kind: 'patient',
     filename: buildPdfFilename('patient', when),
-    title: 'Physician Ready Report',
+    title: copy.patientTitle,
     patientInfo: report.patientInfo,
     headerLines: buildSharedHeader(copy, when),
     sections,
@@ -379,6 +407,31 @@ export function planPdfLogoEmbed(
 }
 
 export const PDF_WATERMARK_ASSET_PATH = '/images/asclepius-watermark.png'
+export const PDF_DEVANAGARI_FONT_ASSET_PATH = '/fonts/NotoSansDevanagari.ttf'
+
+function containsDevanagari(text: string): boolean {
+  return /[\u0900-\u097f]/u.test(text)
+}
+
+async function resolvePdfDevanagariFontBytes(): Promise<Uint8Array | null> {
+  if (typeof fetch !== 'function') return null
+  try {
+    const res = await fetch(PDF_DEVANAGARI_FONT_ASSET_PATH)
+    if (!res.ok) return null
+    return new Uint8Array(await res.arrayBuffer())
+  } catch {
+    return null
+  }
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = ''
+  const chunkSize = 0x8000
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize))
+  }
+  return btoa(binary)
+}
 
 export async function resolvePdfWatermarkBytes(): Promise<Uint8Array | null> {
   if (typeof fetch !== 'function') return null
@@ -414,7 +467,22 @@ export async function renderPdfBlob(
   let pageIndex = 1
   let logoEmbedded = false
 
-  const watermarkBytes = await resolvePdfWatermarkBytes()
+  const [watermarkBytes, devanagariFontBytes] = await Promise.all([
+    resolvePdfWatermarkBytes(),
+    containsDevanagari(flattenPdfDocText(doc)) ? resolvePdfDevanagariFontBytes() : Promise.resolve(null),
+  ])
+  let fontFamily = 'helvetica'
+  if (devanagariFontBytes?.byteLength) {
+    try {
+      const fontFile = 'NotoSansDevanagari.ttf'
+      pdf.addFileToVFS(fontFile, bytesToBase64(devanagariFontBytes))
+      pdf.addFont(fontFile, 'NotoSansDevanagari', 'normal')
+      pdf.addFont(fontFile, 'NotoSansDevanagari', 'bold')
+      fontFamily = 'NotoSansDevanagari'
+    } catch {
+      fontFamily = 'helvetica'
+    }
+  }
 
   const drawPageBackground = () => {
     // Subtle background tint (single rect for minimal PDF payload size)
@@ -454,20 +522,20 @@ export async function renderPdfBlob(
 
   const drawRunningChrome = () => {
     // Light running chrome — wordmark + page number + bottom disclaimer footer
-    pdf.setFont('helvetica', 'normal')
+    pdf.setFont(fontFamily, 'normal')
     pdf.setFontSize(PDF_TYPE_PT.running)
     pdf.setTextColor(PDF_CHROME_COLORS.legal)
     pdf.text(PDF_RUNNING_WORDMARK, margin, margin - 16)
     pdf.setDrawColor(PDF_CHROME_COLORS.rule)
     pdf.setLineWidth(0.5)
     pdf.line(margin, margin - 10, pageWidth - margin, margin - 10)
-    pdf.text(`Page ${pageIndex}`, pageWidth - margin, margin - 16, { align: 'right' })
+    pdf.text(`${copy.meta.page} ${pageIndex}`, pageWidth - margin, margin - 16, { align: 'right' })
 
     // Footer Disclaimer at bottom of page
     pdf.setDrawColor(PDF_CHROME_COLORS.rule)
     pdf.line(margin, pageHeight - 28, pageWidth - margin, pageHeight - 28)
     pdf.text(
-      'AI-generated clinical summary — not a diagnosis · For licensed clinician review',
+      copy.meta.footer,
       margin,
       pageHeight - 16,
     )
@@ -490,7 +558,7 @@ export async function renderPdfBlob(
     style: 'normal' | 'bold' = 'normal',
     color: string = PDF_CHROME_COLORS.ink,
   ) => {
-    pdf.setFont('helvetica', style)
+    pdf.setFont(fontFamily, style)
     pdf.setFontSize(fontSize)
     pdf.setTextColor(color)
     const lines = pdf.splitTextToSize(text, maxWidth) as string[]
@@ -518,7 +586,7 @@ export async function renderPdfBlob(
     const valueText = colonMatch[2].replace(/^:\s*/, ' ')
     const labelStr = labelRaw + ':'
     // Measure label width so we can place value inline
-    pdf.setFont('helvetica', 'bold')
+    pdf.setFont(fontFamily, 'bold')
     pdf.setFontSize(fontSize)
     const labelW = pdf.getTextWidth(labelStr) + 3
     // Write label bold
@@ -526,7 +594,7 @@ export async function renderPdfBlob(
     pdf.setTextColor(PDF_CHROME_COLORS.ink)
     pdf.text(labelStr, margin, y)
     // Write remaining value normal — wrap within remaining width
-    pdf.setFont('helvetica', 'normal')
+    pdf.setFont(fontFamily, 'normal')
     const valueLines = pdf.splitTextToSize(valueText.trim(), maxWidth - labelW) as string[]
     pdf.text(valueLines[0] ?? '', margin + labelW, y)
     y += fontSize + 4
@@ -548,11 +616,11 @@ export async function renderPdfBlob(
   pdf.rect(margin, y, maxWidth, bannerHeight, 'F')
 
   // Top Left: Liberty MD & LibertyMD.ai
-  pdf.setFont('helvetica', 'bold')
+  pdf.setFont(fontFamily, 'bold')
   pdf.setFontSize(20)
   pdf.setTextColor(255, 255, 255)
   pdf.text('Liberty MD', margin + 14, y + 26)
-  pdf.setFont('helvetica', 'normal')
+  pdf.setFont(fontFamily, 'normal')
   pdf.setFontSize(9)
   pdf.setTextColor(230, 240, 255)
   pdf.text('LibertyMD.ai', margin + 14, y + 38)
@@ -571,11 +639,11 @@ export async function renderPdfBlob(
     }
   }
 
-  // Bottom Center: Physician Ready Report Title
-  pdf.setFont('helvetica', 'bold')
+  // Bottom Center: localized physician-review report title
+  pdf.setFont(fontFamily, 'bold')
   pdf.setFontSize(16)
   pdf.setTextColor(255, 255, 255)
-  pdf.text('Physician Ready Report', margin + maxWidth / 2, y + 62, { align: 'center' })
+  pdf.text(doc.title, margin + maxWidth / 2, y + 62, { align: 'center' })
 
   options?.onLogoEmbed?.({ logoEmbedded, kind: doc.kind })
   y += bannerHeight + 12
@@ -586,38 +654,38 @@ export async function renderPdfBlob(
   pdf.line(margin, y, pageWidth - margin, y)
   y += 12
 
-  const nameStr = doc.patientInfo?.name || 'Anonymous Guest'
-  const ageStr = doc.patientInfo?.age ? String(doc.patientInfo.age) : 'Not specified'
+  const nameStr = doc.patientInfo?.name || copy.meta.anonymous
+  const ageStr = doc.patientInfo?.age ? String(doc.patientInfo.age) : copy.meta.notSpecified
   const rawSexStr = doc.patientInfo?.sexAtBirth
-  const sexStr = rawSexStr ? rawSexStr.split('_').join(' ').replace(/^./, (c: string) => c.toUpperCase()) : 'Not specified'
+  const sexStr = rawSexStr ? rawSexStr.split('_').join(' ').replace(/^./, (c: string) => c.toUpperCase()) : copy.meta.notSpecified
   const dateStr = doc.patientInfo?.date || formatPdfUtcDate()
 
   // Row 1: Name (Left), Date (Right)
-  pdf.setFont('helvetica', 'bold')
+  pdf.setFont(fontFamily, 'bold')
   pdf.setFontSize(9)
   pdf.setTextColor('#475569')
-  pdf.text('PATIENT NAME:', margin + 4, y)
-  pdf.setFont('helvetica', 'normal')
+  pdf.text(copy.meta.patientName, margin + 4, y)
+  pdf.setFont(fontFamily, 'normal')
   pdf.setTextColor('#111827')
   pdf.text(nameStr, margin + 92, y)
 
-  pdf.setFont('helvetica', 'bold')
+  pdf.setFont(fontFamily, 'bold')
   pdf.setTextColor('#475569')
-  pdf.text(`DATE:  ${dateStr}`, pageWidth - margin - 4, y, { align: 'right' })
+  pdf.text(`${copy.meta.date}  ${dateStr}`, pageWidth - margin - 4, y, { align: 'right' })
   y += 14
 
   // Row 2: Gender & Age (Left)
-  pdf.setFont('helvetica', 'bold')
+  pdf.setFont(fontFamily, 'bold')
   pdf.setTextColor('#475569')
-  pdf.text('GENDER:', margin + 4, y)
-  pdf.setFont('helvetica', 'normal')
+  pdf.text(copy.meta.gender, margin + 4, y)
+  pdf.setFont(fontFamily, 'normal')
   pdf.setTextColor('#111827')
   pdf.text(sexStr, margin + 54, y)
 
-  pdf.setFont('helvetica', 'bold')
+  pdf.setFont(fontFamily, 'bold')
   pdf.setTextColor('#475569')
-  pdf.text('AGE:', margin + 140, y)
-  pdf.setFont('helvetica', 'normal')
+  pdf.text(copy.meta.age, margin + 140, y)
+  pdf.setFont(fontFamily, 'normal')
   pdf.setTextColor('#111827')
   pdf.text(ageStr, margin + 168, y)
   y += 12

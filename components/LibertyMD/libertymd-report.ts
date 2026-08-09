@@ -79,6 +79,7 @@ export type LibertyMdAssessmentAndPlan = {
   assessment?: string
   plan: string[]
   selfCare: string[]
+  diagnosticInvestigations: string[]
 }
 
 export type LibertyMdPatientInfo = {
@@ -401,57 +402,14 @@ export function formatClinicalBullets(
 
 export function synthesizeSessionSummary(
   rawHeadline: string | undefined,
-  differentials: LibertyMdDifferentialItem[],
+  _differentials: LibertyMdDifferentialItem[],
   patientSummary?: string,
-  ap?: LibertyMdAssessmentAndPlan,
+  _ap?: LibertyMdAssessmentAndPlan,
 ): string | undefined {
-  if (!rawHeadline && !patientSummary) {
-    return undefined
-  }
-
-  const topDx = differentials[0]
-  const lowerDx = differentials.slice(1)
-  
-  const topDxText = topDx
-    ? `${topDx.name}${topDx.ordinal ? ` (${topDx.ordinal} confidence)` : ''}`
-    : null
-
-  const lowerDxText = lowerDx.length > 0
-    ? lowerDx.map((d) => d.name).join(', ')
-    : null
-
-  const workupText = topDx?.furtherInvestigations?.length
-    ? topDx.furtherInvestigations.join('; ')
-    : ap?.plan?.length
-      ? ap.plan.slice(0, 2).join('; ')
-      : 'Targeted in-person diagnostic evaluation and laboratory workup'
-
-  const lines: string[] = []
-
-  if (rawHeadline && rawHeadline.includes('\n')) {
-    return rawHeadline
-  }
-
-  if (rawHeadline) {
-    lines.push(`Patient Symptoms: ${rawHeadline}`)
-  } else if (patientSummary) {
-    const firstSentence = patientSummary.split('.')[0] || patientSummary
-    lines.push(`Patient Symptoms: ${firstSentence}.`)
-  }
-
-  if (topDxText) {
-    let dxLine = `Primary Diagnosis: ${topDxText}.`
-    if (lowerDxText) {
-      dxLine += ` Secondary Consideration(s): ${lowerDxText}.`
-    }
-    lines.push(dxLine)
-  }
-
-  if (workupText) {
-    lines.push(`Further Investigations: ${workupText}.`)
-  }
-
-  return lines.length > 0 ? lines.join('\n') : rawHeadline
+  if (rawHeadline) return rawHeadline
+  if (!patientSummary) return undefined
+  const firstSentence = patientSummary.split(/(?<=[.!?।])\s/u)[0]?.trim()
+  return firstSentence || patientSummary
 }
 
 /**
@@ -476,14 +434,24 @@ export function normalizeReportData(raw: unknown): LibertyMdNormalizedReport {
   const assessmentText = asOptionalText(ap?.assessment)
   const planItems = listFrom(ap?.plan)
   const selfCareItems = listFrom(ap?.self_care)
+  const diagnosticInvestigationItems = listFrom(
+    ap?.diagnostic_investigations || ap?.further_investigations || ap?.investigations,
+  )
   const topPlan = listFrom(data.plan || data.care_plan || data.recommendations)
-  const hasApBody = Boolean(assessmentText || planItems.length || selfCareItems.length || (ap && topPlan.length))
+  const hasApBody = Boolean(
+    assessmentText
+    || planItems.length
+    || selfCareItems.length
+    || diagnosticInvestigationItems.length
+    || (ap && topPlan.length),
+  )
 
   const assessmentAndPlan: LibertyMdAssessmentAndPlan | undefined = hasApBody
     ? {
         ...(assessmentText ? { assessment: assessmentText } : {}),
         plan: planItems.length ? planItems : (!ap && topPlan.length ? topPlan : planItems),
         selfCare: selfCareItems,
+        diagnosticInvestigations: diagnosticInvestigationItems,
       }
     : undefined
 
@@ -491,7 +459,7 @@ export function normalizeReportData(raw: unknown): LibertyMdNormalizedReport {
   const resolvedAp =
     assessmentAndPlan
     || (topPlan.length
-      ? { plan: topPlan, selfCare: [] as string[] }
+      ? { plan: topPlan, selfCare: [] as string[], diagnosticInvestigations: [] as string[] }
       : undefined)
 
   const redFlags = listFrom(

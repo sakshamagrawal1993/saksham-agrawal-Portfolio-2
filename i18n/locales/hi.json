@@ -70,7 +70,11 @@
       "gender": "लिंग:",
       "age": "आयु:",
       "date": "तिथि:",
-      "refNo": "संदर्भ सं.:"
+      "refNo": "संदर्भ सं.:",
+      "anonymous": "अनाम रोगी",
+      "notSpecified": "उल्लेख नहीं किया गया",
+      "page": "पृष्ठ",
+      "pdfFooter": "AI-जनित नैदानिक सारांश — यह निदान नहीं है · लाइसेंस प्राप्त चिकित्सक की समीक्षा के लिए"
     },
     "title": "आपकी स्वास्थ्य रिपोर्ट",
     "likely": "संभावित कारण",
@@ -86,7 +90,7 @@
     "savedNote": "आपकी LibertyMD हिस्ट्री में निजी रूप से सहेजा गया।",
     "guestNote": "अतिथि पहुंच 7 दिनों के बाद समाप्त हो जाएगी।",
     "pdf": {
-      "patientTitle": "रोगी सारांश",
+      "patientTitle": "चिकित्सक की समीक्षा के लिए रिपोर्ट",
       "soapTitle": "चिकित्सक SOAP नोट",
       "summaryHeading": "सारांश",
       "aiGenerated": "AI-जनित — यह निदान नहीं है।",
@@ -135,6 +139,9 @@
       },
       "serious": "गंभीर",
       "clinicalReviewRequired": "चिकित्सक समीक्षा आवश्यक",
+      "aboutCondition": "इस स्थिति के बारे में",
+      "whyConsidered": "इसे क्यों माना जा रहा है",
+      "clinicalAssessment": "नैदानिक आकलन",
       "furtherInvestigations": "अतिरिक्त जांचें",
       "symptomaticTreatment": "लक्षण राहत",
       "supportiveTreatment": "सहायक देखभाल",

@@ -76,7 +76,7 @@
     "savedNote": "Saved privately to your LibertyMD history.",
     "guestNote": "Guest access expires after seven days.",
     "pdf": {
-      "patientTitle": "Patient summary",
+      "patientTitle": "Report for Physician Review",
       "soapTitle": "Physician SOAP note",
       "summaryHeading": "Summary",
       "aiGenerated": "AI-generated — not a diagnosis.",
@@ -134,6 +134,9 @@
       },
       "serious": "Serious Condition",
       "clinicalReviewRequired": "Clinical Review Required",
+      "aboutCondition": "About this condition",
+      "whyConsidered": "Why it is being considered",
+      "clinicalAssessment": "Clinical assessment",
       "furtherInvestigations": "Diagnostic Investigations & Workup",
       "symptomaticTreatment": "Medical Treatments & Therapeutics",
       "supportiveTreatment": "Self-Care & Home Management",
@@ -142,7 +145,18 @@
       "showDetail": "Show details",
       "hideDetail": "Hide details"
     },
-    "viewTitle": "Consultation Report",
+    "viewTitle": "Report for Physician Review",
+    "meta": {
+      "patientName": "Patient name:",
+      "gender": "Gender:",
+      "age": "Age:",
+      "date": "Date:",
+      "refNo": "Ref. no.:",
+      "anonymous": "Anonymous guest",
+      "notSpecified": "Not specified",
+      "page": "Page",
+      "pdfFooter": "AI-generated clinical summary — not a diagnosis · For licensed clinician review"
+    },
     "emailDelivery": {
       "cta": "Email me my report",
       "title": "Email your report",

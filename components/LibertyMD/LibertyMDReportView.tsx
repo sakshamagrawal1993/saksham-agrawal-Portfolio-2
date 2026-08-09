@@ -125,13 +125,20 @@ function buildPdfCopy(t: TranslateFn): LibertyMdPdfCopy {
     noClinicianReview: t('report.pdf.noClinicianReview'),
     generatedLabel: t('report.pdf.generatedLabel'),
     sections: {
+      sessionSummary: t('report.sections.sessionSummary'),
+      patientSummary: t('report.sections.patientSummary'),
       triage: t('report.sections.triage'),
       nextStep: t('report.sections.nextStep'),
       differential: t('report.sections.differential'),
       assessmentAndPlan: t('report.sections.assessmentAndPlan'),
       redFlags: t('report.sections.redFlags'),
-      plan: t('report.pdf.plan'),
-      selfCare: t('report.selfCare'),
+      soap: t('report.sections.soap'),
+      plan: t('report.card.symptomaticTreatment'),
+      selfCare: t('report.card.supportiveTreatment'),
+      clinicalAssessment: t('report.card.clinicalAssessment'),
+      investigations: t('report.card.furtherInvestigations'),
+      aboutCondition: t('report.card.aboutCondition'),
+      whyConsidered: t('report.card.whyConsidered'),
       soapSubjective: t('report.teasers.soapSubjective'),
       soapObjective: t('report.teasers.soapObjective'),
       soapAssessment: t('report.teasers.soapAssessment'),
@@ -144,6 +151,16 @@ function buildPdfCopy(t: TranslateFn): LibertyMdPdfCopy {
       minimal: t('report.card.ordinal.minimal'),
     },
     serious: t('report.card.serious'),
+    meta: {
+      patientName: t('report.meta.patientName'),
+      gender: t('report.meta.gender'),
+      age: t('report.meta.age'),
+      date: t('report.meta.date'),
+      anonymous: t('report.meta.anonymous'),
+      notSpecified: t('report.meta.notSpecified'),
+      page: t('report.meta.page'),
+      footer: t('report.meta.pdfFooter'),
+    },
     triageLabels,
   }
 }
@@ -168,7 +185,7 @@ function renderFormattedSessionSummary(headline: string) {
   return (
     <div className="mt-1.5 space-y-1.5">
       {lines.map((line, idx) => {
-        const colonMatch = line.match(/^(\*\*.*?\*\*|[A-Za-z0-9\s()\/_-]+:)(.*)$/)
+        const colonMatch = line.match(/^(\*\*.*?\*\*|[^:：]{1,80}[:：])(.*)$/u)
         if (colonMatch) {
           const headerRaw = colonMatch[1].replace(/^\*\*|\*\*$|:$/g, '').trim()
           const displayHeader = headerRaw.replace(/^Primary Differential$/i, 'Primary Diagnosis')
@@ -720,24 +737,16 @@ export function LibertyMDReportView({
             onToggle={() => onExpand('assessment_and_plan', sectionOpen.assessment_and_plan)}
           >
             <div className="libertymd-type-body-small space-y-4 text-libertymd-slate-700">
-              {/* 10.1 Self-Care & Home Management */}
-              <div>
-                <p className="libertymd-type-label font-bold uppercase text-libertymd-slate-500">
-                  {t('report.card.supportiveTreatment')}
-                </p>
-                <ul className="mt-1 list-disc space-y-1 pl-5">
-                  {formatClinicalBullets(
-                    report.assessmentAndPlan?.selfCare?.length
-                      ? report.assessmentAndPlan.selfCare
-                      : report.differentials[0]?.supportiveTreatment,
-                    'selfCare',
-                  ).map((item, index) => (
-                    <li key={`self-${index}`}>{item}</li>
-                  ))}
-                </ul>
-              </div>
+              {report.assessmentAndPlan?.assessment ? (
+                <div data-report-clinical-assessment>
+                  <p className="libertymd-type-label font-bold uppercase text-libertymd-slate-500">
+                    {t('report.card.clinicalAssessment')}
+                  </p>
+                  <p className="mt-1 leading-relaxed">{report.assessmentAndPlan.assessment}</p>
+                </div>
+              ) : null}
 
-              {/* 10.2 Medical Treatments & Therapeutics */}
+              {/* 10.1 Medical Treatments & Therapeutics */}
               <div>
                 <p className="libertymd-type-label font-bold uppercase text-libertymd-slate-500">
                   {t('report.card.symptomaticTreatment')}
@@ -754,6 +763,23 @@ export function LibertyMDReportView({
                 </ul>
               </div>
 
+              {/* 10.2 Self-Care & Home Management */}
+              <div>
+                <p className="libertymd-type-label font-bold uppercase text-libertymd-slate-500">
+                  {t('report.card.supportiveTreatment')}
+                </p>
+                <ul className="mt-1 list-disc space-y-1 pl-5">
+                  {formatClinicalBullets(
+                    report.assessmentAndPlan?.selfCare?.length
+                      ? report.assessmentAndPlan.selfCare
+                      : report.differentials[0]?.supportiveTreatment,
+                    'selfCare',
+                  ).map((item, index) => (
+                    <li key={`self-${index}`}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+
               {/* 10.3 Diagnostic Investigations & Workup */}
               <div>
                 <p className="libertymd-type-label font-bold uppercase text-libertymd-slate-500">
@@ -761,7 +787,9 @@ export function LibertyMDReportView({
                 </p>
                 <ul className="mt-1 list-disc space-y-1 pl-5">
                   {formatClinicalBullets(
-                    report.differentials[0]?.furtherInvestigations,
+                    report.assessmentAndPlan?.diagnosticInvestigations?.length
+                      ? report.assessmentAndPlan.diagnosticInvestigations
+                      : report.differentials[0]?.furtherInvestigations,
                     'diagnostic',
                   ).map((item, index) => (
                     <li key={`workup-${index}`}>{item}</li>

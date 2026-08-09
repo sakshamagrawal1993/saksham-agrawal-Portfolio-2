@@ -83,6 +83,23 @@ function hasItems(value: unknown, exactLength?: number): boolean {
     && (exactLength === undefined ? value.length > 0 : value.length === exactLength)
 }
 
+function hasCompleteDifferentials(value: unknown): boolean {
+  if (!Array.isArray(value) || value.length !== 3) return false
+  return value.every((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return false
+    const row = item as Record<string, unknown>
+    const confidence = typeof row.confidence === 'number'
+      ? row.confidence
+      : Number(String(row.confidence ?? row.confidence_score ?? '').replace('%', ''))
+    return hasText(row.full_name || row.common_name || row.name)
+      && hasText(row.description)
+      && hasText(row.reason)
+      && Number.isFinite(confidence)
+      && confidence >= 0
+      && confidence <= 100
+  })
+}
+
 /** Required physician-review sections shared by reads and report recovery. */
 export function isCompleteReportData(value: unknown): boolean {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
@@ -95,10 +112,13 @@ export function isCompleteReportData(value: unknown): boolean {
   const soapData = soap as Record<string, unknown>
   return hasText(report.headline)
     && hasText(report.patient_summary)
-    && hasItems(report.differential_diagnosis, 3)
+    && hasCompleteDifferentials(report.differential_diagnosis)
     && hasText(planData.assessment)
     && hasItems(planData.plan)
+    && hasItems(planData.self_care)
+    && hasItems(planData.diagnostic_investigations)
     && hasItems(planData.red_flags_to_watch)
+    && hasText(planData.when_to_seek_care)
     && ['subjective', 'objective', 'assessment', 'plan'].every((key) => hasText(soapData[key]))
 }
 

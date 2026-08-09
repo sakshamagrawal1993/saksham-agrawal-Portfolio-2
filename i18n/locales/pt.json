@@ -78,7 +78,7 @@
     "savedNote": "Saved privately to your LibertyMD history.",
     "guestNote": "Guest access expires after seven days.",
     "pdf": {
-      "patientTitle": "Resumo do paciente",
+      "patientTitle": "Relatório para revisão médica",
       "soapTitle": "Nota SOAP do médico",
       "summaryHeading": "Resumo",
       "aiGenerated": "Gerado por IA — não é um diagnóstico.",
@@ -117,6 +117,11 @@
       "unknown": "Care setting unavailable"
     },
     "viewTitle": "Relatório para revisão médica",
+    "meta": {
+      "patientName": "Nome do paciente:", "gender": "Sexo:", "age": "Idade:", "date": "Data:", "refNo": "Ref.:",
+      "anonymous": "Paciente anônimo", "notSpecified": "Não especificado", "page": "Página",
+      "pdfFooter": "Resumo clínico gerado por IA — não é um diagnóstico · Para revisão médica profissional"
+    },
     "card": {
       "ordinal": {
         "high": "Confiança alta",
@@ -126,6 +131,10 @@
         "high_serious": "Confiança alta · Grave"
       },
       "serious": "Grave",
+      "clinicalReviewRequired": "Revisão clínica necessária",
+      "aboutCondition": "Sobre esta condição",
+      "whyConsidered": "Por que está sendo considerada",
+      "clinicalAssessment": "Avaliação clínica",
       "furtherInvestigations": "Investigações adicionais",
       "symptomaticTreatment": "Alívio dos sintomas",
       "supportiveTreatment": "Cuidados de suporte",

@@ -55,13 +55,20 @@ const PDF_COPY: LibertyMdPdfCopy = {
   noClinicianReview: 'For licensed clinician review.',
   generatedLabel: 'Generated',
   sections: {
+    sessionSummary: 'Session summary',
+    patientSummary: 'Patient summary',
     triage: 'Recommended care setting',
     nextStep: 'What to do now',
     differential: 'Possible causes',
     assessmentAndPlan: 'Assessment and plan',
     redFlags: 'Red flags to watch',
+    soap: 'SOAP note',
     plan: 'Plan',
     selfCare: 'Self-care',
+    clinicalAssessment: 'Clinical assessment',
+    investigations: 'Diagnostic investigations',
+    aboutCondition: 'About this condition',
+    whyConsidered: 'Why it is being considered',
     soapSubjective: 'Subjective',
     soapObjective: 'Objective',
     soapAssessment: 'Assessment',
@@ -73,6 +80,16 @@ const PDF_COPY: LibertyMdPdfCopy = {
     minimal: 'Less likely',
   },
   serious: 'Serious',
+  meta: {
+    patientName: 'Patient name:',
+    gender: 'Gender:',
+    age: 'Age:',
+    date: 'Date:',
+    anonymous: 'Anonymous guest',
+    notSpecified: 'Not specified',
+    page: 'Page',
+    footer: 'AI-generated clinical summary — not a diagnosis · For licensed clinician review',
+  },
   triageLabels: {
     home: 'Home care',
     telehealth: 'Telehealth',
@@ -279,4 +296,42 @@ Deno.test('P2-16 AC6 · mangled partial under new layout; no branded invent', as
   assertTrue(soap.headerLines.some((l) => l.includes(PDF_COPY.aiGenerated)))
   // Logo omit path still available for partial renders
   assertEquals(planPdfLogoEmbed(null, 'soap').logoEmbedded, false)
+})
+
+Deno.test('FULL-REPORT · patient PDF localizes headings and includes every component', () => {
+  const view = normalizeReportData(MUNDANE_FULL_REPORT_DATA)
+  const spanishCopy: LibertyMdPdfCopy = {
+    ...PDF_COPY,
+    patientTitle: 'Informe para revisión médica',
+    sections: {
+      ...PDF_COPY.sections,
+      sessionSummary: 'Resumen de la sesión',
+      patientSummary: 'Resumen del paciente',
+      differential: 'Diagnóstico diferencial',
+      assessmentAndPlan: 'Plan de acción recomendado',
+      redFlags: 'Señales de alarma',
+      soap: 'Nota SOAP',
+      clinicalAssessment: 'Evaluación clínica',
+      investigations: 'Estudios adicionales',
+      aboutCondition: 'Acerca de esta afección',
+      whyConsidered: 'Por qué se considera',
+    },
+  }
+  const doc = buildPatientPdfDoc(view, spanishCopy, WHEN)
+  const headings = doc.sections.map((section) => section.heading)
+  assertEquals(doc.title, spanishCopy.patientTitle)
+  for (const required of [
+    'Resumen de la sesión',
+    'Resumen del paciente',
+    'Diagnóstico diferencial',
+    'Plan de acción recomendado',
+    'Señales de alarma',
+    'Nota SOAP',
+  ]) assertTrue(headings.includes(required), `missing localized section ${required}`)
+
+  const text = flattenPdfDocText(doc)
+  assertTrue(text.includes('Acerca de esta afección'), 'condition description label')
+  assertTrue(text.includes('Por qué se considera'), 'case reasoning label')
+  assertTrue(text.includes('Evaluación clínica'), 'clinical assessment narrative')
+  assertTrue(text.includes('Estudios adicionales'), 'diagnostic investigations')
 })

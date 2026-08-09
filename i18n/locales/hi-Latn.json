@@ -68,7 +68,11 @@
       "gender": "Gender:",
       "age": "Age:",
       "date": "Date:",
-      "refNo": "Ref No.:"
+      "refNo": "Ref No.:",
+      "anonymous": "Anonymous patient",
+      "notSpecified": "Bataya nahi gaya",
+      "page": "Page",
+      "pdfFooter": "AI-generated clinical summary — ye diagnosis nahi hai · Licensed doctor review ke liye"
     },
     "title": "Aapki Health Report",
     "subtitle": "Clinician ke liye taiyaar ki gayi summary",
@@ -91,7 +95,7 @@
     "savedNote": "Aapki LibertyMD history mein privately save kar diya gaya hai.",
     "guestNote": "Guest access 7 dino ke baad expire ho jayega.",
     "pdf": {
-      "patientTitle": "Patient Summary",
+      "patientTitle": "Doctor Review ke liye Report",
       "soapTitle": "Doctor SOAP Note",
       "summaryHeading": "Summary",
       "aiGenerated": "AI-generated — ye diagnosis nahi hai.",
@@ -140,6 +144,9 @@
       },
       "serious": "Gambhir (Serious)",
       "clinicalReviewRequired": "Doctor review required",
+      "aboutCondition": "Is condition ke baare mein",
+      "whyConsidered": "Isko kyun consider kiya gaya",
+      "clinicalAssessment": "Clinical assessment",
       "furtherInvestigations": "Extra investigations",
       "symptomaticTreatment": "Symptoms se rahat",
       "supportiveTreatment": "Supportive care",

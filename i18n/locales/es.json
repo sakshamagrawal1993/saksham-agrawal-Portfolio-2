@@ -70,7 +70,11 @@
       "gender": "Sexo:",
       "age": "Edad:",
       "date": "Fecha:",
-      "refNo": "Ref. N.º:"
+      "refNo": "Ref. N.º:",
+      "anonymous": "Paciente anónimo",
+      "notSpecified": "No especificado",
+      "page": "Página",
+      "pdfFooter": "Resumen clínico generado por IA — no es un diagnóstico · Para revisión médica profesional"
     },
     "title": "Tu informe de salud",
     "likely": "Posibilidades probables",
@@ -86,7 +90,7 @@
     "savedNote": "Guardado de forma privada en tu historial de LibertyMD.",
     "guestNote": "El acceso de invitado expira en siete días.",
     "pdf": {
-      "patientTitle": "Resumen para el paciente",
+      "patientTitle": "Informe para revisión médica",
       "soapTitle": "Nota SOAP para el médico",
       "summaryHeading": "Resumen",
       "aiGenerated": "Generado por IA — no es un diagnóstico.",
@@ -135,6 +139,9 @@
       },
       "serious": "Grave",
       "clinicalReviewRequired": "Revisión clínica requerida",
+      "aboutCondition": "Acerca de esta afección",
+      "whyConsidered": "Por qué se considera",
+      "clinicalAssessment": "Evaluación clínica",
       "furtherInvestigations": "Estudios adicionales",
       "symptomaticTreatment": "Alivio de síntomas",
       "supportiveTreatment": "Cuidados de apoyo",

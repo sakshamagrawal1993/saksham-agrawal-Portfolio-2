@@ -78,7 +78,7 @@
     "savedNote": "Saved privately to your LibertyMD history.",
     "guestNote": "Guest access expires after seven days.",
     "pdf": {
-      "patientTitle": "Résumé patient",
+      "patientTitle": "Rapport pour examen médical",
       "soapTitle": "Note SOAP médecin",
       "summaryHeading": "Résumé",
       "aiGenerated": "Généré par IA — ce n’est pas un diagnostic.",
@@ -117,6 +117,11 @@
       "unknown": "Care setting unavailable"
     },
     "viewTitle": "Rapport pour examen médical",
+    "meta": {
+      "patientName": "Nom du patient :", "gender": "Sexe :", "age": "Âge :", "date": "Date :", "refNo": "Réf. :",
+      "anonymous": "Patient anonyme", "notSpecified": "Non précisé", "page": "Page",
+      "pdfFooter": "Résumé clinique généré par IA — ce n’est pas un diagnostic · Pour examen par un médecin"
+    },
     "card": {
       "ordinal": {
         "high": "Confiance élevée",
@@ -126,6 +131,10 @@
         "high_serious": "Confiance élevée · Grave"
       },
       "serious": "Grave",
+      "clinicalReviewRequired": "Examen clinique requis",
+      "aboutCondition": "À propos de cette affection",
+      "whyConsidered": "Pourquoi elle est envisagée",
+      "clinicalAssessment": "Évaluation clinique",
       "furtherInvestigations": "Examens complémentaires",
       "symptomaticTreatment": "Soulagement des symptômes",
       "supportiveTreatment": "Soins de soutien",

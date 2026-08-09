@@ -78,7 +78,7 @@
     "savedNote": "Saved privately to your LibertyMD history.",
     "guestNote": "Guest access expires after seven days.",
     "pdf": {
-      "patientTitle": "Patientenzusammenfassung",
+      "patientTitle": "Bericht zur ärztlichen Überprüfung",
       "soapTitle": "Ärztliche SOAP-Notiz",
       "summaryHeading": "Zusammenfassung",
       "aiGenerated": "KI-generiert — keine Diagnose.",
@@ -117,6 +117,11 @@
       "unknown": "Care setting unavailable"
     },
     "viewTitle": "Bericht zur ärztlichen Überprüfung",
+    "meta": {
+      "patientName": "Patientenname:", "gender": "Geschlecht:", "age": "Alter:", "date": "Datum:", "refNo": "Ref.:",
+      "anonymous": "Anonymer Patient", "notSpecified": "Nicht angegeben", "page": "Seite",
+      "pdfFooter": "KI-generierte klinische Zusammenfassung — keine Diagnose · Zur Überprüfung durch medizinisches Fachpersonal"
+    },
     "card": {
       "ordinal": {
         "high": "Hohe Sicherheit",
@@ -126,6 +131,10 @@
         "high_serious": "Hohe Sicherheit · Ernst"
       },
       "serious": "Ernst",
+      "clinicalReviewRequired": "Ärztliche Überprüfung erforderlich",
+      "aboutCondition": "Über diese Erkrankung",
+      "whyConsidered": "Warum sie in Betracht gezogen wird",
+      "clinicalAssessment": "Klinische Beurteilung",
       "furtherInvestigations": "Weitere Untersuchungen",
       "symptomaticTreatment": "Symptomlinderung",
       "supportiveTreatment": "Unterstützende Maßnahmen",

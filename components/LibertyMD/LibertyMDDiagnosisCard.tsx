@@ -49,7 +49,8 @@ export function LibertyMDDiagnosisCard({
   const detailPanelId = useId()
   const [detailOpen, setDetailOpen] = useState(false)
 
-  const why = item.reason || item.description
+  const description = item.description
+  const why = item.reason
   const hasFurther = Boolean(item.furtherInvestigations?.length)
   const hasSymptomatic = Boolean(item.symptomaticTreatment?.length)
   const hasSupportive = Boolean(item.supportiveTreatment?.length)
@@ -112,11 +113,22 @@ export function LibertyMDDiagnosisCard({
         </div>
       </div>
 
-      {/* Full-Width Explanation Paragraph */}
-      {why ? (
-        <p className="libertymd-type-body-small mt-2.5 w-full text-libertymd-slate-600 leading-relaxed" data-diagnosis-why>
-          {why}
-        </p>
+      {/* Keep the medical definition and case-specific reasoning distinct. */}
+      {description || why ? (
+        <div className="mt-2.5 w-full space-y-2 text-libertymd-slate-600">
+          {description ? (
+            <p className="libertymd-type-body-small leading-relaxed" data-diagnosis-description>
+              <strong className="font-bold text-libertymd-slate-700">{t('report.card.aboutCondition')}:</strong>{' '}
+              {description}
+            </p>
+          ) : null}
+          {why ? (
+            <p className="libertymd-type-body-small leading-relaxed" data-diagnosis-why>
+              <strong className="font-bold text-libertymd-slate-700">{t('report.card.whyConsidered')}:</strong>{' '}
+              {why}
+            </p>
+          ) : null}
+        </div>
       ) : null}
 
       <div className="mt-[var(--libertymd-space-sm)]">
