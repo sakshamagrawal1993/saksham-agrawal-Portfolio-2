@@ -13,7 +13,10 @@ import {
   resolveEmergencyCopyResolved,
   type EmergencyCopyWire,
 } from '../../supabase/functions/libertymd-care-proxy/lib/emergency-copy.ts'
-import { P0_17_CATALOG_KEYS } from '../../supabase/functions/libertymd-care-proxy/lib/message-catalog.ts'
+import {
+  canonicalCatalogLanguage,
+  P0_17_CATALOG_KEYS,
+} from '../../supabase/functions/libertymd-care-proxy/lib/message-catalog.ts'
 import registry from '../../i18n/registry.json' with { type: 'json' }
 
 declare const Deno: {
@@ -63,6 +66,28 @@ Deno.test('P3-08 AC2 · US 911/988 asymmetry; EU fixture is not hardcoded 911', 
   })
   assert(/\b112\b/.test(eu.copy.detail), 'EU medical uses 112')
   assert(!/\b911\b/.test(eu.copy.detail), 'EU medical not hardcoded 911')
+})
+
+Deno.test('P3-09 · canonical locale lookup preserves Hinglish and serves complete German emergency copy', async () => {
+  assertEquals(canonicalCatalogLanguage('hi-Latn'), 'hi-Latn', 'canonical Hinglish case')
+  assertEquals(canonicalCatalogLanguage('hi_latn'), 'hi-Latn', 'underscore Hinglish alias')
+  assertEquals(canonicalCatalogLanguage('de-DE'), 'de', 'German regional code')
+  assertEquals(canonicalCatalogLanguage('unsupported'), 'en', 'unsupported fallback')
+
+  const german = await resolveEmergencyCopyResolved('acs_chest_pain', {
+    language: 'de',
+    catalogOverride: {
+      'emergency.heading': 'Aus Sicherheitsgründen mussten wir diese Konsultation beenden.',
+      'emergency.standing.acs_chest_pain': 'Rufen Sie sofort {emergency_number} an. Fahren Sie nicht selbst.',
+      'emergency.detail.acs_chest_pain': 'Dies kann ein Herznotfall sein. Rufen Sie jetzt {emergency_number} an.',
+    },
+    regionOverride: EU_REGION_FIXTURE,
+  })
+  assertEquals(german.source, 'catalog', 'German whole-surface catalog path')
+  assert(german.copy.heading.startsWith('Aus Sicherheitsgründen'), 'German heading')
+  assert(german.copy.standingInstruction.includes('112'), 'German standing receives EU number')
+  assert(german.copy.detail.includes('Herznotfall'), 'German detail')
+  assert(!/For safety reasons|Call 911|emergency department/i.test(JSON.stringify(german.wire)), 'no English fallback')
 })
 
 Deno.test('P3-08 AC3 · pending / incomplete catalog does not serve partial keys — fail-open fixture', async () => {
@@ -179,6 +204,21 @@ Deno.test('P3-08 migration · neutralized draft cannot create tables', () => {
   assert(!/insert into public\.libertymd_message_catalog[\s\S]*safety\.high_risk_continue/i.test(mig), 'no high_risk_continue seed')
   assert(!/'safety\.high_risk_continue'/i.test(mig), 'no high_risk_continue key literal insert')
   assert(!/sakshamagrawal1993@gmail\.com/i.test(mig), 'no email-owner policy')
+})
+
+Deno.test('P3-09 migration · approved emergency catalog covers every approved clinical locale', () => {
+  const migration = Deno.readTextFileSync(
+    new URL('../../supabase/migrations/20260810110000_libertymd_approved_multilingual_emergency_copy.sql', import.meta.url).pathname,
+  )
+  for (const locale of ['hi', 'hi-Latn', 'fr', 'de', 'pt']) {
+    assert(migration.includes(`('${locale}',`), `${locale}: approved translation review row`)
+    assert(migration.includes(`'${locale}', 'machine'`) || migration.includes(`'${locale}', 'human'`), `${locale}: catalog bundle`)
+  }
+  for (const key of P0_17_CATALOG_KEYS) {
+    const count = migration.split(`'${key}'`).length - 1
+    assert(count === 5, `${key}: one translated row per newly enabled locale`)
+  }
+  assert(migration.includes("status = excluded.status"), 'approval upsert is idempotent')
 })
 
 Deno.test('FULL-REPORT · every supported locale has complete report chrome', () => {

@@ -15,6 +15,7 @@
 
 import {
   applyRegionToCatalogTemplate,
+  canonicalCatalogLanguage,
   loadApprovedCatalogContent,
   type CatalogLogger,
 } from './message-catalog.ts'
@@ -324,7 +325,7 @@ export async function resolveEmergencyCopyResolved(
   crisisType: unknown,
   opts: EmergencyResolveOptions = {},
 ): Promise<{ copy: EmergencyCopyVariant; wire: EmergencyCopyWire; source: 'catalog' | 'fixture' }> {
-  const language = String(opts.language || 'en').trim().toLowerCase() || 'en'
+  const language = canonicalCatalogLanguage(opts.language)
   const variantKey = resolveVariantKey(crisisType)
 
   let numbers: RegionNumbers

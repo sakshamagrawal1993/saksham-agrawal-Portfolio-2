@@ -17,6 +17,18 @@ export type CatalogLogger = (event: string, props: Record<string, string | numbe
 // deno-lint-ignore no-explicit-any
 type DbLike = any
 
+/** Canonical case used by the catalog constraint (`hi-Latn` is case-sensitive). */
+export function canonicalCatalogLanguage(raw: unknown): string {
+  const value = String(raw || 'en').trim().replace(/_/g, '-').toLowerCase()
+  if (value === 'hi-latn' || value === 'hinglish') return 'hi-Latn'
+  if (value === 'es' || value.startsWith('es-')) return 'es'
+  if (value === 'hi' || value.startsWith('hi-')) return 'hi'
+  if (value === 'fr' || value.startsWith('fr-')) return 'fr'
+  if (value === 'de' || value.startsWith('de-')) return 'de'
+  if (value === 'pt' || value.startsWith('pt-')) return 'pt'
+  return 'en'
+}
+
 /** Required P0-17 emergency catalog keys (approved EN seeds). */
 export const P0_17_CATALOG_KEYS = [
   'emergency.heading',
@@ -50,7 +62,7 @@ export async function loadApprovedCatalogContent(
   language: string,
   log?: CatalogLogger,
 ): Promise<{ content: string; source: 'catalog' } | null> {
-  const lang = String(language || 'en').trim().toLowerCase() || 'en'
+  const lang = canonicalCatalogLanguage(language)
   if (!db) {
     log?.('catalog_unavailable', { table: 'libertymd_message_catalog', reason: 'no_db', key: messageKey })
     return null

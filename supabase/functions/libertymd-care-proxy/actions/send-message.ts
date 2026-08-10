@@ -77,13 +77,16 @@ import { ensureProfile, getOwnedPatient } from '../lib/profiles.ts'
 import { runGuardrail, saveSafetyEvent, toClientSafety } from '../lib/safety.ts'
 import {
   buildComprehensionCheckPayload,
-  COMPREHENSION_BRIDGE_MESSAGE,
-  CONTINUE_EMPTY_QUESTION_FALLBACK,
   isComprehensionCompleted,
   readComprehensionFlags,
   withComprehensionCompleted,
   withComprehensionPending,
 } from '../lib/comprehension-check.ts'
+import {
+  comprehensionBridgeMessage,
+  continueFallbackQuestion,
+  reportGateMessage,
+} from '../lib/clinical-copy.ts'
 import { calculateMissingSlots } from '../lib/slots.ts'
 import {
   computeShouldRunDiagnosis,
@@ -779,11 +782,7 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
     if (gateOpen && !comprehensionDone && !completingComprehension) {
       const comprehension = buildComprehensionCheckPayload(slots, clinicalLanguage)
       const nextStatus = guardrail.status === 'high_risk_continue' ? 'high_risk' : 'interviewing'
-      const bridge = limitConsultationMessage(
-        clinicalLanguage === 'es'
-          ? 'He resumido lo que me ha compartido hasta ahora. Por favor revise el resumen.'
-          : COMPREHENSION_BRIDGE_MESSAGE
-      )
+      const bridge = limitConsultationMessage(comprehensionBridgeMessage(clinicalLanguage))
       await addMessage(ctx, consultation, 'assistant', bridge, {
         options: [],
         target_slot: interview.target_slot,
@@ -1001,13 +1000,7 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
         })
       }
 
-      const reportGateText = clinicalLanguage === 'es'
-        ? (isAnonymous
-            ? 'Su informe de LibertyMD está listo. Vincule su cuenta de Google para guardarlo y volver a consultar esta consulta, o continúe sin guardar.'
-            : 'Su informe de LibertyMD está listo y ha sido guardado en su historial.')
-        : (isAnonymous
-            ? 'Your LibertyMD report is ready. Link Google to save it and revisit this consult, or continue without saving.'
-            : 'Your LibertyMD report is ready and has been saved to your history.')
+      const reportGateText = reportGateMessage(clinicalLanguage, isAnonymous)
 
       await addMessage(ctx, consultation, 'assistant', reportGateText, {
         message_type: 'report_gate',
@@ -1094,7 +1087,7 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
     }
 
     const nextQuestion = limitConsultationMessage(
-      interview.next_question || CONTINUE_EMPTY_QUESTION_FALLBACK,
+      interview.next_question || continueFallbackQuestion(clinicalLanguage),
     )
     const nextStatus = guardrail.status === 'high_risk_continue' ? 'high_risk' : 'interviewing'
     await addMessage(ctx, consultation, 'assistant', nextQuestion, {

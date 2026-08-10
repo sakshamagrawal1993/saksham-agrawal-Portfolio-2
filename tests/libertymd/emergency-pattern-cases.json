@@ -1,5 +1,5 @@
 {
-  "pattern_set_version": "1.1.0",
+  "pattern_set_version": "1.2.0",
   "positives": [
     {
       "id": "acs_clause_boundary",
@@ -78,6 +78,36 @@
       "message": "I have been thinking about ending my life.",
       "crisis_type": "suicidal_ideation",
       "care_setting": "crisis_line"
+    },
+    {
+      "id": "de_acs_radiating_arm",
+      "message": "Ich habe einen starken, drückenden Schmerz in der Brust, der in meinen linken Arm ausstrahlt. Mir ist übel und ich schwitze stark.",
+      "crisis_type": "acs_chest_pain",
+      "care_setting": "call_911"
+    },
+    {
+      "id": "de_thunderclap_headache",
+      "message": "Plötzlich habe ich den schlimmsten Kopfschmerz meines Lebens bekommen. Er begann innerhalb von Sekunden.",
+      "crisis_type": "thunderclap_headache",
+      "care_setting": "call_911"
+    },
+    {
+      "id": "de_anaphylaxis",
+      "message": "Nach dem Essen von Erdnüssen schwillt meine Zunge an, mein Hals wird eng und ich bekomme schlecht Luft.",
+      "crisis_type": "anaphylaxis",
+      "care_setting": "call_911"
+    },
+    {
+      "id": "de_surgical_abdomen",
+      "message": "Ich habe plötzlich sehr starke Schmerzen im rechten Unterbauch, muss erbrechen und kann vor Schmerzen kaum gehen.",
+      "crisis_type": "surgical_abdomen",
+      "care_setting": "call_911"
+    },
+    {
+      "id": "de_hypoxic_respiratory_distress",
+      "message": "Meine Sauerstoffsättigung liegt bei 88 Prozent. Ich ringe nach Luft und kann keinen ganzen Satz sprechen.",
+      "crisis_type": "respiratory_distress",
+      "care_setting": "call_911"
     }
   ],
   "negatives": [
@@ -119,7 +149,22 @@
     { "id": "uri_shortness_of_breath", "message": "I have cough and fever with some shortness of breath, but I can speak normally and I am not gasping." },
     { "id": "resolved_exertional_breathlessness", "message": "I was mildly short of breath after climbing stairs, but it settled with rest." },
     { "id": "post_cough_chest_soreness", "message": "After coughing all day, the muscles across my chest feel mildly sore." },
-    { "id": "brief_exertional_tightness_resolved", "message": "My chest briefly felt tight after running, but it resolved and I am breathing normally now." }
+    { "id": "brief_exertional_tightness_resolved", "message": "My chest briefly felt tight after running, but it resolved and I am breathing normally now." },
+    { "id": "de_negated_chest_pain", "message": "Ich habe keine Brustschmerzen, nur einen leichten Husten." },
+    { "id": "de_gradual_mild_headache", "message": "Nach einem langen Bildschirmtag habe ich langsam leichte Kopfschmerzen bekommen." },
+    { "id": "de_negated_tongue_swelling", "message": "Meine Zunge ist nicht geschwollen und mein Hals ist nicht eng." },
+    { "id": "de_normal_oxygen", "message": "Meine Sauerstoffsättigung liegt bei 98 Prozent und ich atme normal." },
+    { "id": "de_mild_abdominal_pain", "message": "Nach einer schweren Mahlzeit habe ich leichte Bauchschmerzen, kann aber normal gehen." },
+    { "id": "de_cough_chest_pain", "message": "Beim Husten tut meine Brust kurz weh, sonst habe ich keinen Brustdruck." },
+    { "id": "de_uri_mild_breathlessness", "message": "Bei meiner Erkältung bin ich etwas kurzatmig, kann aber normal sprechen und gehe normal herum." },
+    { "id": "de_resolved_exertional_breathlessness", "message": "Nach dem Treppensteigen war ich kurz außer Atem, aber nach einer Minute war alles wieder normal." },
+    { "id": "de_family_history_chest", "message": "In der Familienanamnese gibt es Brustschmerzen; ich selbst habe nur leichten Schnupfen." },
+    { "id": "de_dental_jaw_pain", "message": "Mein Kiefer schmerzt wegen eines kaputten Zahns, ohne Schweiß oder Übelkeit." },
+    { "id": "de_usual_migraine", "message": "Meine übliche Migräne ist langsam wiedergekommen und fühlt sich genauso an wie sonst." },
+    { "id": "de_seasonal_allergy", "message": "Meine Augen jucken und ich niese wegen Pollen, ohne Schwellung im Mund oder Hals." },
+    { "id": "de_resolved_stress_tightness", "message": "Bei Stress war die Brust kurz eng, aber das ist vorbei und ich atme normal." },
+    { "id": "de_negated_throat_swelling", "message": "Mein Hals ist nicht geschwollen, ich kann normal schlucken und atmen." },
+    { "id": "de_low_fever", "message": "Seit gestern habe ich leichtes Fieber und eine laufende Nase, sonst geht es mir gut." }
   ],
   "normalizer_downgrades": [
     {
@@ -190,6 +235,16 @@
       "message": "I am thinking about suicide",
       "crisis_type": "suicidal_ideation",
       "care_setting": "crisis_line"
+    },
+    {
+      "id": "llm_de_acs_radiating_arm",
+      "message": "Ich habe drückende Schmerzen in der Brust, die in meinen linken Arm ausstrahlen.",
+      "crisis_type": "acs_chest_pain"
+    },
+    {
+      "id": "llm_de_hypoxic_respiratory_distress",
+      "message": "Meine Sauerstoffsättigung ist 88 und ich kann keinen ganzen Satz sprechen.",
+      "crisis_type": "respiratory_distress"
     }
   ]
 }

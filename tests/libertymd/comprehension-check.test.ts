@@ -21,6 +21,13 @@ import {
 } from '../../supabase/functions/libertymd-care-proxy/lib/comprehension-check.ts'
 import { CLINICAL_SLOTS } from '../../supabase/functions/libertymd-care-proxy/lib/slots.ts'
 import { CLINICAL_LANGUAGES } from '../../supabase/functions/libertymd-care-proxy/lib/journey-locale.ts'
+import {
+  comprehensionBridgeMessage,
+  continueFallbackQuestion,
+  fallbackEntryQuestion,
+  reportGateMessage,
+  startAcknowledgement,
+} from '../../supabase/functions/libertymd-care-proxy/lib/clinical-copy.ts'
 
 const CHAT = new URL('../../components/LibertyMD/LibertyMDChat.tsx', import.meta.url)
 const SHEET = new URL('../../components/LibertyMD/LibertyMDComprehensionCheck.tsx', import.meta.url)
@@ -106,6 +113,27 @@ Deno.test('P3-09 · database constraint accepts the complete closed clinical lan
   }
 })
 
+Deno.test('P3-09 · deterministic journey copy exists in every clinical language', () => {
+  for (const language of CLINICAL_LANGUAGES) {
+    const values = [
+      startAcknowledgement(language, null, false),
+      fallbackEntryQuestion(language),
+      comprehensionBridgeMessage(language),
+      continueFallbackQuestion(language),
+      reportGateMessage(language, true),
+      reportGateMessage(language, false),
+    ]
+    if (values.some((value) => !value.trim())) throw new Error(`${language}: missing deterministic journey copy`)
+  }
+  if (!startAcknowledgement('de', null, false).includes('Vielen Dank')) throw new Error('German acknowledgement')
+  if (!fallbackEntryQuestion('de').includes('Wann')) throw new Error('German fallback question')
+  if (!comprehensionBridgeMessage('de').includes('zusammengefasst')) throw new Error('German comprehension bridge')
+  if (!reportGateMessage('de', true).includes('Ihr LibertyMD-Bericht ist fertig')) throw new Error('German report gate')
+  if (!startAcknowledgement('en', null, false, 'I have fever').includes('your fever')) {
+    throw new Error('English fever acknowledgement regression')
+  }
+})
+
 Deno.test('P1-14 · once-completed / pending workflow_versions helpers', () => {
   if (isComprehensionCompleted({})) throw new Error('default not completed')
   const pending = withComprehensionPending({ guardrail: 'v1' })
@@ -157,7 +185,7 @@ Deno.test('P1-14 AC1/AC5 · Chat mounts OverlaySheet consumer; Gap 5 literal gon
   if (!chat.includes('onDismiss={() => setComprehensionCheck(null)}')) {
     throw new Error('dismiss must clear sheet only (≠ proceed)')
   }
-  if (!send.includes('buildComprehensionCheckPayload') || !send.includes('CONTINUE_EMPTY_QUESTION_FALLBACK')) {
+  if (!send.includes('buildComprehensionCheckPayload') || !send.includes('continueFallbackQuestion')) {
     throw new Error('send_message must short-circuit + retire Gap 5 fallback')
   }
   if (send.includes('Before I prepare the report, is there anything else')) {

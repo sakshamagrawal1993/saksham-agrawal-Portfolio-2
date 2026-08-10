@@ -1,12 +1,12 @@
 import type { JsonObject } from './types.ts'
 
-const CARDIO_RESPIRATORY_SYMPTOM = /\b(chest (?:only )?(?:pain|discomfort|tightness|hurts?|aches?)|short(?:ness)? of breath|short of breath|breathless|difficulty breathing)\b/i
+const CARDIO_RESPIRATORY_SYMPTOM = /\b(chest (?:only )?(?:pain|discomfort|tightness|hurts?|aches?)|short(?:ness)? of breath|short of breath|breathless|difficulty breathing|brustschmerz|brustdruck|atemnot|kurzatmig)\b/i
 
-const HIGH_SPECIFICITY_ACS = /\b(?:crushing|squeezing|heavy) (?:chest|pressure)\b|\bchest (?:pressure|squeezing|heaviness)\b|\bchest (?:pain|discomfort).{0,80}(?:radiat(?:es|ing)?|spread(?:s|ing)?).{0,35}(?:arm|jaw|back|neck)\b|\bchest (?:pain|discomfort).{0,80}(?:cold sweat|sweating|lightheaded|faint(?:ed|ing)?)\b|\b(?:cold sweat|sweating|lightheaded|faint(?:ed|ing)?).{0,80}chest (?:pain|discomfort)\b|\bchest (?:pain|discomfort).{0,60}(?:persistent|keeps returning|comes back|lasting (?:more than )?(?:a few|[5-9]|[1-9]\d) minutes?)\b/gi
+const HIGH_SPECIFICITY_ACS = /\b(?:crushing|squeezing|heavy) (?:chest|pressure)\b|\bchest (?:pressure|squeezing|heaviness)\b|\bchest (?:pain|discomfort).{0,80}(?:radiat(?:es|ing)?|spread(?:s|ing)?).{0,35}(?:arm|jaw|back|neck)\b|\bchest (?:pain|discomfort).{0,80}(?:cold sweat|sweating|lightheaded|faint(?:ed|ing)?)\b|\b(?:cold sweat|sweating|lightheaded|faint(?:ed|ing)?).{0,80}chest (?:pain|discomfort)\b|\bchest (?:pain|discomfort).{0,60}(?:persistent|keeps returning|comes back|lasting (?:more than )?(?:a few|[5-9]|[1-9]\d) minutes?)\b|drückend(?:e|er|en)? schmerz.{0,45}brust.{0,90}(?:arm|kiefer|rücken|nacken).{0,30}(?:ausstrahl|zieh)|brust(?:schmerz|druck).{0,80}(?:strahlt|zieht).{0,35}(?:arm|kiefer|rücken|nacken)|brust(?:schmerz|druck).{0,80}(?:kalter schweiß|schwitze|schwitzen|ohnmacht|benommen)/gi
 
-const HIGH_SPECIFICITY_BREATHING = /\b(?:cannot|can't|unable to) breathe\b|\bgasping(?: for air)?\b|\bchoking\b|\b(?:cannot|can't|unable to) (?:speak|talk|get words out)\b|\b(?:blue|grey|gray) (?:lips|skin|face)\b|\bnew confusion\b|\b(?:collapsed|passed out|unconscious)\b|\boxygen (?:sat|saturation)?[^.]{0,12}(?:[0-8]\d|9[0-2])\b|\bsevere (?:shortness of breath|difficulty breathing)\b|\b(?:shortness of breath|difficulty breathing).{0,30}(?:at rest|while resting|sitting still)\b/gi
+const HIGH_SPECIFICITY_BREATHING = /\b(?:cannot|can't|unable to) breathe\b|\bgasping(?: for air)?\b|\bchoking\b|\b(?:cannot|can't|unable to) (?:speak|talk|get words out)\b|\b(?:blue|grey|gray) (?:lips|skin|face)\b|\bnew confusion\b|\b(?:collapsed|passed out|unconscious)\b|\boxygen (?:sat|saturation)?[^.]{0,12}(?:[0-8]\d|9[0-2])\b|\bsevere (?:shortness of breath|difficulty breathing)\b|\b(?:shortness of breath|difficulty breathing).{0,30}(?:at rest|while resting|sitting still)\b|(?:kann|können) (?:kaum|nicht) atmen|ring(?:e|t|en)? nach luft|(?:kann|können) keinen ganzen satz sprechen|blaue lippen|sauerstoffsättigung.{0,18}(?:[0-8]\d|9[0-2])\b/gi
 
-const NEGATION = /\b(no|not|without|denies|denied|never|don'?t have|doesn'?t have)\b/i
+const NEGATION = /\b(no|not|without|denies|denied|never|don'?t have|doesn'?t have|kein(?:e|en|er|es)?|nicht|ohne|verneint)\b/i
 const THIRD_PARTY_HISTORY = /\b(my|his|her|their)\s+\w*\s*(father|mother|dad|mum|mom|brother|sister|friend|husband|wife|son|daughter|uncle|aunt)\s+(had|has had|used to have)\b|\b(family history|history of|hx of)\b/i
 
 function historyText(entry: unknown): string | null {
@@ -24,7 +24,7 @@ function hasUnnegatedPatientMatch(statement: string, pattern: RegExp): boolean {
   let match: RegExpExecArray | null
   while ((match = matcher.exec(text)) !== null) {
     const before = text.slice(Math.max(0, match.index - 60), match.index)
-    const clause = before.split(/[;.!?]|\bbut\b|\bhowever\b|\balthough\b|\bthough\b/i).pop() || ''
+    const clause = before.split(/[;.!?]|\bbut\b|\bhowever\b|\balthough\b|\bthough\b|\baber\b|\bjedoch\b|\bobwohl\b/i).pop() || ''
     if (!NEGATION.test(clause) && !THIRD_PARTY_HISTORY.test(before)) return true
     if (match.index === matcher.lastIndex) matcher.lastIndex += 1
   }

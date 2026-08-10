@@ -82,14 +82,14 @@ export function detectDeterministicEmergency(message: string): DeterministicEmer
       // Negation does not carry across sentence/contrast boundaries. Deliberately
       // do NOT split on commas — "no lip swelling, tongue swelling, or X" is one
       // negated list (corpus: lip_dryness_no_swelling).
-      const seg = before.split(/[;.!?]|\bbut\b|\bhowever\b|\balthough\b|\bthough\b/i).pop() || ''
-      if (/\b(no|not|without|denies|denied|never|don'?t have|doesn'?t have)\b/.test(seg)) continue
+      const seg = before.split(/[;.!?]|\bbut\b|\bhowever\b|\balthough\b|\bthough\b|\baber\b|\bjedoch\b|\bobwohl\b/i).pop() || ''
+      if (/\b(no|not|without|denies|denied|never|don'?t have|doesn'?t have|kein(?:e|en|er|es)?|nicht|ohne|verneint)\b/.test(seg)) continue
       // Past-tense family history only — "my father had chest pain last year" is not
       // the patient's emergency; "my father is having chest pain" still fires.
       // Check the window before the match (includes the relative + had).
       if (
         /\b(my|his|her|their)\s+\w*\s*(father|mother|dad|mum|mom|brother|sister|friend|husband|wife|son|daughter|uncle|aunt)\s+(had|has had|used to have)\b/.test(before)
-        || /\b(family history|history of|hx of)\b/.test(before)
+        || /\b(family history|history of|hx of|familienanamnese)\b/.test(before)
       ) continue
       const spanStart = match.index
       const spanEnd = match.index + match[0].length

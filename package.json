@@ -56,6 +56,7 @@
     "test:libertymd:evaluation": "deno run --no-config --allow-read scripts/libertymd-clinical-evaluation.ts",
     "test:libertymd:db": "supabase test db",
     "test:libertymd:live": "node --env-file=.env scripts/libertymd-live-backend-smoke.mjs",
+    "test:libertymd:german-e2e": "node --env-file=.env scripts/libertymd-german-e2e-smoke.mjs",
     "test:libertymd:separability": "node scripts/libertymd-separability-check.mjs",
     "test:libertymd:no-native-dialogs": "node scripts/libertymd-no-native-dialogs.mjs",
     "test:libertymd:harness-no-mixpanel": "node scripts/libertymd-harness-no-mixpanel.mjs",

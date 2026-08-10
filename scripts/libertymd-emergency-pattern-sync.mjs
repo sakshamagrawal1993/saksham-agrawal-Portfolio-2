@@ -31,6 +31,8 @@ const GUARDRAIL_SYSTEM_MESSAGE = `You are LibertyMD's emergency triage guardrail
 
 Classify the LATEST patient message in context of history. Use only evidence the patient actually stated; never invent severity, persistence, duration, or associated symptoms.
 
+Apply the same clinical threshold in every input language, including German. Translate meaning before classifying; do not require English keywords.
+
 Decision threshold:
 - force_end only when there is a HIGH likelihood of an immediate emergency needing 911/ER now, or explicit current suicidal intent/plan needing crisis-line support.
 - high_risk_continue when a symptom is concerning but the evidence is incomplete or ambiguous. Continue the interview and ask the missing severity/context questions.
@@ -84,9 +86,9 @@ function hasUnnegatedPatientMatch(statement, pattern) {
   let match;
   while ((match = matcher.exec(statement)) !== null) {
     const before = statement.slice(Math.max(0, match.index - 60), match.index);
-    const clause = before.split(/[;.!?]|\\bbut\\b|\\bhowever\\b|\\balthough\\b|\\bthough\\b/i).pop() || '';
-    const negated = /\\b(no|not|without|denies|denied|never|don'?t have|doesn'?t have)\\b/i.test(clause);
-    const thirdPartyHistory = /\\b(my|his|her|their)\\s+\\w*\\s*(father|mother|dad|mum|mom|brother|sister|friend|husband|wife|son|daughter|uncle|aunt)\\s+(had|has had|used to have)\\b|\\b(family history|history of|hx of)\\b/i.test(before);
+    const clause = before.split(/[;.!?]|\\bbut\\b|\\bhowever\\b|\\balthough\\b|\\bthough\\b|\\baber\\b|\\bjedoch\\b|\\bobwohl\\b/i).pop() || '';
+    const negated = /\\b(no|not|without|denies|denied|never|don'?t have|doesn'?t have|kein(?:e|en|er|es)?|nicht|ohne|verneint)\\b/i.test(clause);
+    const thirdPartyHistory = /\\b(my|his|her|their)\\s+\\w*\\s*(father|mother|dad|mum|mom|brother|sister|friend|husband|wife|son|daughter|uncle|aunt)\\s+(had|has had|used to have)\\b|\\b(family history|history of|hx of|familienanamnese)\\b/i.test(before);
     if (!negated && !thirdPartyHistory) return true;
     if (match.index === matcher.lastIndex) matcher.lastIndex += 1;
   }
@@ -97,9 +99,9 @@ function hasUnnegatedPatientMatch(statement, pattern) {
 // families even when the model over-calls them. It does not mark them safe: it
 // downgrades terminal force_end to high_risk_continue so the interview can ask
 // severity, persistence, rest/exertion, radiation, and ability to speak.
-const hasChestOrBreathingSymptom = /\\b(chest (?:only )?(?:pain|discomfort|tightness|hurts?|aches?)|short(?:ness)? of breath|short of breath|breathless|difficulty breathing)\\b/i.test(patientText);
-const highSpecificityAcs = patientStatements.some((statement) => hasUnnegatedPatientMatch(statement, /\\b(?:crushing|squeezing|heavy) (?:chest|pressure)\\b|\\bchest (?:pressure|squeezing|heaviness)\\b|\\bchest (?:pain|discomfort).{0,80}(?:radiat(?:es|ing)?|spread(?:s|ing)?).{0,35}(?:arm|jaw|back|neck)\\b|\\bchest (?:pain|discomfort).{0,80}(?:cold sweat|sweating|lightheaded|faint(?:ed|ing)?)\\b|\\b(?:cold sweat|sweating|lightheaded|faint(?:ed|ing)?).{0,80}chest (?:pain|discomfort)\\b|\\bchest (?:pain|discomfort).{0,60}(?:persistent|keeps returning|comes back|lasting (?:more than )?(?:a few|[5-9]|[1-9]\\d) minutes?)\\b/i));
-const highSpecificityBreathing = patientStatements.some((statement) => hasUnnegatedPatientMatch(statement, /\\b(?:cannot|can't|unable to) breathe\\b|\\bgasping(?: for air)?\\b|\\bchoking\\b|\\b(?:cannot|can't|unable to) (?:speak|talk|get words out)\\b|\\b(?:blue|grey|gray) (?:lips|skin|face)\\b|\\bnew confusion\\b|\\b(?:collapsed|passed out|unconscious)\\b|\\boxygen (?:sat|saturation)?[^.]{0,12}(?:[0-8]\\d|9[0-2])\\b|\\bsevere (?:shortness of breath|difficulty breathing)\\b|\\b(?:shortness of breath|difficulty breathing).{0,30}(?:at rest|while resting|sitting still)\\b/i));
+const hasChestOrBreathingSymptom = /\\b(chest (?:only )?(?:pain|discomfort|tightness|hurts?|aches?)|short(?:ness)? of breath|short of breath|breathless|difficulty breathing|brustschmerz(?:en)?|brustdruck|atemnot|kurzatmig(?:keit)?)\\b/i.test(patientText);
+const highSpecificityAcs = patientStatements.some((statement) => hasUnnegatedPatientMatch(statement, /\\b(?:crushing|squeezing|heavy) (?:chest|pressure)\\b|\\bchest (?:pressure|squeezing|heaviness)\\b|\\bchest (?:pain|discomfort).{0,80}(?:radiat(?:es|ing)?|spread(?:s|ing)?).{0,35}(?:arm|jaw|back|neck)\\b|\\bchest (?:pain|discomfort).{0,80}(?:cold sweat|sweating|lightheaded|faint(?:ed|ing)?)\\b|\\b(?:cold sweat|sweating|lightheaded|faint(?:ed|ing)?).{0,80}chest (?:pain|discomfort)\\b|\\bchest (?:pain|discomfort).{0,60}(?:persistent|keeps returning|comes back|lasting (?:more than )?(?:a few|[5-9]|[1-9]\\d) minutes?)\\b|drückend(?:e|er|en)? schmerz.{0,45}brust.{0,90}(?:arm|kiefer|rücken|nacken).{0,30}(?:ausstrahl|zieh)|brust(?:schmerz|druck).{0,80}(?:strahlt|zieht).{0,35}(?:arm|kiefer|rücken|nacken)|brust(?:schmerz|druck).{0,80}(?:kalter schweiß|schwitze|schwitzen|ohnmacht|benommen)/i));
+const highSpecificityBreathing = patientStatements.some((statement) => hasUnnegatedPatientMatch(statement, /\\b(?:cannot|can't|unable to) breathe\\b|\\bgasping(?: for air)?\\b|\\bchoking\\b|\\b(?:cannot|can't|unable to) (?:speak|talk|get words out)\\b|\\b(?:blue|grey|gray) (?:lips|skin|face)\\b|\\bnew confusion\\b|\\b(?:collapsed|passed out|unconscious)\\b|\\boxygen (?:sat|saturation)?[^.]{0,12}(?:[0-8]\\d|9[0-2])\\b|\\bsevere (?:shortness of breath|difficulty breathing)\\b|\\b(?:shortness of breath|difficulty breathing).{0,30}(?:at rest|while resting|sitting still)\\b|\\b(?:kann|koennte|könnte) (?:kaum |nicht )?(?:atmen|luft bekommen)\\b|\\b(?:ringt|schnappt) nach luft\\b|\\b(?:kann|koennte|könnte) (?:kaum |nicht )?(?:sprechen|ganze saetze|ganze sätze)\\b|\\b(?:blaue|bläuliche|blaeuliche|graue) (?:lippen|haut|gesicht)\\b|\\b(?:neue |ploetzliche |plötzliche )?verwirrtheit\\b|\\b(?:zusammengebrochen|bewusstlos|ohnmaechtig|ohnmächtig)\\b|\\b(?:sauerstoffsaettigung|sauerstoffsättigung|spo2)[^.]{0,12}(?:[0-8]\\d|9[0-2])\\b|\\b(?:schwere|starke) atemnot\\b|\\batemnot.{0,30}(?:in ruhe|beim sitzen|ohne belastung)\\b/i));
 const cardioRespiratoryCall = requestedCrisisType === 'acs_chest_pain'
   || requestedCrisisType === 'respiratory_distress'
   || (requestedCrisisType === 'other_emergency' && hasChestOrBreathingSymptom);
@@ -125,7 +127,7 @@ const risk_level = needsClarification
   : String(parsed.risk_level || (force_end ? 'emergency' : status === 'high_risk_continue' ? 'high' : 'low')).toLowerCase();
 const crisis_type = needsClarification
   ? (requestedCrisisType === 'other_emergency'
-    ? (/chest/.test(patientText) ? 'acs_chest_pain' : 'respiratory_distress')
+    ? (/(?:chest|brust)/.test(patientText) ? 'acs_chest_pain' : 'respiratory_distress')
     : requestedCrisisType)
   : requestedCrisisType;
 const care_setting = needsClarification
@@ -175,11 +177,11 @@ function firstUnnegatedMatch(rule) {
     // Commas do not end a clause: "no lip swelling, tongue swelling, or X"
     // is one negated list. Adversatives do end a clause, preserving
     // "no chest pain but crushing chest pressure".
-    const segment = before.split(/[;.!?]|\\bbut\\b|\\bhowever\\b|\\balthough\\b|\\bthough\\b/i).pop() || '';
-    const negated = /\\b(no|not|without|denies|denied|never|don'?t have|doesn'?t have)\\b/.test(segment);
+    const segment = before.split(/[;.!?]|\\bbut\\b|\\bhowever\\b|\\balthough\\b|\\bthough\\b|\\baber\\b|\\bjedoch\\b|\\bobwohl\\b/i).pop() || '';
+    const negated = /\\b(no|not|without|denies|denied|never|don'?t have|doesn'?t have|kein(?:e|en|er|es)?|nicht|ohne|verneint)\\b/.test(segment);
     const thirdPartyHistory =
       /\\b(my|his|her|their)\\s+\\w*\\s*(father|mother|dad|mum|mom|brother|sister|friend|husband|wife|son|daughter|uncle|aunt)\\s+(had|has had|used to have)\\b/.test(before)
-      || /\\b(family history|history of|hx of)\\b/.test(before);
+      || /\\b(family history|history of|hx of|familienanamnese)\\b/.test(before);
     if (!negated && !thirdPartyHistory) return match[0];
     if (match.index === matcher.lastIndex) matcher.lastIndex += 1;
   }
