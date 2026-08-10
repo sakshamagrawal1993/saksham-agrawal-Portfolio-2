@@ -104,6 +104,7 @@ import {
   isServeEligibleStoredReport,
 } from '../lib/report-persistence.ts'
 import { addDays, cleanMessage, limitConsultationMessage, patientPayload } from '../lib/utils.ts'
+import { asClinicalLanguage } from '../lib/journey-locale.ts'
 import {
   MAX_TOTAL_TURNS,
   answerAskedMediaFollowup,
@@ -323,7 +324,7 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
   if (!message) return jsonResponse({ error: 'Message cannot be empty' }, 400)
   const consultation = await getOwnedConsultation(ctx, payload.consultation_id)
   // P3-07 — Mixpanel locale super + n8n IO from stored clinical language (immutable).
-  const clinicalLanguage = String(consultation.language || 'en').trim().toLowerCase() === 'es' ? 'es' : 'en'
+  const clinicalLanguage = asClinicalLanguage(consultation.language)
   ctx.clinicalLocale = clinicalLanguage
   // P0-13 AC2. `send_message` accepts a narrower set than
   // INFERENCE_ALLOWED_STATUSES (which also admits the demographics turn), so the

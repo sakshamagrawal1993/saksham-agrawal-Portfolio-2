@@ -9,6 +9,7 @@ import {
 } from '../../supabase/functions/libertymd-care-proxy/lib/emergency-copy.ts'
 import {
   asClinicalLanguage,
+  CLINICAL_LANGUAGES,
   isClinicalEsUnlocked,
   resolveJourneyLocale,
   toClinicalCandidate,
@@ -44,6 +45,8 @@ Deno.test('P3-09 · toClinicalCandidate normalizes es / es-ES / hi / hi-Latn / p
   assertEquals(asClinicalLanguage('es'), 'es', 'asClinical es')
   assertEquals(asClinicalLanguage('hi'), 'hi', 'asClinical hi')
   assertEquals(asClinicalLanguage('hi-Latn'), 'hi-Latn', 'asClinical hi-Latn')
+  assertEquals(asClinicalLanguage('unsupported-locale'), 'en', 'unsupported→en')
+  assertEquals(CLINICAL_LANGUAGES.length, 7, 'closed persisted language set')
 })
 
 Deno.test('P3-07 AC6 path(2) · Spanish request blocked→en when gate closed', async () => {

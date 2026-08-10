@@ -20,6 +20,7 @@ import { generatePartialOutcome } from '../lib/partial-outcome.ts'
 import { listMediaEvidence } from '../lib/media-evidence.ts'
 import { ensureProfile, ensureSelfPatient } from '../lib/profiles.ts'
 import { isCompleteReportData } from '../lib/report-persistence.ts'
+import { asClinicalLanguage } from '../lib/journey-locale.ts'
 import type { ProxyContext } from '../lib/context.ts'
 import type { RequestPayload } from '../lib/types.ts'
 
@@ -33,7 +34,7 @@ export async function handleGetConsultation(ctx: ProxyContext, payload: RequestP
   if (!payload.consultation_id) return jsonResponse({ error: 'Missing consultation id' }, 400)
   const consultation = await getOwnedConsultation(ctx, payload.consultation_id)
   // P3-07 — Mixpanel / reopen use stored clinical language.
-  ctx.clinicalLocale = String(consultation.language || 'en').trim().toLowerCase() === 'es' ? 'es' : 'en'
+  ctx.clinicalLocale = asClinicalLanguage(consultation.language)
   const messages = await getHistory(ctx, consultation.id)
   // P2-02 Q3: include `withheld` so anonymous complete consults return report_data
   // under the soft gate. P2-06 AC7: omit body when retention_expires_at is past

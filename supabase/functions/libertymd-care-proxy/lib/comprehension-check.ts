@@ -34,9 +34,7 @@ type ComprehensionSlotLabels = Record<ClinicalSlot, string>
 
 /**
  * Complete patient-facing labels for every language the clinical journey can
- * persist. Chrome-only locales are normalized by the journey locale policy and
- * therefore use the English clinical map until that language is clinically
- * enabled.
+ * persist. Spanish regional chrome variants normalize to `es`.
  */
 export const COMPREHENSION_SLOT_LABELS_BY_LANGUAGE: Record<
   ClinicalLanguage,
@@ -71,6 +69,81 @@ export const COMPREHENSION_SLOT_LABELS_BY_LANGUAGE: Record<
     medications: 'Medicamentos actuales',
     allergies: 'Alergias',
     pregnancy_status: 'Estado de embarazo',
+  },
+  hi: {
+    chief_complaint: 'मुख्य समस्या',
+    onset: 'यह कब शुरू हुई',
+    duration: 'यह कितने समय से है',
+    severity: 'समस्या कितनी गंभीर है',
+    location: 'समस्या कहाँ है',
+    character: 'यह कैसा महसूस होता है',
+    associated_symptoms: 'साथ में अन्य लक्षण',
+    red_flag_negatives: 'जाँचे गए चेतावनी संकेत',
+    functional_impact: 'रोज़मर्रा के जीवन पर असर',
+    relevant_history: 'प्रासंगिक चिकित्सा इतिहास',
+    medications: 'दवाइयाँ',
+    allergies: 'एलर्जी',
+    pregnancy_status: 'गर्भावस्था की स्थिति',
+  },
+  'hi-Latn': {
+    chief_complaint: 'Mukhya pareshaani',
+    onset: 'Yeh kab shuru hui',
+    duration: 'Yeh kitne samay se hai',
+    severity: 'Pareshaani kitni zyada hai',
+    location: 'Pareshaani kahan hai',
+    character: 'Yeh kaisa mehsoos hota hai',
+    associated_symptoms: 'Saath ke doosre symptoms',
+    red_flag_negatives: 'Check kiye gaye warning signs',
+    functional_impact: 'Rozmarra ki zindagi par asar',
+    relevant_history: 'Zaroori medical history',
+    medications: 'Dawaaiyan',
+    allergies: 'Allergies',
+    pregnancy_status: 'Pregnancy status',
+  },
+  fr: {
+    chief_complaint: 'Motif principal',
+    onset: 'Début des symptômes',
+    duration: 'Durée des symptômes',
+    severity: 'Intensité des symptômes',
+    location: 'Localisation',
+    character: 'Nature des symptômes',
+    associated_symptoms: 'Autres symptômes',
+    red_flag_negatives: 'Signes d’alerte vérifiés',
+    functional_impact: 'Impact sur la vie quotidienne',
+    relevant_history: 'Antécédents médicaux pertinents',
+    medications: 'Médicaments',
+    allergies: 'Allergies',
+    pregnancy_status: 'Statut de grossesse',
+  },
+  de: {
+    chief_complaint: 'Hauptbeschwerde',
+    onset: 'Beginn der Beschwerden',
+    duration: 'Dauer der Beschwerden',
+    severity: 'Stärke der Beschwerden',
+    location: 'Ort der Beschwerden',
+    character: 'Art der Beschwerden',
+    associated_symptoms: 'Weitere Symptome',
+    red_flag_negatives: 'Geprüfte Warnzeichen',
+    functional_impact: 'Auswirkung auf den Alltag',
+    relevant_history: 'Relevante Krankengeschichte',
+    medications: 'Medikamente',
+    allergies: 'Allergien',
+    pregnancy_status: 'Schwangerschaftsstatus',
+  },
+  pt: {
+    chief_complaint: 'Queixa principal',
+    onset: 'Quando começou',
+    duration: 'Duração dos sintomas',
+    severity: 'Intensidade dos sintomas',
+    location: 'Localização',
+    character: 'Como é o sintoma',
+    associated_symptoms: 'Outros sintomas',
+    red_flag_negatives: 'Sinais de alerta verificados',
+    functional_impact: 'Impacto na vida diária',
+    relevant_history: 'Histórico médico relevante',
+    medications: 'Medicamentos',
+    allergies: 'Alergias',
+    pregnancy_status: 'Estado de gravidez',
   },
 }
 

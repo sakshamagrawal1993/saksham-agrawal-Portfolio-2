@@ -136,7 +136,9 @@ import {
   emitReportDeliveryRequested,
   emitTurnCompletedTtft,
   emitTurnFailed,
+  normalizeClinicalLocale,
   setClinicalLocaleSuper,
+  type LibertyMdClinicalLanguage,
 } from './libertymd-analytics';
 import {
   parsePartialOutcome,
@@ -332,7 +334,7 @@ export default function LibertyMDChat() {
   const initialStartRequestRef = useRef<any>((location.state as any)?.libertyMDStartRequest || null);
   const [phase, setPhase] = useState<ChatPhase>('loading');
   /** P3-07 — stored clinical journey language; locks chrome on this surface. */
-  const [clinicalLanguage, setClinicalLanguage] = useState<'en' | 'es' | null>(null);
+  const [clinicalLanguage, setClinicalLanguage] = useState<LibertyMdClinicalLanguage | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     const symptom = String(initialStartRequestRef.current?.symptom || '').trim();
     return symptom ? [{ id: `${initialStartRequestRef.current?.draftId || 'draft'}-user`, sender: 'user', text: symptom }] : [];
@@ -435,12 +437,12 @@ export default function LibertyMDChat() {
   const applyClinicalLanguage = (raw: unknown) => {
     // null/undefined means the consultation has no language stored yet — preserve chrome.
     if (raw == null || raw === '') {
-      const currentCode = language === 'es' ? 'es' : 'en';
+      const currentCode = normalizeClinicalLocale(language);
       setClinicalLanguage(currentCode);
       setClinicalLocaleSuper(currentCode);
       return;
     }
-    const code = String(raw).trim().toLowerCase() === 'es' ? 'es' : 'en';
+    const code = normalizeClinicalLocale(String(raw));
     setClinicalLanguage(code);
     setClinicalLocaleSuper(code);
     const chrome = chromeCodeForClinicalLanguage(code);

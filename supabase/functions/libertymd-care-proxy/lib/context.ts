@@ -11,6 +11,7 @@
  */
 import { createClient, type SupabaseClient, type User } from 'https://esm.sh/@supabase/supabase-js@2'
 import { jsonResponse } from './errors.ts'
+import type { ClinicalLanguage } from './journey-locale.ts'
 
 export interface ProxyContext {
   db: SupabaseClient
@@ -22,7 +23,7 @@ export interface ProxyContext {
    * P3-07 — clinical journey language for Mixpanel `locale` super.
    * Handlers set from consultations.language (or gated start result).
    */
-  clinicalLocale?: 'en' | 'es'
+  clinicalLocale?: ClinicalLanguage
 }
 
 export type ContextResult =

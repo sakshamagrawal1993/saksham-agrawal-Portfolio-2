@@ -17,7 +17,10 @@
 
 import { P0_17_CATALOG_KEYS } from './message-catalog.ts'
 
-export type ClinicalLanguage = 'en' | 'es' | 'es-ES' | 'hi' | 'hi-Latn' | 'fr' | 'de' | 'pt' | string
+export const CLINICAL_LANGUAGES = ['en', 'es', 'hi', 'hi-Latn', 'fr', 'de', 'pt'] as const
+
+/** Closed set persisted in `libertymd_consultations.language`. */
+export type ClinicalLanguage = (typeof CLINICAL_LANGUAGES)[number]
 
 export type JourneyLocaleLog = (
   event: string,
@@ -54,7 +57,8 @@ export interface JourneyLocaleResult {
 
 /**
  * Q6 — Normalize registry / chrome codes to clinical candidate.
- * Preserves exact requested language for en, es, es-ES, hi, hi-Latn, fr, de, pt.
+ * Normalizes supported chrome/request codes to the closed clinical set.
+ * Unsupported codes fail safely to English instead of reaching the database.
  */
 export function toClinicalCandidate(raw: unknown): ClinicalLanguage {
   const s = String(raw ?? '').trim().replace(/_/g, '-')
@@ -66,7 +70,7 @@ export function toClinicalCandidate(raw: unknown): ClinicalLanguage {
   if (lower === 'fr' || lower.startsWith('fr-')) return 'fr'
   if (lower === 'de' || lower.startsWith('de-')) return 'de'
   if (lower === 'pt' || lower.startsWith('pt-')) return 'pt'
-  return s
+  return 'en'
 }
 
 /** Clinical super-property / DB language. */
@@ -151,7 +155,7 @@ export async function resolveJourneyLocale(
     return { language: 'en', candidate: 'en', blocked: false, reason: null }
   }
 
-  if (candidate === 'es' || candidate === 'es-ES') {
+  if (candidate === 'es') {
     const unlocked = await isClinicalEsUnlocked(opts)
     if (unlocked) {
       return { language: 'es', candidate: 'es', blocked: false, reason: null }

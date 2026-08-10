@@ -62,6 +62,24 @@ assert(bootstrap.data.is_anonymous === true, 'bootstrap must identify the new us
 assert(Array.isArray(bootstrap.data.history) && bootstrap.data.history.length === 0, 'anonymous history must be empty')
 checks.push('anonymous bootstrap')
 
+// Regression: every language exposed in the product must survive the database
+// insert and remain the immutable clinical journey language. This previously
+// failed at start_consultation because PostgreSQL accepted only en/es.
+const multilingual = await createAnonymousSession()
+const hinglishStart = await invoke(multilingual.session, {
+  action: 'start_consultation',
+  message: 'Mere gale mein halka dard hai.',
+  language: 'hi-Latn',
+})
+assert(hinglishStart.data.consultation_id, 'Hinglish consultation must be created')
+assert(hinglishStart.data.language === 'hi-Latn', 'start response must preserve hi-Latn')
+const hinglishRead = await invoke(multilingual.session, {
+  action: 'get_consultation',
+  consultation_id: hinglishStart.data.consultation_id,
+})
+assert(hinglishRead.data.consultation?.language === 'hi-Latn', 'stored consultation must preserve hi-Latn')
+checks.push('Hinglish language persistence')
+
 const emergency = await invoke(primary.session, {
   action: 'start_consultation',
   message: 'I have crushing chest pain and pain radiating to my left arm.',

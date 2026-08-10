@@ -20,6 +20,7 @@ import {
   withComprehensionPending,
 } from '../../supabase/functions/libertymd-care-proxy/lib/comprehension-check.ts'
 import { CLINICAL_SLOTS } from '../../supabase/functions/libertymd-care-proxy/lib/slots.ts'
+import { CLINICAL_LANGUAGES } from '../../supabase/functions/libertymd-care-proxy/lib/journey-locale.ts'
 
 const CHAT = new URL('../../components/LibertyMD/LibertyMDChat.tsx', import.meta.url)
 const SHEET = new URL('../../components/LibertyMD/LibertyMDComprehensionCheck.tsx', import.meta.url)
@@ -27,6 +28,10 @@ const ANALYTICS = new URL('../../components/LibertyMD/libertymd-analytics.ts', i
 const SEND = new URL('../../supabase/functions/libertymd-care-proxy/actions/send-message.ts', import.meta.url)
 const OVERLAY = new URL('../../components/LibertyMD/LibertyMDOverlaySheet.tsx', import.meta.url)
 const EN = new URL('../../i18n/locales/en.json', import.meta.url)
+const LANGUAGE_MIGRATION = new URL(
+  '../../supabase/migrations/20260810090000_libertymd_multilingual_consultation_language.sql',
+  import.meta.url,
+)
 
 Deno.test('P1-14 AC2 · summary lines ⊆ present slot keys/values; empty optionals omit', () => {
   const lines = buildComprehensionSummary({
@@ -69,7 +74,7 @@ Deno.test('P1-14 · payload includes pending + categorical slot_count', () => {
 
 Deno.test('P1-14 · every supported clinical language maps every comprehension slot', () => {
   const expectedSlots = [...CLINICAL_SLOTS].sort()
-  for (const language of ['en', 'es'] as const) {
+  for (const language of CLINICAL_LANGUAGES) {
     const labels = COMPREHENSION_SLOT_LABELS_BY_LANGUAGE[language]
     const mappedSlots = Object.keys(labels).sort()
     if (JSON.stringify(mappedSlots) !== JSON.stringify(expectedSlots)) {
@@ -82,11 +87,22 @@ Deno.test('P1-14 · every supported clinical language maps every comprehension s
 
   const english = buildComprehensionSummary({ onset: 'yesterday' }, 'en')[0]
   const spanish = buildComprehensionSummary({ onset: 'ayer' }, 'es')[0]
-  const unsupportedClinicalLocale = buildComprehensionSummary({ onset: 'hier' }, 'fr')[0]
+  const french = buildComprehensionSummary({ onset: 'hier' }, 'fr')[0]
+  const hinglish = buildComprehensionSummary({ onset: 'kal' }, 'hi-Latn')[0]
+  const unsupportedClinicalLocale = buildComprehensionSummary({ onset: 'yesterday' }, 'xx')[0]
   if (english?.label !== 'When it started') throw new Error('English map not selected')
   if (spanish?.label !== 'Cuándo comenzó') throw new Error('Spanish map not selected')
-  if (unsupportedClinicalLocale?.label !== english.label) {
-    throw new Error('chrome-only locale must use the English clinical fallback')
+  if (french?.label !== 'Début des symptômes') throw new Error('French map not selected')
+  if (hinglish?.label !== 'Yeh kab shuru hui') throw new Error('Hinglish map not selected')
+  if (unsupportedClinicalLocale?.label !== english.label) throw new Error('unsupported locale must fall back to English')
+})
+
+Deno.test('P3-09 · database constraint accepts the complete closed clinical language set', async () => {
+  const migration = await Deno.readTextFile(LANGUAGE_MIGRATION)
+  for (const language of CLINICAL_LANGUAGES) {
+    if (!migration.includes(`'${language}'`)) {
+      throw new Error(`migration is missing clinical language ${language}`)
+    }
   }
 })
 

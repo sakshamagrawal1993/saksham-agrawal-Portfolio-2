@@ -20,13 +20,27 @@ export const LIBERTYMD_EVENT_PREFIX = 'LibertyMd ';
  * P3-07 Q3 — clinical journey language for client Mixpanel supers.
  * Never chrome-only `es` while AC6 gate keeps clinical `en`.
  */
-let clinicalLocaleSuper: 'en' | 'es' = 'en';
+export const LIBERTYMD_CLINICAL_LANGUAGES = ['en', 'es', 'hi', 'hi-Latn', 'fr', 'de', 'pt'] as const;
+export type LibertyMdClinicalLanguage = (typeof LIBERTYMD_CLINICAL_LANGUAGES)[number];
 
-export function setClinicalLocaleSuper(language: string | null | undefined): void {
-  clinicalLocaleSuper = String(language || 'en').trim().toLowerCase() === 'es' ? 'es' : 'en';
+export function normalizeClinicalLocale(language: string | null | undefined): LibertyMdClinicalLanguage {
+  const value = String(language || 'en').trim().replace(/_/g, '-').toLowerCase();
+  if (value === 'hinglish' || value === 'hi-latn') return 'hi-Latn';
+  if (value === 'es' || value.startsWith('es-')) return 'es';
+  if (value === 'hi' || value.startsWith('hi-')) return 'hi';
+  if (value === 'fr' || value.startsWith('fr-')) return 'fr';
+  if (value === 'de' || value.startsWith('de-')) return 'de';
+  if (value === 'pt' || value.startsWith('pt-')) return 'pt';
+  return 'en';
 }
 
-export function getClinicalLocaleSuper(): 'en' | 'es' {
+let clinicalLocaleSuper: LibertyMdClinicalLanguage = 'en';
+
+export function setClinicalLocaleSuper(language: string | null | undefined): void {
+  clinicalLocaleSuper = normalizeClinicalLocale(language);
+}
+
+export function getClinicalLocaleSuper(): LibertyMdClinicalLanguage {
   return clinicalLocaleSuper;
 }
 
@@ -85,9 +99,9 @@ export function trackLibertyMd(eventSuffix: string, properties: LibertyMdTrackPr
     if (value === undefined) continue;
     safe[key] = value;
   }
-  // Explicit properties.locale wins only if clinical en|es.
+  // Explicit properties.locale wins only after closed-set clinical normalization.
   if (typeof properties.locale === 'string') {
-    safe.locale = String(properties.locale).trim().toLowerCase() === 'es' ? 'es' : 'en';
+    safe.locale = normalizeClinicalLocale(properties.locale);
   }
   if (testTrackOverride) {
     testTrackOverride(name, safe);
