@@ -40,6 +40,8 @@
 import { assessClinicalEvidence, classifyResponseRelevance, decideReportOutcome } from '../clinical-policy.ts'
 import {
   getDiagnosticClarificationMaxQuestions,
+  getDiagnosisEvidenceFloor,
+  getDiagnosisTurnFloor,
   getDifferentialStopConfidence,
   isDiagnosticClarificationEnabled,
   isSpeculativeDiagnosisEnabled,
@@ -844,11 +846,22 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
     )
     const clarificationConfidenceLow = differentialState.topConfidence === null
       || differentialState.topConfidence < getDifferentialStopConfidence()
+    // The strict report evidence gate includes every safety/history field and
+    // can remain false when a multilingual extractor misses one slot even
+    // though the patient has already provided a useful core history. Start the
+    // bounded clarification phase at the same turn/score floor used by
+    // Diagnosis, while differential red flags remain a separate hard blocker.
+    // This reserves 2-3 genuinely diagnostic questions before the turn cap
+    // instead of letting generic history collection consume all 15 turns.
+    const clarificationHistoryReady = evidence.sufficient || (
+      turnCount >= getDiagnosisTurnFloor()
+      && evidence.score >= getDiagnosisEvidenceFloor()
+    )
     const clarificationEligible = shouldAskDiagnosticClarification({
       enabled: clarificationEnabled,
       turnCount,
       maxTurns: MAX_TURNS,
-      evidenceSufficient: evidence.sufficient,
+      evidenceSufficient: clarificationHistoryReady,
       mediaBlocksCompletion,
       redFlagsOutstanding: differentialState.redFlagsOutstanding,
       topConfidence: differentialState.topConfidence,
@@ -880,7 +893,7 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
       )
     } else if (clarificationEligible || (
       clarificationEnabled
-      && evidence.sufficient
+      && clarificationHistoryReady
       && clarificationConfidenceLow
       && !clarificationStateAtStart.completed
       && (clarificationStateAtStart.askedCount >= clarificationMaxQuestions || interview.clarification_exhausted)
