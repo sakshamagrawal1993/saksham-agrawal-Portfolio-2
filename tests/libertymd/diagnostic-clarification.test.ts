@@ -94,6 +94,14 @@ Deno.test('diagnostic clarification rejects administrative report-closing prompt
   assertEquals(selected, null)
 })
 
+Deno.test('backend clarification phase may use a new unflagged Interview question', () => {
+  const selected = selectDiagnosticClarificationCandidate(interview({
+    diagnostic_clarification: false,
+    target_slot: 'location',
+  }), [], readDiagnosticClarificationState({}), true)
+  assertEquals(selected?.question, 'Does twisting or changing direction worsen the pain?')
+})
+
 Deno.test('fresh mini differential supplies a new discriminator when Interview does not', () => {
   const entries: JsonObject[] = [
     { condition: 'Pes anserinus bursitis', discriminator: 'Is there focal tenderness below the inner knee joint?' },

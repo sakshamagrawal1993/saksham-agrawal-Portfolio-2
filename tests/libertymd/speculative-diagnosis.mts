@@ -262,8 +262,9 @@ Deno.test('P2-14 AC7 · call-volume delta: odd turn 7 newly eligible (+1 acted-u
   assertEquals(retunedCount - legacyCount, 1, 'AC7 expected +1 acted-upon on newly eligible odd turn')
 })
 
-Deno.test('workflow-ready history produces a low-confidence physician-review report before turn 15', async () => {
+Deno.test('clarification flag off preserves workflow-ready low-confidence report behavior', async () => {
   await withEnv('LIBERTYMD_ASYNC_DIFFERENTIAL', 'true', async () => {
+    await withEnv('LIBERTYMD_DIAGNOSTIC_CLARIFICATION', 'false', async () => {
     const fetchLog = stubFetch((url) => {
       if (url === INTERVIEW_WEBHOOK) {
         return interviewPass({
@@ -329,6 +330,7 @@ Deno.test('workflow-ready history produces a low-confidence physician-review rep
     } finally {
       fetchLog.restore()
     }
+    })
   })
 })
 

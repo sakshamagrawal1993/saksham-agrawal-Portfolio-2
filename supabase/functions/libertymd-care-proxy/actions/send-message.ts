@@ -825,6 +825,16 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
       history,
       clarificationStateAtStart,
     )
+    // The phase is backend-owned. Once core history is sufficient, a new
+    // clinical Interview question may consume the bounded clarification budget
+    // even when the model omitted its advisory diagnostic_clarification flag.
+    // Administrative closing prompts are rejected by the selector.
+    const interviewClarificationCandidate = selectDiagnosticClarificationCandidate(
+      interview,
+      history,
+      clarificationStateAtStart,
+      true,
+    )
     const clarificationConfidenceLow = differentialState.topConfidence === null
       || differentialState.topConfidence < getDifferentialStopConfidence()
     const clarificationEligible = shouldAskDiagnosticClarification({
@@ -839,13 +849,12 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
       state: clarificationStateAtStart,
       maxQuestions: clarificationMaxQuestions,
       // Interview remains the primary question generator. A fresh mini-
-      // differential discriminator is the fail-open path when Interview
-      // ignores the phase or returns only administrative closing copy.
-      interviewRequestedClarification: interview.diagnostic_clarification || Boolean(differentialClarificationCandidate),
+      // differential discriminator is the fail-open path when Interview has no
+      // useful new clinical question or returns only administrative copy.
+      interviewRequestedClarification: Boolean(interviewClarificationCandidate || differentialClarificationCandidate),
     })
     const clarificationCandidate = clarificationEligible
-      ? selectDiagnosticClarificationCandidate(interview, history, clarificationStateAtStart)
-        || differentialClarificationCandidate
+      ? interviewClarificationCandidate || differentialClarificationCandidate
       : null
     let workflowVersionsForTurn = consultation.workflow_versions
     let servingDiagnosticClarification = false

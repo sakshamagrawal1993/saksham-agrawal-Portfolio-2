@@ -173,8 +173,9 @@ export function selectDiagnosticClarificationCandidate(
   interview: InterviewResult,
   history: Array<{ role?: unknown; content?: unknown }>,
   state: DiagnosticClarificationState,
+  allowUnflagged = false,
 ): ClarificationCandidate | null {
-  if (!interview.diagnostic_clarification) return null
+  if (!interview.diagnostic_clarification && !allowUnflagged) return null
   const transcriptQuestions = history
     .filter((message) => message.role === 'assistant')
     .map((message) => String(message.content || '').trim())
