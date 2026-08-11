@@ -3,6 +3,7 @@ import {
   questionsNearDuplicate,
   readDiagnosticClarificationState,
   selectDiagnosticClarificationCandidate,
+  selectDifferentialClarificationCandidate,
   selectNonDuplicateInterviewCandidate,
   shouldAskDiagnosticClarification,
   withDiagnosticClarificationCompleted,
@@ -81,6 +82,32 @@ Deno.test('diagnostic clarification refuses both candidates when transcript alre
     history,
     readDiagnosticClarificationState({}),
   ), null)
+})
+
+Deno.test('diagnostic clarification rejects administrative report-closing prompts', () => {
+  const selected = selectDiagnosticClarificationCandidate(interview({
+    next_question: 'The report is ready. Would you like to finish now?',
+    question_purpose: 'Finalize the consultation and prepare the report.',
+    backup_question: 'Would you like me to close the consultation?',
+    backup_question_purpose: 'Conclude the interview.',
+  }), [], readDiagnosticClarificationState({}))
+  assertEquals(selected, null)
+})
+
+Deno.test('fresh mini differential supplies a new discriminator when Interview does not', () => {
+  const entries: JsonObject[] = [
+    { condition: 'Pes anserinus bursitis', discriminator: 'Is there focal tenderness below the inner knee joint?' },
+    { condition: 'MCL strain', discriminator: 'Does sideways stress reproduce the inner-knee pain?' },
+    { condition: 'Meniscal injury', discriminator: 'Does twisting under weight reproduce the pain?' },
+  ]
+  const first = selectDifferentialClarificationCandidate(entries, [], readDiagnosticClarificationState({}))
+  assertEquals(first?.question, 'Is there focal tenderness below the inner knee joint?')
+  if (!first) throw new Error('expected first differential candidate')
+  const workflow = withDiagnosticClarificationQuestion({}, readDiagnosticClarificationState({}), first, 6)
+  const second = selectDifferentialClarificationCandidate(entries, [
+    { role: 'assistant', content: first.question },
+  ], readDiagnosticClarificationState(workflow))
+  assertEquals(second?.question, 'Does sideways stress reproduce the inner-knee pain?')
 })
 
 Deno.test('ordinary interview uses same-response backup when primary repeats', () => {

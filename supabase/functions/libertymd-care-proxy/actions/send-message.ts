@@ -72,6 +72,7 @@ import {
   diagnosticClarificationContext,
   readDiagnosticClarificationState,
   selectDiagnosticClarificationCandidate,
+  selectDifferentialClarificationCandidate,
   selectNonDuplicateInterviewCandidate,
   shouldAskDiagnosticClarification,
   withDiagnosticClarificationCompleted,
@@ -818,6 +819,12 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
     // With the flag off this collapses to the pre-P5 behaviour exactly.
     const differentialState = readStoredDifferential(consultation)
     const differentialStop = decideDifferentialStop(differentialState, turnCount)
+    const freshDifferentialHint = buildDifferentialHint(differentialState, turnCount)
+    const differentialClarificationCandidate = selectDifferentialClarificationCandidate(
+      Array.isArray(freshDifferentialHint?.entries) ? freshDifferentialHint.entries as JsonObject[] : [],
+      history,
+      clarificationStateAtStart,
+    )
     const clarificationConfidenceLow = differentialState.topConfidence === null
       || differentialState.topConfidence < getDifferentialStopConfidence()
     const clarificationEligible = shouldAskDiagnosticClarification({
@@ -831,10 +838,14 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
       stopConfidence: getDifferentialStopConfidence(),
       state: clarificationStateAtStart,
       maxQuestions: clarificationMaxQuestions,
-      interviewRequestedClarification: interview.diagnostic_clarification,
+      // Interview remains the primary question generator. A fresh mini-
+      // differential discriminator is the fail-open path when Interview
+      // ignores the phase or returns only administrative closing copy.
+      interviewRequestedClarification: interview.diagnostic_clarification || Boolean(differentialClarificationCandidate),
     })
     const clarificationCandidate = clarificationEligible
       ? selectDiagnosticClarificationCandidate(interview, history, clarificationStateAtStart)
+        || differentialClarificationCandidate
       : null
     let workflowVersionsForTurn = consultation.workflow_versions
     let servingDiagnosticClarification = false

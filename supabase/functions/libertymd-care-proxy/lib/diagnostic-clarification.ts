@@ -163,6 +163,11 @@ function candidateIfNew(
   }
 }
 
+function isAdministrativeClosingQuestion(question: string, purpose: string): boolean {
+  const value = normalize(`${question} ${purpose}`)
+  return /\b(report|physician review|finali[sz]\p{L}*|conclud\p{L}*|close consultation|bericht|informe|rapport|relatorio|relatorio medico)\b/u.test(value)
+}
+
 /** Primary first, backup second. No extra model call is ever made. */
 export function selectDiagnosticClarificationCandidate(
   interview: InterviewResult,
@@ -175,14 +180,19 @@ export function selectDiagnosticClarificationCandidate(
     .map((message) => String(message.content || '').trim())
     .filter(Boolean)
   const priorQuestions = [...transcriptQuestions, ...state.askedQuestions]
-  return candidateIfNew(
+  const primary = isAdministrativeClosingQuestion(interview.next_question, interview.question_purpose)
+    ? null
+    : candidateIfNew(
     interview.next_question,
     interview.options,
     interview.question_purpose,
     priorQuestions,
     state.askedPurposes,
     false,
-  ) || candidateIfNew(
+  )
+  const backup = isAdministrativeClosingQuestion(interview.backup_question, interview.backup_question_purpose)
+    ? null
+    : candidateIfNew(
     interview.backup_question,
     interview.backup_options.length ? interview.backup_options : interview.options,
     interview.backup_question_purpose,
@@ -190,6 +200,38 @@ export function selectDiagnosticClarificationCandidate(
     state.askedPurposes,
     true,
   )
+  return primary || backup
+}
+
+/**
+ * Zero-latency fallback when Interview does not enter clarification itself.
+ * Mini-differential discriminators are already in the selected patient
+ * language and are never condition labels; only the question is shown.
+ */
+export function selectDifferentialClarificationCandidate(
+  entries: JsonObject[],
+  history: Array<{ role?: unknown; content?: unknown }>,
+  state: DiagnosticClarificationState,
+): ClarificationCandidate | null {
+  const transcriptQuestions = history
+    .filter((message) => message.role === 'assistant')
+    .map((message) => String(message.content || '').trim())
+    .filter(Boolean)
+  const priorQuestions = [...transcriptQuestions, ...state.askedQuestions]
+  for (const entry of entries.slice(0, 3)) {
+    const discriminator = String(entry.discriminator || '').trim()
+    const condition = String(entry.condition || '').trim()
+    const candidate = candidateIfNew(
+      discriminator,
+      [],
+      condition ? `differentiate ${condition}` : 'differentiate leading causes',
+      priorQuestions,
+      state.askedPurposes,
+      true,
+    )
+    if (candidate) return candidate
+  }
+  return null
 }
 
 /**
