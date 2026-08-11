@@ -119,8 +119,14 @@
     },
     "viewTitle": "Bericht zur ärztlichen Überprüfung",
     "meta": {
-      "patientName": "Patientenname:", "gender": "Geschlecht:", "age": "Alter:", "date": "Datum:", "refNo": "Ref.:",
-      "anonymous": "Anonymer Patient", "notSpecified": "Nicht angegeben", "page": "Seite",
+      "patientName": "Patientenname:",
+      "gender": "Geschlecht:",
+      "age": "Alter:",
+      "date": "Datum:",
+      "refNo": "Ref.:",
+      "anonymous": "Anonymer Patient",
+      "notSpecified": "Nicht angegeben",
+      "page": "Seite",
       "pdfFooter": "KI-generierte klinische Zusammenfassung — keine Diagnose · Zur Überprüfung durch medizinisches Fachpersonal"
     },
     "card": {
@@ -269,26 +275,26 @@
     "humanCareKicker": "Menschliche Fürsorge",
     "humanCareTitle": "Ärztliche Aufmerksamkeit, von Anfang an eingebaut.",
     "humanCareSubtitle": "Jede Triage ist darauf ausgelegt, sauber an approbierte Ärzte übergeben zu werden.",
-    "steps": [
+    "phases": [
       {
-        "title": "Symptome schildern",
-        "eyebrow": "Natürlich beginnen",
-        "description": "Sagen Sie LibertyMD, was Sie fühlen, wann es begann und was Sie am meisten beunruhigt. Medizinische Fachbegriffe sind nicht nötig."
+        "title": "Beschreiben Sie Ihre Symptome",
+        "eyebrow": "Ganz natürlich beginnen",
+        "body": "Sagen Sie LibertyMD, was Sie spüren, seit wann es besteht und was Sie am meisten beunruhigt. Medizinische Fachwörter brauchen Sie nicht."
       },
       {
-        "title": "Gezielte Rückfragen",
-        "eyebrow": "Nur das Wesentliche",
-        "description": "LibertyMD stellt knappe Fragen zu Zeitverlauf, Schwere, Vorgeschichte und Kontext und passt jede Rückfrage an Ihre Antworten an."
-      },
-      {
-        "title": "Sicherheitsprüfung",
-        "eyebrow": "Dringlichkeit früh geprüft",
-        "description": "Klinische Schutzmechanismen achten im gesamten Gespräch auf Warnzeichen und erklären klar, wann dringende oder Notfallversorgung nötig ist."
+        "title": "Gezielte Nachfrage",
+        "eyebrow": "Nur was zählt",
+        "body": "Kurze Fragen zu Dauer, Schwere und Vorgeschichte — jede ergibt sich aus Ihrer letzten Antwort, und Warnzeichen werden durchgehend geprüft."
       },
       {
         "title": "Arztfertiger Bericht",
-        "eyebrow": "Kontext zum Teilen",
-        "description": "Ihre Antworten werden zu einer strukturierten Zusammenfassung mit Zeitverlauf, Sicherheitshinweisen, nächsten Schritten und einer arztfertigen SOAP-Notiz."
+        "eyebrow": "Kontext zum Weitergeben",
+        "body": "Aus Ihren Antworten wird eine strukturierte Übersicht: Symptomverlauf, Sicherheitshinweise, nächste Schritte und eine arztfertige SOAP-Notiz."
+      },
+      {
+        "title": "Ärztliche Beratung",
+        "eyebrow": "Übergabe statt Neustart",
+        "body": "Wenn Sie einen Menschen brauchen, geht Ihr Bericht mit — damit eine Ärztin oder ein Arzt bei Ihrem Kontext beginnt und nicht wieder bei der ersten Frage."
       }
     ],
     "heroTrustReport": "Free doctor-ready report",

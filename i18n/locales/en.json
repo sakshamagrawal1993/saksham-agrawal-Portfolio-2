@@ -273,26 +273,26 @@
     "humanCareKicker": "Human care",
     "humanCareTitle": "A doctor's attention, built in.",
     "humanCareSubtitle": "Every triage is designed to hand off cleanly to a licensed physician.",
-    "steps": [
+    "phases": [
       {
         "title": "Share your symptoms",
         "eyebrow": "Start naturally",
-        "description": "Tell LibertyMD what you feel, when it began, and what worries you most. You do not need to know the medical words."
+        "body": "Tell LibertyMD what you feel, when it began, and what worries you most. You do not need to know the medical words."
       },
       {
         "title": "Focussed Follow-up",
         "eyebrow": "Only what matters",
-        "description": "LibertyMD asks concise questions about timing, severity, history, and context, adapting each follow-up to your answers."
-      },
-      {
-        "title": "Safety Screen",
-        "eyebrow": "Urgency checked early",
-        "description": "Clinical guardrails look for warning signs throughout the conversation and clearly explain when urgent or emergency care is needed."
+        "body": "Concise questions about timing, severity and history — each one chosen from your last answer, with warning signs checked for throughout."
       },
       {
         "title": "Doctor Ready Report",
         "eyebrow": "Context ready to share",
-        "description": "Your answers become a structured summary with the symptom timeline, safety guidance, next steps, and a doctor-ready SOAP note."
+        "body": "Your answers become a structured summary: the symptom timeline, safety guidance, next steps, and a doctor-ready SOAP note."
+      },
+      {
+        "title": "Doctor Consultation",
+        "eyebrow": "A handoff, not a restart",
+        "body": "When you need a person, your report goes with you — so a licensed physician starts from your context, not from your first question again."
       }
     ],
     "heroTrustReport": "Free doctor-ready report",

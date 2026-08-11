@@ -14,10 +14,6 @@ import {
   UsersRound,
   Send,
   ArrowRight,
-  Sparkles,
-  FileText,
-  Video,
-  Activity,
   Loader2,
   Menu,
   RotateCcw,
@@ -33,6 +29,7 @@ import {
   LibertyMDPhoneCareSection,
   LibertyMDPricingSection,
 } from './LibertyMDMarketingSections';
+import { LibertyMDPhaseStack } from './LibertyMDPhaseStack';
 import { LibertyMDScrollFilmSection } from './LibertyMDScrollFilmSection';
 import { LibertyMDProgressIndicator } from './LibertyMDProgressIndicator';
 import { LibertyMDReportView } from './LibertyMDReportView';
@@ -161,16 +158,6 @@ interface LibertyMDProfile {
   sex_at_birth?: string | null;
 }
 
-const HOW_IT_WORKS_ROTATION_MS = 5600;
-/** Below this width the pin is dropped and the rail is tapped through, as freehand.ai does. */
-const HOW_IT_WORKS_PIN_QUERY = '(min-width: 1024px)';
-/**
- * Total pinned height in viewports. One viewport is the pinned pane itself, so the steps
- * advance over (value - 1) viewports of travel. 3.95 mirrors freehand.ai's own pin-spacer
- * ratio (3480px against an 880px viewport), which lands each of the 4 steps at ~0.74vh.
- */
-const HOW_IT_WORKS_PIN_VIEWPORTS = 3.95;
-
 const EMERGENCY_ACKNOWLEDGE_LABEL = 'I understand';
 const EMERGENCY_PERSISTENCE_NOTE = 'This guidance stays pinned to the bottom of the screen after you acknowledge it.';
 
@@ -187,266 +174,6 @@ function crisisTypeFromSafetyPayload(payload: unknown): string | null {
   return null
 }
 
-const howItWorksSteps = [
-  {
-    title: 'Share your symptoms',
-    eyebrow: 'Start naturally',
-    description: 'Tell LibertyMD what you feel, when it began, and what worries you most. You do not need to know the medical words.',
-    placeholder: 'Video placeholder: symptom entry and conversation start',
-    icon: Sparkles,
-  },
-  {
-    title: 'Focussed Follow-up',
-    eyebrow: 'Only what matters',
-    description: 'LibertyMD asks concise questions about timing, severity, history, and context, adapting each follow-up to your answers.',
-    placeholder: 'Video placeholder: adaptive follow-up questions',
-    icon: Activity,
-  },
-  {
-    title: 'Safety Screen',
-    eyebrow: 'Urgency checked early',
-    description: 'Clinical guardrails look for warning signs throughout the conversation and clearly explain when urgent or emergency care is needed.',
-    placeholder: 'Video placeholder: safety screening and escalation',
-    icon: ShieldCheck,
-  },
-  {
-    title: 'Doctor Ready Report',
-    eyebrow: 'Context ready to share',
-    description: 'Your answers become a structured summary with the symptom timeline, safety guidance, next steps, and a doctor-ready SOAP note.',
-    placeholder: 'Video placeholder: doctor-ready report and handoff',
-    icon: FileText,
-  },
-];
-
-function LibertyMDHowItWorksTabs({ onOpenSampleReport }: { onOpenSampleReport?: () => void }) {
-  const { t } = useI18n();
-  const steps = howItWorksSteps.map((step, i) => ({
-    ...step,
-    title: t(`app.steps.${i}.title`),
-    eyebrow: t(`app.steps.${i}.eyebrow`),
-    description: t(`app.steps.${i}.description`),
-  }));
-  const [activeStep, setActiveStep] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
-  const [cycleKey, setCycleKey] = useState(0);
-  const tabRailRef = useRef<HTMLDivElement | null>(null);
-  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  const pinRef = useRef<HTMLDivElement | null>(null);
-  const fillRef = useRef<HTMLSpanElement | null>(null);
-  const rafRef = useRef<number | null>(null);
-  const currentStep = steps[activeStep];
-
-  // Desktop pins the block and advances the steps on scroll; below `lg` the rail stays a
-  // normal horizontally-scrollable strip the reader taps through. freehand.ai does exactly
-  // this — it drops its pin on mobile rather than hijacking touch scrolling.
-  const [isScrollDriven, setIsScrollDriven] = useState(false);
-
-  useEffect(() => {
-    const query = window.matchMedia(HOW_IT_WORKS_PIN_QUERY);
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const update = () => setIsScrollDriven(query.matches && !reduce.matches);
-    update();
-    query.addEventListener('change', update);
-    reduce.addEventListener('change', update);
-    // Belt and braces: some environments (and device emulation) resize without firing the
-    // media-query change event, which would otherwise leave the pin on at mobile widths.
-    window.addEventListener('resize', update);
-    return () => {
-      query.removeEventListener('change', update);
-      reduce.removeEventListener('change', update);
-      window.removeEventListener('resize', update);
-    };
-  }, []);
-
-  // Scroll → step index + fill. The index goes through React (it changes 4 times), but the
-  // fill width is written straight to the DOM node: re-rendering this subtree every frame is
-  // what made the hero logo stutter before it moved to imperative writes.
-  useEffect(() => {
-    if (!isScrollDriven) return;
-    const pin = pinRef.current;
-    if (!pin) return;
-
-    const read = () => {
-      const range = pin.offsetHeight - window.innerHeight;
-      if (range <= 0) return 0;
-      return Math.min(1, Math.max(0, -pin.getBoundingClientRect().top / range));
-    };
-
-    const tick = () => {
-      rafRef.current = null;
-      const spread = read() * howItWorksSteps.length;
-      const index = Math.min(howItWorksSteps.length - 1, Math.floor(spread));
-      setActiveStep((current) => (current === index ? current : index));
-      if (fillRef.current) {
-        fillRef.current.style.transform = `scaleX(${Math.min(1, spread - index)})`;
-      }
-    };
-
-    const wake = () => {
-      if (rafRef.current !== null) return;
-      rafRef.current = window.requestAnimationFrame(tick);
-    };
-
-    tick();
-    window.addEventListener('scroll', wake, { passive: true });
-    window.addEventListener('resize', wake);
-    return () => {
-      window.removeEventListener('scroll', wake);
-      window.removeEventListener('resize', wake);
-      if (rafRef.current !== null) {
-        window.cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      }
-    };
-  }, [isScrollDriven]);
-
-  useEffect(() => {
-    // Scroll position owns the active step when pinned, so the rotation timer would fight it.
-    if (isScrollDriven || isPaused || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-
-    const timer = window.setTimeout(() => {
-      setActiveStep((current) => (current + 1) % howItWorksSteps.length);
-      setCycleKey((current) => current + 1);
-    }, HOW_IT_WORKS_ROTATION_MS);
-
-    return () => window.clearTimeout(timer);
-  }, [activeStep, cycleKey, isPaused, isScrollDriven]);
-
-  useEffect(() => {
-    const rail = tabRailRef.current;
-    const tab = tabRefs.current[activeStep];
-    if (!rail || !tab) return;
-
-    const railRect = rail.getBoundingClientRect();
-    const tabRect = tab.getBoundingClientRect();
-    rail.scrollTo({
-      left: rail.scrollLeft + tabRect.left - railRect.left - (rail.clientWidth - tabRect.width) / 2,
-      behavior: 'smooth',
-    });
-  }, [activeStep]);
-
-  const selectStep = (index: number) => {
-    setActiveStep(index);
-    setCycleKey((current) => current + 1);
-  };
-
-  const resumeRotation = () => {
-    setIsPaused(false);
-    setCycleKey((current) => current + 1);
-  };
-
-  return (
-    <div
-      ref={pinRef}
-      style={isScrollDriven ? { height: `${HOW_IT_WORKS_PIN_VIEWPORTS * 100}vh` } : undefined}
-      className={isScrollDriven ? 'relative' : undefined}
-    >
-    <div
-      className={`libertymd-content-shell mx-auto ${
-        isScrollDriven ? 'sticky top-0 flex h-screen flex-col justify-center' : 'mt-12'
-      }`}
-      // Hover-pause only matters for the rotation timer; scroll owns the step when pinned.
-      onMouseEnter={isScrollDriven ? undefined : () => setIsPaused(true)}
-      onMouseLeave={isScrollDriven ? undefined : resumeRotation}
-      onFocusCapture={isScrollDriven ? undefined : () => setIsPaused(true)}
-      onBlurCapture={isScrollDriven ? undefined : resumeRotation}
-    >
-      <div
-        ref={tabRailRef}
-        role="tablist"
-        aria-label="How LibertyMD works"
-        className="libertymd-how-tabs flex snap-x snap-mandatory gap-4 overflow-x-auto border-b border-libertymd-green-sage pb-0 lg:grid lg:grid-cols-4 lg:gap-7"
-      >
-        {steps.map((step, index) => {
-          const Icon = step.icon;
-          const isActive = index === activeStep;
-
-          return (
-            <button
-              key={step.title}
-              ref={(node) => { tabRefs.current[index] = node; }}
-              type="button"
-              role="tab"
-              id={`libertymd-how-tab-${index}`}
-              aria-controls="libertymd-how-panel"
-              aria-selected={isActive}
-              tabIndex={isActive ? 0 : -1}
-              onClick={() => selectStep(index)}
-              className={`relative flex min-w-[12.5rem] snap-start items-center gap-3 pb-5 text-left transition-colors sm:min-w-[15rem] lg:min-w-0 ${
-                isActive ? 'text-libertymd-navy' : 'text-libertymd-slate-400 hover:text-libertymd-slate-700'
-              }`}
-            >
-              <Icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-libertymd-blue-600' : 'text-libertymd-slate-400'}`} />
-              <span className="text-sm font-bold leading-5">{step.title}</span>
-              <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[3px] overflow-hidden bg-libertymd-green-sage">
-                {index < activeStep && <span className="block h-full w-full bg-libertymd-blue-500" />}
-                {isActive && (
-                  isScrollDriven ? (
-                    // Scroll drives this fill imperatively; scaleX avoids a layout pass per frame.
-                    <span
-                      ref={fillRef}
-                      className="block h-full w-full origin-left bg-libertymd-blue-600"
-                      style={{ transform: 'scaleX(0)' }}
-                    />
-                  ) : (
-                    <span
-                      key={`${activeStep}-${cycleKey}`}
-                      className="libertymd-how-progress block h-full w-full bg-libertymd-blue-600"
-                      style={{
-                        animationDuration: `${HOW_IT_WORKS_ROTATION_MS}ms`,
-                        animationPlayState: isPaused ? 'paused' : 'running',
-                      }}
-                    />
-                  )
-                )}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      <div
-        id="libertymd-how-panel"
-        role="tabpanel"
-        aria-labelledby={`libertymd-how-tab-${activeStep}`}
-        className="mt-10 grid items-center gap-9 lg:grid-cols-[minmax(17rem,0.58fr)_minmax(34rem,1.42fr)] lg:gap-[clamp(3rem,6vw,7rem)]"
-      >
-        <div className="order-2 mx-auto max-w-lg text-center lg:order-1 lg:mx-0 lg:text-left">
-          <p className="text-xs font-bold uppercase text-libertymd-blue-600">Step {String(activeStep + 1).padStart(2, '0')} · {currentStep.eyebrow}</p>
-          <h3 className="mt-4 font-serif text-3xl font-semibold leading-tight text-libertymd-ink sm:text-4xl">{currentStep.title}</h3>
-          <p className="mt-5 text-sm leading-7 text-libertymd-slate-muted sm:text-base">{currentStep.description}</p>
-          {/* BO 2026-08-01 — the sample report belongs on the step that talks
-              about the report. Keyed off the step's own icon rather than a
-              hardcoded index so reordering the steps cannot orphan it. */}
-          {currentStep.icon === FileText && onOpenSampleReport && (
-            <button
-              type="button"
-              data-libertymd-sample-report-entry="how-it-works"
-              onClick={onOpenSampleReport}
-              className="mt-6 inline-flex items-center gap-2 rounded-full border border-libertymd-blue-600 bg-white px-5 py-2.5 text-sm font-bold text-libertymd-blue-700 transition hover:bg-libertymd-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-libertymd-blue-600 focus-visible:ring-offset-2"
-            >
-              <FileText className="h-4 w-4" aria-hidden="true" />
-              {t('sampleReport.entry')}
-            </button>
-          )}
-        </div>
-
-        <div className="order-1 lg:order-2">
-          <div className="relative aspect-video overflow-hidden rounded-lg border border-libertymd-mist bg-[linear-gradient(145deg,rgba(255,255,255,0.92),rgba(225,238,251,0.82)_55%,rgba(225,245,239,0.9))] shadow-[0_24px_70px_rgba(23,50,95,0.11)]">
-            <div className="absolute inset-0 opacity-[0.16] [background-image:linear-gradient(rgba(37,99,235,0.18)_1px,transparent_1px),linear-gradient(90deg,rgba(37,99,235,0.18)_1px,transparent_1px)] [background-size:32px_32px]" />
-            <div className="relative flex h-full flex-col items-center justify-center px-6 text-center">
-              <span className="inline-flex h-14 w-14 items-center justify-center rounded-full border border-white/90 bg-white/70 text-libertymd-blue-600 shadow-[0_12px_34px_rgba(37,99,235,0.13)] backdrop-blur-md">
-                <Video className="h-6 w-6" />
-              </span>
-              <p className="mt-5 text-sm font-semibold text-libertymd-slate-700 sm:text-base">{currentStep.placeholder}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    </div>
-  );
-}
 
 export default function LibertyMDApp() {
   const navigate = useNavigate();
@@ -532,7 +259,7 @@ export default function LibertyMDApp() {
   // P3-02 — landing sample report OverlaySheet (synthetic uri_mundane).
   const [isSampleReportOpen, setIsSampleReportOpen] = useState(false);
   const chatPanelRef = useRef<HTMLDivElement | null>(null);
-  const logoDockHeadlineRef = useRef<HTMLHeadingElement | null>(null);
+  const logoDockHeadlineRef = useRef<HTMLDivElement | null>(null);
   const heroComposerRef = useRef<HTMLFormElement | null>(null);
   const heroSymptomsRef = useRef<HTMLTextAreaElement | null>(null);
   const hasActiveConsultRef = useRef(false);
@@ -1627,19 +1354,32 @@ export default function LibertyMDApp() {
         </section>
 
         <section ref={chatPanelRef} className="libertymd-page-gutter relative z-0 bg-[linear-gradient(180deg,rgba(245,250,243,0.96),rgba(237,247,241,0.98))] pb-16 pt-[300px] sm:pt-[340px]">
-          <div className="mx-auto max-w-3xl text-center">
-            <p className="text-xs font-bold uppercase tracking-normal text-libertymd-blue-600">{t('app.howItWorksKicker')}</p>
-            <h2 ref={logoDockHeadlineRef} className="mt-3 text-4xl font-black leading-tight tracking-normal text-libertymd-ink sm:text-5xl">
-              {t('app.howItWorksTitle')}
-            </h2>
-            <p className="mx-auto mt-4 max-w-xl text-base font-bold leading-7 text-libertymd-navy sm:text-lg">
-              {t('app.howItWorksSubtitle')}
-            </p>
-          </div>
+          {/* The hero logo docks to a STATIC anchor, never to the heading itself. The heading now
+              rides inside the pinned pane, and `LibertyMDPremiumLogo` derives its landing from
+              `rect.top + scrollY` — on a sticky element that sum climbs with every pixel of
+              scroll, so the target ran away and the damped follow chased it as a bounce. */}
+          <div ref={logoDockHeadlineRef} aria-hidden="true" className="h-0" />
 
-          {phase === 'initial' ? (
-            <LibertyMDHowItWorksTabs onOpenSampleReport={() => setIsSampleReportOpen(true)} />
-          ) : (
+          {(() => {
+            const sectionHeader = (
+              <div className="mx-auto max-w-3xl text-center">
+                <p className="text-xs font-bold uppercase tracking-normal text-libertymd-blue-600">{t('app.howItWorksKicker')}</p>
+                <h2 className="mt-3 text-4xl font-black leading-tight tracking-normal text-libertymd-ink sm:text-5xl">
+                  {t('app.howItWorksTitle')}
+                </h2>
+                <p className="mx-auto mt-4 max-w-xl text-base font-bold leading-7 text-libertymd-navy sm:text-lg">
+                  {t('app.howItWorksSubtitle')}
+                </p>
+              </div>
+            );
+            return phase === 'initial' ? (
+              <LibertyMDPhaseStack header={sectionHeader} onOpenSampleReport={() => setIsSampleReportOpen(true)} />
+            ) : (
+              sectionHeader
+            );
+          })()}
+
+          {phase === 'initial' ? null : (
             <div className="libertymd-content-shell mx-auto mt-14 max-w-4xl text-center">
               {/*
                 P0-19 · Chat-like consult shell: fixed-height flex column so the transcript

@@ -119,8 +119,14 @@
     },
     "viewTitle": "Relatório para revisão médica",
     "meta": {
-      "patientName": "Nome do paciente:", "gender": "Sexo:", "age": "Idade:", "date": "Data:", "refNo": "Ref.:",
-      "anonymous": "Paciente anônimo", "notSpecified": "Não especificado", "page": "Página",
+      "patientName": "Nome do paciente:",
+      "gender": "Sexo:",
+      "age": "Idade:",
+      "date": "Data:",
+      "refNo": "Ref.:",
+      "anonymous": "Paciente anônimo",
+      "notSpecified": "Não especificado",
+      "page": "Página",
       "pdfFooter": "Resumo clínico gerado por IA — não é um diagnóstico · Para revisão médica profissional"
     },
     "card": {
@@ -269,26 +275,26 @@
     "humanCareKicker": "Cuidado humano",
     "humanCareTitle": "A atenção de um médico, integrada.",
     "humanCareSubtitle": "Cada triagem é projetada para passar de forma limpa a um médico licenciado.",
-    "steps": [
+    "phases": [
       {
         "title": "Conte seus sintomas",
-        "eyebrow": "Comece naturalmente",
-        "description": "Diga ao LibertyMD o que sente, quando começou e o que mais preocupa. Você não precisa saber os termos médicos."
+        "eyebrow": "Comece com naturalidade",
+        "body": "Diga ao LibertyMD o que você sente, quando começou e o que mais preocupa. Não é preciso saber os termos médicos."
       },
       {
-        "title": "Perguntas focadas",
+        "title": "Acompanhamento focado",
         "eyebrow": "Só o que importa",
-        "description": "O LibertyMD faz perguntas concisas sobre tempo, intensidade, histórico e contexto, adaptando cada pergunta às suas respostas."
+        "body": "Perguntas curtas sobre duração, gravidade e histórico: cada uma vem da sua resposta anterior, e os sinais de alerta são vigiados o tempo todo."
       },
       {
-        "title": "Triagem de segurança",
-        "eyebrow": "Urgência verificada cedo",
-        "description": "As proteções clínicas procuram sinais de alerta durante toda a conversa e explicam claramente quando é preciso atendimento urgente ou de emergência."
-      },
-      {
-        "title": "Relatório pronto para o médico",
+        "title": "Relatório para o médico",
         "eyebrow": "Contexto pronto para compartilhar",
-        "description": "Suas respostas viram um resumo estruturado com linha do tempo, orientações de segurança, próximos passos e uma nota SOAP pronta para o médico."
+        "body": "Suas respostas viram um resumo estruturado: linha do tempo dos sintomas, orientações de segurança, próximos passos e uma nota SOAP para o médico."
+      },
+      {
+        "title": "Consulta médica",
+        "eyebrow": "Uma passagem de bastão, não um recomeço",
+        "body": "Quando você precisa de uma pessoa, seu relatório vai junto — assim um médico licenciado começa pelo seu contexto, não pela primeira pergunta de novo."
       }
     ],
     "heroTrustReport": "Free doctor-ready report",

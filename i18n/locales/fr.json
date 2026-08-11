@@ -119,8 +119,14 @@
     },
     "viewTitle": "Rapport pour examen médical",
     "meta": {
-      "patientName": "Nom du patient :", "gender": "Sexe :", "age": "Âge :", "date": "Date :", "refNo": "Réf. :",
-      "anonymous": "Patient anonyme", "notSpecified": "Non précisé", "page": "Page",
+      "patientName": "Nom du patient :",
+      "gender": "Sexe :",
+      "age": "Âge :",
+      "date": "Date :",
+      "refNo": "Réf. :",
+      "anonymous": "Patient anonyme",
+      "notSpecified": "Non précisé",
+      "page": "Page",
       "pdfFooter": "Résumé clinique généré par IA — ce n’est pas un diagnostic · Pour examen par un médecin"
     },
     "card": {
@@ -269,26 +275,26 @@
     "humanCareKicker": "Soin humain",
     "humanCareTitle": "L'attention d'un médecin, intégrée.",
     "humanCareSubtitle": "Chaque triage est conçu pour être transmis proprement à un médecin agréé.",
-    "steps": [
+    "phases": [
       {
         "title": "Décrivez vos symptômes",
         "eyebrow": "Commencez naturellement",
-        "description": "Dites à LibertyMD ce que vous ressentez, quand cela a commencé et ce qui vous inquiète le plus. Pas besoin de connaître les termes médicaux."
+        "body": "Dites à LibertyMD ce que vous ressentez, depuis quand et ce qui vous inquiète le plus. Nul besoin de connaître les termes médicaux."
       },
       {
-        "title": "Questions ciblées",
+        "title": "Suivi ciblé",
         "eyebrow": "Seulement l'essentiel",
-        "description": "LibertyMD pose des questions concises sur la chronologie, l'intensité, les antécédents et le contexte, en s'adaptant à vos réponses."
+        "body": "Des questions brèves sur la durée, la gravité et les antécédents : chacune découle de votre réponse précédente, et les signaux d'alerte sont surveillés en continu."
       },
       {
-        "title": "Filtre de sécurité",
-        "eyebrow": "L'urgence vérifiée tôt",
-        "description": "Des garde-fous cliniques recherchent les signes d'alerte tout au long de la conversation et expliquent clairement quand des soins urgents sont nécessaires."
+        "title": "Rapport pour le médecin",
+        "eyebrow": "Un contexte prêt à partager",
+        "body": "Vos réponses deviennent un résumé structuré : chronologie des symptômes, consignes de sécurité, prochaines étapes et une note SOAP pour le médecin."
       },
       {
-        "title": "Rapport prêt pour le médecin",
-        "eyebrow": "Contexte prêt à partager",
-        "description": "Vos réponses deviennent un résumé structuré avec chronologie, consignes de sécurité, prochaines étapes et une note SOAP prête pour le médecin."
+        "title": "Consultation médicale",
+        "eyebrow": "Une transmission, pas un redémarrage",
+        "body": "Quand il vous faut une personne, votre rapport vous suit : un médecin agréé part de votre contexte, et non de votre première question."
       }
     ],
     "heroTrustReport": "Free doctor-ready report",

@@ -174,8 +174,14 @@
     },
     "viewTitle": "Informe para revisión médica",
     "meta": {
-      "patientName": "Nombre del paciente:", "gender": "Sexo:", "age": "Edad:", "date": "Fecha:", "refNo": "Ref. N.º:",
-      "anonymous": "Paciente anónimo", "notSpecified": "No especificado", "page": "Página",
+      "patientName": "Nombre del paciente:",
+      "gender": "Sexo:",
+      "age": "Edad:",
+      "date": "Fecha:",
+      "refNo": "Ref. N.º:",
+      "anonymous": "Paciente anónimo",
+      "notSpecified": "No especificado",
+      "page": "Página",
       "pdfFooter": "Resumen clínico generado por IA — no es un diagnóstico · Para revisión médica profesional"
     },
     "card": {
@@ -335,7 +341,29 @@
     "heroTrustRating": "4.5 out of 5",
     "heroTrustRatingShort": "4.5",
     "heroTrustHipaa": "HIPAA compliant",
-    "heroTrustHipaaShort": "HIPAA"
+    "heroTrustHipaaShort": "HIPAA",
+    "phases": [
+      {
+        "title": "Cuenta tus síntomas",
+        "eyebrow": "Empieza con naturalidad",
+        "body": "Dile a LibertyMD qué sientes, cuándo empezó y qué es lo que más te preocupa. No necesitas saber los términos médicos."
+      },
+      {
+        "title": "Seguimiento enfocado",
+        "eyebrow": "Solo lo que importa",
+        "body": "Preguntas breves sobre duración, gravedad e historial: cada una surge de tu respuesta anterior, y las señales de alarma se vigilan en todo momento."
+      },
+      {
+        "title": "Informe para el médico",
+        "eyebrow": "Contexto listo para compartir",
+        "body": "Tus respuestas se convierten en un resumen estructurado: cronología de síntomas, pautas de seguridad, próximos pasos y una nota SOAP para el médico."
+      },
+      {
+        "title": "Consulta médica",
+        "eyebrow": "Una continuación, no un reinicio",
+        "body": "Cuando necesitas a una persona, tu informe va contigo, para que un médico colegiado empiece por tu contexto y no por la primera pregunta otra vez."
+      }
+    ]
   },
   "trust": {
     "kicker": "What LibertyMD is",
