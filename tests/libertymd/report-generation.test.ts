@@ -139,5 +139,27 @@ Deno.test('REPORT-09 · n8n response carries PHI-free execution audit metadata',
   const settings = (workflow as unknown as { settings: Record<string, unknown> }).settings
   assert(settings.saveDataSuccessExecution === 'all', 'successful report executions must be visible in n8n')
   assert(settings.saveDataErrorExecution === 'all', 'failed report executions must be visible in n8n')
+  assert(settings.saveManualExecutions === true, 'manual report executions must be visible in n8n')
   assert(settings.saveExecutionProgress === false, 'intermediate progress snapshots remain disabled')
+})
+
+Deno.test('REPORT-10 · every LibertyMD workflow keeps bounded inspectable executions', async () => {
+  const files = [
+    'libertymd-guardrail-workflow__9qeE6tUcEY74OYV8.json',
+    'libertymd-interview-workflow__hqT6SFsmdRy1kWKa.json',
+    'libertymd-mini-differential-workflow__HfRcohhBalqrGll8.json',
+    'libertymd-diagnosis-workflow__vljapWQv5ug7pFA9.json',
+    'libertymd-lab-analysis-workflow__7DNhiWE3VKuNN0ZN.json',
+    'libertymd-lab-analysis-workflow__lGndiGHjO2SQgWZz.json',
+    'libertymd-photo-analysis-workflow__V6uB1GZPfSqbhKw6.json',
+    'libertymd-photo-analysis-workflow__ipEzpO7URC0me5aw.json',
+  ]
+  for (const file of files) {
+    const raw = await Deno.readTextFile(new URL(`../n8n-workflows/definitions/${file}`, ROOT))
+    const settings = (JSON.parse(raw) as { settings: Record<string, unknown> }).settings
+    assert(settings.saveDataSuccessExecution === 'all', `${file}: successful executions must be saved`)
+    assert(settings.saveDataErrorExecution === 'all', `${file}: failed executions must be saved`)
+    assert(settings.saveManualExecutions === true, `${file}: manual executions must be saved`)
+    assert(settings.saveExecutionProgress === false, `${file}: progress snapshots must stay disabled`)
+  }
 })

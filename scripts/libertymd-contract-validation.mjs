@@ -5,20 +5,6 @@ import { fileURLToPath } from 'node:url'
 import Ajv from 'ajv'
 import addFormats from 'ajv-formats'
 
-/**
- * BO 2026-08-01 — temporary waiver for n8n execution capture.
- *
- * With capture on, an execution record holds the patient transcript, so the
- * payload-retention contract legitimately fails. Set
- * LIBERTYMD_ALLOW_PAYLOAD_RETENTION=true while debugging. Unset it and this
- * gate fires again — which is the point: the reminder outlives the session.
- */
-const ALLOW_PAYLOAD_RETENTION = String(process.env.LIBERTYMD_ALLOW_PAYLOAD_RETENTION || '')
-  .trim().toLowerCase() === 'true'
-if (ALLOW_PAYLOAD_RETENTION) {
-  console.warn('WARNING: payload-retention contract WAIVED. n8n is storing patient transcripts. Revert to saveData*=none when debugging ends.')
-}
-
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const schemaDir = path.join(root, 'schemas', 'libertymd', 'n8n')
 const fixtureDir = path.join(root, 'tests', 'libertymd', 'contracts')
@@ -169,16 +155,10 @@ if (definitionsDir) {
         && unreadableModelNodes.length === 0
         && models.length > 0
         && models.every((model) => approved.has(model)),
-      noPayloadRetention: settings.saveDataErrorExecution === 'none'
-        && settings.saveDataSuccessExecution === 'none'
-        && settings.saveManualExecutions === false
+      executionRetentionEnabled: settings.saveDataErrorExecution === 'all'
+        && settings.saveDataSuccessExecution === 'all'
+        && settings.saveManualExecutions === true
         && settings.saveExecutionProgress === false,
-      // BO 2026-08-01 — execution capture is temporarily ON for debugging, so
-      // this check is expected to be false right now. It is suppressed by an
-      // explicit opt-in rather than deleted: the day retention should go back
-      // to `none`, removing the env var makes this gate fail again on its own.
-      // Deleting the check would mean nothing ever reminds anyone.
-      payloadRetentionWaived: ALLOW_PAYLOAD_RETENTION,
       timeout: settings.executionTimeout,
       // P3-07 AC2 — Interview + Diagnosis must bind body.language / body.locale.
       // Guardrail locale IO is out of scope.
@@ -196,7 +176,7 @@ if (definitionsDir) {
 const fixtureFailures = results.filter((result) => result.actualValid !== result.expectedValid)
 const workflowFailures = workflowResults.filter((result) => !result.active
   || !result.correctModel
-  || (!result.noPayloadRetention && !ALLOW_PAYLOAD_RETENTION)
+  || !result.executionRetentionEnabled
   || result.timeout !== 60
   || (result.localeIo?.required && !result.localeIo?.present))
 
