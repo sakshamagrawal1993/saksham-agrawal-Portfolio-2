@@ -239,9 +239,12 @@ export function isAsyncDifferentialEnabled(): boolean {
   return envBool('LIBERTYMD_ASYNC_DIFFERENTIAL', false)
 }
 
-/** P5-DDX — first turn the differential may run (BO 2026-08-01: 6). */
+/**
+ * P5-DDX — start early enough that a background result can steer the later
+ * clarification phase. It remains detached, so this does not add turn latency.
+ */
 export function getDifferentialStartTurn(): number {
-  return envInt('LIBERTYMD_DIFFERENTIAL_START_TURN', 6, 1, MAX_TURNS)
+  return envInt('LIBERTYMD_DIFFERENTIAL_START_TURN', 4, 1, MAX_TURNS)
 }
 
 /** P5-DDX — top_confidence needed to stop early (BO 2026-08-03: 80). */
@@ -256,6 +259,21 @@ export function getDifferentialStopConfidence(): number {
  */
 export function getDifferentialMaxStaleTurns(): number {
   return envInt('LIBERTYMD_DIFFERENTIAL_MAX_STALE_TURNS', 3, 1, MAX_TURNS)
+}
+
+/**
+ * A short, fail-open phase in which the existing Interview workflow asks
+ * case-specific questions after the core history is complete. It deliberately
+ * uses the same synchronous Interview call; the mini differential remains a
+ * background hint and is never a dependency for serving the turn.
+ */
+export function isDiagnosticClarificationEnabled(): boolean {
+  return envBool('LIBERTYMD_DIAGNOSTIC_CLARIFICATION', true)
+}
+
+/** Maximum patient-visible clarification questions before report release. */
+export function getDiagnosticClarificationMaxQuestions(): number {
+  return envInt('LIBERTYMD_DIAGNOSTIC_CLARIFICATION_MAX_QUESTIONS', 3, 1, 5)
 }
 
 export function isDiagnosisEvenTurnRequired(): boolean {

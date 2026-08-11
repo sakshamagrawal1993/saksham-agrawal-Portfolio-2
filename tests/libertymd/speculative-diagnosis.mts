@@ -332,6 +332,83 @@ Deno.test('workflow-ready history produces a low-confidence physician-review rep
   })
 })
 
+Deno.test('low-confidence complete history asks clarification even when mini diagnosis is absent', async () => {
+  await withEnv('LIBERTYMD_ASYNC_DIFFERENTIAL', 'true', async () => {
+    await withEnv('LIBERTYMD_DIAGNOSTIC_CLARIFICATION', 'true', async () => {
+      const fetchLog = stubFetch((url) => {
+        if (url === INTERVIEW_WEBHOOK) {
+          return interviewPass({
+            next_question: 'Does twisting or changing direction worsen the pain?',
+            options: ['Yes, clearly', 'A little', 'No', 'Not sure'],
+            ready_for_report: false,
+            target_slot: 'diagnostic_clarification',
+            missing_slots: [],
+            diagnostic_clarification: true,
+            clarification_exhausted: false,
+            question_purpose: 'whether twisting provokes knee pain',
+            backup_question: 'Did you recently increase your running distance?',
+            backup_options: ['Yes', 'No', 'Not sure', 'Changed footwear'],
+            backup_question_purpose: 'recent change in running load',
+          })
+        }
+        if (url === GUARDRAIL_WEBHOOK) return guardrailPass()
+        if (url === DIAGNOSIS_WEBHOOK) return diagnosisPass(45)
+        return okResponse({})
+      })
+
+      const { ctx, ops } = createFakeContext({
+        consultation: consultationRow({
+          status: 'interviewing',
+          turn_count: 5,
+          version: 6,
+          filled_slots: HIGH_EVIDENCE_SLOTS,
+          missing_slots: [],
+          target_slot: 'relevant_history',
+          clinical_evidence_score: 85,
+          patient_snapshot: { age: 34 },
+          working_differential: [],
+          differential_top_confidence: null,
+          differential_red_flags_outstanding: [],
+          differential_computed_at_turn: null,
+          workflow_versions: {},
+        }),
+        claim: { accepted: true, replayed: false, current_version: 6 },
+      })
+
+      try {
+        const response = await handleSendMessage(ctx, {
+          action: 'send_message',
+          consultation_id: 'consultation-1',
+          message: 'No medical history or regular medicines',
+          client_message_id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeee0f47',
+          expected_version: 6,
+        })
+        const body = await response.json() as {
+          next_question?: string
+          target_slot?: string
+          diagnosis_ran?: boolean
+        }
+        assertEquals(response.status, 200)
+        assertEquals(body.next_question, 'Does twisting or changing direction worsen the pain?')
+        assertEquals(body.target_slot, 'diagnostic_clarification')
+        assertEquals(body.diagnosis_ran, false)
+        assertEquals(fetchLog.calls.filter((call) => call.url === DIAGNOSIS_WEBHOOK).length, 0)
+        assertEquals(opsFor(ops, 'libertymd_reports', 'insert').length, 0)
+        const updates = opsFor(ops, 'libertymd_consultations', 'update')
+          .map((op) => op.payload as Record<string, unknown>)
+        const clarificationUpdate = updates.find((payload) => {
+          const versions = payload.workflow_versions as Record<string, unknown> | undefined
+          const state = versions?.diagnostic_clarification as Record<string, unknown> | undefined
+          return state?.asked_count === 1
+        })
+        assertTrue(Boolean(clarificationUpdate), 'clarification state persists atomically with the question')
+      } finally {
+        fetchLog.restore()
+      }
+    })
+  })
+})
+
 Deno.test('workflow-ready cannot bypass outstanding differential red flags', async () => {
   await withEnv('LIBERTYMD_ASYNC_DIFFERENTIAL', 'true', async () => {
     const fetchLog = stubFetch((url) => {

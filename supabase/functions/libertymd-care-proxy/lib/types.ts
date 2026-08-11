@@ -172,6 +172,8 @@ export interface ConsultationRow {
   abandoned_at: string | null
   /** US | EU — care region (AC2 numbers via region_config). */
   region?: string
+  /** Persisted consultation-level routing category used by emergency resume. */
+  care_setting?: string
   /** P3-07 journey-wide clinical language (`en` | `es`). Immutable after create. */
   language?: string
 }
@@ -449,6 +451,13 @@ export interface InterviewResult {
   missing_slots: string[]
   input_relevance: ResponseRelevance
   input_relevance_reason: string
+  /** The existing Interview call may enter a bounded, low-confidence phase. */
+  diagnostic_clarification: boolean
+  clarification_exhausted: boolean
+  question_purpose: string
+  backup_question: string
+  backup_options: string[]
+  backup_question_purpose: string
   /**
    * BO 2026-08-01 — running differential + calibrated confidence for the top
    * entry, recomputed every turn. `diagnostic_confidence` is what gates the

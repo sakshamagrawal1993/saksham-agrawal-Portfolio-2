@@ -487,6 +487,12 @@ function interviewHoldingResult(
     missing_slots: missingSlots,
     input_relevance: 'unclear',
     input_relevance_reason: 'Interview workflow unavailable',
+    diagnostic_clarification: false,
+    clarification_exhausted: false,
+    question_purpose: '',
+    backup_question: '',
+    backup_options: [],
+    backup_question_purpose: '',
     // A holding turn produced no clinical reasoning, so the differential is
     // empty and confidence is 0 — never carry a stale figure across an outage.
     working_differential: [],
@@ -526,7 +532,7 @@ export async function runInterview(
   /** Processed, same-patient photo/lab evidence plus answered follow-ups. */
   mediaContext: JsonObject[] = [],
   /** Explicit patient correction is the only path allowed to replace timing slots. */
-  controlContext: { comprehensionCorrection?: boolean } = {},
+  controlContext: { comprehensionCorrection?: boolean; diagnosticClarification?: JsonObject } = {},
 ): Promise<InterviewResult> {
   // Thrown, not swallowed: a post-emergency interview attempt is a caller bug,
   // and returning a fallback question would hide it behind a plausible reply.
@@ -553,6 +559,7 @@ export async function runInterview(
       locale: clinicalLanguage,
       media_context: mediaContext,
       comprehension_correction: controlContext.comprehensionCorrection === true,
+      diagnostic_clarification: controlContext.diagnosticClarification || {},
       ...(differentialHint ? { differential_hint: differentialHint } : {}),
     }, N8N_TIMEOUT_MS.interview, undefined, {
       correlationId: correlationId || undefined,
@@ -608,6 +615,14 @@ export async function runInterview(
       missing_slots: Array.isArray(raw.missing_slots) ? raw.missing_slots.map(String).filter((slot) => CORE_SLOTS.includes(slot)) : [],
       input_relevance: relevance,
       input_relevance_reason: cleanMessage(raw.input_relevance_reason),
+      diagnostic_clarification: raw.diagnostic_clarification === true,
+      clarification_exhausted: raw.clarification_exhausted === true,
+      question_purpose: cleanMessage(raw.question_purpose),
+      backup_question: limitConsultationMessage(raw.backup_question),
+      backup_options: Array.isArray(raw.backup_options)
+        ? raw.backup_options.map((option) => cleanMessage(option)).filter(Boolean).slice(0, 4)
+        : [],
+      backup_question_purpose: cleanMessage(raw.backup_question_purpose),
       // P5-DDX — the interview no longer computes a differential; the
       // mini-differential workflow owns it. These stay on the type as empty
       // defaults so the holding path and older bundles keep type-checking.
@@ -821,7 +836,11 @@ export async function runDifferential(
         .slice(0, 3)
       : []
 
-    if (entries.length === 0) return null
+    const uniqueConditions = new Set(entries.map((entry) => entry.condition.trim().toLocaleLowerCase('en-US')))
+    // Partial or duplicate contenders cannot steer questions or stop a consult.
+    // Returning null is the soft-fail contract: Interview self-steers and the
+    // final Diagnosis workflow remains independent.
+    if (entries.length !== 3 || uniqueConditions.size !== 3) return null
 
     // Belt to the workflow's braces: the stop rule reads top_confidence, so it
     // is re-clamped here rather than trusted across a network boundary.

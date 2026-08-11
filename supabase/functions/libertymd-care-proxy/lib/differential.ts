@@ -101,7 +101,7 @@ export function decideDifferentialStop(
 ): DifferentialStopDecision {
   if (!isAsyncDifferentialEnabled()) return { stop: false, reason: 'flag_off' }
   if (turnCount < getDifferentialStartTurn()) return { stop: false, reason: 'below_turn_floor' }
-  if (stored.topConfidence === null || stored.entries.length === 0) {
+  if (stored.topConfidence === null || stored.entries.length !== 3) {
     return { stop: false, reason: 'no_differential' }
   }
   if (!isDifferentialFresh(stored, turnCount)) return { stop: false, reason: 'stale' }
@@ -123,7 +123,7 @@ export function buildDifferentialHint(
   turnCount: number,
 ): JsonObject | null {
   if (!isAsyncDifferentialEnabled()) return null
-  if (stored.entries.length === 0) return null
+  if (stored.entries.length !== 3) return null
   if (!isDifferentialFresh(stored, turnCount)) return null
   const first = (stored.entries[0] || {}) as Record<string, unknown>
   return {

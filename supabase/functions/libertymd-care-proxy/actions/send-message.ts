@@ -38,7 +38,13 @@
  *      goes through `updateOwnedConsultation` / the row form of `addMessage`.
  */
 import { assessClinicalEvidence, classifyResponseRelevance, decideReportOutcome } from '../clinical-policy.ts'
-import { isSpeculativeDiagnosisEnabled, MAX_TURNS } from '../lib/config.ts'
+import {
+  getDiagnosticClarificationMaxQuestions,
+  getDifferentialStopConfidence,
+  isDiagnosticClarificationEnabled,
+  isSpeculativeDiagnosisEnabled,
+  MAX_TURNS,
+} from '../lib/config.ts'
 import {
   addMessage,
   assertTurnWithinCap,
@@ -62,6 +68,14 @@ import {
   shouldAcceptDifferentialWrite,
   shouldScheduleDifferential,
 } from '../lib/differential.ts'
+import {
+  diagnosticClarificationContext,
+  readDiagnosticClarificationState,
+  selectDiagnosticClarificationCandidate,
+  shouldAskDiagnosticClarification,
+  withDiagnosticClarificationCompleted,
+  withDiagnosticClarificationQuestion,
+} from '../lib/diagnostic-clarification.ts'
 import {
   INFERENCE_ALLOWED_STATUSES,
   isInterviewHoldingSource,
@@ -163,6 +177,12 @@ function cappedComprehensionAcknowledgement(
       : [],
     input_relevance: 'clinical',
     input_relevance_reason: 'Patient confirmed the comprehension summary',
+    diagnostic_clarification: false,
+    clarification_exhausted: true,
+    question_purpose: '',
+    backup_question: '',
+    backup_options: [],
+    backup_question_purpose: '',
     working_differential: [],
     diagnostic_confidence: 0,
     stop_reason: 'comprehension_confirmed',
@@ -454,6 +474,9 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
     let mediaContext = mediaContextForAgents(mediaPackets)
 
     const history = await getHistory(ctx, consultation.id)
+    const clarificationEnabled = isDiagnosticClarificationEnabled()
+    const clarificationMaxQuestions = getDiagnosticClarificationMaxQuestions()
+    const clarificationStateAtStart = readDiagnosticClarificationState(consultation.workflow_versions)
     // The guardrail runs on every turn including the capped one. Skipping the
     // screen because the interview is over would mean an emergency described in
     // the 16th message goes unread — safety asymmetry, CONTEXT.md §4.
@@ -488,7 +511,14 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
           // then falls back to missing_slots exactly as before.
           buildDifferentialHint(readStoredDifferential(consultation), turnCount),
           mediaContext,
-          { comprehensionCorrection },
+          {
+            comprehensionCorrection,
+            diagnosticClarification: diagnosticClarificationContext(
+              consultation.workflow_versions,
+              clarificationEnabled,
+              clarificationMaxQuestions,
+            ),
+          },
         )
         : comprehensionAck
           ? Promise.resolve(cappedComprehensionAcknowledgement(consultation))
@@ -758,6 +788,76 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
     // With the flag off this collapses to the pre-P5 behaviour exactly.
     const differentialState = readStoredDifferential(consultation)
     const differentialStop = decideDifferentialStop(differentialState, turnCount)
+    const clarificationConfidenceLow = differentialState.topConfidence === null
+      || differentialState.topConfidence < getDifferentialStopConfidence()
+    const clarificationEligible = shouldAskDiagnosticClarification({
+      enabled: clarificationEnabled,
+      turnCount,
+      maxTurns: MAX_TURNS,
+      evidenceSufficient: evidence.sufficient,
+      mediaBlocksCompletion,
+      redFlagsOutstanding: differentialState.redFlagsOutstanding,
+      topConfidence: differentialState.topConfidence,
+      stopConfidence: getDifferentialStopConfidence(),
+      state: clarificationStateAtStart,
+      maxQuestions: clarificationMaxQuestions,
+      interviewRequestedClarification: interview.diagnostic_clarification,
+    })
+    const clarificationCandidate = clarificationEligible
+      ? selectDiagnosticClarificationCandidate(interview, history, clarificationStateAtStart)
+      : null
+    let workflowVersionsForTurn = consultation.workflow_versions
+    let servingDiagnosticClarification = false
+    if (clarificationCandidate) {
+      servingDiagnosticClarification = true
+      interview.next_question = clarificationCandidate.question
+      interview.options = clarificationCandidate.options
+      interview.ready_for_report = false
+      interview.target_slot = 'diagnostic_clarification'
+      workflowVersionsForTurn = withDiagnosticClarificationQuestion(
+        workflowVersionsForTurn,
+        clarificationStateAtStart,
+        clarificationCandidate,
+        turnCount,
+      )
+    } else if (clarificationEligible || (
+      clarificationEnabled
+      && evidence.sufficient
+      && clarificationConfidenceLow
+      && !clarificationStateAtStart.completed
+      && (clarificationStateAtStart.askedCount >= clarificationMaxQuestions || interview.clarification_exhausted)
+    )) {
+      const reason = turnCount >= MAX_TURNS
+        ? 'turn_limit'
+        : clarificationStateAtStart.askedCount >= clarificationMaxQuestions
+          ? 'question_budget_exhausted'
+          : 'no_new_question'
+      workflowVersionsForTurn = withDiagnosticClarificationCompleted(
+        workflowVersionsForTurn,
+        clarificationStateAtStart,
+        reason,
+      )
+      // Both candidates repeated, the model declared exhaustion, or the
+      // bounded budget is spent. Fail open to comprehension/report rather than
+      // serving the duplicate question that was rejected above.
+      interview.diagnostic_clarification = false
+      interview.clarification_exhausted = true
+      interview.ready_for_report = true
+      interview.next_question = ''
+      interview.options = []
+      interview.target_slot = 'none'
+    } else if (
+      clarificationEnabled
+      && !clarificationStateAtStart.completed
+      && differentialState.topConfidence !== null
+      && differentialState.topConfidence >= getDifferentialStopConfidence()
+    ) {
+      workflowVersionsForTurn = withDiagnosticClarificationCompleted(
+        workflowVersionsForTurn,
+        clarificationStateAtStart,
+        'confidence_met',
+      )
+    }
     const legacyGateOpen = computeShouldRunDiagnosis({
       evidenceScore: evidence.score,
       turnCount,
@@ -767,6 +867,7 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
       && legacyGateOpen
       && evidence.sufficient
       && differentialState.redFlagsOutstanding.length === 0
+      && !servingDiagnosticClarification
     const baseGateOpen = isAsyncDifferentialEnabled()
       ? ((differentialStop.stop && evidence.sufficient) || workflowReadyStop)
       : legacyGateOpen
@@ -780,7 +881,7 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
     const gateOpen = !mediaBlocksCompletion && (
       baseGateOpen || mediaExtensionReady || informationCapReportReady
     )
-    const comprehensionDone = isComprehensionCompleted(consultation.workflow_versions)
+    const comprehensionDone = isComprehensionCompleted(workflowVersionsForTurn)
 
     // P1-14 — Diagnosis-gate short-circuit: slots summary OverlaySheet before Diagnosis.
     // Once-completed via workflow_versions (no new column). Dismiss ≠ proceed (client-only).
@@ -809,7 +910,7 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
         consecutive_non_clinical_response_count: 0,
         clinical_evidence_score: evidence.score,
         resolution_reason: null,
-        workflow_versions: withComprehensionPending(consultation.workflow_versions),
+        workflow_versions: withComprehensionPending(workflowVersionsForTurn),
         last_activity_at: new Date().toISOString(),
       })
       return jsonResponse({
@@ -829,9 +930,9 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
     }
 
     // Proceed / correct: mark once-completed, then force Diagnosis continuum.
-    let workflowVersions = consultation.workflow_versions
+    let workflowVersions = workflowVersionsForTurn
     if (completingComprehension) {
-      workflowVersions = withComprehensionCompleted(consultation.workflow_versions)
+      workflowVersions = withComprehensionCompleted(workflowVersionsForTurn)
       // Persist before Diagnosis so a holding/unavailable path cannot re-open the sheet forever.
       await updateOwnedConsultation(ctx, consultation, {
         workflow_versions: workflowVersions,
@@ -1103,7 +1204,17 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
       options: interview.options,
       target_slot: interview.target_slot,
       slot_updates: appliedUpdates,
-      metadata: { workflow_source: interview.source, safety_status: guardrail.status },
+      metadata: {
+        workflow_source: interview.source,
+        safety_status: guardrail.status,
+        ...(servingDiagnosticClarification
+          ? {
+            diagnostic_clarification: true,
+            question_purpose: clarificationCandidate?.purpose || '',
+            used_backup_question: clarificationCandidate?.usedBackup === true,
+          }
+          : {}),
+      },
     })
     await updateOwnedConsultation(ctx, consultation, {
       status: nextStatus,
@@ -1118,7 +1229,7 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
       clinical_evidence_score: evidence.score,
       resolution_reason: null,
       last_activity_at: new Date().toISOString(),
-      ...(completingComprehension ? { workflow_versions: workflowVersions } : {}),
+      workflow_versions: workflowVersions,
     })
 
     const nextSlot = String(interview.target_slot || '').trim() || 'none'
@@ -1129,6 +1240,7 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
       had_options: nextOptions.length > 0,
       was_repeat: false,
       evidence_bucket: scoreBucket(evidence.score),
+      diagnostic_clarification: servingDiagnosticClarification,
     })
 
     // P1-08 — detached speculative Diagnosis one gate-step ahead (Q1 A+S1).

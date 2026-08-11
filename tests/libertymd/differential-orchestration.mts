@@ -38,7 +38,11 @@ function withFlag<T>(enabled: boolean, run: () => T): T {
 
 function stored(overrides: Partial<StoredDifferential> = {}): StoredDifferential {
   return {
-    entries: [{ condition: 'Viral pharyngitis', confidence: 85 }],
+    entries: [
+      { condition: 'Viral pharyngitis', confidence: 85 },
+      { condition: 'Streptococcal pharyngitis', confidence: 10 },
+      { condition: 'Allergic pharyngitis', confidence: 5 },
+    ],
     topConfidence: 85,
     redFlagsOutstanding: [],
     computedAtTurn: 8,
@@ -48,7 +52,11 @@ function stored(overrides: Partial<StoredDifferential> = {}): StoredDifferential
 
 function result(overrides: Partial<DifferentialResult> = {}): DifferentialResult {
   return {
-    entries: [{ condition: 'Viral pharyngitis', confidence: 85 }],
+    entries: [
+      { condition: 'Viral pharyngitis', confidence: 85 },
+      { condition: 'Streptococcal pharyngitis', confidence: 10 },
+      { condition: 'Allergic pharyngitis', confidence: 5 },
+    ],
     top_confidence: 85,
     discriminator: 'tonsillar exudate',
     red_flags_outstanding: [],
@@ -106,6 +114,14 @@ Deno.test('P5-DDX: no hint when there is no differential yet', () => {
   })
 })
 
+Deno.test('P5-DDX: partial differential is withheld and cannot stop the interview', () => {
+  withFlag(true, () => {
+    const partial = stored({ entries: [{ condition: 'Viral pharyngitis', confidence: 85 }] })
+    assertEquals(buildDifferentialHint(partial, 9), null)
+    assertEquals(decideDifferentialStop(partial, 9).reason, 'no_differential')
+  })
+})
+
 // --- Rule 3: the stop rule --------------------------------------------------
 
 Deno.test('P5-DDX stop rule: all four conditions met', () => {
@@ -118,7 +134,7 @@ Deno.test('P5-DDX stop rule: all four conditions met', () => {
 
 Deno.test('P5-DDX stop rule: below the turn floor never stops', () => {
   withFlag(true, () => {
-    const decision = decideDifferentialStop(stored({ computedAtTurn: 5 }), 5)
+    const decision = decideDifferentialStop(stored({ computedAtTurn: 3 }), 3)
     assertEquals(decision.stop, false)
     assertEquals(decision.reason, 'below_turn_floor')
   })
@@ -173,8 +189,8 @@ Deno.test('P5-DDX stop rule: with the flag off nothing stops or schedules', () =
 
 Deno.test('P5-DDX: scheduling starts at the configured floor, not before', () => {
   withFlag(true, () => {
-    assertEquals(shouldScheduleDifferential(5), false)
-    assertEquals(shouldScheduleDifferential(6), true)
+    assertEquals(shouldScheduleDifferential(3), false)
+    assertEquals(shouldScheduleDifferential(4), true)
   })
 })
 
