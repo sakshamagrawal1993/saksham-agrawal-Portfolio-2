@@ -781,7 +781,11 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
     // and adds no latency. If both model candidates repeat, use the existing
     // localized open-detail fallback. Diagnostic-clarification questions keep
     // their purpose-aware selector below.
-    if (!interview.ready_for_report && !interview.diagnostic_clarification) {
+    // `ready_for_report` is advisory. Another gate (for example outstanding
+    // differential safety coverage) may still keep the consultation open, so
+    // a question returned alongside ready=true can reach the patient and must
+    // be deduplicated too.
+    if (!interview.diagnostic_clarification && interview.next_question) {
       const nonDuplicateCandidate = selectNonDuplicateInterviewCandidate(
         interview,
         history,

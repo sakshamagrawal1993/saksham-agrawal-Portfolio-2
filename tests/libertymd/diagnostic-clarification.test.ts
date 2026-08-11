@@ -97,6 +97,19 @@ Deno.test('ordinary interview uses same-response backup when primary repeats', (
   assertEquals(selected?.usedBackup, true)
 })
 
+Deno.test('ordinary interview still deduplicates a question returned with advisory ready', () => {
+  const ordinary = interview({
+    diagnostic_clarification: false,
+    ready_for_report: true,
+    next_question: 'Is the physician-review report ready to finish?',
+    backup_question: 'Is there one new symptom detail you have not mentioned?',
+  })
+  const selected = selectNonDuplicateInterviewCandidate(ordinary, [
+    { role: 'assistant', content: 'Is the physician-review report ready to finish?' },
+  ])
+  assertEquals(selected?.question, 'Is there one new symptom detail you have not mentioned?')
+})
+
 Deno.test('ordinary interview falls back locally when both model candidates repeat', () => {
   const ordinary = interview({ diagnostic_clarification: false, target_slot: 'severity' })
   const history = [
