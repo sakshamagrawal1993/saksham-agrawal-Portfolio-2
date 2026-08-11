@@ -192,6 +192,44 @@ export function selectDiagnosticClarificationCandidate(
   )
 }
 
+/**
+ * Apply the same no-repeat boundary to ordinary history-taking questions.
+ * The Interview workflow already returns primary and backup candidates in one
+ * response, so this adds no network call and no user-visible latency.
+ */
+export function selectNonDuplicateInterviewCandidate(
+  interview: InterviewResult,
+  history: Array<{ role?: unknown; content?: unknown }>,
+  fallbackQuestion = '',
+): ClarificationCandidate | null {
+  const priorQuestions = history
+    .filter((message) => message.role === 'assistant')
+    .map((message) => String(message.content || '').trim())
+    .filter(Boolean)
+  return candidateIfNew(
+    interview.next_question,
+    interview.options,
+    interview.question_purpose,
+    priorQuestions,
+    [],
+    false,
+  ) || candidateIfNew(
+    interview.backup_question,
+    interview.backup_options.length ? interview.backup_options : interview.options,
+    interview.backup_question_purpose,
+    priorQuestions,
+    [],
+    true,
+  ) || candidateIfNew(
+    fallbackQuestion,
+    [],
+    'new clinical detail not already discussed',
+    priorQuestions,
+    [],
+    true,
+  )
+}
+
 export function withDiagnosticClarificationQuestion(
   workflowVersions: JsonObject,
   state: DiagnosticClarificationState,

@@ -201,7 +201,12 @@ async function runMundaneCase(testCase) {
   }
   assert(response.state !== 'high_risk', `${testCase.id}: false-positive high-risk UI state after demographics`)
 
-  const observedQuestions = [started.next_question, response.next_question].filter(Boolean)
+  // The first question is hidden behind demographics when that gate is active;
+  // count only questions that the patient could actually see.
+  const observedQuestions = [
+    ...(started.state === 'awaiting_demographics' ? [] : [started.next_question]),
+    response.next_question,
+  ].filter(Boolean)
   let answerIndex = 0
   let sends = 0
   while (sends < 18 && !response.report_ready && !['report_pending_auth', 'completed'].includes(response.state)) {
@@ -231,6 +236,13 @@ async function runMundaneCase(testCase) {
   assert(!/Report for Physician Review|Recommended Action Plan|Red Flags to Watch|SOAP Note/i.test(reportText), `${testCase.id}: English report content leaked`)
   const questionText = observedQuestions.join(' ')
   assert(/\b(wann|wie|welche|haben|ist|sind|beschreiben|seit)\b/i.test(questionText), `${testCase.id}: no German interview question observed`)
+  const normalizedQuestions = observedQuestions.map((question) => String(question)
+    .toLocaleLowerCase('de')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim())
+  assert(new Set(normalizedQuestions).size === normalizedQuestions.length, `${testCase.id}: duplicate patient-facing question observed`)
   console.error(`[German E2E] mundane ${testCase.id}: passed`)
   return {
     id: testCase.id,

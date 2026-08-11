@@ -3,6 +3,7 @@ import {
   questionsNearDuplicate,
   readDiagnosticClarificationState,
   selectDiagnosticClarificationCandidate,
+  selectNonDuplicateInterviewCandidate,
   shouldAskDiagnosticClarification,
   withDiagnosticClarificationCompleted,
   withDiagnosticClarificationQuestion,
@@ -80,6 +81,35 @@ Deno.test('diagnostic clarification refuses both candidates when transcript alre
     history,
     readDiagnosticClarificationState({}),
   ), null)
+})
+
+Deno.test('ordinary interview uses same-response backup when primary repeats', () => {
+  const ordinary = interview({ diagnostic_clarification: false, target_slot: 'severity' })
+  const history = [
+    { role: 'assistant', content: 'Does changing direction or twisting worsen the pain?' },
+  ]
+  const selected = selectNonDuplicateInterviewCandidate(
+    ordinary,
+    history,
+    'Could you share one new detail about what has changed?',
+  )
+  assertEquals(selected?.question, 'Did you recently increase your running distance?')
+  assertEquals(selected?.usedBackup, true)
+})
+
+Deno.test('ordinary interview falls back locally when both model candidates repeat', () => {
+  const ordinary = interview({ diagnostic_clarification: false, target_slot: 'severity' })
+  const history = [
+    { role: 'assistant', content: 'Does changing direction or twisting worsen the pain?' },
+    { role: 'assistant', content: 'Did you recently increase your running distance?' },
+  ]
+  const selected = selectNonDuplicateInterviewCandidate(
+    ordinary,
+    history,
+    'Could you share one new detail about what has changed?',
+  )
+  assertEquals(selected?.question, 'Could you share one new detail about what has changed?')
+  assertEquals(selected?.options, [])
 })
 
 Deno.test('diagnostic clarification state is bounded and preserves unrelated workflow versions', () => {

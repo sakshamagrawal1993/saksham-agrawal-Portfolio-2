@@ -72,6 +72,7 @@ import {
   diagnosticClarificationContext,
   readDiagnosticClarificationState,
   selectDiagnosticClarificationCandidate,
+  selectNonDuplicateInterviewCandidate,
   shouldAskDiagnosticClarification,
   withDiagnosticClarificationCompleted,
   withDiagnosticClarificationQuestion,
@@ -775,6 +776,31 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
     const mediaBlocksCompletion = hasClientMediaUpload
       || currentMediaState.processing
       || currentMediaState.pendingFollowups.length > 0
+    // Refuse repeated ordinary interview questions at the proxy boundary. The
+    // backup was generated in the same Interview call, so selection is local
+    // and adds no latency. If both model candidates repeat, use the existing
+    // localized open-detail fallback. Diagnostic-clarification questions keep
+    // their purpose-aware selector below.
+    if (!interview.ready_for_report && !interview.diagnostic_clarification) {
+      const nonDuplicateCandidate = selectNonDuplicateInterviewCandidate(
+        interview,
+        history,
+        continueFallbackQuestion(clinicalLanguage),
+      )
+      if (nonDuplicateCandidate) {
+        interview.next_question = nonDuplicateCandidate.question
+        interview.options = nonDuplicateCandidate.options
+      } else if (evidence.sufficient) {
+        // Every available candidate has already been asked and the minimum
+        // physician-review history is present. Do not repeat a question merely
+        // to keep the chat alive; let the normal clarification/report gates
+        // below decide the next phase.
+        interview.ready_for_report = true
+        interview.next_question = ''
+        interview.options = []
+        interview.target_slot = 'none'
+      }
+    }
     // P5-DDX T6 — the stop rule.
     //
     // With the flag on, confidence >= 80 remains the confident early-stop path.
