@@ -20,7 +20,7 @@ async function createAnonymousSession() {
   return data.session
 }
 
-async function invoke(session, body, expected = [200]) {
+async function invoke(session, body, expected = [200], attempt = 0) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 80_000)
   try {
@@ -35,6 +35,11 @@ async function invoke(session, body, expected = [200]) {
       signal: controller.signal,
     })
     const data = await response.json().catch(() => ({}))
+    if (response.status === 503 && data?.retryable === true && attempt < 2) {
+      console.error(`[German E2E] ${body.action}: retrying transient 503 (${attempt + 1}/2)`)
+      await new Promise((resolve) => setTimeout(resolve, Math.max(500, Number(data.retry_after_ms || 0))))
+      return invoke(session, body, expected, attempt + 1)
+    }
     if (!expected.includes(response.status)) {
       throw new Error(`${body.action} returned HTTP ${response.status}: ${JSON.stringify(data).slice(0, 1000)}`)
     }

@@ -44,11 +44,18 @@ export interface ClarificationEligibilityInput {
 export function shouldAskDiagnosticClarification(input: ClarificationEligibilityInput): boolean {
   const confidenceLowOrUnavailable = input.topConfidence === null
     || input.topConfidence < input.stopConfidence
+  // A high mini-differential can still disagree with the Interview Agent's
+  // case-specific judgment. Permit at most two explicit final-validation asks
+  // in that situation; this gives the final Diagnosis more evidence without
+  // letting an over-cautious model consume the full conversation budget.
+  const highConfidenceFinalValidation = !confidenceLowOrUnavailable
+    && input.interviewRequestedClarification
+    && input.state.askedCount < Math.min(2, input.maxQuestions)
   return input.enabled
     && input.turnCount < input.maxTurns
     && input.evidenceSufficient
     && !input.mediaBlocksCompletion
-    && confidenceLowOrUnavailable
+    && (confidenceLowOrUnavailable || highConfidenceFinalValidation)
     && !input.state.completed
     && input.state.askedCount < input.maxQuestions
     && input.interviewRequestedClarification

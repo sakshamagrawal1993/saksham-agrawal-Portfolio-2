@@ -261,7 +261,7 @@ Deno.test('outstanding differential discriminators remain eligible for clarifica
   }), true)
 })
 
-Deno.test('diagnostic clarification does not add questions at high confidence or after budget', () => {
+Deno.test('high-confidence mini differential permits two Interview-requested validation questions', () => {
   const base = {
     enabled: true,
     turnCount: 6,
@@ -276,6 +276,19 @@ Deno.test('diagnostic clarification does not add questions at high confidence or
   assertEquals(shouldAskDiagnosticClarification({
     ...base,
     topConfidence: 80,
+    state: readDiagnosticClarificationState({}),
+  }), true)
+  assertEquals(shouldAskDiagnosticClarification({
+    ...base,
+    topConfidence: 90,
+    state: readDiagnosticClarificationState({
+      diagnostic_clarification: { asked_count: 2 },
+    }),
+  }), false)
+  assertEquals(shouldAskDiagnosticClarification({
+    ...base,
+    interviewRequestedClarification: false,
+    topConfidence: 90,
     state: readDiagnosticClarificationState({}),
   }), false)
   assertEquals(shouldAskDiagnosticClarification({
