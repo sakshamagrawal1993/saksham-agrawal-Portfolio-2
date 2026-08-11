@@ -907,6 +907,13 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
     } else if (
       clarificationEnabled
       && !clarificationStateAtStart.completed
+      // Do not permanently close clarification from an early speculative
+      // mini-differential. Its confidence can be high before the core history
+      // is complete and still disagree with the final Diagnosis (for example,
+      // the shoulder-overuse case finished at 45%). Wait until the evidence
+      // floor is met so the Interview Agent gets its bounded final-validation
+      // questions first.
+      && evidence.sufficient
       && differentialState.topConfidence !== null
       && differentialState.topConfidence >= getDifferentialStopConfidence()
     ) {
