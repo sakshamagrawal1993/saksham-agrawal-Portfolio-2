@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { questionsNearDuplicate } from '../supabase/functions/libertymd-care-proxy/lib/diagnostic-clarification.ts'
 
 const url = process.env.VITE_SUPABASE_URL
 const anonKey = process.env.VITE_SUPABASE_ANON_KEY
@@ -255,6 +256,18 @@ async function runMundaneCase(testCase) {
   assert(
     duplicateQuestions.length === 0,
     `${testCase.id}: duplicate patient-facing question observed: ${JSON.stringify(duplicateQuestions)}`,
+  )
+  const semanticDuplicates = []
+  for (let index = 0; index < observedQuestions.length; index += 1) {
+    for (let prior = 0; prior < index; prior += 1) {
+      if (questionsNearDuplicate(observedQuestions[prior], observedQuestions[index])) {
+        semanticDuplicates.push([observedQuestions[prior], observedQuestions[index]])
+      }
+    }
+  }
+  assert(
+    semanticDuplicates.length === 0,
+    `${testCase.id}: semantically repeated question observed: ${JSON.stringify(semanticDuplicates)}`,
   )
   const clarificationState = finalState.consultation?.workflow_versions?.diagnostic_clarification || {}
   const clarificationQuestions = Number(clarificationState.asked_count || 0)

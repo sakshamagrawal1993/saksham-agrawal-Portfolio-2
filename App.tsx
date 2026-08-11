@@ -57,9 +57,11 @@ const AICareProfile = lazy(() => import('./components/AICare/AICareProfile').the
 const AICareChat = lazy(() => import('./components/AICare/AICareChat').then(m => ({ default: m.AICareChat })));
 const AICareObservations = lazy(() => import('./components/AICare/AICareObservations').then(m => ({ default: m.AICareObservations })));
 const LibertyMDApp = lazy(() => import('./components/LibertyMD/LibertyMDApp'));
-const LibertyMDChat = lazy(() => import('./components/LibertyMD/LibertyMDChat'));
+const loadLibertyMDChat = () => import('./components/LibertyMD/LibertyMDChat');
+const loadLibertyMDReportPage = () => import('./components/LibertyMD/LibertyMDReportPage');
+const LibertyMDChat = lazy(loadLibertyMDChat);
 const LibertyMDReportRedeemPage = lazy(() => import('./components/LibertyMD/LibertyMDReportRedeemPage'));
-const LibertyMDReportPage = lazy(() => import('./components/LibertyMD/LibertyMDReportPage'));
+const LibertyMDReportPage = lazy(loadLibertyMDReportPage);
 const LibertyMDFollowupCheckinPage = lazy(() => import('./components/LibertyMD/LibertyMDFollowupCheckinPage'));
 const LibertyMDFollowupUnsubscribePage = lazy(() => import('./components/LibertyMD/LibertyMDFollowupUnsubscribePage'));
 
@@ -71,8 +73,18 @@ const LoadingFallback = () => (
 
 /** P4-09 — LibertyMD Suspense fallback; never Saksham cream/ink on `/liberty-md*`. */
 const LibertyMDLoadingFallback = () => (
-  <div className="flex min-h-screen items-center justify-center bg-[image:var(--libertymd-surface-wash)] font-sans text-libertymd-slate-500">
-    Loading...
+  <div
+    role="status"
+    aria-live="polite"
+    className="flex min-h-[100svh] flex-col items-center justify-center bg-[#f4f8fd] px-6 text-center font-sans text-[#17325f]"
+  >
+    <div className="relative mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#2563eb] text-4xl font-light text-white shadow-[0_16px_40px_rgba(37,99,235,0.28)]">
+      <span aria-hidden="true">+</span>
+      <span className="absolute -inset-2 -z-10 animate-pulse rounded-3xl bg-[#2563eb]/15" aria-hidden="true" />
+    </div>
+    <p className="font-serif text-2xl font-semibold text-[#0f274a]">LibertyMD</p>
+    <p className="mt-2 text-sm font-medium text-[#526784]">Opening your private care experience…</p>
+    <span className="mt-5 h-6 w-6 animate-spin rounded-full border-2 border-[#b9caf0] border-t-[#2563eb]" aria-hidden="true" />
   </div>
 );
 
@@ -205,6 +217,17 @@ function App() {
   // Runs before/without waiting on lazy Chat; Chat remount calls the same helper.
   useEffect(() => {
     syncLibertyMdSessionReplayForPath(location.pathname);
+  }, [location.pathname]);
+
+  // Warm the next LibertyMD route while the patient is reading the current
+  // screen. This removes the lazy-chunk gap that can otherwise look like a
+  // blank white page on slower mobile connections.
+  useEffect(() => {
+    if (location.pathname === '/liberty-md' || location.pathname.startsWith('/liberty-md/t/')) {
+      void loadLibertyMDChat();
+    } else if (location.pathname === '/liberty-md/chat') {
+      void loadLibertyMDReportPage();
+    }
   }, [location.pathname]);
 
   // P4-09 — deliberate boundary: isolate `/liberty-md*` from Saksham cream / Grain.
