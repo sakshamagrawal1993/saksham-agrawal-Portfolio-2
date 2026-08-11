@@ -780,21 +780,24 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
     // Refuse repeated ordinary interview questions at the proxy boundary. The
     // backup was generated in the same Interview call, so selection is local
     // and adds no latency. If both model candidates repeat, use the existing
-    // localized open-detail fallback. Diagnostic-clarification questions keep
-    // their purpose-aware selector below.
+    // localized open-detail fallback. This boundary also applies before the
+    // formal clarification phase: a model label must never exempt a question
+    // from transcript-wide deduplication. The purpose-aware selector below then
+    // records eligible clarification questions in the bounded phase ledger.
     // `ready_for_report` is advisory. Another gate (for example outstanding
     // differential safety coverage) may still keep the consultation open, so
     // a question returned alongside ready=true can reach the patient and must
     // be deduplicated too.
-    if (!interview.diagnostic_clarification && interview.next_question) {
+    if (interview.next_question) {
       const nonDuplicateCandidate = selectNonDuplicateInterviewCandidate(
         interview,
         history,
-        continueFallbackQuestion(clinicalLanguage),
+        evidence.sufficient ? '' : continueFallbackQuestion(clinicalLanguage),
       )
       if (nonDuplicateCandidate) {
         interview.next_question = nonDuplicateCandidate.question
         interview.options = nonDuplicateCandidate.options
+        interview.question_purpose = nonDuplicateCandidate.purpose
       } else if (evidence.sufficient) {
         // Every available candidate has already been asked and the minimum
         // physician-review history is present. Do not repeat a question merely

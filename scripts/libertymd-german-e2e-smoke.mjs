@@ -5,6 +5,7 @@ const anonKey = process.env.VITE_SUPABASE_ANON_KEY
 if (!url || !anonKey) throw new Error('VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are required')
 
 const mode = process.argv.find((arg) => arg.startsWith('--mode='))?.split('=')[1] || 'all'
+const caseFilter = process.argv.find((arg) => arg.startsWith('--case='))?.split('=')[1] || ''
 const validModes = new Set(['all', 'emergency', 'mundane'])
 if (!validModes.has(mode)) throw new Error(`Unsupported mode: ${mode}`)
 
@@ -187,6 +188,7 @@ async function runMundaneCase(testCase) {
     action: 'start_consultation', language: 'de', entry_type: 'freetext', message: testCase.message,
   })
   assert(started.consultation_id, `${testCase.id}: consultation was not created`)
+  console.error(`[German E2E] mundane ${testCase.id}: consultation ${started.consultation_id}`)
   assert(started.language === 'de', `${testCase.id}: language was not preserved`)
   assert(started.emergency !== true, `${testCase.id}: false-positive emergency at start`)
   assert(started.state !== 'high_risk', `${testCase.id}: false-positive high-risk UI state at start`)
@@ -242,7 +244,13 @@ async function runMundaneCase(testCase) {
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim())
-  assert(new Set(normalizedQuestions).size === normalizedQuestions.length, `${testCase.id}: duplicate patient-facing question observed`)
+  const duplicateQuestions = observedQuestions.filter((question, index) => (
+    normalizedQuestions.indexOf(normalizedQuestions[index]) !== index
+  ))
+  assert(
+    duplicateQuestions.length === 0,
+    `${testCase.id}: duplicate patient-facing question observed: ${JSON.stringify(duplicateQuestions)}`,
+  )
   const clarificationState = finalState.consultation?.workflow_versions?.diagnostic_clarification || {}
   const clarificationQuestions = Number(clarificationState.asked_count || 0)
   if (Number(finalState.confidence_score || 0) < 80) {
@@ -265,7 +273,9 @@ if (mode === 'all' || mode === 'emergency') {
   for (const testCase of emergencyCases) output.emergency.push(await runEmergencyCase(testCase))
 }
 if (mode === 'all' || mode === 'mundane') {
-  for (const testCase of mundaneCases) output.mundane.push(await runMundaneCase(testCase))
+  for (const testCase of mundaneCases.filter((item) => !caseFilter || item.id === caseFilter)) {
+    output.mundane.push(await runMundaneCase(testCase))
+  }
 }
 output.passed = [...output.emergency, ...output.mundane].every((result) => result.passed)
 console.log(JSON.stringify(output, null, 2))

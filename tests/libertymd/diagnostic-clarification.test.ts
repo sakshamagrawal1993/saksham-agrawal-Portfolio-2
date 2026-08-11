@@ -132,6 +132,31 @@ Deno.test('ordinary interview uses same-response backup when primary repeats', (
   assertEquals(selected?.usedBackup, true)
 })
 
+Deno.test('diagnostic-labelled question is still deduplicated before clarification eligibility', () => {
+  const diagnostic = interview({
+    diagnostic_clarification: true,
+    next_question: 'Haben Sie geschwollene Lymphknoten im Bereich des Halses bemerkt?',
+    backup_question: 'Haben Sie Schuettelfrost bemerkt?',
+    backup_question_purpose: 'differentiate viral infection from influenza',
+  })
+  const selected = selectNonDuplicateInterviewCandidate(diagnostic, [
+    { role: 'assistant', content: 'Haben Sie geschwollene Lymphknoten im Bereich des Halses bemerkt?' },
+  ])
+  assertEquals(selected?.question, 'Haben Sie Schuettelfrost bemerkt?')
+  assertEquals(selected?.usedBackup, true)
+})
+
+Deno.test('ordinary interview refuses administrative report-closing prompts', () => {
+  const closing = interview({
+    diagnostic_clarification: false,
+    next_question: 'Vielen Dank. Soll ich den Bericht nun abschliessen?',
+    question_purpose: 'Finalize the report.',
+    backup_question: 'Haben Sie noch weitere Fragen, bevor wir abschliessen?',
+    backup_question_purpose: 'Conclude the interview.',
+  })
+  assertEquals(selectNonDuplicateInterviewCandidate(closing, [], ''), null)
+})
+
 Deno.test('ordinary interview still deduplicates a question returned with advisory ready', () => {
   const ordinary = interview({
     diagnostic_clarification: false,

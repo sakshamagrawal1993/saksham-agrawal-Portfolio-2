@@ -115,8 +115,19 @@ function normalize(value: string): string {
     .trim()
 }
 
+const QUESTION_STOPWORDS = new Set([
+  // Common question scaffolding must not make two clinically different asks
+  // look equivalent. Exact-string matching above still catches true repeats.
+  'are', 'can', 'did', 'do', 'does', 'have', 'has', 'is', 'the', 'there', 'you',
+  'haben', 'hat', 'ist', 'sind', 'sie', 'eine', 'einen', 'einer', 'bemerkt',
+  'ha', 'hay', 'tiene', 'tienes', 'usted',
+  'aap', 'hai', 'hain', 'kya',
+])
+
 function tokenSet(value: string): Set<string> {
-  return new Set(normalize(value).split(/\s+/).filter((token) => token.length > 1))
+  return new Set(normalize(value).split(/\s+/).filter((token) => (
+    token.length > 1 && !QUESTION_STOPWORDS.has(token)
+  )))
 }
 
 /** Lightweight, deterministic comparison; the model still receives full history. */
@@ -163,7 +174,7 @@ function candidateIfNew(
   }
 }
 
-function isAdministrativeClosingQuestion(question: string, purpose: string): boolean {
+export function isAdministrativeClosingQuestion(question: string, purpose: string): boolean {
   const value = normalize(`${question} ${purpose}`)
   return /\b(report|physician review|finali[sz]\p{L}*|conclud\p{L}*|close consultation|bericht|informe|rapport|relatorio|relatorio medico)\b/u.test(value)
 }
@@ -249,21 +260,27 @@ export function selectNonDuplicateInterviewCandidate(
     .filter((message) => message.role === 'assistant')
     .map((message) => String(message.content || '').trim())
     .filter(Boolean)
-  return candidateIfNew(
-    interview.next_question,
-    interview.options,
-    interview.question_purpose,
-    priorQuestions,
-    [],
-    false,
-  ) || candidateIfNew(
-    interview.backup_question,
-    interview.backup_options.length ? interview.backup_options : interview.options,
-    interview.backup_question_purpose,
-    priorQuestions,
-    [],
-    true,
-  ) || candidateIfNew(
+  const primary = isAdministrativeClosingQuestion(interview.next_question, interview.question_purpose)
+    ? null
+    : candidateIfNew(
+      interview.next_question,
+      interview.options,
+      interview.question_purpose,
+      priorQuestions,
+      [],
+      false,
+    )
+  const backup = isAdministrativeClosingQuestion(interview.backup_question, interview.backup_question_purpose)
+    ? null
+    : candidateIfNew(
+      interview.backup_question,
+      interview.backup_options.length ? interview.backup_options : interview.options,
+      interview.backup_question_purpose,
+      priorQuestions,
+      [],
+      true,
+    )
+  return primary || backup || candidateIfNew(
     fallbackQuestion,
     [],
     'new clinical detail not already discussed',
