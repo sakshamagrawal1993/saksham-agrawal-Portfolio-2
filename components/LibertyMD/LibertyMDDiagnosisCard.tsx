@@ -77,16 +77,16 @@ export function LibertyMDDiagnosisCard({
       className="rounded-md border border-libertymd-slate-200 bg-white px-4 py-3 shadow-xs"
     >
       {/* Top Header Row: Disease Name (Left) + Confidence Badges (Right) */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="libertymd-type-body-small font-bold text-libertymd-ink sm:text-base">
+      <div className="flex min-w-0 flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <p className="libertymd-type-body-small min-w-0 break-words font-bold text-libertymd-ink sm:text-base">
           {item.name}
         </p>
 
-        <div className="flex flex-wrap items-center justify-end gap-1.5 shrink-0" data-confidence-container>
+        <div className="flex min-w-0 max-w-full flex-wrap items-center justify-start gap-1.5 sm:w-auto sm:justify-end" data-confidence-container>
           {item.requiresClinicalReview || ordinal === 'low' || ordinal === 'minimal' ? (
             <span
               data-clinical-review-badge
-              className="libertymd-type-label inline-flex items-center rounded-md border border-amber-500/40 bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-900"
+              className="libertymd-type-label inline-flex max-w-full items-center whitespace-normal rounded-md border border-amber-500/40 bg-amber-50 px-2 py-1 text-left text-xs font-bold leading-tight text-amber-900"
             >
               {t('report.card.clinicalReviewRequired')}
             </span>
@@ -95,7 +95,7 @@ export function LibertyMDDiagnosisCard({
           {(isSerious || seriousPair || seriousOnly || composedHighSerious) ? (
             <span
               data-serious-badge
-              className={`libertymd-type-label inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-bold ${SERIOUS_BADGE_CLASS}`}
+              className={`libertymd-type-label inline-flex max-w-full items-center whitespace-normal rounded-md border px-2 py-1 text-left text-xs font-bold leading-tight ${SERIOUS_BADGE_CLASS}`}
             >
               {t('report.card.serious')}
             </span>
@@ -105,7 +105,7 @@ export function LibertyMDDiagnosisCard({
             <span
               data-ordinal-badge={ordinal}
               data-confidence-badge={ordinal}
-              className={`libertymd-type-label inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-bold ${ORDINAL_BADGE_CLASS[ordinal]}`}
+              className={`libertymd-type-label inline-flex max-w-full items-center whitespace-normal rounded-md border px-2 py-1 text-left text-xs font-bold leading-tight ${ORDINAL_BADGE_CLASS[ordinal]}`}
             >
               {t(`report.card.ordinal.${ordinal}`)}
             </span>

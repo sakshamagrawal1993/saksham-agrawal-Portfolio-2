@@ -20,7 +20,7 @@ const COPY: Record<ClinicalLanguage, JourneyCopy> = {
     fallbackEntryQuestion: 'When did this symptom begin?',
     comprehensionBridge: 'I have summarised what you have shared so far. Please check the summary.',
     continueFallbacks: [
-      'Could you tell me what has changed since the symptom began?',
+      'How are the symptoms affecting sleep, eating, walking, work, or your usual activities?',
       'How severe is the main symptom now, from 0 to 10?',
       'What makes the symptom better or worse?',
       'Are there any other symptoms you have not mentioned yet?',
@@ -36,7 +36,7 @@ const COPY: Record<ClinicalLanguage, JourneyCopy> = {
     fallbackEntryQuestion: '¿Cuándo comenzó este síntoma?',
     comprehensionBridge: 'He resumido lo que me ha compartido hasta ahora. Por favor revise el resumen.',
     continueFallbacks: [
-      '¿Qué ha cambiado desde que comenzó el síntoma?',
+      '¿Cómo afectan los síntomas al sueño, la alimentación, caminar, el trabajo o sus actividades habituales?',
       '¿Qué intensidad tiene ahora el síntoma principal, de 0 a 10?',
       '¿Qué mejora o empeora el síntoma?',
       '¿Hay algún otro síntoma que aún no haya mencionado?',
@@ -52,7 +52,7 @@ const COPY: Record<ClinicalLanguage, JourneyCopy> = {
     fallbackEntryQuestion: 'Wann hat dieses Symptom begonnen?',
     comprehensionBridge: 'Ich habe Ihre bisherigen Angaben zusammengefasst. Bitte prüfen Sie die Zusammenfassung.',
     continueFallbacks: [
-      'Was hat sich seit Beginn der Symptome verändert?',
+      'Wie beeinträchtigen die Symptome Schlaf, Essen, Gehen, Arbeit oder Ihre üblichen Aktivitäten?',
       'Wie stark ist das Hauptsymptom jetzt auf einer Skala von 0 bis 10?',
       'Was verbessert oder verschlimmert das Symptom?',
       'Gibt es weitere Symptome, die Sie noch nicht erwähnt haben?',
@@ -68,7 +68,7 @@ const COPY: Record<ClinicalLanguage, JourneyCopy> = {
     fallbackEntryQuestion: 'Quand ce symptôme a-t-il commencé ?',
     comprehensionBridge: 'J’ai résumé ce que vous avez partagé jusqu’ici. Veuillez vérifier ce résumé.',
     continueFallbacks: [
-      'Qu’est-ce qui a changé depuis le début des symptômes ?',
+      'Comment les symptômes affectent-ils le sommeil, les repas, la marche, le travail ou vos activités habituelles ?',
       'Quelle est maintenant l’intensité du symptôme principal, de 0 à 10 ?',
       'Qu’est-ce qui améliore ou aggrave le symptôme ?',
       'Y a-t-il d’autres symptômes que vous n’avez pas encore mentionnés ?',
@@ -84,7 +84,7 @@ const COPY: Record<ClinicalLanguage, JourneyCopy> = {
     fallbackEntryQuestion: 'Quando esse sintoma começou?',
     comprehensionBridge: 'Resumi o que você compartilhou até agora. Confira o resumo.',
     continueFallbacks: [
-      'O que mudou desde o início dos sintomas?',
+      'Como os sintomas afetam o sono, a alimentação, caminhar, o trabalho ou suas atividades habituais?',
       'Qual é a intensidade do principal sintoma agora, de 0 a 10?',
       'O que melhora ou piora o sintoma?',
       'Há algum outro sintoma que você ainda não mencionou?',
@@ -100,7 +100,7 @@ const COPY: Record<ClinicalLanguage, JourneyCopy> = {
     fallbackEntryQuestion: 'यह लक्षण कब शुरू हुआ?',
     comprehensionBridge: 'मैंने अब तक आपकी दी हुई जानकारी का सारांश बनाया है। कृपया इसे जाँच लें।',
     continueFallbacks: [
-      'लक्षण शुरू होने के बाद से क्या बदला है?',
+      'लक्षण आपकी नींद, खाने, चलने, काम या रोज़मर्रा की गतिविधियों को कैसे प्रभावित कर रहे हैं?',
       'मुख्य लक्षण अभी 0 से 10 में कितना गंभीर है?',
       'किस चीज़ से लक्षण बेहतर या बदतर होता है?',
       'क्या कोई और लक्षण है जिसका आपने अभी तक उल्लेख नहीं किया?',
@@ -116,7 +116,7 @@ const COPY: Record<ClinicalLanguage, JourneyCopy> = {
     fallbackEntryQuestion: 'Yeh symptom kab shuru hua?',
     comprehensionBridge: 'Maine ab tak aapki di hui jaankari ka summary banaya hai. Kripya ise check karein.',
     continueFallbacks: [
-      'Symptom shuru hone ke baad se kya badla hai?',
+      'Symptoms aapki neend, khane, chalne, kaam ya daily activities ko kaise affect kar rahe hain?',
       'Main symptom abhi 0 se 10 mein kitna severe hai?',
       'Kis cheez se symptom better ya worse hota hai?',
       'Kya koi aur symptom hai jo aapne abhi tak nahi bataya?',

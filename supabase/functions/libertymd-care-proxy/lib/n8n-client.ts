@@ -544,6 +544,9 @@ export async function runInterview(
     const qaSummaryText = buildQASummary(history)
     const denseContextText = buildDenseContext(history, patient, slots)
     const raw = normalizeObject(await postJson(INTERVIEW_WEBHOOK, {
+      // Stored n8n executions must be traceable to the consultation without
+      // relying on timestamps or symptom text.
+      consultation_id: consultationId || undefined,
       history: formattedHistory,
       conversation_transcript: transcriptText,
       transcript: transcriptText,
@@ -607,7 +610,7 @@ export async function runInterview(
       : 'clinical'
     return {
       // Partial but schema-shaped responses may keep empty-field defaults under n8n.
-      next_question: question || (ready ? '' : 'Could you tell me what has changed since the symptom began?'),
+      next_question: question || (ready ? '' : 'How are the symptoms affecting your usual activities right now?'),
       options: ready ? [] : options,
       ready_for_report: ready,
       target_slot: String(raw.target_slot || 'none'),

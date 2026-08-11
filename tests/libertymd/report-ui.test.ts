@@ -120,6 +120,15 @@ Deno.test('P2-02 AC2 · mangled fixture normalizes without throw / undefined lit
   assertEquals(view.redFlags.length, 0)
 })
 
+Deno.test('anonymous self relationship label is not rendered as the patient name', () => {
+  const view = normalizeReportData({
+    patient: { name: 'Me', age: 32, sex_at_birth: 'male' },
+    differential_diagnosis: [],
+  })
+  assertEquals(view.patientInfo?.name, undefined)
+  assertEquals(view.patientInfo?.age, 32)
+})
+
 Deno.test('P2-02 DoD+ · mundane full report maps all major sections; no patient confidence', () => {
   const view = normalizeReportData(MUNDANE_FULL_REPORT_DATA)
   assertEquals(view.headline?.includes('viral'), true)
@@ -665,6 +674,9 @@ Deno.test('P2-04 AC1–AC5 · shared card chrome + waitlist CTA + badge pair', a
   assertEquals(en.report.card.ordinal.low, 'Low confidence')
   assertEquals(en.report.card.ordinal.minimal, 'Minimal confidence')
   assertEquals(en.report.card.serious, 'Serious Condition')
+  assertTrue(card.includes('max-w-full flex-wrap'), 'diagnosis badges must wrap within the mobile card')
+  assertTrue(card.includes('whitespace-normal'), 'long diagnosis badges may wrap instead of overflowing')
+  assertTrue(view.includes("[${t('report.meta.anonymous')}]"), 'anonymous patient label is bracketed and localized')
 
   // Chat + App share handoff wiring (P2-11 parity)
   assertTrue(chat.includes('<LibertyMDReportView'), 'Chat still renders shared report')

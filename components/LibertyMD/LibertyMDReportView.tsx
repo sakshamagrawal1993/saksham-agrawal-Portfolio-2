@@ -515,7 +515,7 @@ export function LibertyMDReportView({
   if (report.soap?.plan) soapChips.push(t('report.teasers.soapPlan'))
   const soapTeaser = showSoap && soapChips.length > 0 ? soapChips.join(' · ') : undefined
 
-  const displayPatientName = report.patientInfo?.name || 'Anonymous Guest'
+  const displayPatientName = report.patientInfo?.name || `[${t('report.meta.anonymous')}]`
   const displayPatientAge = report.patientInfo?.age ? String(report.patientInfo.age) : 'Not specified'
   const rawSex = report.patientInfo?.sexAtBirth
   const displayPatientSex = rawSex ? rawSex.split('_').join(' ').replace(/^./, (c: string) => c.toUpperCase()) : 'Not specified'

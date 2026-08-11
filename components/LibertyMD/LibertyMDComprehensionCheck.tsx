@@ -174,7 +174,7 @@ export function LibertyMDComprehensionCheck({
         </div>
 
         {/* Fixed Action Buttons Container - Pinned at Bottom */}
-        <div className="shrink-0 border-t border-libertymd-slate-200 bg-white px-4 py-3 sm:px-6 shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
+        <div className="shrink-0 border-t border-libertymd-slate-200 bg-white px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:px-6 sm:pb-3 shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
           {correcting ? (
             <div className="flex flex-col gap-2 sm:flex-row">
               <button
@@ -182,7 +182,7 @@ export function LibertyMDComprehensionCheck({
                 data-libertymd-comprehension-correct-submit=""
                 disabled={busy || !correctionText.trim()}
                 onClick={handleCorrectSubmit}
-                className="inline-flex h-12 flex-1 items-center justify-center rounded-full bg-libertymd-blue-600 px-6 text-sm font-bold text-white transition hover:bg-libertymd-blue-700 disabled:opacity-50"
+                className="inline-flex min-h-14 flex-1 items-center justify-center rounded-2xl bg-libertymd-blue-600 px-6 py-3 text-base font-bold leading-tight text-white transition hover:bg-libertymd-blue-700 disabled:opacity-50 sm:min-h-12 sm:rounded-full sm:text-sm"
               >
                 {t('chatx.comprehensionCorrectionSubmit')}
               </button>
@@ -193,7 +193,7 @@ export function LibertyMDComprehensionCheck({
                   setCorrecting(false);
                   setCorrectionText('');
                 }}
-                className="inline-flex h-12 flex-1 items-center justify-center rounded-full border border-libertymd-slate-200 bg-white px-6 text-sm font-bold text-libertymd-ink transition hover:bg-libertymd-slate-50 disabled:opacity-50"
+                className="inline-flex min-h-14 flex-1 items-center justify-center rounded-2xl border border-libertymd-slate-200 bg-white px-6 py-3 text-base font-bold leading-tight text-libertymd-ink transition hover:bg-libertymd-slate-50 disabled:opacity-50 sm:min-h-12 sm:rounded-full sm:text-sm"
               >
                 {t('chatx.comprehensionCorrectionCancel')}
               </button>
@@ -205,7 +205,7 @@ export function LibertyMDComprehensionCheck({
                 data-libertymd-comprehension-proceed=""
                 disabled={busy}
                 onClick={handleProceed}
-                className="inline-flex h-12 flex-1 items-center justify-center rounded-full bg-libertymd-blue-600 px-6 text-sm font-bold text-white shadow-md transition hover:bg-libertymd-blue-700 disabled:opacity-50"
+                className="inline-flex min-h-14 flex-1 items-center justify-center rounded-2xl bg-libertymd-blue-600 px-6 py-3 text-base font-bold leading-tight text-white shadow-md transition hover:bg-libertymd-blue-700 disabled:opacity-50 sm:min-h-12 sm:rounded-full sm:text-sm"
               >
                 {t('chatx.comprehensionProceed')}
               </button>
@@ -214,7 +214,7 @@ export function LibertyMDComprehensionCheck({
                 data-libertymd-comprehension-correct=""
                 disabled={busy}
                 onClick={() => setCorrecting(true)}
-                className="inline-flex h-12 flex-1 items-center justify-center rounded-full border border-libertymd-slate-200 bg-white px-6 text-sm font-bold text-libertymd-ink transition hover:bg-libertymd-slate-50 disabled:opacity-50"
+                className="inline-flex min-h-14 flex-1 items-center justify-center rounded-2xl border border-libertymd-slate-200 bg-white px-6 py-3 text-base font-bold leading-tight text-libertymd-ink transition hover:bg-libertymd-slate-50 disabled:opacity-50 sm:min-h-12 sm:rounded-full sm:text-sm"
               >
                 {t('chatx.comprehensionCorrect')}
               </button>

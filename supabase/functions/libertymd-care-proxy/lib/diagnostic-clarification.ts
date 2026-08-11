@@ -182,7 +182,10 @@ function candidateIfNew(
 
 export function isAdministrativeClosingQuestion(question: string, purpose: string): boolean {
   const value = normalize(`${question} ${purpose}`)
-  return /\b(report|physician review|finali[sz]\p{L}*|conclud\p{L}*|close consultation|bericht|informe|rapport|relatorio|relatorio medico)\b/u.test(value)
+  return /\b(report|physician review|finali[sz]\p{L}*|conclud\p{L}*|close consultation|closing (?:the )?interview|consultation completed|transition to (?:the )?(?:summary|report)|bericht|informe|rapport|relatorio|relatorio medico)\b/u.test(value)
+    || /\b(?:enough|sufficient|necessary) information\b/u.test(value)
+    || /\b(?:gathered|prepare|generate|review|share|proceed|finish)\p{L}*\b.{0,80}\b(?:summary|report|assessment|healthcare provider)\b/u.test(value)
+    || /\b(?:resumen|zusammenfassung|resume|resumo|सारांश|summary)\b.{0,80}\b(?:medico|arzt|medecin|doctor|provider|रिपोर्ट|report)\b/u.test(value)
 }
 
 /** Primary first, backup second. No extra model call is ever made. */

@@ -13,7 +13,7 @@ import type { JsonObject } from './types.ts'
 
 /** Non-open-ended continue fallback — retires Gap 5 "anything else…?" confirm UX. */
 export const CONTINUE_EMPTY_QUESTION_FALLBACK =
-  'Could you tell me what has changed since the symptom began?'
+  'How are the symptoms affecting your usual activities right now?'
 
 /**
  * Brief bridge when the gate opens and the sheet is pending.

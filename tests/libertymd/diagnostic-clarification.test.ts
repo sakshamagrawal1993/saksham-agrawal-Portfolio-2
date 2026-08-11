@@ -1,5 +1,6 @@
 import {
   diagnosticClarificationContext,
+  isAdministrativeClosingQuestion,
   questionsNearDuplicate,
   readDiagnosticClarificationState,
   selectDiagnosticClarificationCandidate,
@@ -93,6 +94,33 @@ Deno.test('diagnostic clarification rejects administrative report-closing prompt
     backup_question_purpose: 'Conclude the interview.',
   }), [], readDiagnosticClarificationState({}))
   assertEquals(selected, null)
+})
+
+Deno.test('administrative closing detector catches summary prose that is not a patient question', () => {
+  const leakedClosings = [
+    [
+      'I have gathered all the necessary information for now. I will summarize your symptoms so you can share this with your healthcare provider.',
+      'Closing the interview as diagnostic clarification is exhausted and clinical history is complete.',
+    ],
+    [
+      'Thank you. I have enough information now to provide a summary of your situation. Are you ready for me to generate that report?',
+      'Signal that history taking is complete and transition to the summary/report generation.',
+    ],
+    [
+      'I have enough information. Please review the summary below for your doctor.',
+      'Transition to final report summary.',
+    ],
+  ]
+  for (const [question, purpose] of leakedClosings) {
+    assertEquals(isAdministrativeClosingQuestion(question, purpose), true, question)
+  }
+  assertEquals(
+    isAdministrativeClosingQuestion(
+      'How are the symptoms affecting sleep, eating, walking, work, or your usual activities?',
+      'functional impact of the symptoms',
+    ),
+    false,
+  )
 })
 
 Deno.test('backend clarification phase may use a new unflagged Interview question', () => {

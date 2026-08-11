@@ -659,7 +659,7 @@ export async function renderPdfBlob(
   pdf.line(margin, y, pageWidth - margin, y)
   y += 12
 
-  const nameStr = doc.patientInfo?.name || copy.meta.anonymous
+  const nameStr = doc.patientInfo?.name || `[${copy.meta.anonymous}]`
   const ageStr = doc.patientInfo?.age ? String(doc.patientInfo.age) : copy.meta.notSpecified
   const rawSexStr = doc.patientInfo?.sexAtBirth
   const sexStr = rawSexStr ? rawSexStr.split('_').join(' ').replace(/^./, (c: string) => c.toUpperCase()) : copy.meta.notSpecified

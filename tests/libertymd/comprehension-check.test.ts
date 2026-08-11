@@ -194,7 +194,7 @@ Deno.test('P1-14 AC1/AC5 · Chat mounts OverlaySheet consumer; Gap 5 literal gon
   if (!send.includes('comprehension_completed') && !send.includes('withComprehensionCompleted')) {
     throw new Error('once-completed flag required')
   }
-  if (!CONTINUE_EMPTY_QUESTION_FALLBACK.includes('changed since the symptom')) {
+  if (!CONTINUE_EMPTY_QUESTION_FALLBACK.includes('usual activities')) {
     throw new Error('continue fallback must stay non-open-ended')
   }
 })
@@ -213,6 +213,9 @@ Deno.test('P1-14 AC3/AC6 · telemetry type + action discriminator; correction me
   }
   if (!sheet.includes("emitContinuationPromptShown('comprehension_check'")) {
     throw new Error('sheet must emit shown with type comprehension_check')
+  }
+  if (!sheet.includes('min-h-14') || !sheet.includes('safe-area-inset-bottom')) {
+    throw new Error('comprehension actions must retain mobile touch height and safe-area padding')
   }
   if (!sheet.includes("action: 'proceed'") || !sheet.includes("action: 'correct'")) {
     throw new Error('sheet must emit action proceed|correct')

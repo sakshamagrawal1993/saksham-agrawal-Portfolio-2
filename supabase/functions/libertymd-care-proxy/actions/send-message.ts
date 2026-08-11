@@ -72,6 +72,7 @@ import {
 } from '../lib/differential.ts'
 import {
   diagnosticClarificationContext,
+  isAdministrativeClosingQuestion,
   readDiagnosticClarificationState,
   selectDiagnosticClarificationCandidate,
   selectDifferentialClarificationCandidate,
@@ -794,25 +795,44 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
     // be deduplicated too.
     let questionCandidatesExhausted = false
     if (interview.next_question) {
-      const nonDuplicateCandidate = selectNonDuplicateInterviewCandidate(
-        interview,
-        history,
-        evidence.sufficient ? [] : continueFallbackQuestions(clinicalLanguage),
-      )
-      if (nonDuplicateCandidate) {
-        interview.next_question = nonDuplicateCandidate.question
-        interview.options = nonDuplicateCandidate.options
-        interview.question_purpose = nonDuplicateCandidate.purpose
-      } else {
-        // Every available candidate has already been asked and the minimum
-        // physician-review fallback set is exhausted. Do not repeat a question
-        // merely to keep the chat alive; let the normal clarification/report
-        // gates below decide the next phase.
+      const administrativeCloseAfterCompletedHistory = evidence.sufficient
+        && !mediaBlocksCompletion
+        && (
+          clarificationStateAtStart.completed
+          || clarificationStateAtStart.askedCount >= clarificationMaxQuestions
+          || interview.clarification_exhausted
+        )
+        && isAdministrativeClosingQuestion(interview.next_question, interview.question_purpose)
+      if (administrativeCloseAfterCompletedHistory) {
+        // The model has stopped asking for clinical information. Do not make
+        // the patient answer several variants of "shall I prepare the report?"
+        // before the deterministic comprehension sheet.
         questionCandidatesExhausted = true
         interview.ready_for_report = true
         interview.next_question = ''
         interview.options = []
         interview.target_slot = 'none'
+      } else {
+        const nonDuplicateCandidate = selectNonDuplicateInterviewCandidate(
+          interview,
+          history,
+          evidence.sufficient ? [] : continueFallbackQuestions(clinicalLanguage),
+        )
+        if (nonDuplicateCandidate) {
+          interview.next_question = nonDuplicateCandidate.question
+          interview.options = nonDuplicateCandidate.options
+          interview.question_purpose = nonDuplicateCandidate.purpose
+        } else {
+          // Every available candidate has already been asked and the minimum
+          // physician-review fallback set is exhausted. Do not repeat a question
+          // merely to keep the chat alive; let the normal clarification/report
+          // gates below decide the next phase.
+          questionCandidatesExhausted = true
+          interview.ready_for_report = true
+          interview.next_question = ''
+          interview.options = []
+          interview.target_slot = 'none'
+        }
       }
     }
     // P5-DDX T6 — the stop rule.

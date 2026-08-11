@@ -477,7 +477,13 @@ export function normalizeReportData(raw: unknown): LibertyMdNormalizedReport {
   const rawPatient = data.patient && typeof data.patient === 'object' && !Array.isArray(data.patient) ? (data.patient as Record<string, unknown>) : null
   const rawProfile = data.profile && typeof data.profile === 'object' && !Array.isArray(data.profile) ? (data.profile as Record<string, unknown>) : null
 
-  const patientName = asOptionalText(rawPatient?.name || rawPatient?.display_name || rawProfile?.display_name || data.patient_name || data.display_name)
+  const rawPatientName = asOptionalText(rawPatient?.name || rawPatient?.display_name || rawProfile?.display_name || data.patient_name || data.display_name)
+  // "Me" is a relationship label from the anonymous self-profile, not a
+  // patient name. Suppress generic placeholders so the renderers can show a
+  // localized [Anonymous] label, including for reports already persisted.
+  const patientName = rawPatientName && !/^(me|self|patient|profile)$/i.test(rawPatientName)
+    ? rawPatientName
+    : undefined
   const patientAge = rawPatient?.age || rawProfile?.age || data.age || data.patient_age
   const patientSex = asOptionalText(rawPatient?.sex_at_birth || rawPatient?.gender || rawProfile?.sex_at_birth || data.sex_at_birth || data.gender)
   const reportDate = asOptionalText(data.date || data.created_at || data.generated_at)
