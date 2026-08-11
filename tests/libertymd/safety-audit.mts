@@ -170,6 +170,34 @@ Deno.test('P0-14c AC8 · n8n webhook transcript fields are stripped before persi
   }
 })
 
+Deno.test('guardrail consistency · low-risk no-red-flag verdict cannot enter high-risk UI state', async () => {
+  const fetchLog = stubFetch((url) => {
+    if (url === GUARDRAIL_WEBHOOK) {
+      return okResponse({
+        status: 'high_risk_continue',
+        risk_level: 'low',
+        crisis_type: 'none',
+        force_end: false,
+        is_emergency: false,
+        care_setting: 'telehealth',
+        message: 'The symptoms remain mild; continue the routine interview.',
+        red_flags: [],
+        source: 'llm',
+      })
+    }
+    return failUpstream(url)
+  })
+  try {
+    const verdict = await runGuardrail('My mild headache began after a long screen day.', [], {}, {})
+    assertEquals(verdict.status, 'pass', 'internally low-risk verdict must not trigger high-risk UI')
+    assertEquals(verdict.risk_level, 'low', 'clinical risk remains low')
+    assertEquals(verdict.force_end, false, 'non-emergency remains non-terminal')
+    assertEquals(verdict.source, 'n8n_low_risk_normalized', 'normalization remains auditable')
+  } finally {
+    fetchLog.restore()
+  }
+})
+
 Deno.test('guardrail specificity · bare shortness of breath plus fever cannot force-end', async () => {
   const fetchLog = stubFetch((url) => {
     if (url === GUARDRAIL_WEBHOOK) {

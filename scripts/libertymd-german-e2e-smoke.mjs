@@ -189,6 +189,7 @@ async function runMundaneCase(testCase) {
   assert(started.consultation_id, `${testCase.id}: consultation was not created`)
   assert(started.language === 'de', `${testCase.id}: language was not preserved`)
   assert(started.emergency !== true, `${testCase.id}: false-positive emergency at start`)
+  assert(started.state !== 'high_risk', `${testCase.id}: false-positive high-risk UI state at start`)
   assert(/Vielen Dank/.test(started.acknowledgement || ''), `${testCase.id}: German acknowledgement missing`)
 
   let response = started
@@ -198,12 +199,13 @@ async function runMundaneCase(testCase) {
       age: testCase.age, sex_at_birth: testCase.sex, consent_version: '1.0',
     })
   }
+  assert(response.state !== 'high_risk', `${testCase.id}: false-positive high-risk UI state after demographics`)
 
   const observedQuestions = [started.next_question, response.next_question].filter(Boolean)
   let answerIndex = 0
   let sends = 0
   while (sends < 18 && !response.report_ready && !['report_pending_auth', 'completed'].includes(response.state)) {
-    if (response.emergency || response.state === 'emergency_stopped') {
+    if (response.emergency || response.state === 'emergency_stopped' || response.state === 'high_risk') {
       throw new Error(`${testCase.id}: false-positive emergency during mundane journey`)
     }
     const isComprehension = Boolean(response.comprehension_check)

@@ -465,21 +465,39 @@ export async function runGuardrail(
     }
     const screenedRaw = enforceCardioRespiratoryEmergencySpecificity(webhookRaw, message, history)
     const forceEnd = Boolean(screenedRaw.force_end || screenedRaw.is_emergency || screenedRaw.status === 'force_end')
-    const status: GuardrailResult['status'] = forceEnd
+    const requestedStatus: GuardrailResult['status'] = forceEnd
       ? 'force_end'
       : screenedRaw.status === 'high_risk_continue'
         ? 'high_risk_continue'
         : 'pass'
+    const riskLevel = String(screenedRaw.risk_level || (forceEnd ? 'emergency' : requestedStatus === 'high_risk_continue' ? 'high' : 'low')) as GuardrailResult['risk_level']
+    const crisisType = String(screenedRaw.crisis_type || 'none')
+    const redFlags = Array.isArray(screenedRaw.red_flags) ? screenedRaw.red_flags.map(String).filter(Boolean).slice(0, 12) : []
+    // The LLM occasionally returned the internally contradictory combination
+    // high_risk_continue + low risk + no crisis + no red flags for routine
+    // symptoms. That briefly put benign consultations into the user-facing
+    // high-risk state even though the same verdict explicitly said there was
+    // no emergency. Normalize that exact contradiction to pass. Medium/high
+    // risk, a named crisis, any red flag, transport failures, and force_end are
+    // deliberately untouched.
+    const lowRiskFalsePositive = !forceEnd
+      && requestedStatus === 'high_risk_continue'
+      && riskLevel === 'low'
+      && crisisType === 'none'
+      && redFlags.length === 0
+    const status: GuardrailResult['status'] = lowRiskFalsePositive ? 'pass' : requestedStatus
     const core = {
       status,
-      risk_level: String(screenedRaw.risk_level || (forceEnd ? 'emergency' : status === 'high_risk_continue' ? 'high' : 'low')) as GuardrailResult['risk_level'],
-      crisis_type: String(screenedRaw.crisis_type || 'none'),
+      risk_level: riskLevel,
+      crisis_type: crisisType,
       force_end: forceEnd,
       is_emergency: forceEnd,
       care_setting: String(screenedRaw.care_setting || (forceEnd ? 'call_911' : 'home')),
       message: limitConsultationMessage(screenedRaw.message || (forceEnd ? 'Please seek emergency care now.' : 'No emergency detected.')),
-      red_flags: Array.isArray(screenedRaw.red_flags) ? screenedRaw.red_flags.map(String).slice(0, 12) : [],
-      source: String(screenedRaw.source || 'n8n'),
+      red_flags: redFlags,
+      source: lowRiskFalsePositive
+        ? 'n8n_low_risk_normalized'
+        : String(screenedRaw.source || 'n8n'),
     }
     const result = {
       ...core,
