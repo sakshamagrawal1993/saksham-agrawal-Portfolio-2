@@ -3,6 +3,7 @@ import {
   EMERGENCY_PATTERN_SET_VERSION,
   type EmergencyCareSetting,
 } from './emergency-patterns.ts'
+import { isUsableTimingSlotValue } from './lib/slots.ts'
 
 export type ClinicalSlots = Record<string, unknown>
 
@@ -71,6 +72,19 @@ export const hasValue = (value: unknown): boolean => {
   return true
 }
 
+const hasSafetyNegative = (value: unknown): boolean => {
+  if (!hasValue(value)) return false
+  if (Array.isArray(value)) return value.some(hasSafetyNegative)
+  const text = String(value).trim()
+  return /\b(no|none|without|den(?:y|ies|ied)|absent|negative|normal|sin|nada|ningun[oa]?|non|rien|aucun(?:e)?|sans|nein|kein(?:e|en|er|es)?|ohne|nahi|nahin|koi\s+nahi|kuch\s+nahi|nao|não|nenhum(?:a)?|sem)\b|नहीं|नही|कोई\s+नहीं/u.test(text)
+}
+
+function hasClinicalSlotValue(slot: string, value: unknown): boolean {
+  if (slot === 'onset' || slot === 'duration') return isUsableTimingSlotValue(value)
+  if (slot === 'red_flag_negatives') return hasSafetyNegative(value)
+  return hasValue(value)
+}
+
 export function detectDeterministicEmergency(message: string): DeterministicEmergency | null {
   const text = message.toLowerCase()
   for (const rule of EMERGENCY_PATTERNS) {
@@ -110,12 +124,12 @@ export function detectDeterministicEmergency(message: string): DeterministicEmer
 }
 
 export function assessClinicalEvidence(slots: ClinicalSlots): EvidenceAssessment {
-  const present = Object.keys(SLOT_WEIGHTS).filter((slot) => hasValue(slots[slot]))
+  const present = Object.keys(SLOT_WEIGHTS).filter((slot) => hasClinicalSlotValue(slot, slots[slot]))
   const missing = Object.keys(SLOT_WEIGHTS).filter((slot) => !present.includes(slot))
   const score = present.reduce((total, slot) => total + SLOT_WEIGHTS[slot], 0)
-  const timelinePresent = hasValue(slots.onset) || hasValue(slots.duration)
+  const timelinePresent = isUsableTimingSlotValue(slots.onset) || isUsableTimingSlotValue(slots.duration)
   const symptomDetailPresent = hasValue(slots.severity) || hasValue(slots.associated_symptoms)
-  const safetyPresent = hasValue(slots.red_flag_negatives)
+  const safetyPresent = hasSafetyNegative(slots.red_flag_negatives)
 
   return {
     score,

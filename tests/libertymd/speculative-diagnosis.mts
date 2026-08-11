@@ -76,10 +76,10 @@ function guardrailPass() {
   })
 }
 
-function diagnosisPass() {
+function diagnosisPass(confidence = 82) {
   return okResponse({
     valid_report: true,
-    confidence_score: 82,
+    confidence_score: confidence,
     differential_diagnosis: [
       { name: 'tension headache', likelihood: 'most_likely' },
       { name: 'migraine', likelihood: 'possible' },
@@ -260,6 +260,123 @@ Deno.test('P2-14 AC7 · call-volume delta: odd turn 7 newly eligible (+1 acted-u
   assertEquals(legacyCount, 0, 'legacy even-required: odd turn 7 → 0 Diagnosis')
   assertEquals(retunedCount, 1, 'retuned gate: odd turn 7 → 1 acted-upon Diagnosis')
   assertEquals(retunedCount - legacyCount, 1, 'AC7 expected +1 acted-upon on newly eligible odd turn')
+})
+
+Deno.test('workflow-ready history produces a low-confidence physician-review report before turn 15', async () => {
+  await withEnv('LIBERTYMD_ASYNC_DIFFERENTIAL', 'true', async () => {
+    const fetchLog = stubFetch((url) => {
+      if (url === INTERVIEW_WEBHOOK) {
+        return interviewPass({
+          ready_for_report: true,
+          target_slot: 'none',
+          options: [],
+          missing_slots: [],
+        })
+      }
+      if (url === GUARDRAIL_WEBHOOK) return guardrailPass()
+      if (url === DIAGNOSIS_WEBHOOK) return diagnosisPass(45)
+      return okResponse({})
+    })
+
+    const { ctx, ops } = createFakeContext({
+      consultation: consultationRow({
+        status: 'interviewing',
+        turn_count: 5,
+        version: 6,
+        filled_slots: HIGH_EVIDENCE_SLOTS,
+        missing_slots: [],
+        target_slot: 'associated_symptoms',
+        clinical_evidence_score: 85,
+        patient_snapshot: { age: 34 },
+        working_differential: [
+          { condition: 'Viral syndrome', confidence: 45 },
+          { condition: 'Influenza', confidence: 35 },
+          { condition: 'Other infection', confidence: 20 },
+        ],
+        differential_top_confidence: 45,
+        differential_red_flags_outstanding: [],
+        differential_computed_at_turn: 5,
+        workflow_versions: { comprehension_completed: true },
+      }),
+      claim: { accepted: true, replayed: false, current_version: 6 },
+    })
+
+    try {
+      const response = await handleSendMessage(ctx, {
+        action: 'send_message',
+        consultation_id: 'consultation-1',
+        message: 'Nothing else to add',
+        client_message_id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeee0f45',
+        expected_version: 6,
+      })
+      const body = await response.json() as {
+        report_ready?: boolean
+        confidence_score?: number
+        turn_count?: number
+      }
+
+      assertEquals(response.status, 200)
+      assertEquals(body.report_ready, true, 'Low confidence still receives a report')
+      assertEquals(body.confidence_score, 45, 'Confidence is preserved, not inflated')
+      assertEquals(body.turn_count, 6, 'Report completes before the turn ceiling')
+      assertEquals(fetchLog.calls.filter((call) => call.url === DIAGNOSIS_WEBHOOK).length, 1)
+      assertEquals(opsFor(ops, 'libertymd_reports', 'insert').length, 1)
+
+      const updates = opsFor(ops, 'libertymd_consultations', 'update')
+      const completion = updates.map((op) => op.payload as Record<string, unknown>)
+        .find((payload) => payload.resolution_reason === 'workflow_ready')
+      assertTrue(Boolean(completion), 'Completion records workflow_ready rather than high confidence')
+    } finally {
+      fetchLog.restore()
+    }
+  })
+})
+
+Deno.test('workflow-ready cannot bypass outstanding differential red flags', async () => {
+  await withEnv('LIBERTYMD_ASYNC_DIFFERENTIAL', 'true', async () => {
+    const fetchLog = stubFetch((url) => {
+      if (url === INTERVIEW_WEBHOOK) {
+        return interviewPass({ ready_for_report: true, target_slot: 'none', options: [], missing_slots: [] })
+      }
+      if (url === GUARDRAIL_WEBHOOK) return guardrailPass()
+      if (url === DIAGNOSIS_WEBHOOK) return diagnosisPass(45)
+      return okResponse({})
+    })
+
+    const { ctx } = createFakeContext({
+      consultation: consultationRow({
+        status: 'interviewing',
+        turn_count: 5,
+        version: 6,
+        filled_slots: HIGH_EVIDENCE_SLOTS,
+        missing_slots: [],
+        clinical_evidence_score: 85,
+        working_differential: [{ condition: 'Viral syndrome', confidence: 45 }],
+        differential_top_confidence: 45,
+        differential_red_flags_outstanding: ['difficulty breathing'],
+        differential_computed_at_turn: 5,
+        workflow_versions: { comprehension_completed: true },
+      }),
+      claim: { accepted: true, replayed: false, current_version: 6 },
+    })
+
+    try {
+      const response = await handleSendMessage(ctx, {
+        action: 'send_message',
+        consultation_id: 'consultation-1',
+        message: 'Nothing else to add',
+        client_message_id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeee0f46',
+        expected_version: 6,
+      })
+      const body = await response.json() as { report_ready?: boolean; diagnosis_ran?: boolean }
+      assertEquals(response.status, 200)
+      assertEquals(body.report_ready, undefined, 'Safety gap keeps the interview open')
+      assertEquals(body.diagnosis_ran, false, 'Diagnosis does not run through an open red flag')
+      assertEquals(fetchLog.calls.filter((call) => call.url === DIAGNOSIS_WEBHOOK).length, 0)
+    } finally {
+      fetchLog.restore()
+    }
+  })
 })
 
 Deno.test('P1-08 AC2 · material equality ignores missing_slots; deltas invalidate', () => {
@@ -607,7 +724,7 @@ Deno.test('P1-08 AC3 · stale speculative never served → fresh Diagnosis inser
         return interviewPass({
           target_slot: 'associated_symptoms',
           ready_for_report: true,
-          slot_updates: { onset: 'three days ago' },
+          slot_updates: { location: 'behind the eyes' },
           missing_slots: [],
         })
       }
@@ -655,7 +772,7 @@ Deno.test('P1-08 AC3 · stale speculative never served → fresh Diagnosis inser
       const response = await handleSendMessage(ctx, {
         action: 'send_message',
         consultation_id: 'consultation-1',
-        message: 'It started three days ago',
+        message: 'The pain is behind my eyes',
         client_message_id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeee0004',
         expected_version: 6,
       })

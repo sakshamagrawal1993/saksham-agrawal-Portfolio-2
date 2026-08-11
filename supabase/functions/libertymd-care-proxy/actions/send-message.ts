@@ -87,7 +87,7 @@ import {
   continueFallbackQuestion,
   reportGateMessage,
 } from '../lib/clinical-copy.ts'
-import { calculateMissingSlots } from '../lib/slots.ts'
+import { calculateMissingSlots, mergeClinicalSlotUpdates } from '../lib/slots.ts'
 import {
   computeShouldRunDiagnosis,
   isOneTurnFromDiagnosisGate,
@@ -488,6 +488,7 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
           // then falls back to missing_slots exactly as before.
           buildDifferentialHint(readStoredDifferential(consultation), turnCount),
           mediaContext,
+          { comprehensionCorrection },
         )
         : comprehensionAck
           ? Promise.resolve(cappedComprehensionAcknowledgement(consultation))
@@ -581,10 +582,12 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
     const consecutiveNonClinicalResponseCount = isNonClinical
       ? (consultation.consecutive_non_clinical_response_count || 0) + 1
       : 0
-    const provisionalEvidence = assessClinicalEvidence({
-      ...consultation.filled_slots,
-      ...interview.slot_updates,
-    })
+    const { slots, appliedUpdates } = mergeClinicalSlotUpdates(
+      consultation.filled_slots,
+      interview.slot_updates,
+      { allowTimingOverwrite: comprehensionCorrection },
+    )
+    const provisionalEvidence = assessClinicalEvidence(slots)
 
     if (isNonClinical && !(turnCount >= MAX_TURNS && provisionalEvidence.present.length > 0)) {
       // P1-10 Q6A: last non-off-topic clinical ask (skip prior redirects), not nested warm copy.
@@ -602,7 +605,7 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
       // the consultation still sat in `interviewing` replaying the same redirect.
       //
       // A chief_complaint that itself classifies as off-topic is not evidence.
-      const mergedSlots = { ...consultation.filled_slots, ...interview.slot_updates }
+      const mergedSlots = slots
       const chiefComplaintText = String((mergedSlots as JsonObject)?.chief_complaint ?? '').trim()
       const chiefComplaintIsClinical = chiefComplaintText.length > 0
         && classifyResponseRelevance(chiefComplaintText) === 'clinical'
@@ -664,7 +667,6 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
       })
     }
 
-    const slots = { ...consultation.filled_slots, ...interview.slot_updates }
     const missingSlots = interview.missing_slots.length ? interview.missing_slots : calculateMissingSlots(slots)
     const evidence = assessClinicalEvidence(slots)
 
@@ -745,11 +747,13 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
       || currentMediaState.pendingFollowups.length > 0
     // P5-DDX T6 — the stop rule.
     //
-    // With the flag on, the mini-differential decides when the interview may
-    // end: turn >= 6 AND confidence >= 80 AND no outstanding red flags AND not
-    // stale. All four are evaluated here, from stored state, so neither the
-    // interview nor the differential workflow gets a vote — a model cannot talk
-    // its way past a rule it does not execute.
+    // With the flag on, confidence >= 80 remains the confident early-stop path.
+    // A second path handles a different question: whether the history is
+    // complete enough for a physician-review report even though no single
+    // diagnosis is highly certain. That path requires the Interview workflow to
+    // declare its useful questions exhausted, the deterministic evidence floor,
+    // and zero outstanding differential red flags. It never changes or inflates
+    // the differential confidence itself.
     //
     // With the flag off this collapses to the pre-P5 behaviour exactly.
     const differentialState = readStoredDifferential(consultation)
@@ -759,11 +763,12 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
       turnCount,
       readyForReport: interview.ready_for_report,
     })
+    const workflowReadyStop = interview.ready_for_report
+      && legacyGateOpen
+      && evidence.sufficient
+      && differentialState.redFlagsOutstanding.length === 0
     const baseGateOpen = isAsyncDifferentialEnabled()
-      // Evidence sufficiency still applies: the differential says "I know what
-      // this is", the evidence score says "enough was actually recorded to
-      // write a report from". Both, not either.
-      ? (differentialStop.stop && evidence.sufficient)
+      ? ((differentialStop.stop && evidence.sufficient) || workflowReadyStop)
       : legacyGateOpen
     const mediaExtensionReady = Boolean(answeredMediaFollowup)
       && !mediaBlocksCompletion
@@ -786,7 +791,7 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
       await addMessage(ctx, consultation, 'assistant', bridge, {
         options: [],
         target_slot: interview.target_slot,
-        slot_updates: interview.slot_updates,
+        slot_updates: appliedUpdates,
         metadata: {
           workflow_source: interview.source,
           safety_status: guardrail.status,
@@ -912,7 +917,11 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
         differential_confidence_bucket: scoreBucket(differentialState.topConfidence ?? 0),
         differential_stale_turns: stalenessTurns(differentialState, turnCount) ?? -1,
         differential_red_flags_open: differentialState.redFlagsOutstanding.length,
-        stop_reason: differentialStop.stop ? 'confidence_met' : differentialStop.reason,
+        stop_reason: differentialStop.stop
+          ? 'confidence_met'
+          : workflowReadyStop
+            ? 'workflow_ready'
+            : differentialStop.reason,
       })
 
       if (!servedFromSpeculativeCache && diagnosis.failure) {
@@ -1093,7 +1102,7 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
     await addMessage(ctx, consultation, 'assistant', nextQuestion, {
       options: interview.options,
       target_slot: interview.target_slot,
-      slot_updates: interview.slot_updates,
+      slot_updates: appliedUpdates,
       metadata: { workflow_source: interview.source, safety_status: guardrail.status },
     })
     await updateOwnedConsultation(ctx, consultation, {

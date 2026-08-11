@@ -18,6 +18,7 @@ import {
   detectDeterministicEmergency,
 } from '../../supabase/functions/libertymd-care-proxy/clinical-policy.ts'
 import { EMERGENCY_PATTERN_SET_VERSION } from '../../supabase/functions/libertymd-care-proxy/emergency-patterns.ts'
+import { mergeClinicalSlotUpdates } from '../../supabase/functions/libertymd-care-proxy/lib/slots.ts'
 import { LIBERTYMD_VALIDATION_CASES } from '../../scripts/libertymd-validation-cases.ts'
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -27,6 +28,97 @@ function assert(condition: unknown, message: string): asserts condition {
 function assertEquals<T>(actual: T, expected: T, message: string) {
   assert(Object.is(actual, expected), `${message}: expected ${String(expected)}, got ${String(actual)}`)
 }
+
+Deno.test('normal interview turns preserve established onset and duration', () => {
+  const result = mergeClinicalSlotUpdates(
+    { onset: '3-5 days ago', duration: '3-5 days', severity: 'mild' },
+    { onset: 'comes and goes', duration: 'a few hours', severity: 'moderate' },
+  )
+
+  assertEquals(result.slots.onset, '3-5 days ago', 'Established onset must survive')
+  assertEquals(result.slots.duration, '3-5 days', 'Established duration must survive')
+  assertEquals(result.slots.severity, 'moderate', 'Non-timing updates still apply')
+  assert(!('onset' in result.appliedUpdates), 'Rejected onset must not be persisted as an applied update')
+  assert(!('duration' in result.appliedUpdates), 'Rejected duration must not be persisted as an applied update')
+})
+
+Deno.test('acute illness may store identical onset and duration values', () => {
+  const result = mergeClinicalSlotUpdates(
+    { chief_complaint: 'fever' },
+    { onset: 'four days ago', duration: 'four days ago' },
+  )
+
+  assertEquals(result.slots.onset, 'four days ago', 'Onset is filled')
+  assertEquals(result.slots.duration, 'four days ago', 'Identical duration is valid')
+})
+
+Deno.test('frequency-only answers do not count as timeline completeness', () => {
+  const evidence = assessClinicalEvidence({
+    chief_complaint: 'fever',
+    onset: 'comes and goes throughout the day',
+    severity: 'moderate',
+    associated_symptoms: ['body aches'],
+    red_flag_negatives: ['no chest pain'],
+    relevant_history: 'none',
+  })
+
+  assert(!evidence.present.includes('onset'), 'Pattern-only onset must be rejected')
+  assert(!evidence.sufficient, 'Pattern-only timing cannot make history sufficient')
+})
+
+Deno.test('positive associated symptoms misfiled as red-flag negatives do not count as safety coverage', () => {
+  const evidence = assessClinicalEvidence({
+    chief_complaint: 'fever',
+    onset: 'four days ago',
+    severity: 'moderate',
+    associated_symptoms: ['body aches'],
+    red_flag_negatives: ['sore throat', 'cough'],
+    relevant_history: 'diabetes',
+  })
+
+  assert(!evidence.present.includes('red_flag_negatives'), 'Positive symptoms are not safety negatives')
+  assert(!evidence.sufficient, 'Unanswered safety coverage cannot be sufficient')
+})
+
+Deno.test('a missing timing field may be filled without replacing its established peer', () => {
+  const result = mergeClinicalSlotUpdates(
+    { onset: 'four days ago' },
+    { onset: 'comes and goes', duration: 'four days ago' },
+  )
+
+  assertEquals(result.slots.onset, 'four days ago', 'Existing onset remains')
+  assertEquals(result.slots.duration, 'four days ago', 'Empty duration may be filled identically')
+})
+
+Deno.test('frequency-only timing updates are discarded even when the timing field is empty', () => {
+  const result = mergeClinicalSlotUpdates(
+    { chief_complaint: 'fever' },
+    { onset: 'comes and goes throughout the day', duration: 'intermittently' },
+  )
+
+  assert(!('onset' in result.slots), 'Pattern must not become onset')
+  assert(!('duration' in result.slots), 'Pattern must not become duration')
+})
+
+Deno.test('pattern plus explicit elapsed time remains valid duration evidence', () => {
+  const result = mergeClinicalSlotUpdates(
+    { chief_complaint: 'fever' },
+    { duration: 'constant for four days' },
+  )
+
+  assertEquals(result.slots.duration, 'constant for four days', 'Elapsed duration must survive pattern wording')
+})
+
+Deno.test('explicit comprehension correction may replace timing values', () => {
+  const result = mergeClinicalSlotUpdates(
+    { onset: 'last week', duration: 'one week' },
+    { onset: 'yesterday', duration: 'one day' },
+    { allowTimingOverwrite: true },
+  )
+
+  assertEquals(result.slots.onset, 'yesterday', 'Explicit correction replaces onset')
+  assertEquals(result.slots.duration, 'one day', 'Explicit correction replaces duration')
+})
 
 Deno.test('Heart Attack fixture force-ends before model inference', () => {
   const result = detectDeterministicEmergency(LIBERTYMD_VALIDATION_CASES.heartAttack.message)

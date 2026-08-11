@@ -525,6 +525,8 @@ export async function runInterview(
   differentialHint?: JsonObject | null,
   /** Processed, same-patient photo/lab evidence plus answered follow-ups. */
   mediaContext: JsonObject[] = [],
+  /** Explicit patient correction is the only path allowed to replace timing slots. */
+  controlContext: { comprehensionCorrection?: boolean } = {},
 ): Promise<InterviewResult> {
   // Thrown, not swallowed: a post-emergency interview attempt is a caller bug,
   // and returning a fallback question would hide it behind a plausible reply.
@@ -550,6 +552,7 @@ export async function runInterview(
       language: clinicalLanguage,
       locale: clinicalLanguage,
       media_context: mediaContext,
+      comprehension_correction: controlContext.comprehensionCorrection === true,
       ...(differentialHint ? { differential_hint: differentialHint } : {}),
     }, N8N_TIMEOUT_MS.interview, undefined, {
       correlationId: correlationId || undefined,
