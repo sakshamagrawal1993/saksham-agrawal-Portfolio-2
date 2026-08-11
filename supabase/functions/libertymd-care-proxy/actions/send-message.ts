@@ -101,6 +101,7 @@ import {
 import {
   comprehensionBridgeMessage,
   continueFallbackQuestion,
+  continueFallbackQuestions,
   reportGateMessage,
 } from '../lib/clinical-copy.ts'
 import { calculateMissingSlots, mergeClinicalSlotUpdates } from '../lib/slots.ts'
@@ -788,21 +789,23 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
     // differential safety coverage) may still keep the consultation open, so
     // a question returned alongside ready=true can reach the patient and must
     // be deduplicated too.
+    let questionCandidatesExhausted = false
     if (interview.next_question) {
       const nonDuplicateCandidate = selectNonDuplicateInterviewCandidate(
         interview,
         history,
-        evidence.sufficient ? '' : continueFallbackQuestion(clinicalLanguage),
+        evidence.sufficient ? [] : continueFallbackQuestions(clinicalLanguage),
       )
       if (nonDuplicateCandidate) {
         interview.next_question = nonDuplicateCandidate.question
         interview.options = nonDuplicateCandidate.options
         interview.question_purpose = nonDuplicateCandidate.purpose
-      } else if (evidence.sufficient) {
+      } else {
         // Every available candidate has already been asked and the minimum
-        // physician-review history is present. Do not repeat a question merely
-        // to keep the chat alive; let the normal clarification/report gates
-        // below decide the next phase.
+        // physician-review fallback set is exhausted. Do not repeat a question
+        // merely to keep the chat alive; let the normal clarification/report
+        // gates below decide the next phase.
+        questionCandidatesExhausted = true
         interview.ready_for_report = true
         interview.next_question = ''
         interview.options = []
@@ -862,6 +865,7 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
     let workflowVersionsForTurn = consultation.workflow_versions
     let servingDiagnosticClarification = false
     if (clarificationCandidate) {
+      questionCandidatesExhausted = false
       servingDiagnosticClarification = true
       interview.next_question = clarificationCandidate.question
       interview.options = clarificationCandidate.options
@@ -931,8 +935,11 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
     // physician-review report attempt. Confidence affects its labels, not its
     // existence. A score of zero is the only no-health-information exception.
     const informationCapReportReady = turnCount >= MAX_TURNS && evidence.present.length > 0
+    const questionExhaustedReportReady = questionCandidatesExhausted
+      && evidence.present.length > 0
+      && !servingDiagnosticClarification
     const gateOpen = !mediaBlocksCompletion && (
-      baseGateOpen || mediaExtensionReady || informationCapReportReady
+      baseGateOpen || mediaExtensionReady || informationCapReportReady || questionExhaustedReportReady
     )
     const comprehensionDone = isComprehensionCompleted(workflowVersionsForTurn)
 

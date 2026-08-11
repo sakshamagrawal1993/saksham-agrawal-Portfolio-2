@@ -253,7 +253,7 @@ export function selectDifferentialClarificationCandidate(
 export function selectNonDuplicateInterviewCandidate(
   interview: InterviewResult,
   history: Array<{ role?: unknown; content?: unknown }>,
-  fallbackQuestion = '',
+  fallbackQuestions: string | string[] = '',
 ): ClarificationCandidate | null {
   const priorQuestions = history
     .filter((message) => message.role === 'assistant')
@@ -279,14 +279,20 @@ export function selectNonDuplicateInterviewCandidate(
       [],
       true,
     )
-  return primary || backup || candidateIfNew(
-    fallbackQuestion,
-    [],
-    'new clinical detail not already discussed',
-    priorQuestions,
-    [],
-    true,
-  )
+  if (primary || backup) return primary || backup
+  const localFallbacks = Array.isArray(fallbackQuestions) ? fallbackQuestions : [fallbackQuestions]
+  for (const fallbackQuestion of localFallbacks) {
+    const fallback = candidateIfNew(
+      fallbackQuestion,
+      [],
+      'new clinical detail not already discussed',
+      priorQuestions,
+      [],
+      true,
+    )
+    if (fallback) return fallback
+  }
+  return null
 }
 
 export function withDiagnosticClarificationQuestion(

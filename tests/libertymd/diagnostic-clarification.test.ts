@@ -185,6 +185,24 @@ Deno.test('ordinary interview falls back locally when both model candidates repe
   assertEquals(selected?.options, [])
 })
 
+Deno.test('ordinary interview advances through a fallback pool without repeating', () => {
+  const ordinary = interview({ diagnostic_clarification: false, target_slot: 'severity' })
+  const history = [
+    { role: 'assistant', content: 'Does changing direction or twisting worsen the pain?' },
+    { role: 'assistant', content: 'Did you recently increase your running distance?' },
+    { role: 'assistant', content: 'What has changed since the symptom began?' },
+  ]
+  const selected = selectNonDuplicateInterviewCandidate(
+    ordinary,
+    history,
+    [
+      'What has changed since the symptom began?',
+      'How severe is the main symptom now, from 0 to 10?',
+    ],
+  )
+  assertEquals(selected?.question, 'How severe is the main symptom now, from 0 to 10?')
+})
+
 Deno.test('diagnostic clarification state is bounded and preserves unrelated workflow versions', () => {
   const initial: JsonObject = { guardrail: 'v1', comprehension: { completed: false } }
   const state = readDiagnosticClarificationState(initial)
