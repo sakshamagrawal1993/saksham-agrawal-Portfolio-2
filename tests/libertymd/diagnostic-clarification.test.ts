@@ -227,6 +227,22 @@ Deno.test('diagnostic clarification remains eligible when mini diagnosis is unav
   }), true)
 })
 
+Deno.test('outstanding differential discriminators remain eligible for clarification', () => {
+  assertEquals(shouldAskDiagnosticClarification({
+    enabled: true,
+    turnCount: 6,
+    maxTurns: 15,
+    evidenceSufficient: true,
+    mediaBlocksCompletion: false,
+    redFlagsOutstanding: ['Kopfschmerzen', 'Muskelschmerzen'],
+    topConfidence: 75,
+    stopConfidence: 80,
+    state: readDiagnosticClarificationState({}),
+    maxQuestions: 3,
+    interviewRequestedClarification: true,
+  }), true)
+})
+
 Deno.test('diagnostic clarification does not add questions at high confidence or after budget', () => {
   const base = {
     enabled: true,

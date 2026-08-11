@@ -48,7 +48,6 @@ export function shouldAskDiagnosticClarification(input: ClarificationEligibility
     && input.turnCount < input.maxTurns
     && input.evidenceSufficient
     && !input.mediaBlocksCompletion
-    && input.redFlagsOutstanding.length === 0
     && confidenceLowOrUnavailable
     && !input.state.completed
     && input.state.askedCount < input.maxQuestions
