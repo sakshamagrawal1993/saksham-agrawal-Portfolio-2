@@ -243,12 +243,18 @@ async function runMundaneCase(testCase) {
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim())
   assert(new Set(normalizedQuestions).size === normalizedQuestions.length, `${testCase.id}: duplicate patient-facing question observed`)
+  const clarificationState = finalState.consultation?.workflow_versions?.diagnostic_clarification || {}
+  const clarificationQuestions = Number(clarificationState.asked_count || 0)
+  if (Number(finalState.confidence_score || 0) < 80) {
+    assert(clarificationQuestions > 0, `${testCase.id}: low-confidence report had no diagnostic clarification question`)
+  }
   console.error(`[German E2E] mundane ${testCase.id}: passed`)
   return {
     id: testCase.id,
     consultation_id: started.consultation_id,
     status: finalState.consultation.status,
     turns_sent: sends,
+    clarification_questions: clarificationQuestions,
     confidence_score: finalState.confidence_score ?? null,
     passed: true,
   }
