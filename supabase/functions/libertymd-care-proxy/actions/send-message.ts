@@ -73,6 +73,7 @@ import {
   readDiagnosticClarificationState,
   selectDiagnosticClarificationCandidate,
   selectDifferentialClarificationCandidate,
+  selectNonDuplicateFallbackCandidate,
   selectNonDuplicateInterviewCandidate,
   shouldAskDiagnosticClarification,
   withDiagnosticClarificationCompleted,
@@ -914,6 +915,29 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
         clarificationStateAtStart,
         'confidence_met',
       )
+    }
+    // A completed/exhausted clarification phase can still be blocked for one
+    // turn while the async differential refreshes unresolved discriminators.
+    // If the phase cleared next_question, rotate to a transcript-new local
+    // fallback instead of reintroducing the first fallback at response time.
+    if (
+      !interview.next_question
+      && !servingDiagnosticClarification
+      && (!evidence.sufficient || differentialState.redFlagsOutstanding.length > 0)
+    ) {
+      const postClarificationFallback = selectNonDuplicateFallbackCandidate(
+        continueFallbackQuestions(clinicalLanguage),
+        history,
+      )
+      if (postClarificationFallback) {
+        interview.next_question = postClarificationFallback.question
+        interview.options = []
+        interview.question_purpose = postClarificationFallback.purpose
+        interview.target_slot = 'none'
+        questionCandidatesExhausted = false
+      } else {
+        questionCandidatesExhausted = true
+      }
     }
     const legacyGateOpen = computeShouldRunDiagnosis({
       evidenceScore: evidence.score,

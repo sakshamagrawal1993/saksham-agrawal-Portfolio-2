@@ -287,6 +287,17 @@ export function selectNonDuplicateInterviewCandidate(
       true,
     )
   if (primary || backup) return primary || backup
+  return selectNonDuplicateFallbackCandidate(fallbackQuestions, history)
+}
+
+export function selectNonDuplicateFallbackCandidate(
+  fallbackQuestions: string | string[],
+  history: Array<{ role?: unknown; content?: unknown }>,
+): ClarificationCandidate | null {
+  const priorQuestions = history
+    .filter((message) => message.role === 'assistant')
+    .map((message) => String(message.content || '').trim())
+    .filter(Boolean)
   const localFallbacks = Array.isArray(fallbackQuestions) ? fallbackQuestions : [fallbackQuestions]
   for (const fallbackQuestion of localFallbacks) {
     const fallback = candidateIfNew(

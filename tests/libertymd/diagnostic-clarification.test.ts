@@ -4,6 +4,7 @@ import {
   readDiagnosticClarificationState,
   selectDiagnosticClarificationCandidate,
   selectDifferentialClarificationCandidate,
+  selectNonDuplicateFallbackCandidate,
   selectNonDuplicateInterviewCandidate,
   shouldAskDiagnosticClarification,
   withDiagnosticClarificationCompleted,
@@ -201,6 +202,16 @@ Deno.test('ordinary interview advances through a fallback pool without repeating
     ],
   )
   assertEquals(selected?.question, 'How severe is the main symptom now, from 0 to 10?')
+})
+
+Deno.test('post-clarification fallback also advances past transcript repeats', () => {
+  const selected = selectNonDuplicateFallbackCandidate([
+    'Was hat sich seit Beginn der Symptome verändert?',
+    'Wie stark ist das Hauptsymptom jetzt auf einer Skala von 0 bis 10?',
+  ], [
+    { role: 'assistant', content: 'Was hat sich seit Beginn der Symptome verändert?' },
+  ])
+  assertEquals(selected?.question, 'Wie stark ist das Hauptsymptom jetzt auf einer Skala von 0 bis 10?')
 })
 
 Deno.test('diagnostic clarification state is bounded and preserves unrelated workflow versions', () => {
