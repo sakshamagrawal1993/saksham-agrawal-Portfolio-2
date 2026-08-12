@@ -206,6 +206,7 @@ const doctorAdvisors = [
     institution: 'Indiana University School of Medicine',
     experience: '22 years of exp',
     image: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=400&q=80',
+    quote: '“LibertyMD bridges critical symptom evaluation with immediate, structured physician clarity.”',
   },
   {
     name: 'Dr. Rajiv Patel, MD',
@@ -213,6 +214,7 @@ const doctorAdvisors = [
     institution: 'Indiana-Purdue IUPUI',
     experience: '25 years of exp',
     image: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80',
+    quote: '“It gives patients an instant, intelligent partner to triage symptoms before stepping into clinic.”',
   },
   {
     name: 'Dr. Barry Pevner, MD',
@@ -220,6 +222,7 @@ const doctorAdvisors = [
     institution: 'Hahnemann University/Drexel Internal Medicine',
     experience: '25 years of exp',
     image: 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&w=400&q=80',
+    quote: '“The depth of clinical context LibertyMD captures makes follow-up care dramatically more effective.”',
   },
   {
     name: 'Dr. Scott Jensen, MD',
@@ -227,6 +230,7 @@ const doctorAdvisors = [
     institution: 'Medical College of Wisconsin',
     experience: '24 years of exp',
     image: 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&w=400&q=80',
+    quote: '“An essential step forward in patient-first primary care and continuous health guidance.”',
   },
   {
     name: 'Dr. Octavio Frank Neri, MD',
@@ -234,11 +238,22 @@ const doctorAdvisors = [
     institution: 'New York Medical College, Metropolitan Hospital, NY',
     experience: '20 years of exp',
     image: 'https://images.unsplash.com/photo-1582750433449-648ed127bb54?auto=format&fit=crop&w=400&q=80',
+    quote: '“LibertyMD turns anxious health questions into clear, actionable, doctor-ready conversations.”',
   },
 ];
 
 export function LibertyMDSpecialistsSection() {
   const { t } = useI18n();
+  const [activeQuoteIndex, setActiveQuoteIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveQuoteIndex((prev) => (prev + 1) % doctorAdvisors.length);
+    }, 2000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const activeDoc = doctorAdvisors[activeQuoteIndex];
 
   return (
     <section data-specialists-section="" className="libertymd-page-gutter libertymd-section-spacing relative overflow-hidden bg-gradient-to-b from-[#F0F5F2] via-[#FAF8F5] to-[#F0F5F2] py-16 sm:py-24">
@@ -258,44 +273,63 @@ export function LibertyMDSpecialistsSection() {
 
         {/* Doctor Cards Grid (Static - No Mouse Hover Effects) */}
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5 items-stretch">
-          {doctorAdvisors.map((doc) => (
-            <div
-              key={doc.name}
-              className="flex flex-col justify-between items-center rounded-[28px] border border-libertymd-slate-200/70 bg-[#FCFCFA] p-4 sm:p-5 text-center shadow-[0_4px_20px_rgba(0,0,0,0.025)]"
-            >
-              {/* Top Doctor Headshot */}
-              <div className="w-full h-40 overflow-hidden rounded-[20px] bg-gradient-to-b from-sky-50 to-blue-100/60 mb-4 shrink-0">
-                <img
-                  src={doc.image}
-                  alt={doc.name}
-                  className="h-full w-full object-cover object-top"
-                />
-              </div>
+          {doctorAdvisors.map((doc, idx) => {
+            const isActive = idx === activeQuoteIndex;
+            return (
+              <div
+                key={doc.name}
+                onClick={() => setActiveQuoteIndex(idx)}
+                className={`flex flex-col justify-between items-center rounded-[28px] border bg-[#FCFCFA] p-4 sm:p-5 text-center transition-all duration-500 cursor-pointer ${
+                  isActive
+                    ? 'border-libertymd-blue-500/80 ring-2 ring-libertymd-blue-500/15 shadow-[0_8px_24px_rgba(37,99,235,0.08)]'
+                    : 'border-libertymd-slate-200/70 shadow-[0_4px_20px_rgba(0,0,0,0.025)]'
+                }`}
+              >
+                {/* Top Doctor Headshot */}
+                <div className="w-full h-40 overflow-hidden rounded-[20px] bg-gradient-to-b from-sky-50 to-blue-100/60 mb-4 shrink-0">
+                  <img
+                    src={doc.image}
+                    alt={doc.name}
+                    className="h-full w-full object-cover object-top"
+                  />
+                </div>
 
-              {/* Thin Dashed Divider */}
-              <div className="w-full border-t border-dashed border-libertymd-slate-200 mb-4" />
+                {/* Thin Dashed Divider */}
+                <div className="w-full border-t border-dashed border-libertymd-slate-200 mb-4" />
 
-              {/* Name & Specialty */}
-              <div className="flex-1 flex flex-col justify-start items-center w-full space-y-1.5 mb-5">
-                <h3 className="font-sans text-base font-bold leading-snug text-libertymd-ink">
-                  {doc.name}
-                </h3>
-                <p className="text-xs text-libertymd-slate-500 font-medium leading-relaxed px-0.5">
-                  {doc.specialty}
-                </p>
-              </div>
+                {/* Name & Specialty */}
+                <div className="flex-1 flex flex-col justify-start items-center w-full space-y-1.5 mb-5">
+                  <h3 className="font-sans text-base font-bold leading-snug text-libertymd-ink">
+                    {doc.name}
+                  </h3>
+                  <p className="text-xs text-libertymd-slate-500 font-medium leading-relaxed px-0.5">
+                    {doc.specialty}
+                  </p>
+                </div>
 
-              {/* Badges Stack with Exact Pill Curves from Screenshot */}
-              <div className="w-full flex flex-col items-center gap-2 mt-auto">
-                <span className="w-full rounded-[14px] bg-[#EEF1F4] px-3 py-2 text-[11px] font-semibold text-[#475569] leading-tight text-center">
-                  {doc.institution}
-                </span>
-                <span className="inline-flex items-center rounded-full bg-[#E5F3EB] px-3.5 py-1 text-[11px] font-bold text-[#2D6A4F]">
-                  {doc.experience}
-                </span>
+                {/* Badges Stack with Exact Pill Curves from Screenshot */}
+                <div className="w-full flex flex-col items-center gap-2 mt-auto">
+                  <span className="w-full rounded-[14px] bg-[#EEF1F4] px-3 py-2 text-[11px] font-semibold text-[#475569] leading-tight text-center">
+                    {doc.institution}
+                  </span>
+                  <span className="inline-flex items-center rounded-full bg-[#E5F3EB] px-3.5 py-1 text-[11px] font-bold text-[#2D6A4F]">
+                    {doc.experience}
+                  </span>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
+        </div>
+
+        {/* Rotating Single-Line Endorsement Quote Bar */}
+        <div className="mt-10 flex flex-col items-center justify-center text-center px-4">
+          <div className="inline-flex flex-wrap items-center justify-center gap-2.5 rounded-full bg-white/95 border border-libertymd-slate-200/90 px-6 py-3 shadow-[0_4px_20px_rgba(15,23,42,0.04)] backdrop-blur-sm transition-all duration-500 max-w-4xl">
+            <span className="h-2 w-2 rounded-full bg-libertymd-blue-600 animate-pulse shrink-0" />
+            <p className="font-sans text-sm sm:text-base font-medium text-libertymd-ink transition-opacity duration-300">
+              <span className="italic text-libertymd-slate-700">{activeDoc.quote}</span>
+              <span className="ml-2 font-semibold text-libertymd-blue-600 whitespace-nowrap">— {activeDoc.name}</span>
+            </p>
+          </div>
         </div>
       </div>
     </section>
