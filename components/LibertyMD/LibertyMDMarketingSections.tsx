@@ -503,6 +503,29 @@ const patientStoriesRail = [
 
 export function LibertyMDPatientStoriesSection() {
   const { t } = useI18n();
+  const railRef = useRef<HTMLDivElement>(null);
+  const [isPaused, setIsPaused] = useState(false);
+  const reduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    if (reduceMotion || isPaused) return;
+
+    const interval = setInterval(() => {
+      const rail = railRef.current;
+      if (!rail) return;
+
+      const cardWidth = rail.firstElementChild ? rail.firstElementChild.clientWidth + 24 : 310;
+      const maxScroll = rail.scrollWidth - rail.clientWidth;
+
+      if (rail.scrollLeft >= maxScroll - 10) {
+        rail.scrollTo({ left: 0, behavior: 'smooth' });
+      } else {
+        rail.scrollBy({ left: cardWidth, behavior: 'smooth' });
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [reduceMotion, isPaused]);
 
   return (
     <section className="libertymd-page-gutter libertymd-section-spacing relative overflow-hidden bg-gradient-to-b from-[#FAF8F5] via-[#FBFBF9] to-[#FAF8F5] py-16 sm:py-24">
@@ -517,8 +540,13 @@ export function LibertyMDPatientStoriesSection() {
           </h2>
         </div>
 
-        {/* Minimal Horizontal Card Rail */}
+        {/* Minimal Horizontal Card Rail with 1s Auto Rotation */}
         <div
+          ref={railRef}
+          onMouseEnter={() => setIsPaused(true)}
+          onMouseLeave={() => setIsPaused(false)}
+          onTouchStart={() => setIsPaused(true)}
+          onTouchEnd={() => setIsPaused(false)}
           className="flex gap-4 sm:gap-6 overflow-x-auto no-scrollbar scroll-smooth snap-x snap-mandatory py-4 px-2 -mx-2"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
@@ -527,15 +555,27 @@ export function LibertyMDPatientStoriesSection() {
               return (
                 <div
                   key={item.id}
-                  className="group relative flex h-[440px] w-[260px] sm:h-[480px] sm:w-[290px] shrink-0 snap-start flex-col justify-end overflow-hidden rounded-[2rem] bg-libertymd-slate-900 shadow-md transition-transform duration-300 hover:scale-[1.02]"
+                  className="group relative flex h-[440px] w-[260px] sm:h-[480px] sm:w-[290px] shrink-0 snap-start flex-col justify-between overflow-hidden rounded-[2rem] bg-libertymd-slate-900 p-6 text-left shadow-md transition-transform duration-300 hover:scale-[1.02]"
                 >
                   <img
                     src={item.image}
                     alt={item.name}
                     className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
-                  <div className="relative z-10 p-6 text-left">
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
+                  
+                  {/* Empty top for visual spacing */}
+                  <div className="relative z-10 h-6" />
+
+                  {/* Center One-Liner Quote Overlay */}
+                  <div className="relative z-10 my-auto py-4">
+                    <p className="text-base sm:text-lg font-normal leading-snug text-white/95 drop-shadow-sm">
+                      {item.quote}
+                    </p>
+                  </div>
+
+                  {/* Bottom Left Stylized Name */}
+                  <div className="relative z-10 pt-2">
                     <p className="font-serif text-xl sm:text-2xl italic tracking-wide text-white/95 font-medium">
                       {item.name}
                     </p>
