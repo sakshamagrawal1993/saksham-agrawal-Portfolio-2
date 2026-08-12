@@ -67,11 +67,10 @@ export default function LibertyMDPremiumLogo({
       const movingLogoHeight = moving.offsetHeight || (isCompact ? 240 : 320);
       const scaledLogoHeight = movingLogoHeight * finalScale;
 
-      // Gap between the bottom of the logo and the top of the "How LibertyMD works" headline
-      const gapAboveHeadline = isCompact ? 10 : 16;
+      // Clean gap between bottom of 3D cross logo and top of "How LibertyMD works" text
+      const gapAboveHeadline = isCompact ? 14 : 20;
 
-      // Formula: movingBottom = h2Rect.top - gapAboveHeadline
-      // movingTop = h2Rect.top - scaledLogoHeight - gapAboveHeadline
+      // With transformOrigin: 'top center', targetScreenY is the top of the scaled logo
       const targetScreenY = h2Rect.top - scaledLogoHeight - gapAboveHeadline;
       const travelTarget = scrollY - rootDocumentTop + targetScreenY;
 
@@ -252,8 +251,8 @@ export default function LibertyMDPremiumLogo({
         ref={movingLogoRef}
         className="libertymd-premium-logo-moving absolute inset-x-0 top-0 z-30"
         style={{
-          // Initial resting transform; the rAF effect above drives this imperatively on scroll.
           transform: 'translate3d(0, 0px, 0) scale(1) rotateX(0deg)',
+          transformOrigin: 'top center',
           transition: 'none',
           transformStyle: 'preserve-3d',
           willChange: 'transform',
