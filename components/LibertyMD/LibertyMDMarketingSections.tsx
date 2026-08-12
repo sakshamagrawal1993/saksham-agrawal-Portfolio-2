@@ -199,6 +199,109 @@ export function LibertyMDPhoneCareSection({ onStartChat }: MarketingSectionProps
   );
 }
 
+const doctorAdvisors = [
+  {
+    name: 'Dr. Jeffrey Jones, MD',
+    specialty: 'Emergency medicine',
+    institution: 'Indiana University School of Medicine',
+    experience: '22 years of exp',
+    image: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=400&q=80',
+  },
+  {
+    name: 'Dr. Rajiv Patel, MD',
+    specialty: 'Internal Medicine, Urgent Care, Hospital Medicine, Cardiovascular Disease',
+    institution: 'Indiana-Purdue IUPUI',
+    experience: '25 years of exp',
+    image: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80',
+  },
+  {
+    name: 'Dr. Barry Pevner, MD',
+    specialty: 'Internal Medicine',
+    institution: 'Hahnemann University/Drexel Internal Medicine',
+    experience: '25 years of exp',
+    image: 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&w=400&q=80',
+  },
+  {
+    name: 'Dr. Scott Jensen, MD',
+    specialty: 'Family Medicine and Integrative Medicine',
+    institution: 'Medical College of Wisconsin',
+    experience: '24 years of exp',
+    image: 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&w=400&q=80',
+  },
+  {
+    name: 'Dr. Octavio Frank Neri, MD',
+    specialty: 'Family Medicine and Integrative Medicine',
+    institution: 'New York Medical College, Metropolitan Hospital, NY',
+    experience: '20 years of exp',
+    image: 'https://images.unsplash.com/photo-1582750433449-648ed127bb54?auto=format&fit=crop&w=400&q=80',
+  },
+];
+
+export function LibertyMDSpecialistsSection() {
+  const { t } = useI18n();
+
+  return (
+    <section data-specialists-section="" className="libertymd-page-gutter libertymd-section-spacing relative overflow-hidden bg-gradient-to-b from-[#F0F5F2] via-[#FAF8F5] to-[#F0F5F2] py-16 sm:py-24">
+      <div className="libertymd-content-shell max-w-7xl mx-auto">
+        {/* Section Header */}
+        <div className="flex flex-col items-center justify-center text-center mb-14 px-4 max-w-2xl mx-auto">
+          <p className="text-xs font-bold uppercase tracking-widest text-libertymd-blue-600">
+            {t('marketing.specialists.kicker') || 'MEDICAL GUIDANCE'}
+          </p>
+          <h2 className="mt-2 font-serif text-3xl font-semibold leading-tight text-libertymd-ink sm:text-4xl lg:text-5xl">
+            {t('marketing.specialists.title') || 'Guided by specialists'}
+          </h2>
+          <p className="mt-3 text-base text-libertymd-slate-muted sm:text-lg font-medium">
+            {t('marketing.specialists.subtitle') || 'Designed by experts in Health and Medicine'}
+          </p>
+        </div>
+
+        {/* Doctor Cards Grid */}
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-5 items-stretch">
+          {doctorAdvisors.map((doc) => (
+            <div
+              key={doc.name}
+              className="flex flex-col justify-between items-center rounded-3xl border border-libertymd-slate-200/80 bg-white/95 p-5 text-center shadow-[0_8px_30px_rgba(15,23,42,0.04)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_16px_40px_rgba(15,23,42,0.08)]"
+            >
+              {/* Top Doctor Image */}
+              <div className="w-full h-44 overflow-hidden rounded-2xl bg-libertymd-slate-100 mb-4">
+                <img
+                  src={doc.image}
+                  alt={doc.name}
+                  className="h-full w-full object-cover object-top transition duration-500 hover:scale-105"
+                />
+              </div>
+
+              {/* Dashed Separator Line */}
+              <div className="w-full border-t border-dashed border-libertymd-slate-200/90 mb-4" />
+
+              {/* Name & Specialty */}
+              <div className="flex-1 flex flex-col justify-start items-center w-full space-y-1.5 mb-4">
+                <h3 className="font-sans text-base font-bold leading-snug text-libertymd-ink">
+                  {doc.name}
+                </h3>
+                <p className="text-xs text-libertymd-slate-500 font-medium leading-relaxed px-1">
+                  {doc.specialty}
+                </p>
+              </div>
+
+              {/* Badges Stack (Institution & Experience) */}
+              <div className="w-full flex flex-col items-center gap-2 mt-auto">
+                <span className="w-full rounded-xl bg-[#F3F4F6] px-3 py-1.5 text-[11px] font-semibold text-libertymd-slate-700 leading-tight">
+                  {doc.institution}
+                </span>
+                <span className="inline-flex items-center rounded-xl bg-[#E8F3EB] px-3 py-1 text-[11px] font-bold text-[#2C6E49]">
+                  {doc.experience}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function LibertyMDPricingSection({ onStartChat }: MarketingSectionProps) {
   const { t } = useI18n();
   const reduceMotion = useReducedMotion();

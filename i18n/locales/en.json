@@ -322,6 +322,11 @@
       "pillContext": "Your report carries the context",
       "pillAvailability": "AI chat available anytime"
     },
+    "specialists": {
+      "kicker": "Medical Guidance",
+      "title": "Guided by specialists",
+      "subtitle": "Designed by experts in Health and Medicine"
+    },
     "pricing": {
       "kicker": "Simple pricing",
       "title": "Care that stays clear about cost.",

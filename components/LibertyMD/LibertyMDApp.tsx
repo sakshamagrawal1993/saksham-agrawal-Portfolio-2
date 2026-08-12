@@ -29,6 +29,7 @@ import {
   LibertyMDPatientStoriesSection,
   LibertyMDPhoneCareSection,
   LibertyMDPricingSection,
+  LibertyMDSpecialistsSection,
 } from './LibertyMDMarketingSections';
 import { LibertyMDPhaseStack } from './LibertyMDPhaseStack';
 import { LibertyMDScrollFilmSection } from './LibertyMDScrollFilmSection';
@@ -1636,6 +1637,8 @@ export default function LibertyMDApp() {
             window.setTimeout(() => heroSymptomsRef.current?.focus(), 650);
           }}
         />
+
+        <LibertyMDSpecialistsSection />
 
         <LibertyMDPricingSection
           onStartChat={() => {
