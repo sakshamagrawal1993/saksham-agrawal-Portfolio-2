@@ -555,7 +555,7 @@ export function LibertyMDPatientStoriesSection() {
               return (
                 <div
                   key={item.id}
-                  className="group relative flex h-[440px] w-[260px] sm:h-[480px] sm:w-[290px] shrink-0 snap-start flex-col justify-between overflow-hidden rounded-[2rem] bg-libertymd-slate-900 p-6 text-left shadow-md transition-transform duration-300 hover:scale-[1.02]"
+                  className="group relative flex h-[440px] w-[260px] sm:h-[480px] sm:w-[290px] shrink-0 snap-start flex-col justify-end overflow-hidden rounded-[2rem] bg-libertymd-slate-900 p-6 text-left shadow-md transition-transform duration-300 hover:scale-[1.02]"
                 >
                   <img
                     src={item.image}
@@ -563,20 +563,13 @@ export function LibertyMDPatientStoriesSection() {
                     className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
-                  
-                  {/* Empty top for visual spacing */}
-                  <div className="relative z-10 h-6" />
 
-                  {/* Center One-Liner Quote Overlay */}
-                  <div className="relative z-10 my-auto py-4">
+                  {/* Bottom Aligned Testimonial Overlay */}
+                  <div className="relative z-10 space-y-3">
                     <p className="text-base sm:text-lg font-normal leading-snug text-white/95 drop-shadow-sm">
                       {item.quote}
                     </p>
-                  </div>
-
-                  {/* Bottom Left Stylized Name */}
-                  <div className="relative z-10 pt-2">
-                    <p className="font-serif text-xl sm:text-2xl italic tracking-wide text-white/95 font-medium">
+                    <p className="font-serif text-xl sm:text-2xl italic tracking-wide text-white/95 font-medium pt-1">
                       {item.name}
                     </p>
                   </div>
