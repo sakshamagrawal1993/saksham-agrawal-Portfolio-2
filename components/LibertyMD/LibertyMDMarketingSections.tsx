@@ -457,59 +457,68 @@ const patientStoriesRail = [
     avatar: homepagePhoto('photo-1519085360753-af0119f7cbe7'),
     quote: '"The symptom summary gave me a much better starting point."',
   },
+  {
+    id: 'priya',
+    type: 'photo' as const,
+    name: 'Priya',
+    image: homepagePhoto('photo-1531123897727-8f129e1688ce'),
+    quote: '"The safety checks gave me peace of mind when making care choices."',
+  },
+  {
+    id: 'noah',
+    type: 'dark' as const,
+    name: 'Noah',
+    avatar: homepagePhoto('photo-1527980965255-d3b416303d12'),
+    quote: '"It helped me describe the swelling timing without missing key details."',
+  },
+  {
+    id: 'maya',
+    type: 'dark' as const,
+    name: 'Maya',
+    avatar: homepagePhoto('photo-1524504388940-b1c1722653e1'),
+    quote: '"I felt much calmer deciding what level of care my mother needed next."',
+  },
+  {
+    id: 'jordan',
+    type: 'photo' as const,
+    name: 'Jordan',
+    image: homepagePhoto('photo-1500648767791-00dcc994a43e'),
+    quote: '"My follow-up started with the exact symptoms that mattered most."',
+  },
+  {
+    id: 'sofia',
+    type: 'dark' as const,
+    name: 'Sofia',
+    avatar: homepagePhoto('photo-1494790108377-be9c29b29330'),
+    quote: '"Seeing the symptom pattern mapped out gave me answers right away."',
+  },
+  {
+    id: 'daniel',
+    type: 'photo' as const,
+    name: 'Daniel',
+    image: homepagePhoto('photo-1559839734-2b71ea197ec2'),
+    quote: '"Having the timeline ready saved me time at the clinic."',
+  },
 ];
 
 export function LibertyMDPatientStoriesSection() {
   const { t } = useI18n();
-  const railRef = useRef<HTMLDivElement>(null);
-
-  const scrollRail = (direction: 'left' | 'right') => {
-    if (!railRef.current) return;
-    const scrollAmount = railRef.current.clientWidth * 0.75;
-    railRef.current.scrollBy({
-      left: direction === 'left' ? -scrollAmount : scrollAmount,
-      behavior: 'smooth',
-    });
-  };
 
   return (
     <section className="libertymd-page-gutter libertymd-section-spacing border-t border-libertymd-green-sage/40 bg-[#FAF8F5] py-16 sm:py-24 overflow-hidden">
       <div className="libertymd-content-shell max-w-7xl mx-auto">
-        {/* Minimalistic Header */}
-        <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end mb-10 px-2">
-          <div className="max-w-xl text-left">
-            <p className="text-xs font-bold uppercase tracking-widest text-libertymd-blue-600">
-              {t('marketing.stories.kicker') || 'PATIENT STORIES'}
-            </p>
-            <h2 className="mt-2 font-serif text-3xl font-semibold leading-tight text-libertymd-ink sm:text-4xl">
-              {t('marketing.stories.title') || 'A clearer conversation can change what happens next.'}
-            </h2>
-          </div>
-
-          {/* Minimalist Navigation Arrows */}
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => scrollRail('left')}
-              aria-label="Previous testimonials"
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-libertymd-slate-300 bg-white/90 text-libertymd-ink shadow-sm transition hover:border-libertymd-blue-600 hover:text-libertymd-blue-600 active:scale-95"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => scrollRail('right')}
-              aria-label="Next testimonials"
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-libertymd-slate-300 bg-white/90 text-libertymd-ink shadow-sm transition hover:border-libertymd-blue-600 hover:text-libertymd-blue-600 active:scale-95"
-            >
-              <ChevronRight className="h-5 w-5" />
-            </button>
-          </div>
+        {/* Center Aligned Minimalistic Header */}
+        <div className="flex flex-col items-center justify-center text-center mb-12 px-4 max-w-2xl mx-auto">
+          <p className="text-xs font-bold uppercase tracking-widest text-libertymd-blue-600">
+            {t('marketing.stories.kicker') || 'LIBERTYMD STORIES'}
+          </p>
+          <h2 className="mt-2 font-serif text-3xl font-semibold leading-tight text-libertymd-ink sm:text-4xl lg:text-5xl">
+            {t('marketing.stories.title') || 'A clearer conversation can change what happens next.'}
+          </h2>
         </div>
 
         {/* Minimal Horizontal Card Rail */}
         <div
-          ref={railRef}
           className="flex gap-4 sm:gap-6 overflow-x-auto no-scrollbar scroll-smooth snap-x snap-mandatory py-4 px-2 -mx-2"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >

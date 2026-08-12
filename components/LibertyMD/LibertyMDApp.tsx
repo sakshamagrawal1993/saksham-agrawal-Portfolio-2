@@ -1613,13 +1613,6 @@ export default function LibertyMDApp() {
           )}
         </section>
 
-        <LibertyMDPhoneCareSection
-          onStartChat={() => {
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-            window.setTimeout(() => heroSymptomsRef.current?.focus(), 650);
-          }}
-        />
-
         {selectedTab === 'doctors' && (
           <section
             className="libertymd-page-gutter libertymd-section-spacing border-t border-libertymd-slate-200 bg-[linear-gradient(180deg,rgba(251,252,248,0.98),rgba(239,246,255,0.72))]"
