@@ -1630,14 +1630,19 @@ export default function LibertyMDApp() {
           </section>
         )}
 
-        <LibertyMDPricingSection
+        <LibertyMDPhoneCareSection
           onStartChat={() => {
             window.scrollTo({ top: 0, behavior: 'smooth' });
             window.setTimeout(() => heroSymptomsRef.current?.focus(), 650);
           }}
         />
 
-        <LibertyMDScrollFilmSection />
+        <LibertyMDPricingSection
+          onStartChat={() => {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            window.setTimeout(() => heroSymptomsRef.current?.focus(), 650);
+          }}
+        />
 
         <LibertyMDPatientStoriesSection />
 
