@@ -256,41 +256,41 @@ export function LibertyMDSpecialistsSection() {
           </p>
         </div>
 
-        {/* Doctor Cards Grid */}
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-5 items-stretch">
+        {/* Doctor Cards Grid (Static - No Mouse Hover Effects) */}
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5 items-stretch">
           {doctorAdvisors.map((doc) => (
             <div
               key={doc.name}
-              className="flex flex-col justify-between items-center rounded-3xl border border-libertymd-slate-200/80 bg-white/95 p-5 text-center shadow-[0_8px_30px_rgba(15,23,42,0.04)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_16px_40px_rgba(15,23,42,0.08)]"
+              className="flex flex-col justify-between items-center rounded-[28px] border border-libertymd-slate-200/70 bg-[#FCFCFA] p-4 sm:p-5 text-center shadow-[0_4px_20px_rgba(0,0,0,0.025)]"
             >
-              {/* Top Doctor Image */}
-              <div className="w-full h-44 overflow-hidden rounded-2xl bg-libertymd-slate-100 mb-4">
+              {/* Top Doctor Headshot */}
+              <div className="w-full h-40 overflow-hidden rounded-[20px] bg-gradient-to-b from-sky-50 to-blue-100/60 mb-4 shrink-0">
                 <img
                   src={doc.image}
                   alt={doc.name}
-                  className="h-full w-full object-cover object-top transition duration-500 hover:scale-105"
+                  className="h-full w-full object-cover object-top"
                 />
               </div>
 
-              {/* Dashed Separator Line */}
-              <div className="w-full border-t border-dashed border-libertymd-slate-200/90 mb-4" />
+              {/* Thin Dashed Divider */}
+              <div className="w-full border-t border-dashed border-libertymd-slate-200 mb-4" />
 
               {/* Name & Specialty */}
-              <div className="flex-1 flex flex-col justify-start items-center w-full space-y-1.5 mb-4">
+              <div className="flex-1 flex flex-col justify-start items-center w-full space-y-1.5 mb-5">
                 <h3 className="font-sans text-base font-bold leading-snug text-libertymd-ink">
                   {doc.name}
                 </h3>
-                <p className="text-xs text-libertymd-slate-500 font-medium leading-relaxed px-1">
+                <p className="text-xs text-libertymd-slate-500 font-medium leading-relaxed px-0.5">
                   {doc.specialty}
                 </p>
               </div>
 
-              {/* Badges Stack (Institution & Experience) */}
+              {/* Badges Stack with Exact Pill Curves from Screenshot */}
               <div className="w-full flex flex-col items-center gap-2 mt-auto">
-                <span className="w-full rounded-xl bg-[#F3F4F6] px-3 py-1.5 text-[11px] font-semibold text-libertymd-slate-700 leading-tight">
+                <span className="w-full rounded-[14px] bg-[#EEF1F4] px-3 py-2 text-[11px] font-semibold text-[#475569] leading-tight text-center">
                   {doc.institution}
                 </span>
-                <span className="inline-flex items-center rounded-xl bg-[#E8F3EB] px-3 py-1 text-[11px] font-bold text-[#2C6E49]">
+                <span className="inline-flex items-center rounded-full bg-[#E5F3EB] px-3.5 py-1 text-[11px] font-bold text-[#2D6A4F]">
                   {doc.experience}
                 </span>
               </div>
