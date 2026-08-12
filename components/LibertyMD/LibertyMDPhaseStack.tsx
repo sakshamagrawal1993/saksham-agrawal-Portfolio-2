@@ -168,31 +168,32 @@ const floorHaloPath = (cy: number, scale = 1.2) => {
 
 /**
  * Persistent 3D translucent veil behind and around the bottom of the stack matching the reference design.
- * Formed as a 6-point 3D isometric shroud that extends from below the 4th tile all the way up to
- * behind the 3rd tile (plate index 2), with a low-opacity gradient that fades seamlessly into the canvas.
+ * Formed as a 6-point 3D isometric diamond extrusion shell that extends from below the 4th tile all the way up to
+ * behind the 3rd tile (plate index 2), with parallel vertical walls and an ultra-light gradient that fades
+ * seamlessly into the canvas.
  */
-const floorVeilPath = (scale = 1.25) => {
+const floorVeilPath = (scale = 1.18) => {
   const rx = RX * scale;
   const ry = RY * scale;
-  // Top apex reaches behind the 3rd tile (plateCy(2) = 236)
-  const topApexY = plateCy(2) - 28;
-  const shoulderY = plateCy(2) + GAP * 0.45;
-  const bottomApexY = plateCy(3) + ry + 46;
+  
+  // Top diamond sits behind 3rd tile (plateCy(2) = 236)
+  const topCy = plateCy(2) + 12;
+  const depth = 114;
 
   return roundedPolygonPath(
     [
-      [CX - rx, shoulderY],
-      [CX, topApexY],
-      [CX + rx, shoulderY],
-      [CX + rx, bottomApexY - ry],
-      [CX, bottomApexY],
-      [CX - rx, bottomApexY - ry],
+      [CX - rx, topCy],
+      [CX, topCy - ry],
+      [CX + rx, topCy],
+      [CX + rx, topCy + depth],
+      [CX, topCy + ry + depth],
+      [CX - rx, topCy + depth],
     ],
-    [CORNER_R * 1.2, CORNER_R * 1.6, CORNER_R * 1.2, CORNER_R * 2.5, CORNER_R * 3.4, CORNER_R * 2.5],
+    [CORNER_R * 1.0, CORNER_R * 1.2, CORNER_R * 1.0, CORNER_R * 1.5, CORNER_R * 1.8, CORNER_R * 1.5],
   );
 };
 
-const floorPedestalPath = (cy: number, scale = 1.2, depth = 64) => floorVeilPath(scale);
+const floorPedestalPath = (cy: number, scale = 1.18, depth = 64) => floorVeilPath(scale);
 
 /**
  * Projects an upright glyph drawn around the origin onto a plate's face: unit x runs down-right
@@ -286,20 +287,20 @@ function PhaseStackArt({ activeIndex }: { activeIndex: number }) {
           <stop offset="100%" stopColor="var(--libertymd-slate-300)" stopOpacity="0.3" />
         </linearGradient>
         <radialGradient id="lmd-floor-pedestal-top" cx="50%" cy="40%" r="80%">
-          <stop offset="0%" stopColor="var(--libertymd-blue-400)" stopOpacity="0.35" />
-          <stop offset="50%" stopColor="var(--libertymd-blue-500)" stopOpacity="0.18" />
+          <stop offset="0%" stopColor="var(--libertymd-blue-400)" stopOpacity="0.22" />
+          <stop offset="50%" stopColor="var(--libertymd-blue-500)" stopOpacity="0.10" />
           <stop offset="100%" stopColor="var(--libertymd-blue-500)" stopOpacity="0.0" />
         </radialGradient>
-        {/* Translucent 3D veil vertical gradient: seamlessly fades from top (behind 3rd tile) into background */}
+        {/* Ultra-light translucent 3D veil vertical gradient: seamlessly fades from top into background */}
         <linearGradient id="lmd-veil-gradient" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="var(--libertymd-blue-400)" stopOpacity="0.0" />
-          <stop offset="25%" stopColor="var(--libertymd-blue-400)" stopOpacity="0.06" />
-          <stop offset="60%" stopColor="var(--libertymd-blue-500)" stopOpacity="0.16" />
-          <stop offset="100%" stopColor="var(--libertymd-blue-600)" stopOpacity="0.26" />
+          <stop offset="0%" stopColor="var(--libertymd-blue-500)" stopOpacity="0.0" />
+          <stop offset="35%" stopColor="var(--libertymd-blue-500)" stopOpacity="0.04" />
+          <stop offset="70%" stopColor="var(--libertymd-blue-500)" stopOpacity="0.10" />
+          <stop offset="100%" stopColor="var(--libertymd-blue-600)" stopOpacity="0.18" />
         </linearGradient>
         {/* Veil ambient soft edge blur filter */}
         <filter id="lmd-veil-blur" x="-80%" y="-80%" width="260%" height="260%" colorInterpolationFilters="sRGB">
-          <feGaussianBlur stdDeviation="18" />
+          <feGaussianBlur stdDeviation="14" />
         </filter>
         <filter id="lmd-tile-contact" x="-30%" y="-120%" width="160%" height="340%" colorInterpolationFilters="sRGB">
           <feGaussianBlur stdDeviation="3.5" />
@@ -308,24 +309,24 @@ function PhaseStackArt({ activeIndex }: { activeIndex: number }) {
 
       {/* Translucent 3D veil extending from the stack base up to behind the 3rd tile matching the reference image */}
       <g>
-        {/* Outer blurred veil halo mixing into the background */}
-        <path
-          d={floorVeilPath(1.28)}
-          fill="url(#lmd-veil-gradient)"
-          filter="url(#lmd-veil-blur)"
-          opacity="0.6"
-        />
-        {/* Translucent veil container body */}
+        {/* Outer ambient blurred veil halo mixing into the background */}
         <path
           d={floorVeilPath(1.22)}
           fill="url(#lmd-veil-gradient)"
+          filter="url(#lmd-veil-blur)"
+          opacity="0.45"
+        />
+        {/* Translucent veil container body */}
+        <path
+          d={floorVeilPath(1.18)}
+          fill="url(#lmd-veil-gradient)"
           stroke="var(--libertymd-blue-400)"
-          strokeOpacity="0.14"
-          strokeWidth="0.75"
+          strokeOpacity="0.08"
+          strokeWidth="0.5"
         />
         {/* Soft radial glow under the 4th tile floor */}
         <path
-          d={floorHaloPath(plateCy(3) + 2, 1.18)}
+          d={floorHaloPath(plateCy(3) + 2, 1.15)}
           fill="url(#lmd-floor-pedestal-top)"
         />
       </g>
