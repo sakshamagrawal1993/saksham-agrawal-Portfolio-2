@@ -1354,9 +1354,12 @@ export default function LibertyMDApp() {
         </section>
 
         <section ref={chatPanelRef} className="libertymd-page-gutter relative z-0 bg-[linear-gradient(180deg,rgba(245,250,243,0.96),rgba(237,247,241,0.98))] pb-16 pt-[300px] sm:pt-[340px]">
+          {/* Static anchor for hero logo docking */}
+          <div ref={logoDockHeadlineRef} aria-hidden="true" className="h-0" />
+
           {(() => {
             const sectionHeader = (
-              <div ref={logoDockHeadlineRef} className="mx-auto max-w-3xl text-center pt-2 sm:pt-4">
+              <div className="mx-auto max-w-3xl text-center pt-2 sm:pt-4">
                 <h2 className="text-4xl font-black leading-tight tracking-normal text-libertymd-ink sm:text-5xl">
                   {t('app.howItWorksTitle')}
                 </h2>
