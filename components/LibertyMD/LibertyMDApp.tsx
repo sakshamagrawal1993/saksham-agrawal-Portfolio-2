@@ -1354,20 +1354,13 @@ export default function LibertyMDApp() {
         </section>
 
         <section ref={chatPanelRef} className="libertymd-page-gutter relative z-0 bg-[linear-gradient(180deg,rgba(245,250,243,0.96),rgba(237,247,241,0.98))] pb-16 pt-[300px] sm:pt-[340px]">
-          {/* The hero logo docks to a STATIC anchor, never to the heading itself. The heading now
-              rides inside the pinned pane, and `LibertyMDPremiumLogo` derives its landing from
-              `rect.top + scrollY` — on a sticky element that sum climbs with every pixel of
-              scroll, so the target ran away and the damped follow chased it as a bounce. */}
-          <div ref={logoDockHeadlineRef} aria-hidden="true" className="h-0" />
-
           {(() => {
             const sectionHeader = (
-              <div className="mx-auto max-w-3xl text-center">
-                <p className="text-xs font-bold uppercase tracking-normal text-libertymd-blue-600">{t('app.howItWorksKicker')}</p>
-                <h2 className="mt-3 text-4xl font-black leading-tight tracking-normal text-libertymd-ink sm:text-5xl">
+              <div ref={logoDockHeadlineRef} className="mx-auto max-w-3xl text-center pt-2 sm:pt-4">
+                <h2 className="text-4xl font-black leading-tight tracking-normal text-libertymd-ink sm:text-5xl">
                   {t('app.howItWorksTitle')}
                 </h2>
-                <p className="mx-auto mt-4 max-w-xl text-base font-bold leading-7 text-libertymd-navy sm:text-lg">
+                <p className="mx-auto mt-3 max-w-xl text-base font-bold leading-7 text-libertymd-navy sm:text-lg">
                   {t('app.howItWorksSubtitle')}
                 </p>
               </div>
