@@ -193,8 +193,8 @@
    ~1.34x the plate's own half-height. Keyed on the active index in React so it replays per
    arrival instead of looping. */
 @keyframes libertymd-plate-pulse {
-  from { opacity: 0.4; transform: scale(1); }
-  to { opacity: 0; transform: scale(1.26); }
+  from { opacity: 0.28; transform: scale(1); }
+  to { opacity: 0; transform: scale(1.18); }
 }
 
 .libertymd-plate-pulse {
@@ -203,9 +203,51 @@
   animation: libertymd-plate-pulse 1000ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* The lit colour starts at the icon/core and expands across the clipped plate face. The active
+   layer itself still observes the outgoing-then-incoming opacity stagger in React, so two plates
+   never read as lit together. */
+@keyframes libertymd-plate-fill-reveal {
+  from { opacity: 0.4; transform: scale(0.08); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes libertymd-plate-core-reveal {
+  from { opacity: 0; transform: scale(0.56); }
+  to { opacity: 0.22; transform: scale(1); }
+}
+
+@keyframes libertymd-plate-wall-reveal {
+  from { opacity: 0.32; }
+  to { opacity: 1; }
+}
+
+.libertymd-plate-fill-reveal,
+.libertymd-plate-core-reveal {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.libertymd-plate-fill-reveal {
+  animation: libertymd-plate-fill-reveal 420ms cubic-bezier(0.672, 0, 0.272, 1) both;
+}
+
+.libertymd-plate-core-reveal {
+  animation: libertymd-plate-core-reveal 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.libertymd-plate-wall-reveal {
+  animation: libertymd-plate-wall-reveal 300ms cubic-bezier(0.672, 0, 0.272, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .libertymd-plate-pulse {
+  .libertymd-plate-pulse,
+  .libertymd-plate-fill-reveal,
+  .libertymd-plate-core-reveal,
+  .libertymd-plate-wall-reveal {
     animation: none;
+  }
+
+  .libertymd-plate-pulse {
     opacity: 0;
   }
 }
@@ -219,6 +261,55 @@
 
 .libertymd-phase-swap {
   animation: libertymd-phase-swap 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Keep the pinned explainer clear of the persistent composer on short desktop viewports. The
+   section still owns the full viewport; only its internal art and vertical gaps compress. */
+@media (min-width: 64rem) and (max-height: 48rem) {
+  .libertymd-phase-stack-pane {
+    justify-content: flex-start;
+    gap: var(--libertymd-space-2xl);
+    padding-block-start: 0;
+    padding-block-end: calc(var(--libertymd-space-section) + var(--libertymd-space-3xl));
+  }
+
+  .libertymd-phase-stack-layout {
+    transform: translateY(calc(-1 * var(--libertymd-space-xl)));
+  }
+
+  .libertymd-phase-stack-art {
+    height: 38vh;
+  }
+
+  .libertymd-phase-stack-label-column {
+    gap: 0;
+  }
+
+  .libertymd-phase-stack-right {
+    padding-top: 0;
+    transform: translateY(calc(-1 * var(--libertymd-space-3xl)));
+  }
+
+  .libertymd-phase-stack-label > p.mt-4 {
+    margin-top: var(--libertymd-space-sm);
+  }
+
+  .libertymd-phase-stack-label > h3.mt-2 {
+    margin-top: var(--libertymd-space-xs);
+  }
+
+  .libertymd-phase-stack-label > span.mt-3,
+  .libertymd-phase-stack-label > p.mt-3 {
+    margin-top: var(--libertymd-space-sm);
+  }
+
+  .libertymd-phase-stack-label > p.mt-3 {
+    line-height: 1.25rem;
+  }
+
+  .libertymd-phase-stack-label > button.mt-4 {
+    margin-top: var(--libertymd-space-sm);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

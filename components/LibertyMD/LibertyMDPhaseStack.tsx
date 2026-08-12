@@ -30,72 +30,117 @@ const VIEW_W = 320;
  * or colliding with the heading. Headroom here rather than a bigger FIRST_CY keeps the plate
  * arithmetic honest — every cy stays a plain multiple of GAP.
  */
-const VIEW_MIN_Y = -48;
-const VIEW_H = 520;
+const VIEW_MIN_Y = -36;
+/** Extra headroom below the bottom plate so the stack-level floor halo bloom is not clipped. */
+const VIEW_H = 530;
 /**
  * A flat ~3.2:1 projection, not a textbook 2:1. Steeper plates read as chunky boxes at this
  * size; flattening them is what makes the stack look like laid-out sheets.
  */
 const RX = 132;
-const RY = 41;
+const RY = 39;
 /** Slab thickness — the extruded side under each top face. */
-const DEPTH = 17;
+const DEPTH = 10;
 /**
  * Plate-centre spacing. Must exceed 2·RY + DEPTH or adjacent slabs collide instead of stacking;
  * the surplus is the visible air between them.
  */
-const GAP = 110;
+const GAP = 92;
 const CX = 160;
-const FIRST_CY = 58;
-/** Corner rounding. Sharp vertices are what made the plates read as flat vector shapes. */
-const TOP_RADIUS = 13;
-const SIDE_RADIUS = 7;
+const FIRST_CY = 52;
 
 const plateCy = (index: number) => FIRST_CY + index * GAP;
 
 type Point = [number, number];
 
+/** Light corner fillet in viewBox units — soft rhombus tips without a separate lid radius. */
+const CORNER_R = 11;
+/** The extrusion is flatter than the lid, but its outer silhouette still needs a soft edge. */
+const WALL_RADIUS = 7;
+
 /**
- * Rounds every corner of a closed polygon: back off along both edges by `r` (never past an
- * edge's midpoint) and sweep through the original vertex with a quadratic.
+ * Lid-over-wall overlap in viewBox units (V1). Top face expands slightly onto the walls so
+ * the AA hairline is covered — without painting opaque wall fill under the glass face.
  */
-function roundedPath(points: Point[], r: number) {
-  const n = points.length;
-  let d = '';
-  for (let i = 0; i < n; i += 1) {
-    const [px, py] = points[i];
-    const [ax, ay] = points[(i - 1 + n) % n];
-    const [bx, by] = points[(i + 1) % n];
-    const inLen = Math.hypot(px - ax, py - ay);
-    const outLen = Math.hypot(bx - px, by - py);
+const TOP_OVERLAP = 1.25;
+
+type PlateCorner = {
+  /** Original rhombus vertex (quadratic control). */
+  v: Point;
+  /** Offset toward the previous vertex — shared by top + walls. */
+  a: Point;
+  /** Offset toward the next vertex — shared by top + walls. */
+  b: Point;
+};
+
+/**
+ * ONE shared rounded-vertex generator for top + walls. Separate `roundedPath` calls with
+ * different radii (pre-C1) left a lid-on-walls hairline; sharp verts (C2) fused but read as
+ * hard diamonds. Same offset points on every consumer keep corners fused and softly filleted.
+ */
+function plateCorners(cy: number, overlap = 0, r = CORNER_R): [PlateCorner, PlateCorner, PlateCorner, PlateCorner] {
+  const verts: Point[] = [
+    [CX, cy - RY],
+    [CX + RX + overlap * 0.45, cy + overlap * 0.3],
+    [CX, cy + RY + overlap],
+    [CX - RX - overlap * 0.45, cy + overlap * 0.3],
+  ];
+  return verts.map((v, i) => {
+    const prev = verts[(i - 1 + 4) % 4];
+    const next = verts[(i + 1) % 4];
+    const inLen = Math.hypot(v[0] - prev[0], v[1] - prev[1]);
+    const outLen = Math.hypot(next[0] - v[0], next[1] - v[1]);
     const inT = Math.min(r, inLen / 2);
     const outT = Math.min(r, outLen / 2);
-    const start: Point = [px + ((ax - px) / inLen) * inT, py + ((ay - py) / inLen) * inT];
-    const end: Point = [px + ((bx - px) / outLen) * outT, py + ((by - py) / outLen) * outT];
-    d += `${i === 0 ? 'M' : 'L'}${start[0].toFixed(2)},${start[1].toFixed(2)}`;
-    d += ` Q${px.toFixed(2)},${py.toFixed(2)} ${end[0].toFixed(2)},${end[1].toFixed(2)}`;
-  }
-  return `${d}Z`;
+    const a: Point = [v[0] + ((prev[0] - v[0]) / inLen) * inT, v[1] + ((prev[1] - v[1]) / inLen) * inT];
+    const b: Point = [v[0] + ((next[0] - v[0]) / outLen) * outT, v[1] + ((next[1] - v[1]) / outLen) * outT];
+    return { v, a, b };
+  }) as [PlateCorner, PlateCorner, PlateCorner, PlateCorner];
 }
 
-/** The rhombus the plate's face occupies. */
-const topFacePath = (cy: number) =>
-  roundedPath(
-    [
-      [CX, cy - RY],
-      [CX + RX, cy],
-      [CX, cy + RY],
-      [CX - RX, cy],
-    ],
-    TOP_RADIUS,
-  );
+const cornerPath = (corners: PlateCorner[]) => {
+  let d = '';
+  for (let i = 0; i < corners.length; i += 1) {
+    const { v, a, b } = corners[i];
+    d += `${i === 0 ? 'M' : 'L'}${a[0].toFixed(2)},${a[1].toFixed(2)}`;
+    d += ` Q${v[0].toFixed(2)},${v[1].toFixed(2)} ${b[0].toFixed(2)},${b[1].toFixed(2)}`;
+  }
+  return `${d}Z`;
+};
+
+const topFacePath = (cy: number) => cornerPath(plateCorners(cy, TOP_OVERLAP));
 
 /**
- * The slab's whole extruded silhouette drawn as one hexagon rather than two quads. Separate
- * left/right faces leave a hairline seam down the middle at fractional device pixels.
+ * Generic rounded silhouette helper. The front extrusion is deliberately ONE path: two wall
+ * quads terminate at the inner points of the south fillet and expose a conspicuous white seam
+ * at high DPR. A continuous six-sided shell keeps the left/right shading while guaranteeing
+ * that the front tip and both outer corners are watertight. The expanded lid is painted over it.
  */
-const slabPath = (cy: number) =>
-  roundedPath(
+const roundedPolygonPath = (points: Point[], radius: number | number[]) => {
+  const corners = points.map((v, i) => {
+    const prev = points[(i - 1 + points.length) % points.length];
+    const next = points[(i + 1) % points.length];
+    const inLen = Math.hypot(v[0] - prev[0], v[1] - prev[1]);
+    const outLen = Math.hypot(next[0] - v[0], next[1] - v[1]);
+    const vertexRadius = Array.isArray(radius) ? radius[i] : radius;
+    const inT = Math.min(vertexRadius, inLen / 2);
+    const outT = Math.min(vertexRadius, outLen / 2);
+    return {
+      v,
+      a: [v[0] + ((prev[0] - v[0]) / inLen) * inT, v[1] + ((prev[1] - v[1]) / inLen) * inT] as Point,
+      b: [v[0] + ((next[0] - v[0]) / outLen) * outT, v[1] + ((next[1] - v[1]) / outLen) * outT] as Point,
+    };
+  });
+  return cornerPath(corners);
+};
+
+/**
+ * One continuous extrusion band. Its three upper vertices are the lid's exact west, south and
+ * east vertices, so the lateral tips cannot drift down with a second translated diamond. The
+ * lid is painted last with a fractional overlap to cover SVG antialiasing at the shared seam.
+ */
+const wallSilhouettePath = (cy: number) =>
+  roundedPolygonPath(
     [
       [CX - RX, cy],
       [CX, cy + RY],
@@ -104,8 +149,43 @@ const slabPath = (cy: number) =>
       [CX, cy + RY + DEPTH],
       [CX - RX, cy + DEPTH],
     ],
-    SIDE_RADIUS,
+    WALL_RADIUS * 0.35,
   );
+
+/** Stack-level floor halo — rounded diamond footprint so the silhouette survives blur. */
+const floorHaloPath = (cy: number, scale = 1.2) => {
+  const rx = RX * scale;
+  const ry = RY * scale;
+  const r = CORNER_R * scale;
+  const verts: Point[] = [
+    [CX, cy - ry],
+    [CX + rx, cy],
+    [CX, cy + ry],
+    [CX - rx, cy],
+  ];
+  return roundedPolygonPath(verts, r);
+};
+
+/**
+ * Persistent 3D enclosure behind and around the bottom tile matching the reference design.
+ * Formed as a 6-point 3D isometric diamond extrusion shell that wraps around the back and sides
+ * of the 4th plate, then extends vertically downwards into a deeply rounded lower receiver base.
+ */
+const floorPedestalPath = (cy: number, scale = 1.2, depth = 64) => {
+  const rx = RX * scale;
+  const ry = RY * scale;
+  return roundedPolygonPath(
+    [
+      [CX - rx, cy],
+      [CX, cy - ry],
+      [CX + rx, cy],
+      [CX + rx, cy + depth],
+      [CX, cy + ry + depth],
+      [CX - rx, cy + depth],
+    ],
+    [CORNER_R * 1.1, CORNER_R * 1.4, CORNER_R * 1.1, CORNER_R * 2.2, CORNER_R * 3.0, CORNER_R * 2.2],
+  );
+};
 
 /**
  * Projects an upright glyph drawn around the origin onto a plate's face: unit x runs down-right
@@ -160,47 +240,103 @@ const FADE_STAGGER = 210;
  * when both sides have the SAME function list, so the idle state carries a fully transparent
  * blue shadow rather than one function fewer.
  */
-const IDLE_SHADOW = 'drop-shadow(0 7px 7px rgba(29,78,216,0)) drop-shadow(0 8px 10px rgba(23,50,95,0.26))';
-const ACTIVE_SHADOW = 'drop-shadow(0 16px 16px rgba(29,78,216,0.34)) drop-shadow(0 5px 4px rgba(23,50,95,0.2))';
-
 function PhaseStackArt({ activeIndex }: { activeIndex: number }) {
+  // The persistent pedestal begins behind the bottom tile; it is not a detached floor blob.
+  const pedestalCy = plateCy(PHASE_COUNT - 1) + 2;
+
   return (
     <svg
       viewBox={`0 ${VIEW_MIN_Y} ${VIEW_W} ${VIEW_H}`}
       aria-hidden="true"
       focusable="false"
-      className="pointer-events-none h-full w-auto overflow-visible lg:h-auto lg:w-full"
+      className="libertymd-phase-stack-art pointer-events-none h-full w-auto overflow-visible lg:h-[62vh] lg:w-auto"
     >
       <defs>
-        <linearGradient id="lmd-plate-active" x1="0.1" y1="0" x2="0.9" y2="1">
-          <stop offset="0%" stopColor="var(--libertymd-blue-500)" />
-          <stop offset="45%" stopColor="var(--libertymd-blue-600)" />
-          <stop offset="100%" stopColor="var(--libertymd-blue-700)" />
+        {Array.from({ length: PHASE_COUNT }, (_, index) => (
+          <clipPath id={`lmd-plate-face-${index}`} key={`face-clip-${index}`}>
+            <path d={topFacePath(plateCy(index))} />
+          </clipPath>
+        ))}
+        {/* Trust Blue carries the active face; its edge remains translucent, but never glassy. */}
+        <radialGradient id="lmd-plate-active" cx="50%" cy="38%" r="78%" fx="50%" fy="36%" gradientUnits="objectBoundingBox">
+          <stop offset="0%" stopColor="var(--libertymd-blue-700)" stopOpacity="0.98" />
+          <stop offset="28%" stopColor="var(--libertymd-blue-600)" stopOpacity="0.96" />
+          <stop offset="68%" stopColor="var(--libertymd-blue-500)" stopOpacity="0.9" />
+          <stop offset="100%" stopColor="var(--libertymd-blue-500)" stopOpacity="0.78" />
+        </radialGradient>
+        {/* Idle = frosted glass — edges nearly clear. */}
+        <radialGradient id="lmd-plate-idle" cx="50%" cy="38%" r="90%" fx="50%" fy="35%" gradientUnits="objectBoundingBox">
+          <stop offset="0%" stopColor="var(--libertymd-blue-50)" stopOpacity="0.58" />
+          <stop offset="40%" stopColor="var(--libertymd-blue-50)" stopOpacity="0.32" />
+          <stop offset="100%" stopColor="var(--libertymd-slate-200)" stopOpacity="0.2" />
+        </radialGradient>
+        {/* One gradient across one shell preserves directional light without a centre seam. */}
+        <linearGradient id="lmd-wall-active" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="var(--libertymd-blue-800)" stopOpacity="0.94" />
+          <stop offset="50%" stopColor="var(--libertymd-blue-700)" stopOpacity="0.92" />
+          <stop offset="100%" stopColor="var(--libertymd-blue-600)" stopOpacity="0.88" />
         </linearGradient>
-        <linearGradient id="lmd-plate-idle" x1="0.1" y1="0" x2="0.9" y2="1">
-          <stop offset="0%" stopColor="#FFFFFF" />
-          <stop offset="50%" stopColor="var(--libertymd-blue-50)" />
-          <stop offset="100%" stopColor="var(--libertymd-slate-200)" />
+        <linearGradient id="lmd-wall-idle" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="var(--libertymd-slate-500)" stopOpacity="0.46" />
+          <stop offset="50%" stopColor="var(--libertymd-slate-400)" stopOpacity="0.38" />
+          <stop offset="100%" stopColor="var(--libertymd-slate-300)" stopOpacity="0.3" />
         </linearGradient>
-        {/* The extruded side is always darker than the face it carries — that difference is
-            what reads as thickness. */}
-        <linearGradient id="lmd-slab-active" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="var(--libertymd-blue-900)" />
-          <stop offset="50%" stopColor="var(--libertymd-blue-700)" />
-          <stop offset="100%" stopColor="var(--libertymd-blue-800)" />
+        <radialGradient id="lmd-floor-pedestal-top" cx="50%" cy="40%" r="80%">
+          <stop offset="0%" stopColor="var(--libertymd-blue-400)" stopOpacity="0.45" />
+          <stop offset="48%" stopColor="var(--libertymd-blue-500)" stopOpacity="0.25" />
+          <stop offset="100%" stopColor="var(--libertymd-blue-500)" stopOpacity="0.02" />
+        </radialGradient>
+        <linearGradient id="lmd-floor-pedestal-wall" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="var(--libertymd-blue-500)" stopOpacity="0.04" />
+          <stop offset="28%" stopColor="var(--libertymd-blue-500)" stopOpacity="0.16" />
+          <stop offset="65%" stopColor="var(--libertymd-blue-600)" stopOpacity="0.36" />
+          <stop offset="100%" stopColor="var(--libertymd-blue-700)" stopOpacity="0.48" />
         </linearGradient>
-        <linearGradient id="lmd-slab-idle" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="#B8C6D8" />
-          <stop offset="50%" stopColor="var(--libertymd-slate-300)" />
-          <stop offset="100%" stopColor="var(--libertymd-slate-400)" />
-        </linearGradient>
-        <filter id="lmd-plate-glow" x="-60%" y="-60%" width="220%" height="220%">
-          <feGaussianBlur stdDeviation="12" />
+        <radialGradient id="lmd-floor-pedestal-base-bloom" cx="50%" cy="50%" r="75%">
+          <stop offset="0%" stopColor="var(--libertymd-blue-600)" stopOpacity="0.38" />
+          <stop offset="60%" stopColor="var(--libertymd-blue-500)" stopOpacity="0.18" />
+          <stop offset="100%" stopColor="var(--libertymd-blue-500)" stopOpacity="0" />
+        </radialGradient>
+        {/* Soft volumetric halo bloom filter surrounding the pedestal base */}
+        <filter id="lmd-floor-pedestal-bloom" x="-80%" y="-100%" width="260%" height="300%" colorInterpolationFilters="sRGB">
+          <feGaussianBlur stdDeviation="16" />
+        </filter>
+        <filter id="lmd-tile-contact" x="-30%" y="-120%" width="160%" height="340%" colorInterpolationFilters="sRGB">
+          <feGaussianBlur stdDeviation="3.5" />
         </filter>
       </defs>
 
-      {/* Painter's order: the top plate is drawn first, so a lower plate always overlaps the one
-          above it and no z-index reasoning is needed. */}
+      {/* The 3D volumetric bottom halo container wrapping plate 4 matching the reference image */}
+      <g>
+        {/* Outer ambient blue blur halo cloud surrounding the base */}
+        <path
+          d={floorPedestalPath(pedestalCy, 1.24, 68)}
+          fill="var(--libertymd-blue-500)"
+          filter="url(#lmd-floor-pedestal-bloom)"
+          opacity="0.28"
+        />
+        {/* Outer ground reflection halo */}
+        <path
+          d={floorHaloPath(pedestalCy + 52, 1.28)}
+          fill="url(#lmd-floor-pedestal-base-bloom)"
+          filter="url(#lmd-floor-pedestal-bloom)"
+        />
+        {/* 3D isometric pedestal container shell */}
+        <path
+          d={floorPedestalPath(pedestalCy, 1.2, 64)}
+          fill="url(#lmd-floor-pedestal-wall)"
+          stroke="var(--libertymd-blue-400)"
+          strokeOpacity="0.26"
+          strokeWidth="0.85"
+        />
+        {/* Inner floor radial surface halo glow under plate 4 */}
+        <path
+          d={floorHaloPath(pedestalCy + 2, 1.18)}
+          fill="url(#lmd-floor-pedestal-top)"
+        />
+      </g>
+
+      {/* Painter's order: top plate first so a lower plate overlaps the one above it. */}
       {GLYPHS.map((glyph, index) => {
         const isActive = index === activeIndex;
         // The plate is always DRAWN at its resting cy. The lift is a CSS transform on the group,
@@ -214,7 +350,6 @@ function PhaseStackArt({ activeIndex }: { activeIndex: number }) {
         const fadeOut = { transition: `opacity ${FADE_MS}ms ${LIFT_EASE}` };
         const fadeIn = { transition: `opacity ${FADE_MS}ms ${LIFT_EASE} ${FADE_STAGGER}ms` };
         // Whichever layer is arriving waits for the other to clear.
-        const restStyle = isActive ? fadeOut : fadeIn;
         const litStyle = isActive ? fadeIn : fadeOut;
 
         return (
@@ -222,15 +357,26 @@ function PhaseStackArt({ activeIndex }: { activeIndex: number }) {
             key={glyph}
             style={{
               transform: `translateY(${isActive ? -LIFT : 0}px)`,
-              filter: isActive ? ACTIVE_SHADOW : IDLE_SHADOW,
-              transition: `transform ${LIFT_MS}ms ${LIFT_EASE}, filter ${LIFT_MS}ms ${LIFT_EASE}`,
+              transition: `transform ${LIFT_MS}ms ${LIFT_EASE}`,
             }}
           >
-            {/* Resting state */}
-            <g style={{ ...restStyle, opacity: isActive ? 0 : 1 }}>
-              <path d={slabPath(cy)} fill="url(#lmd-slab-idle)" />
-              <path d={topFacePath(cy)} fill="url(#lmd-plate-idle)" stroke="var(--libertymd-slate-200)" strokeWidth="1" />
-              <ellipse cx={CX} cy={cy} rx={RX * 0.3} ry={RY * 0.3} fill="var(--libertymd-slate-400)" opacity="0.14" />
+            {/* Resting glass — walls first (tucked under lid), then translucent top. */}
+            <g>
+              {index < PHASE_COUNT - 1 && (
+                <ellipse
+                  cx={CX}
+                  cy={cy + RY + DEPTH + 2}
+                  rx={RX * 0.62}
+                  ry={RY * 0.12}
+                  fill="var(--libertymd-navy)"
+                  filter="url(#lmd-tile-contact)"
+                  opacity="0.13"
+                />
+              )}
+              <path d={wallSilhouettePath(cy)} fill="url(#lmd-wall-idle)" />
+              <path d={topFacePath(cy)} fill="url(#lmd-plate-idle)" />
+              {/* Soft icon disc — denser than the glass rim, not a hard stamp. */}
+              <ellipse cx={CX} cy={cy} rx={RX * 0.28} ry={RY * 0.28} fill="var(--libertymd-slate-400)" opacity="0.16" />
               <path
                 d={glyph}
                 transform={isoMatrix(cy)}
@@ -239,32 +385,60 @@ function PhaseStackArt({ activeIndex }: { activeIndex: number }) {
                 strokeWidth="1.8"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                opacity="0.34"
+                opacity="0.4"
                 vectorEffect="non-scaling-stroke"
               />
             </g>
 
-            {/* Lit state, crossfaded over the same 417ms. The reference hard-cuts between two
-                copies of the plate at this moment; a crossfade costs nothing and avoids the pop. */}
+            {/* Lit glass — walls first; translucent radial top; no opaque fill under glass. */}
             <g style={{ ...litStyle, opacity: isActive ? 1 : 0 }}>
-              <ellipse
-                cx={CX}
-                cy={cy + RY + DEPTH + 18}
-                rx={RX * 0.72}
-                ry={RY * 0.6}
-                fill="var(--libertymd-blue-500)"
-                filter="url(#lmd-plate-glow)"
-                opacity="0.3"
+              {index < PHASE_COUNT - 1 && (
+                <ellipse
+                  cx={CX}
+                  cy={cy + RY + DEPTH + 2}
+                  rx={RX * 0.66}
+                  ry={RY * 0.14}
+                  fill="var(--libertymd-navy)"
+                  filter="url(#lmd-tile-contact)"
+                  opacity="0.17"
+                />
+              )}
+              <path
+                className={isActive ? 'libertymd-plate-wall-reveal' : undefined}
+                d={wallSilhouettePath(cy)}
+                fill="url(#lmd-wall-active)"
+                style={isActive ? { animationDelay: `${FADE_STAGGER}ms` } : undefined}
               />
-              <path d={slabPath(cy)} fill="url(#lmd-slab-active)" />
-              <path d={topFacePath(cy)} fill="url(#lmd-plate-active)" stroke="var(--libertymd-blue-600)" strokeWidth="1" />
-              <ellipse cx={CX} cy={cy} rx={RX * 0.3} ry={RY * 0.3} fill="var(--libertymd-blue-900)" opacity="0.3" />
+              {/* Activation grows from the bright core across the face. The ellipse is clipped
+                  to the exact lid path, so it cannot tint a neighbouring tile or its walls. */}
+              <g clipPath={`url(#lmd-plate-face-${index})`}>
+                <ellipse
+                  className={isActive ? 'libertymd-plate-fill-reveal' : undefined}
+                  cx={CX}
+                  cy={cy}
+                  rx={RX * 1.08}
+                  ry={RY * 1.08}
+                  fill="url(#lmd-plate-active)"
+                  style={isActive ? { animationDelay: `${FADE_STAGGER}ms` } : undefined}
+                />
+              </g>
+              {/* The core leads the outward fill, as it does in the reference frames. */}
+              <ellipse
+                className={isActive ? 'libertymd-plate-core-reveal' : undefined}
+                cx={CX}
+                cy={cy}
+                rx={RX * 0.27}
+                ry={RY * 0.27}
+                fill="var(--libertymd-blue-800)"
+                opacity="0.22"
+                style={isActive ? { animationDelay: `${FADE_STAGGER}ms` } : undefined}
+              />
               <path
                 d={glyph}
                 transform={isoMatrix(cy)}
                 fill="none"
-                stroke="#FFFFFF"
-                strokeWidth="2.2"
+                stroke="var(--libertymd-blue-50)"
+                strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 opacity="0.92"
@@ -283,7 +457,8 @@ function PhaseStackArt({ activeIndex }: { activeIndex: number }) {
                 d={topFacePath(cy)}
                 fill="none"
                 stroke="var(--libertymd-blue-500)"
-                strokeWidth="1.5"
+                strokeWidth="1.15"
+                style={{ animationDelay: `${FADE_STAGGER}ms` }}
               />
             )}
           </g>
@@ -316,7 +491,7 @@ function PhaseLabel({
   const Icon = LABEL_ICONS[index];
 
   return (
-    <div className={`text-left transition-opacity duration-500 ${isActive ? 'opacity-100' : 'lg:opacity-40'}`}>
+    <div className={`libertymd-phase-stack-label text-left transition-opacity duration-500 ${isActive ? 'opacity-100' : 'lg:opacity-40'}`}>
       <span
         className={`inline-flex h-9 w-9 items-center justify-center rounded-full transition-colors duration-500 ${
           isActive ? 'bg-libertymd-blue-600 text-white' : 'bg-libertymd-slate-100 text-libertymd-slate-400'
@@ -491,7 +666,7 @@ export function LibertyMDPhaseStack({
 
   return (
     <div ref={wrapperRef} className="relative" style={{ height: `${PIN_VIEWPORTS * 100}vh` }}>
-      <div className="libertymd-content-shell sticky top-0 mx-auto flex h-screen flex-col justify-center gap-6 lg:gap-10">
+      <div className="libertymd-phase-stack-pane libertymd-content-shell sticky top-0 mx-auto flex h-screen flex-col justify-center gap-6 lg:gap-10">
         {header}
         {/* Below `lg` the stack is pushed half off the right edge and the copy owns the left,
             showing one phase at a time. From `lg` the stack is centred with two phases either
@@ -501,8 +676,8 @@ export function LibertyMDPhaseStack({
             420px viewport, i.e. a horizontally scrollable page. `clip` contains it without
             creating a scroll container, so the sticky parent keeps working and the plates' glow
             can still bleed vertically. */}
-        <div className="relative min-h-[46vh] overflow-x-clip lg:grid lg:min-h-0 lg:grid-cols-[1fr_auto_1fr] lg:items-center lg:gap-10 lg:overflow-x-visible">
-          <div className="hidden flex-col gap-8 lg:flex xl:gap-10">
+        <div className="libertymd-phase-stack-layout relative min-h-[46vh] overflow-x-clip lg:grid lg:min-h-0 lg:grid-cols-[1fr_auto_1fr] lg:items-center lg:gap-10 lg:overflow-x-visible">
+          <div className="libertymd-phase-stack-label-column hidden flex-col gap-8 lg:flex xl:gap-10">
             {[0, 1].map((index) => (
               <PhaseLabel
                 key={phases[index].title}
@@ -528,7 +703,7 @@ export function LibertyMDPhaseStack({
 
           {/* The right pair is dropped half a block so the four labels read as a spiral around
               the stack rather than two rigid columns — the reference staggers them the same way. */}
-          <div className="hidden flex-col gap-8 lg:flex lg:pt-14 xl:gap-10 xl:pt-20">
+          <div className="libertymd-phase-stack-label-column libertymd-phase-stack-right hidden flex-col gap-8 lg:flex lg:pt-14 xl:gap-10 xl:pt-20">
             {[2, 3].map((index) => (
               <PhaseLabel
                 key={phases[index].title}
