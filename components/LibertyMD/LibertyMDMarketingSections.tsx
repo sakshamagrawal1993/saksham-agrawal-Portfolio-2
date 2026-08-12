@@ -111,7 +111,7 @@ export function LibertyMDPhoneCareSection({ onStartChat }: MarketingSectionProps
 
   return (
     <section
-      className="libertymd-page-gutter libertymd-section-spacing relative overflow-hidden border-t border-libertymd-green-sage bg-libertymd-green-sage/40"
+      className="libertymd-page-gutter libertymd-section-spacing relative overflow-hidden bg-gradient-to-b from-[#FAF8F5] via-[#F4F7F4] to-[#F0F5F2]"
     >
       <div className="libertymd-shell grid items-center gap-[var(--libertymd-layout-gap)] lg:min-h-[720px] lg:grid-cols-[minmax(17rem,0.72fr)_minmax(34rem,1.28fr)]">
         <div className="mx-auto max-w-xl text-center lg:mx-0 lg:text-left">
@@ -302,7 +302,7 @@ export function LibertyMDPricingSection({ onStartChat }: MarketingSectionProps) 
   } as CSSProperties;
 
   return (
-    <section className="libertymd-page-gutter libertymd-section-spacing border-t border-libertymd-green-sage bg-[color:var(--libertymd-blue-50)] text-center">
+    <section className="libertymd-page-gutter libertymd-section-spacing relative overflow-hidden bg-gradient-to-b from-[#F0F5F2] via-[#EFF6FF] to-[#FAF8F5] text-center">
       <div className="libertymd-content-shell grid items-center gap-[var(--libertymd-layout-gap)] lg:grid-cols-[minmax(19rem,0.74fr)_minmax(32rem,1.26fr)]">
         <div>
           <p className="text-xs font-bold uppercase text-libertymd-blue-600">{t('marketing.pricing.kicker')}</p>
@@ -505,7 +505,7 @@ export function LibertyMDPatientStoriesSection() {
   const { t } = useI18n();
 
   return (
-    <section className="libertymd-page-gutter libertymd-section-spacing border-t border-libertymd-green-sage/40 bg-[#FAF8F5] py-16 sm:py-24 overflow-hidden">
+    <section className="libertymd-page-gutter libertymd-section-spacing relative overflow-hidden bg-gradient-to-b from-[#FAF8F5] via-[#FBFBF9] to-[#FAF8F5] py-16 sm:py-24">
       <div className="libertymd-content-shell max-w-7xl mx-auto">
         {/* Center Aligned Minimalistic Header */}
         <div className="flex flex-col items-center justify-center text-center mb-12 px-4 max-w-2xl mx-auto">
@@ -606,8 +606,8 @@ export function LibertyMDHealthLibrarySection() {
     description: t(`marketing.library.items.${i}.description`),
   }));
   return (
-    <section className="libertymd-page-gutter libertymd-section-spacing border-t border-libertymd-green-sage bg-white text-center">
-      <div className="libertymd-content-shell flex flex-col items-center gap-5 border-b border-libertymd-green-sage pb-8">
+    <section className="libertymd-page-gutter libertymd-section-spacing relative overflow-hidden bg-gradient-to-b from-[#FAF8F5] via-white to-[#EFF6FF] text-center">
+      <div className="libertymd-content-shell flex flex-col items-center gap-5 border-b border-libertymd-slate-200/60 pb-8">
         <div className="text-center">
           <p className="text-xs font-bold uppercase text-libertymd-blue-600">{t('marketing.library.kicker')}</p>
           <h2 className="mt-3 font-serif text-4xl font-semibold text-libertymd-ink sm:text-5xl">{t('marketing.library.title')}</h2>
