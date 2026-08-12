@@ -54,27 +54,30 @@ export default function LibertyMDPremiumLogo({
       const rootDocumentTop = rootRect.top + scrollY;
       
       const dockNode = dockHeadlineRef?.current;
-      const dockRect = dockNode ? dockNode.getBoundingClientRect() : null;
-
-      // Scale of docked logo
-      const finalScale = isCompact ? 0.44 : 0.36;
-      const movingLogoHeight = moving.offsetHeight || (isCompact ? 240 : 320);
-
-      // Offset so the bottom of the logo sits gracefully ABOVE the "How LibertyMD works" text
-      const logoHalfHeight = movingLogoHeight * finalScale * 0.45;
-      const headlineOffset = isCompact ? logoHalfHeight + 12 : logoHalfHeight + 18;
-
-      if (!dockRect) {
+      if (!dockNode) {
         return { travel: 0, scale: 1, rotate: 0, ped: 1, progress: 0 };
       }
 
-      // Desired screen Y position for the logo relative to dockHeadlineRef
-      const targetScreenY = dockRect.top - headlineOffset;
+      // Query the actual h2 headline element ("How LibertyMD works") inside the dock container
+      const h2El = dockNode.querySelector('h2') || dockNode;
+      const h2Rect = h2El.getBoundingClientRect();
+
+      // Scale of docked logo
+      const finalScale = isCompact ? 0.42 : 0.35;
+      const movingLogoHeight = moving.offsetHeight || (isCompact ? 240 : 320);
+      const scaledLogoHeight = movingLogoHeight * finalScale;
+
+      // Gap between the bottom of the logo and the top of the "How LibertyMD works" headline
+      const gapAboveHeadline = isCompact ? 10 : 16;
+
+      // Formula: movingBottom = h2Rect.top - gapAboveHeadline
+      // movingTop = h2Rect.top - scaledLogoHeight - gapAboveHeadline
+      const targetScreenY = h2Rect.top - scaledLogoHeight - gapAboveHeadline;
       const travelTarget = scrollY - rootDocumentTop + targetScreenY;
 
       // Scroll trigger and landing threshold
       const triggerScroll = rootDocumentTop;
-      const landingScroll = Math.max(triggerScroll + 1, dockRect.top + scrollY - viewportHeight * 0.65);
+      const landingScroll = Math.max(triggerScroll + 1, h2Rect.top + scrollY - viewportHeight * 0.65);
 
       const rawProgress = Math.min(1, Math.max(0, (scrollY - triggerScroll) / (landingScroll - triggerScroll)));
       const easedProgress = rawProgress ** 3 * (rawProgress * (rawProgress * 6 - 15) + 10);
