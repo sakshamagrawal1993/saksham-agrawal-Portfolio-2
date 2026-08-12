@@ -167,25 +167,32 @@ const floorHaloPath = (cy: number, scale = 1.2) => {
 };
 
 /**
- * Persistent 3D enclosure behind and around the bottom tile matching the reference design.
- * Formed as a 6-point 3D isometric diamond extrusion shell that wraps around the back and sides
- * of the 4th plate, then extends vertically downwards into a deeply rounded lower receiver base.
+ * Persistent 3D translucent veil behind and around the bottom of the stack matching the reference design.
+ * Formed as a 6-point 3D isometric shroud that extends from below the 4th tile all the way up to
+ * behind the 3rd tile (plate index 2), with a low-opacity gradient that fades seamlessly into the canvas.
  */
-const floorPedestalPath = (cy: number, scale = 1.2, depth = 64) => {
+const floorVeilPath = (scale = 1.25) => {
   const rx = RX * scale;
   const ry = RY * scale;
+  // Top apex reaches behind the 3rd tile (plateCy(2) = 236)
+  const topApexY = plateCy(2) - 28;
+  const shoulderY = plateCy(2) + GAP * 0.45;
+  const bottomApexY = plateCy(3) + ry + 46;
+
   return roundedPolygonPath(
     [
-      [CX - rx, cy],
-      [CX, cy - ry],
-      [CX + rx, cy],
-      [CX + rx, cy + depth],
-      [CX, cy + ry + depth],
-      [CX - rx, cy + depth],
+      [CX - rx, shoulderY],
+      [CX, topApexY],
+      [CX + rx, shoulderY],
+      [CX + rx, bottomApexY - ry],
+      [CX, bottomApexY],
+      [CX - rx, bottomApexY - ry],
     ],
-    [CORNER_R * 1.1, CORNER_R * 1.4, CORNER_R * 1.1, CORNER_R * 2.2, CORNER_R * 3.0, CORNER_R * 2.2],
+    [CORNER_R * 1.2, CORNER_R * 1.6, CORNER_R * 1.2, CORNER_R * 2.5, CORNER_R * 3.4, CORNER_R * 2.5],
   );
 };
+
+const floorPedestalPath = (cy: number, scale = 1.2, depth = 64) => floorVeilPath(scale);
 
 /**
  * Projects an upright glyph drawn around the origin onto a plate's face: unit x runs down-right
@@ -215,7 +222,7 @@ const GLYPHS = [
 
 /**
  * Highlight motion, taken from the reference's own Lottie (`result-v3.json`, 30fps):
- *   · the lit plate's null travels y −117.134 → −197.485 = 80.4 units
+ *   · the lit plate'null travels y −117.134 → −197.485 = 80.4 units
  *   · plate-to-plate spacing in the same space is 121 × 2.01 = 243.2 units
  *     → the lift is 33% of the gap, not a nudge
  *   · t 59.5 → 72 and t 242 → 254.5 = 12.5 frames each way = 417ms, rise and fall alike
@@ -241,9 +248,6 @@ const FADE_STAGGER = 210;
  * blue shadow rather than one function fewer.
  */
 function PhaseStackArt({ activeIndex }: { activeIndex: number }) {
-  // The persistent pedestal begins behind the bottom tile; it is not a detached floor blob.
-  const pedestalCy = plateCy(PHASE_COUNT - 1) + 2;
-
   return (
     <svg
       viewBox={`0 ${VIEW_MIN_Y} ${VIEW_W} ${VIEW_H}`}
@@ -282,56 +286,46 @@ function PhaseStackArt({ activeIndex }: { activeIndex: number }) {
           <stop offset="100%" stopColor="var(--libertymd-slate-300)" stopOpacity="0.3" />
         </linearGradient>
         <radialGradient id="lmd-floor-pedestal-top" cx="50%" cy="40%" r="80%">
-          <stop offset="0%" stopColor="var(--libertymd-blue-400)" stopOpacity="0.45" />
-          <stop offset="48%" stopColor="var(--libertymd-blue-500)" stopOpacity="0.25" />
-          <stop offset="100%" stopColor="var(--libertymd-blue-500)" stopOpacity="0.02" />
+          <stop offset="0%" stopColor="var(--libertymd-blue-400)" stopOpacity="0.35" />
+          <stop offset="50%" stopColor="var(--libertymd-blue-500)" stopOpacity="0.18" />
+          <stop offset="100%" stopColor="var(--libertymd-blue-500)" stopOpacity="0.0" />
         </radialGradient>
-        <linearGradient id="lmd-floor-pedestal-wall" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="var(--libertymd-blue-500)" stopOpacity="0.04" />
-          <stop offset="28%" stopColor="var(--libertymd-blue-500)" stopOpacity="0.16" />
-          <stop offset="65%" stopColor="var(--libertymd-blue-600)" stopOpacity="0.36" />
-          <stop offset="100%" stopColor="var(--libertymd-blue-700)" stopOpacity="0.48" />
+        {/* Translucent 3D veil vertical gradient: seamlessly fades from top (behind 3rd tile) into background */}
+        <linearGradient id="lmd-veil-gradient" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="var(--libertymd-blue-400)" stopOpacity="0.0" />
+          <stop offset="25%" stopColor="var(--libertymd-blue-400)" stopOpacity="0.06" />
+          <stop offset="60%" stopColor="var(--libertymd-blue-500)" stopOpacity="0.16" />
+          <stop offset="100%" stopColor="var(--libertymd-blue-600)" stopOpacity="0.26" />
         </linearGradient>
-        <radialGradient id="lmd-floor-pedestal-base-bloom" cx="50%" cy="50%" r="75%">
-          <stop offset="0%" stopColor="var(--libertymd-blue-600)" stopOpacity="0.38" />
-          <stop offset="60%" stopColor="var(--libertymd-blue-500)" stopOpacity="0.18" />
-          <stop offset="100%" stopColor="var(--libertymd-blue-500)" stopOpacity="0" />
-        </radialGradient>
-        {/* Soft volumetric halo bloom filter surrounding the pedestal base */}
-        <filter id="lmd-floor-pedestal-bloom" x="-80%" y="-100%" width="260%" height="300%" colorInterpolationFilters="sRGB">
-          <feGaussianBlur stdDeviation="16" />
+        {/* Veil ambient soft edge blur filter */}
+        <filter id="lmd-veil-blur" x="-80%" y="-80%" width="260%" height="260%" colorInterpolationFilters="sRGB">
+          <feGaussianBlur stdDeviation="18" />
         </filter>
         <filter id="lmd-tile-contact" x="-30%" y="-120%" width="160%" height="340%" colorInterpolationFilters="sRGB">
           <feGaussianBlur stdDeviation="3.5" />
         </filter>
       </defs>
 
-      {/* The 3D volumetric bottom halo container wrapping plate 4 matching the reference image */}
+      {/* Translucent 3D veil extending from the stack base up to behind the 3rd tile matching the reference image */}
       <g>
-        {/* Outer ambient blue blur halo cloud surrounding the base */}
+        {/* Outer blurred veil halo mixing into the background */}
         <path
-          d={floorPedestalPath(pedestalCy, 1.24, 68)}
-          fill="var(--libertymd-blue-500)"
-          filter="url(#lmd-floor-pedestal-bloom)"
-          opacity="0.28"
+          d={floorVeilPath(1.28)}
+          fill="url(#lmd-veil-gradient)"
+          filter="url(#lmd-veil-blur)"
+          opacity="0.6"
         />
-        {/* Outer ground reflection halo */}
+        {/* Translucent veil container body */}
         <path
-          d={floorHaloPath(pedestalCy + 52, 1.28)}
-          fill="url(#lmd-floor-pedestal-base-bloom)"
-          filter="url(#lmd-floor-pedestal-bloom)"
-        />
-        {/* 3D isometric pedestal container shell */}
-        <path
-          d={floorPedestalPath(pedestalCy, 1.2, 64)}
-          fill="url(#lmd-floor-pedestal-wall)"
+          d={floorVeilPath(1.22)}
+          fill="url(#lmd-veil-gradient)"
           stroke="var(--libertymd-blue-400)"
-          strokeOpacity="0.26"
-          strokeWidth="0.85"
+          strokeOpacity="0.14"
+          strokeWidth="0.75"
         />
-        {/* Inner floor radial surface halo glow under plate 4 */}
+        {/* Soft radial glow under the 4th tile floor */}
         <path
-          d={floorHaloPath(pedestalCy + 2, 1.18)}
+          d={floorHaloPath(plateCy(3) + 2, 1.18)}
           fill="url(#lmd-floor-pedestal-top)"
         />
       </g>
