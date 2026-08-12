@@ -1741,7 +1741,7 @@ export default function LibertyMDApp() {
       </div>
 
       {/* Exact Doctronic-Style 3D Volumetric Ribbon Footer in Blue */}
-      <footer className="relative bg-gradient-to-b from-[#EFF6FF] via-libertymd-blue-50 to-libertymd-blue-50 text-libertymd-slate-900 overflow-hidden min-h-[720px] flex flex-col justify-between">
+      <footer className="relative mt-20 sm:mt-24 border-t border-libertymd-slate-200/80 bg-gradient-to-b from-libertymd-blue-50 via-libertymd-blue-50 to-libertymd-blue-50 text-libertymd-slate-900 overflow-hidden min-h-[720px] flex flex-col justify-between">
         {/* Three.js WebGL 3D Silk Wave Ribbon (Blue Theme) */}
         <LibertyMDFooterRibbon />
 

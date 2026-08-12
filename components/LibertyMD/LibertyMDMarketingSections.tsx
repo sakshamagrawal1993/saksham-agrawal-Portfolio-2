@@ -111,7 +111,7 @@ export function LibertyMDPhoneCareSection({ onStartChat }: MarketingSectionProps
 
   return (
     <section
-      className="libertymd-page-gutter libertymd-section-spacing relative overflow-hidden bg-gradient-to-b from-[#FAF8F5] via-[#F4F7F4] to-[#F0F5F2]"
+      className="libertymd-page-gutter libertymd-section-spacing relative overflow-hidden bg-gradient-to-b from-[#EDF7F1] via-[#F4F7F4] to-[#F0F5F2]"
     >
       <div className="libertymd-shell grid items-center gap-[var(--libertymd-layout-gap)] lg:min-h-[720px] lg:grid-cols-[minmax(17rem,0.72fr)_minmax(34rem,1.28fr)]">
         <div className="mx-auto max-w-xl text-center lg:mx-0 lg:text-left">
