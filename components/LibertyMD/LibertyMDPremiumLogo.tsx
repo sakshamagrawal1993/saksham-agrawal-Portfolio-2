@@ -50,41 +50,39 @@ export default function LibertyMDPremiumLogo({
       const isCompact = window.innerWidth < 640;
       const viewportHeight = window.innerHeight;
       
-      const rootDocumentTop = root.getBoundingClientRect().top + scrollY;
-      const headlineDocumentTop = dockHeadlineRef?.current
-        ? dockHeadlineRef.current.getBoundingClientRect().top + scrollY
-        : rootDocumentTop + (isCompact ? 450 : 550);
+      const rootRect = root.getBoundingClientRect();
+      const rootDocumentTop = rootRect.top + scrollY;
+      
+      const dockNode = dockHeadlineRef?.current;
+      const dockRect = dockNode ? dockNode.getBoundingClientRect() : null;
 
+      // Scale of docked logo
+      const finalScale = isCompact ? 0.44 : 0.36;
+      const movingLogoHeight = moving.offsetHeight || (isCompact ? 240 : 320);
+
+      // Offset so the bottom of the logo sits gracefully ABOVE the "How LibertyMD works" text
+      const logoHalfHeight = movingLogoHeight * finalScale * 0.45;
+      const headlineOffset = isCompact ? logoHalfHeight + 12 : logoHalfHeight + 18;
+
+      if (!dockRect) {
+        return { travel: 0, scale: 1, rotate: 0, ped: 1, progress: 0 };
+      }
+
+      // Desired screen Y position for the logo relative to dockHeadlineRef
+      const targetScreenY = dockRect.top - headlineOffset;
+      const travelTarget = scrollY - rootDocumentTop + targetScreenY;
+
+      // Scroll trigger and landing threshold
       const triggerScroll = rootDocumentTop;
-      const landingScroll = Number.isFinite(headlineDocumentTop)
-        ? Math.max(triggerScroll + 1, headlineDocumentTop - viewportHeight * 0.72)
-        : triggerScroll + (isCompact ? 300 : 360);
+      const landingScroll = Math.max(triggerScroll + 1, dockRect.top + scrollY - viewportHeight * 0.65);
 
-      const rawProgress = Number.isFinite(triggerScroll)
-        ? Math.min(1, Math.max(0, (scrollY - triggerScroll) / (landingScroll - triggerScroll)))
-        : 0;
-
+      const rawProgress = Math.min(1, Math.max(0, (scrollY - triggerScroll) / (landingScroll - triggerScroll)));
       const easedProgress = rawProgress ** 3 * (rawProgress * (rawProgress * 6 - 15) + 10);
       const transferProgress = Math.min(1, rawProgress + Math.sin(Math.PI * rawProgress) * 0.24);
 
-      const finalScale = isCompact ? 0.52 : 0.42;
-      const movingLogoHeight = moving.offsetHeight || (isCompact ? 240 : 330);
-      const targetBottom = Number.isFinite(headlineDocumentTop)
-        ? headlineDocumentTop - (isCompact ? 36 : 48)
-        : rootDocumentTop + (isCompact ? 920 : 1040);
-      const scaledBottomFromRoot = movingLogoHeight * (1 + finalScale) * 0.5;
-
-      const initialTravel = Number.isFinite(rootDocumentTop)
-        ? Math.max(0, targetBottom - rootDocumentTop - scaledBottomFromRoot)
-        : 0;
-
-      // Lock to fixed top offset (16px / 10px) once docked at sticky section
-      const topOffset = isCompact ? 10 : 16;
-      const lockedTravel = scrollY - rootDocumentTop + topOffset;
-
       const travel = rawProgress >= 1
-        ? lockedTravel
-        : initialTravel * transferProgress + (lockedTravel - initialTravel) * (rawProgress ** 2);
+        ? Math.max(0, travelTarget)
+        : Math.max(0, travelTarget) * transferProgress;
 
       return {
         travel,
@@ -119,7 +117,7 @@ export default function LibertyMDPremiumLogo({
     const tick = () => {
       const t = computeTarget();
       if (t.progress >= 1) {
-        // Once docked at top of viewport, lock 1:1 with scroll to eliminate bouncing
+        // Direct 1:1 sync when arrived to eliminate spring bouncing
         cur = t;
       } else {
         cur = {
