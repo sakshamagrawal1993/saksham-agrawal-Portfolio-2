@@ -321,15 +321,12 @@ export function LibertyMDSpecialistsSection() {
           })}
         </div>
 
-        {/* Rotating Single-Line Endorsement Quote Bar */}
-        <div className="mt-10 flex flex-col items-center justify-center text-center px-4">
-          <div className="inline-flex flex-wrap items-center justify-center gap-2.5 rounded-full bg-white/95 border border-libertymd-slate-200/90 px-6 py-3 shadow-[0_4px_20px_rgba(15,23,42,0.04)] backdrop-blur-sm transition-all duration-500 max-w-4xl">
-            <span className="h-2 w-2 rounded-full bg-libertymd-blue-600 animate-pulse shrink-0" />
-            <p className="font-sans text-sm sm:text-base font-medium text-libertymd-ink transition-opacity duration-300">
-              <span className="italic text-libertymd-slate-700">{activeDoc.quote}</span>
-              <span className="ml-2 font-semibold text-libertymd-blue-600 whitespace-nowrap">— {activeDoc.name}</span>
-            </p>
-          </div>
+        {/* Rotating Single-Line Endorsement Quote (Flat with Section Background) */}
+        <div className="mt-8 sm:mt-10 mb-6 flex flex-col items-center justify-center text-center px-4">
+          <p className="font-sans text-sm sm:text-base md:text-lg font-medium text-libertymd-ink max-w-3xl leading-relaxed">
+            <span className="italic text-libertymd-slate-700">{activeDoc.quote}</span>
+            <span className="ml-2.5 font-semibold text-libertymd-blue-600 font-serif whitespace-nowrap">— {activeDoc.name}</span>
+          </p>
         </div>
       </div>
     </section>
