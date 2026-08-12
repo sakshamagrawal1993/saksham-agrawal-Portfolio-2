@@ -400,235 +400,188 @@ export function LibertyMDPricingSection({ onStartChat }: MarketingSectionProps) 
   );
 }
 
-const patientStories = [
+const patientStoriesRail = [
   {
-    category: 'Preparing for a visit',
-    title: 'I arrived knowing what to explain.',
-    quote: 'LibertyMD organized the timeline and warning signs, so my appointment started with the details that mattered.',
-    name: 'Jordan, 34',
+    id: 'peter',
+    type: 'dark' as const,
+    name: 'Peter',
+    avatar: homepagePhoto('photo-1507003211169-0a1dd7228f2d'),
+    quote: '"It was very insightful and gave me the ability to self-reflect before my appointment."',
+  },
+  {
+    id: 'jason',
+    type: 'photo' as const,
+    name: 'Jason',
     image: homepagePhoto('photo-1534528741775-53994a69daeb'),
-    format: 'portrait',
+    quote: '"I arrived knowing exactly what to explain."',
   },
   {
-    category: 'Finding peace of mind',
-    title: 'The next step finally felt clear.',
-    quote: 'The conversation separated what I could monitor at home from the symptoms that would need urgent care.',
-    name: 'Marcus, 41',
-    image: homepagePhoto('photo-1506794778202-cad84cf45f1d'),
-    format: 'quote',
+    id: 'devanee',
+    type: 'dark' as const,
+    name: 'Devanee',
+    avatar: homepagePhoto('photo-1544005313-94ddf0286df2'),
+    quote: '"With LibertyMD, I was just able to jump right in without feeling lost."',
   },
   {
-    category: 'Understanding symptoms',
-    title: 'I had better questions for my doctor.',
-    quote: 'Instead of searching through dozens of pages, I left with a concise report and a focused list of questions.',
-    name: 'Ana, 29',
-    image: homepagePhoto('photo-1544005313-94ddf0286df2'),
-    format: 'portrait',
+    id: 'shalom',
+    type: 'dark' as const,
+    name: 'Shalom',
+    avatar: homepagePhoto('photo-1506794778202-cad84cf45f1d'),
+    quote: '"The conversation separated home monitoring from urgent care."',
   },
   {
-    category: 'Recognizing urgency',
-    title: 'It made the warning signs easy to understand.',
-    quote: 'The safety questions were calm and direct. I understood why same-day care mattered and what to tell the clinician.',
-    name: 'Priya, 38',
+    id: 'telika',
+    type: 'photo' as const,
+    name: 'Telika',
     image: homepagePhoto('photo-1488426862026-3ee34a7d66df'),
-    format: 'quote',
+    quote: '"It made the warning signs clear and easy to understand."',
   },
   {
-    category: 'Following up',
-    title: 'I could pick up without starting over.',
-    quote: 'My timeline, medications, and next steps stayed together, which made the follow-up conversation much less scattered.',
-    name: 'Daniel, 46',
-    image: homepagePhoto('photo-1519345182560-3f2917c472ef'),
-    format: 'portrait',
+    id: 'marcus',
+    type: 'dark' as const,
+    name: 'Marcus',
+    avatar: homepagePhoto('photo-1519345182560-3f2917c472ef'),
+    quote: '"I stopped guessing and had better questions for my doctor."',
   },
   {
-    category: 'Managing a fever',
-    title: 'I knew what to watch overnight.',
-    quote: 'The plan gave me practical checkpoints for hydration, temperature, and the changes that would mean getting help.',
-    name: 'Leah, 32',
+    id: 'leah',
+    type: 'photo' as const,
+    name: 'Leah',
     image: homepagePhoto('photo-1508214751196-bcfd4ca60f91'),
-    format: 'quote',
+    quote: '"I knew what to watch overnight for my family."',
   },
   {
-    category: 'Medication questions',
-    title: 'The conversation made my options simpler.',
-    quote: 'I could explain what I had already tried and understand which questions to take to my pharmacist and doctor.',
-    name: 'Ethan, 52',
-    image: homepagePhoto('photo-1519085360753-af0119f7cbe7'),
-    format: 'portrait',
-  },
-  {
-    category: 'Symptom tracking',
-    title: 'I stopped guessing about the swelling.',
-    quote: 'LibertyMD helped me describe the injury clearly and understand when an examination or imaging could be appropriate.',
-    name: 'Noah, 27',
-    image: homepagePhoto('photo-1527980965255-d3b416303d12'),
-    format: 'quote',
-  },
-  {
-    category: 'Family health decisions',
-    title: 'I felt calmer making the decision.',
-    quote: 'The questions helped me organize what had changed and decide what kind of care my mother needed next.',
-    name: 'Maya, 44',
-    image: homepagePhoto('photo-1531123897727-8f129e1688ce'),
-    format: 'portrait',
-  },
-  {
-    category: 'Chronic symptom patterns',
-    title: 'The pattern finally became visible.',
-    quote: 'Seeing the timing and triggers together gave me a much better starting point for a longer-term conversation.',
-    name: 'Sofia, 36',
-    image: homepagePhoto('photo-1524504388940-b1c1722653e1'),
-    format: 'quote',
+    id: 'ethan',
+    type: 'dark' as const,
+    name: 'Ethan',
+    avatar: homepagePhoto('photo-1519085360753-af0119f7cbe7'),
+    quote: '"The symptom summary gave me a much better starting point."',
   },
 ];
 
 export function LibertyMDPatientStoriesSection() {
   const { t } = useI18n();
-  const reduceMotion = useReducedMotion();
-  const [activeStory, setActiveStory] = useState(0);
-  const [isUserPaused, setIsUserPaused] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
+  const railRef = useRef<HTMLDivElement>(null);
 
-  const stories = patientStories.map((item, index) => ({
-    ...item,
-    category: t(`marketing.stories.items.${index}.category`) || item.category,
-    title: t(`marketing.stories.items.${index}.title`) || item.title,
-    quote: t(`marketing.stories.items.${index}.quote`) || item.quote,
-  }));
-
-  const story = stories[activeStory] || stories[0];
-
-  const move = (direction: number) => {
-    setActiveStory((current) => (current + direction + stories.length) % stories.length);
+  const scrollRail = (direction: 'left' | 'right') => {
+    if (!railRef.current) return;
+    const scrollAmount = railRef.current.clientWidth * 0.75;
+    railRef.current.scrollBy({
+      left: direction === 'left' ? -scrollAmount : scrollAmount,
+      behavior: 'smooth',
+    });
   };
 
-  useEffect(() => {
-    if (isUserPaused || isHovered || reduceMotion) return undefined;
-    const timer = window.setInterval(() => {
-      setActiveStory((current) => (current + 1) % stories.length);
-    }, 6000);
-    return () => window.clearInterval(timer);
-  }, [isUserPaused, isHovered, reduceMotion, stories.length]);
-
   return (
-    <section
-      className="libertymd-page-gutter libertymd-section-spacing border-t border-libertymd-green-sage bg-libertymd-green-sage/30 text-center"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      <div className="libertymd-content-shell max-w-4xl mx-auto">
-        <div className="flex flex-col items-center justify-between gap-6 sm:flex-row sm:items-end sm:text-left">
-          <div className="max-w-2xl text-center sm:text-left">
-            <p className="text-xs font-bold uppercase tracking-wider text-libertymd-blue-600">
-              {t('marketing.stories.kicker')}
+    <section className="libertymd-page-gutter libertymd-section-spacing border-t border-libertymd-green-sage/40 bg-[#FAF8F5] py-16 sm:py-24 overflow-hidden">
+      <div className="libertymd-content-shell max-w-7xl mx-auto">
+        {/* Minimalistic Header */}
+        <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end mb-10 px-2">
+          <div className="max-w-xl text-left">
+            <p className="text-xs font-bold uppercase tracking-widest text-libertymd-blue-600">
+              {t('marketing.stories.kicker') || 'PATIENT STORIES'}
             </p>
-            <h2 className="mt-3 font-serif text-3xl font-semibold leading-tight text-libertymd-ink sm:text-4xl lg:text-5xl">
-              {t('marketing.stories.title')}
+            <h2 className="mt-2 font-serif text-3xl font-semibold leading-tight text-libertymd-ink sm:text-4xl">
+              {t('marketing.stories.title') || 'A clearer conversation can change what happens next.'}
             </h2>
-            <p className="mt-4 text-sm leading-7 text-libertymd-slate-muted sm:text-base">
-              {t('marketing.stories.body')}
-            </p>
           </div>
 
-          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-            <span className="mr-1 text-xs font-bold tabular-nums text-libertymd-slate-600">
-              {String(activeStory + 1).padStart(2, '0')} / {String(stories.length).padStart(2, '0')}
-            </span>
+          {/* Minimalist Navigation Arrows */}
+          <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
-              onClick={() => setIsUserPaused((current) => !current)}
-              aria-label={isUserPaused ? t('marketing.stories.play') : t('marketing.stories.pause')}
-              aria-pressed={isUserPaused}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-libertymd-slate-300 bg-white text-libertymd-ink shadow-sm transition hover:border-libertymd-blue-600 hover:text-libertymd-blue-600"
+              onClick={() => scrollRail('left')}
+              aria-label="Previous testimonials"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-libertymd-slate-300 bg-white/90 text-libertymd-ink shadow-sm transition hover:border-libertymd-blue-600 hover:text-libertymd-blue-600 active:scale-95"
             >
-              {isUserPaused ? <Play className="h-4 w-4 fill-current" /> : <Pause className="h-4 w-4 fill-current" />}
+              <ChevronLeft className="h-5 w-5" />
             </button>
             <button
               type="button"
-              onClick={() => move(-1)}
-              aria-label={t('marketing.stories.prev')}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-libertymd-slate-300 bg-white text-libertymd-ink shadow-sm transition hover:border-libertymd-blue-600 hover:text-libertymd-blue-600"
+              onClick={() => scrollRail('right')}
+              aria-label="Next testimonials"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-libertymd-slate-300 bg-white/90 text-libertymd-ink shadow-sm transition hover:border-libertymd-blue-600 hover:text-libertymd-blue-600 active:scale-95"
             >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => move(1)}
-              aria-label={t('marketing.stories.next')}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-libertymd-slate-300 bg-libertymd-blue-600 text-white shadow-[0_8px_20px_rgba(37,99,235,0.25)] transition hover:bg-libertymd-blue-700"
-            >
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-5 w-5" />
             </button>
           </div>
         </div>
 
-        {/* Category Pills Bar */}
-        <div className="mt-8 flex flex-wrap justify-center gap-2 border-b border-libertymd-slate-200 pb-5 sm:justify-start">
-          {stories.map((item, index) => (
-            <button
-              key={item.category}
-              type="button"
-              onClick={() => setActiveStory(index)}
-              aria-pressed={activeStory === index}
-              className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
-                activeStory === index
-                  ? 'bg-libertymd-blue-600 text-white shadow-sm'
-                  : 'bg-white/80 text-libertymd-slate-600 hover:bg-white hover:text-libertymd-ink'
-              }`}
-            >
-              {item.category}
-            </button>
-          ))}
-        </div>
-
-        {/* Story Card Showcase */}
-        <div className="mt-8 grid items-stretch overflow-hidden rounded-2xl border border-white/80 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.08)] md:grid-cols-[0.92fr_1.08fr]">
-          <div className="relative min-h-[280px] bg-libertymd-slate-900 md:min-h-[440px]">
-            <motion.img
-              key={story.image}
-              initial={{ opacity: 0.4, scale: 1.04 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5 }}
-              src={story.image}
-              alt={`${story.name}: ${story.category}`}
-              className="absolute inset-0 h-full w-full object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-libertymd-ink/75 via-transparent to-black/20" />
-            <span className="absolute left-4 top-4 inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3.5 py-1.5 text-xs font-bold text-libertymd-ink backdrop-blur-md">
-              <Play className="h-3.5 w-3.5 fill-libertymd-blue-600 text-libertymd-blue-600" /> Patient story
-            </span>
-            <div className="absolute bottom-4 left-4 right-4 text-left md:hidden">
-              <p className="text-xs font-bold text-white/90">{story.name}</p>
-            </div>
-          </div>
-
-          <div className="flex min-h-[300px] flex-col justify-between p-6 text-left sm:p-10 md:min-h-[440px]">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-libertymd-blue-600">
-                {story.category}
-              </p>
-              <h3 className="mt-3 font-serif text-2xl font-semibold leading-tight text-libertymd-ink sm:text-3xl lg:text-4xl">
-                {story.title}
-              </h3>
-              <blockquote className="mt-5 text-base leading-8 text-libertymd-slate-600 sm:text-lg">
-                “{story.quote}”
-              </blockquote>
-            </div>
-
-            <div className="mt-8 flex items-center justify-between border-t border-libertymd-slate-200/80 pt-5">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-libertymd-blue-50 font-bold text-sm text-libertymd-blue-600">
-                  {story.name.charAt(0)}
+        {/* Minimal Horizontal Card Rail */}
+        <div
+          ref={railRef}
+          className="flex gap-4 sm:gap-6 overflow-x-auto no-scrollbar scroll-smooth snap-x snap-mandatory py-4 px-2 -mx-2"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
+          {patientStoriesRail.map((item) => {
+            if (item.type === 'photo') {
+              return (
+                <div
+                  key={item.id}
+                  className="group relative flex h-[440px] w-[260px] sm:h-[480px] sm:w-[290px] shrink-0 snap-start flex-col justify-end overflow-hidden rounded-[2rem] bg-libertymd-slate-900 shadow-md transition-transform duration-300 hover:scale-[1.02]"
+                >
+                  <img
+                    src={item.image}
+                    alt={item.name}
+                    className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
+                  <div className="relative z-10 p-6 text-left">
+                    <p className="font-serif text-xl sm:text-2xl italic tracking-wide text-white/95 font-medium">
+                      {item.name}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-black text-libertymd-ink">{story.name}</p>
-                  <p className="text-xs text-libertymd-slate-muted">LibertyMD Patient</p>
+              );
+            }
+
+            return (
+              <div
+                key={item.id}
+                className="group relative flex h-[440px] w-[260px] sm:h-[480px] sm:w-[290px] shrink-0 snap-start flex-col justify-between overflow-hidden rounded-[2rem] bg-[#292624] p-6 text-left shadow-md transition-transform duration-300 hover:scale-[1.02]"
+              >
+                {/* Background Subtle Organic Doodles */}
+                <svg
+                  className="pointer-events-none absolute inset-0 h-full w-full opacity-15 stroke-white"
+                  viewBox="0 0 300 500"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M-20 120 C40 40, 180 30, 240 100 C300 170, 260 320, 160 380 C60 440, -40 380, -20 280 Z"
+                    strokeWidth="2"
+                  />
+                  <path
+                    d="M80 -40 C180 20, 320 120, 280 240 C240 360, 120 440, 20 400 Z"
+                    strokeWidth="1.5"
+                  />
+                </svg>
+
+                {/* Top Left Avatar */}
+                <div className="relative z-10">
+                  <img
+                    src={item.avatar}
+                    alt={item.name}
+                    className="h-12 w-12 rounded-full border-2 border-white/20 object-cover shadow-sm"
+                  />
+                </div>
+
+                {/* Center One-Liner Quote */}
+                <div className="relative z-10 my-auto py-4">
+                  <p className="text-base sm:text-lg font-normal leading-snug text-white/95">
+                    {item.quote}
+                  </p>
+                </div>
+
+                {/* Bottom Left Stylized Name */}
+                <div className="relative z-10 pt-2">
+                  <p className="font-serif text-xl sm:text-2xl italic tracking-wide text-white/90 font-medium">
+                    {item.name}
+                  </p>
                 </div>
               </div>
-              <Quote className="h-8 w-8 text-libertymd-blue-600/20" />
-            </div>
-          </div>
+            );
+          })}
         </div>
       </div>
     </section>
