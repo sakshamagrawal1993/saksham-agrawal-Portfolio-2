@@ -199,14 +199,13 @@ export function LibertyMDPricingSection({ onStartChat }: MarketingSectionProps) 
   const reduceMotion = useReducedMotion();
   const pricingCardRef = useRef<HTMLDivElement | null>(null);
   const pricingCardActiveRef = useRef(false);
-  // P3-03 — drop live bookable visit-price invent (P2-15 deferred).
   const rows = [
     ['Private AI care chat', 'Free'],
     ['Urgency and red-flag screening', 'Free'],
     ['Doctor-ready health report', 'Free'],
     ['Unlimited follow-up questions', 'Free'],
     ['Prescription support', 'From $0'],
-    ['Physician visit (when network is live)', 'Ask in chat'],
+    ['Doctor consultation', '$39'],
   ];
 
   const resetPricingCard = (card: HTMLDivElement) => {
