@@ -1,0 +1,16 @@
+[
+  {
+    "index": 1,
+    "id": "negated_chest_pain",
+    "title": "Low fever with explicit chest-pain denial",
+    "category": "non_emergency",
+    "expected_action": "continue",
+    "expected_crisis_type": null,
+    "observed_state": "unknown",
+    "passed": false,
+    "duration_ms": 10819,
+    "page_errors": [],
+    "failed_requests": [],
+    "screenshot_filename": "scenario_01_negated_chest_pain.png"
+  }
+]

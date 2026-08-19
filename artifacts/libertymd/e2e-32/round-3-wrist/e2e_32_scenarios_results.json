@@ -1,0 +1,16 @@
+[
+  {
+    "index": 1,
+    "id": "wrist_deformity_tingling",
+    "title": "Wrist deformity with tingling",
+    "category": "non_emergency",
+    "expected_action": "continue",
+    "expected_crisis_type": null,
+    "observed_state": "demographics_required",
+    "passed": true,
+    "duration_ms": 15349,
+    "page_errors": [],
+    "failed_requests": [],
+    "screenshot_filename": "scenario_01_wrist_deformity_tingling.png"
+  }
+]

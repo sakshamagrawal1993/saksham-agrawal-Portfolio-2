@@ -1,0 +1,20 @@
+{
+  "locales": 1,
+  "passed": 1,
+  "failed": 0,
+  "results": [
+    {
+      "locale": "en",
+      "clinical_locale": "en",
+      "consultation_id": "627fe6b9-264b-4eee-a9aa-b2434aa21170",
+      "status": "report_pending_auth",
+      "turns": 5,
+      "questions": 5,
+      "report_complete": true,
+      "diagnosis_guidance_status": "ready",
+      "diagnosis_guidance_blocks": 3,
+      "duration_ms": 80805,
+      "passed": true
+    }
+  ]
+}

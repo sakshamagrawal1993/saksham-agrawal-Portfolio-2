@@ -1,0 +1,19 @@
+{
+  "round": "post-deploy-canary-es-retry",
+  "base_url": "https://saksham-experiments.com/liberty-md",
+  "started_cases": 2,
+  "expected_cases": 2,
+  "passed": 0,
+  "failed": 2,
+  "by_locale": {
+    "es": {
+      "passed": 0,
+      "total": 1
+    },
+    "es-ES": {
+      "passed": 0,
+      "total": 1
+    }
+  },
+  "numeric_contract": "Input digits and decimal values match the English fixture exactly."
+}

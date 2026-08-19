@@ -1,0 +1,7 @@
+[
+  {
+    "locale": "es",
+    "passed": false,
+    "error": "es: repeated question [[\"¿Qué mejora o empeora el síntoma?\",\"Let's stay focused on your health so I can help. Please answer about your symptoms. ¿Qué mejora o empeora el síntoma?\"]]"
+  }
+]

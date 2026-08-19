@@ -1,0 +1,18 @@
+[
+  {
+    "case_index": 1,
+    "locale": "en",
+    "clinical_locale": "en",
+    "scenario_id": "acs_radiating_arm",
+    "category": "emergency",
+    "expected_action": "force_end",
+    "expected_crisis_type": "acs_chest_pain",
+    "observed_state": "error",
+    "passed": false,
+    "duration_ms": 45448,
+    "error": "Waiting failed: 45000ms exceeded",
+    "page_errors": [],
+    "failed_requests": [],
+    "screenshot_filename": "001_en_acs_radiating_arm_error.png"
+  }
+]

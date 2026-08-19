@@ -1,0 +1,16 @@
+[
+  {
+    "index": 1,
+    "id": "negated_chest_pain",
+    "title": "Low fever with explicit chest-pain denial",
+    "category": "non_emergency",
+    "expected_action": "continue",
+    "observed_state": "error",
+    "passed": false,
+    "duration_ms": 13017,
+    "error": "Consent click did not register: {\"checked\":false,\"disabled\":false,\"rect\":{\"x\":304,\"y\":458,\"width\":16,\"height\":16},\"hit\":\"INPUT.mt-0.5 h-4 w-4 shrink-0 rounded border-libertymd-slate-300 text-libertymd-blue-600 focus:ring-libertymd-blue-600\"}",
+    "page_errors": [],
+    "failed_requests": [],
+    "screenshot_filename": "scenario_01_negated_chest_pain_error.png"
+  }
+]

@@ -1,0 +1,17 @@
+[
+  {
+    "locale": "en",
+    "passed": false,
+    "error": "en: false-positive emergency during report journey"
+  },
+  {
+    "locale": "es",
+    "passed": false,
+    "error": "es: false-positive emergency during report journey"
+  },
+  {
+    "locale": "es-ES",
+    "passed": false,
+    "error": "es-ES: false-positive emergency during report journey"
+  }
+]

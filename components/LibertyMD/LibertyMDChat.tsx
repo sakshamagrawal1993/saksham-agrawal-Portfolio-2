@@ -283,17 +283,17 @@ const phaseFromStatus = (status: string): ChatPhase => {
   return 'intake';
 };
 
-const statusCopy: Record<ChatPhase, string> = {
-  loading: 'Opening your private consultation...',
-  recovery_required: 'Pick up where you left off',
-  profile_pick: 'Who is this consultation for?',
-  demographics_required: 'A little context helps us ask safer questions',
-  intake: 'Focused clinical follow-up',
-  report_gate: 'Your doctor-ready report is prepared',
-  report_ready: 'Your report is ready',
-  emergency_end: 'Safety guidance shown',
-  clinical_review_needed: 'This consultation needs clinical review',
-  error: 'Connection interrupted',
+const statusCopyKey: Record<ChatPhase, string> = {
+  loading: 'chatx.statusLoading',
+  recovery_required: 'chatx.statusRecovery',
+  profile_pick: 'chatx.statusProfilePick',
+  demographics_required: 'chatx.statusDemographics',
+  intake: 'chatx.statusIntake',
+  report_gate: 'chatx.statusReportGate',
+  report_ready: 'chatx.statusReportReady',
+  emergency_end: 'chatx.statusEmergency',
+  clinical_review_needed: 'chatx.statusClinicalReview',
+  error: 'chatx.statusError',
 };
 
 /**
@@ -301,10 +301,6 @@ const statusCopy: Record<ChatPhase, string> = {
  * force_end and reopen. Fixture resolve is last-resort fail-open only.
  * Acknowledge chrome labels stay shared across variants.
  */
-const EMERGENCY_ACKNOWLEDGE_LABEL = 'I understand';
-const EMERGENCY_PERSISTENCE_NOTE = 'This guidance stays pinned to the bottom of the screen after you acknowledge it.';
-const EMERGENCY_REOPEN_LABEL = 'Show details';
-
 function crisisTypeFromSafetyPayload(payload: unknown): string | null {
   if (!payload || typeof payload !== 'object') return null
   const record = payload as Record<string, unknown>
@@ -2746,7 +2742,7 @@ export default function LibertyMDChat() {
               className="h-9 w-9 shrink-0 object-contain"
             />
             <div className="min-w-0">
-              <p className="truncate font-serif text-lg font-semibold leading-5 text-libertymd-ink sm:text-xl">LibertyMD Consultation</p>
+              <p className="truncate font-serif text-lg font-semibold leading-5 text-libertymd-ink sm:text-xl">{t('chatx.consultationTitle')}</p>
             </div>
           </div>
 
@@ -2756,13 +2752,13 @@ export default function LibertyMDChat() {
               <button
                 id="libertymd-chat-signin-btn"
                 type="button"
-                aria-label="Sign in with Google"
+                aria-label={t('chatx.signInGoogle')}
                 disabled={isAuthBusy}
                 onClick={() => { void startGoogleSignIn(); }}
                 className="inline-flex items-center gap-1.5 rounded-full border border-libertymd-blue-600/30 bg-libertymd-blue-600/5 px-2.5 py-1.5 text-xs font-semibold text-libertymd-blue-600 transition-colors hover:bg-libertymd-blue-600 hover:text-white sm:px-4 sm:text-sm"
               >
                 <LogIn className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
-                <span className="hidden sm:inline">Sign in</span>
+                <span className="hidden sm:inline">{t('chatx.signIn')}</span>
               </button>
             )}
             {/* BO 2026-08-01 — "+ New chat" removed from the consult header.
@@ -2770,7 +2766,7 @@ export default function LibertyMDChat() {
                 does not belong next to an in-progress clinical conversation. */}
             <button
               type="button"
-              aria-label="Open profile and consultation history"
+              aria-label={t('chatx.openProfileHistory')}
               onClick={() => {
                 setIsMenuOpen(true);
                 if (!isAnonymous) void refreshAccount();
@@ -2827,7 +2823,7 @@ export default function LibertyMDChat() {
                   : reportLifecycle === 'guest_expired' ? t('report.lifecycle.expiredTitle')
                   : reportLifecycle === 'not_yet_eligible' ? t('report.lifecycle.notYetEligible')
                   : reportLifecycle === 'generating' ? t('chatx.waitingReviewing')
-                  : statusCopy[phase]}
+                  : t(statusCopyKey[phase])}
               </>
             )}
           </div>
@@ -3090,7 +3086,7 @@ export default function LibertyMDChat() {
             <LibertyMDEmergencyPinnedBar
               heading={emergencyHeading}
               standingInstruction={emergencyStandingInstruction}
-              reopenLabel={EMERGENCY_REOPEN_LABEL}
+              reopenLabel={t('chatx.emergencyShowDetails')}
               onReopen={() => setIsEmergencyAcknowledged(false)}
             />
           )}
@@ -3242,7 +3238,7 @@ export default function LibertyMDChat() {
                 </button>
               </form>
               <p className="mt-2 text-center text-[10px] leading-4 text-libertymd-slate-500">
-                LibertyMD provides AI guidance, not a diagnosis or emergency service.
+                {t('chatx.footerDisclaimer')}
               </p>
             </>
           )}
@@ -3259,8 +3255,8 @@ export default function LibertyMDChat() {
           heading={emergencyHeading}
           message={emergencyDetail}
           standingInstruction={emergencyStandingInstruction}
-          acknowledgeLabel={EMERGENCY_ACKNOWLEDGE_LABEL}
-          persistenceNote={EMERGENCY_PERSISTENCE_NOTE}
+          acknowledgeLabel={t('chatx.emergencyAcknowledge')}
+          persistenceNote={t('chatx.emergencyPersistence')}
           onAcknowledge={() => setIsEmergencyAcknowledged(true)}
         />
       )}

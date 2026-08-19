@@ -1,0 +1,15 @@
+[
+  {
+    "locale": "es",
+    "clinical_locale": "es",
+    "consultation_id": "2821d942-7ac3-461b-95a7-8bab78d9fbe1",
+    "status": "report_pending_auth",
+    "turns": 5,
+    "questions": 5,
+    "report_complete": true,
+    "diagnosis_guidance_status": "ready",
+    "diagnosis_guidance_blocks": 3,
+    "duration_ms": 84500,
+    "passed": true
+  }
+]

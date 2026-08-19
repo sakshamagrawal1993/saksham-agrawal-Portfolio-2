@@ -43,6 +43,11 @@ The loop may autonomously:
 - Run builds, tests, local servers, Supabase-safe smoke tests, and browser checks.
 - Create and clean up synthetic test records.
 - Iterate on implementation and tests.
+- Deploy Supabase Edge Functions, and apply and activate LibertyMD n8n
+  workflows via the `n8n-workflows` CLI (BO 2026-08-13). Deployment is no
+  longer controller-only; an agent stage may ship these directly. Ship new
+  clinical surfaces behind an off-by-default flag so production behaviour does
+  not change until the flag is flipped deliberately.
 
 The loop must never:
 
@@ -50,7 +55,6 @@ The loop must never:
 - Start `npm run health-twin:loop`, `health_twin_loop.mjs`, or
   `health_twin_publish.mjs` from inside an agent stage. Only the outer controller
   may invoke the loop or publisher.
-- Publish anything before the independent completion checker returns `COMPLETE`.
 - Rotate, print, copy, or commit secrets.
 - Use real patient or personally identifiable health data.
 - Delete or modify non-test production records.

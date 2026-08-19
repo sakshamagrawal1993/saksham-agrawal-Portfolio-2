@@ -3,7 +3,13 @@ import {
   EMERGENCY_PATTERN_SET_VERSION,
   type EmergencyCareSetting,
 } from './emergency-patterns.ts'
-import { isUsableTimingSlotValue } from './lib/slots.ts'
+import {
+  hasClinicalValue,
+  hasExplicitNegativeFinding,
+  isClinicalSlotSatisfied,
+  isUsableTimingSlotValue,
+  type ClinicalSlot,
+} from './lib/slots.ts'
 
 export type ClinicalSlots = Record<string, unknown>
 
@@ -61,43 +67,37 @@ const SLOT_WEIGHTS: Record<string, number> = {
 }
 
 /** Shared slot-value gate (P1-09 eligibility reuses for `chief_complaint`). */
-export const hasValue = (value: unknown): boolean => {
-  if (value === undefined || value === null) return false
-  if (typeof value === 'string') {
-    const text = value.trim()
-    if (!text) return false
-    return !/\b(unknown|uncertain|unsure|not sure|cannot reliably|contradict|unclear|unspecified|maybe yes|maybe no)\b/i.test(text)
-  }
-  if (Array.isArray(value)) return value.some(hasValue)
-  return true
-}
-
-const hasSafetyNegative = (value: unknown): boolean => {
-  if (!hasValue(value)) return false
-  if (Array.isArray(value)) return value.some(hasSafetyNegative)
-  const text = String(value).trim()
-  return /\b(no|none|without|den(?:y|ies|ied)|absent|negative|normal|sin|nada|ningun[oa]?|non|rien|aucun(?:e)?|sans|nein|kein(?:e|en|er|es)?|ohne|nahi|nahin|koi\s+nahi|kuch\s+nahi|nao|não|nenhum(?:a)?|sem)\b|नहीं|नही|कोई\s+नहीं/u.test(text)
-}
+export const hasValue = hasClinicalValue
 
 function hasClinicalSlotValue(slot: string, value: unknown): boolean {
-  if (slot === 'onset' || slot === 'duration') return isUsableTimingSlotValue(value)
-  if (slot === 'red_flag_negatives') return hasSafetyNegative(value)
-  return hasValue(value)
+  return isClinicalSlotSatisfied(slot as ClinicalSlot, value)
 }
 
 export function detectDeterministicEmergency(message: string): DeterministicEmergency | null {
   const text = message.toLowerCase()
+  const clauseBoundary = /[;.!?]|\bbut\b|\bhowever\b|\balthough\b|\bthough\b|\bpero\b|\bmas\b|\bmais\b|\blekin\b|लेकिन|\baber\b|\bjedoch\b|\bobwohl\b/i
   for (const rule of EMERGENCY_PATTERNS) {
     const globalPattern = new RegExp(rule.matcher.source, rule.matcher.flags.includes('g') ? rule.matcher.flags : `${rule.matcher.flags}g`)
     let match: RegExpExecArray | null
     while ((match = globalPattern.exec(text)) !== null) {
       if (match.index === undefined) continue
-      const before = text.slice(Math.max(0, match.index - 40), match.index)
+      const before = text.slice(Math.max(0, match.index - 160), match.index)
+      const matchEnd = match.index + match[0].length
+      const clauseBefore = text.slice(0, match.index).split(clauseBoundary).pop() || ''
+      const clauseAfter = text.slice(matchEnd).split(clauseBoundary)[0] || ''
+      const wholeClause = `${clauseBefore}${match[0]}${clauseAfter}`.trim()
       // Negation does not carry across sentence/contrast boundaries. Deliberately
       // do NOT split on commas — "no lip swelling, tongue swelling, or X" is one
       // negated list (corpus: lip_dryness_no_swelling).
-      const seg = before.split(/[;.!?]|\bbut\b|\bhowever\b|\balthough\b|\bthough\b|\baber\b|\bjedoch\b|\bobwohl\b/i).pop() || ''
-      if (/\b(no|not|without|denies|denied|never|don'?t have|doesn'?t have|kein(?:e|en|er|es)?|nicht|ohne|verneint)\b/.test(seg)) continue
+      const seg = before.split(clauseBoundary).pop() || ''
+      const prefixNegatedList = /^(?:\s*(?:i (?:have )?|there (?:is|are) |je n['’]ai |ich habe )?)?(?:no|not|without|denies|denied|never|don'?t have|doesn'?t have|n[aã]o|pas|aucun(?:e)?|ni|nahi|kein(?:e|en|er|es)?|nicht|ohne|verneint)\b/.test(wholeClause)
+      const postfixHindiNegatedList = /(?:नहीं|नही)(?:\s+(?:है|हैं))?\s*$|\bnahi(?:\s+(?:hai|hain))?\s*$/i.test(wholeClause)
+      const explicitBreathingInability = /\bno (?:puedo|puede) respirar\b|\bn[aã]o (?:consigo|consegue|pode) respirar\b|\bn['’]arrive pas à respirer\b|\bkann nicht atmen\b|साँस नहीं ले पा|\bsaans nahi le pa/i.test(wholeClause)
+      if (!explicitBreathingInability && (
+        /\b(no|not|without|denies|denied|never|don'?t have|doesn'?t have|n[aã]o|pas|aucun(?:e)?|ni|nahi|kein(?:e|en|er|es)?|nicht|ohne|verneint)\b|नहीं|नही/.test(seg)
+        || prefixNegatedList
+        || postfixHindiNegatedList
+      )) continue
       // Past-tense family history only — "my father had chest pain last year" is not
       // the patient's emergency; "my father is having chest pain" still fires.
       // Check the window before the match (includes the relative + had).
@@ -106,7 +106,7 @@ export function detectDeterministicEmergency(message: string): DeterministicEmer
         || /\b(family history|history of|hx of|familienanamnese)\b/.test(before)
       ) continue
       const spanStart = match.index
-      const spanEnd = match.index + match[0].length
+      const spanEnd = matchEnd
       return {
         crisisType: rule.crisisType,
         careSetting: rule.careSetting,
@@ -129,7 +129,7 @@ export function assessClinicalEvidence(slots: ClinicalSlots): EvidenceAssessment
   const score = present.reduce((total, slot) => total + SLOT_WEIGHTS[slot], 0)
   const timelinePresent = isUsableTimingSlotValue(slots.onset) || isUsableTimingSlotValue(slots.duration)
   const symptomDetailPresent = hasValue(slots.severity) || hasValue(slots.associated_symptoms)
-  const safetyPresent = hasSafetyNegative(slots.red_flag_negatives)
+  const safetyPresent = hasExplicitNegativeFinding(slots.red_flag_negatives)
 
   return {
     score,

@@ -1,0 +1,52 @@
+[
+  {
+    "case_index": 1,
+    "locale": "es",
+    "clinical_locale": "es",
+    "scenario_id": "acs_radiating_arm",
+    "category": "emergency",
+    "expected_action": "force_end",
+    "expected_crisis_type": "acs_chest_pain",
+    "baseline_emergency_numbers": [
+      "112"
+    ],
+    "observed_emergency_numbers": [
+      "112"
+    ],
+    "observed_state": "unknown",
+    "localized_heading_present": false,
+    "no_english_fallback": true,
+    "numeric_input_tokens_preserved": true,
+    "emergency_number_present": true,
+    "passed": false,
+    "duration_ms": 4862,
+    "page_errors": [],
+    "failed_requests": [],
+    "screenshot_filename": "001_es_acs_radiating_arm.png"
+  },
+  {
+    "case_index": 2,
+    "locale": "es-ES",
+    "clinical_locale": "es",
+    "scenario_id": "acs_radiating_arm",
+    "category": "emergency",
+    "expected_action": "force_end",
+    "expected_crisis_type": "acs_chest_pain",
+    "baseline_emergency_numbers": [
+      "112"
+    ],
+    "observed_emergency_numbers": [
+      "112"
+    ],
+    "observed_state": "unknown",
+    "localized_heading_present": false,
+    "no_english_fallback": true,
+    "numeric_input_tokens_preserved": true,
+    "emergency_number_present": true,
+    "passed": false,
+    "duration_ms": 3095,
+    "page_errors": [],
+    "failed_requests": [],
+    "screenshot_filename": "002_es-ES_acs_radiating_arm.png"
+  }
+]

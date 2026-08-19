@@ -128,6 +128,7 @@ export async function handleSaveDemographics(ctx: ProxyContext, payload: Request
     ...(freeText ? { [answerSlot]: freeText } : {}),
   }
   const missingBeforeInterview = calculateMissingSlots(slots)
+  const previousTargetSlot = freeText ? answerSlot : null
 
   await addMessage(ctx, consultation.id, 'user', `Age ${age}; sex assigned at birth: ${sex.replaceAll('_', ' ')}`, {
     message_type: 'demographics',
@@ -181,7 +182,7 @@ export async function handleSaveDemographics(ctx: ProxyContext, payload: Request
       patientPayload(patient as PatientRow),
       slots,
       missingBeforeInterview,
-      answerSlot,
+      previousTargetSlot,
       consultation.turn_count,
       consultation.status,
       consultation.id,

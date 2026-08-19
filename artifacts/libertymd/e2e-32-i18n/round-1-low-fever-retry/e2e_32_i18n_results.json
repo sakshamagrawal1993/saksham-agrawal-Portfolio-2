@@ -1,0 +1,26 @@
+[
+  {
+    "case_index": 1,
+    "locale": "hi",
+    "clinical_locale": "hi",
+    "scenario_id": "low_fever_report",
+    "category": "report_gate",
+    "expected_action": "continue",
+    "expected_crisis_type": null,
+    "baseline_emergency_numbers": [],
+    "observed_emergency_numbers": [],
+    "observed_state": "demographics_required",
+    "localized_heading_present": true,
+    "no_english_fallback": true,
+    "localized_required_chrome": true,
+    "missing_required_chrome": [],
+    "numeric_input_tokens_preserved": true,
+    "emergency_number_present": true,
+    "passed": true,
+    "duration_ms": 5470,
+    "navigation_attempts": 1,
+    "page_errors": [],
+    "failed_requests": [],
+    "screenshot_filename": null
+  }
+]

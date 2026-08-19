@@ -86,8 +86,8 @@ function hasUnnegatedPatientMatch(statement, pattern) {
   let match;
   while ((match = matcher.exec(statement)) !== null) {
     const before = statement.slice(Math.max(0, match.index - 60), match.index);
-    const clause = before.split(/[;.!?]|\\bbut\\b|\\bhowever\\b|\\balthough\\b|\\bthough\\b|\\baber\\b|\\bjedoch\\b|\\bobwohl\\b/i).pop() || '';
-    const negated = /\\b(no|not|without|denies|denied|never|don'?t have|doesn'?t have|kein(?:e|en|er|es)?|nicht|ohne|verneint)\\b/i.test(clause);
+    const clause = before.split(/[;.!?]|\\bbut\\b|\\bhowever\\b|\\balthough\\b|\\bthough\\b|\\bpero\\b|\\bmas\\b|\\bmais\\b|\\blekin\\b|लेकिन|\\baber\\b|\\bjedoch\\b|\\bobwohl\\b/i).pop() || '';
+    const negated = /\\b(no|not|without|denies|denied|never|don'?t have|doesn'?t have|n[aã]o|pas|aucun(?:e)?|ni|nahi|kein(?:e|en|er|es)?|nicht|ohne|verneint)\\b|नहीं/i.test(clause);
     const thirdPartyHistory = /\\b(my|his|her|their)\\s+\\w*\\s*(father|mother|dad|mum|mom|brother|sister|friend|husband|wife|son|daughter|uncle|aunt)\\s+(had|has had|used to have)\\b|\\b(family history|history of|hx of|familienanamnese)\\b/i.test(before);
     if (!negated && !thirdPartyHistory) return true;
     if (match.index === matcher.lastIndex) matcher.lastIndex += 1;
@@ -171,14 +171,26 @@ const msg = message.toLowerCase();
 function firstUnnegatedMatch(rule) {
   const flags = rule.flags.includes('g') ? rule.flags : rule.flags + 'g';
   const matcher = new RegExp(rule.source, flags);
+  const clauseBoundary = /[;.!?]|\\bbut\\b|\\bhowever\\b|\\balthough\\b|\\bthough\\b|\\bpero\\b|\\bmas\\b|\\bmais\\b|\\blekin\\b|लेकिन|\\baber\\b|\\bjedoch\\b|\\bobwohl\\b/i;
   let match;
   while ((match = matcher.exec(msg)) !== null) {
-    const before = msg.slice(Math.max(0, match.index - 40), match.index);
+    const before = msg.slice(Math.max(0, match.index - 160), match.index);
+    const matchEnd = match.index + match[0].length;
+    const clauseBefore = msg.slice(0, match.index).split(clauseBoundary).pop() || '';
+    const clauseAfter = msg.slice(matchEnd).split(clauseBoundary)[0] || '';
+    const wholeClause = (clauseBefore + match[0] + clauseAfter).trim();
     // Commas do not end a clause: "no lip swelling, tongue swelling, or X"
     // is one negated list. Adversatives do end a clause, preserving
     // "no chest pain but crushing chest pressure".
-    const segment = before.split(/[;.!?]|\\bbut\\b|\\bhowever\\b|\\balthough\\b|\\bthough\\b|\\baber\\b|\\bjedoch\\b|\\bobwohl\\b/i).pop() || '';
-    const negated = /\\b(no|not|without|denies|denied|never|don'?t have|doesn'?t have|kein(?:e|en|er|es)?|nicht|ohne|verneint)\\b/.test(segment);
+    const segment = before.split(clauseBoundary).pop() || '';
+    const prefixNegatedList = /^(?:\\s*(?:i (?:have )?|there (?:is|are) |je n['’]ai |ich habe )?)?(?:no|not|without|denies|denied|never|don'?t have|doesn'?t have|n[aã]o|pas|aucun(?:e)?|ni|nahi|kein(?:e|en|er|es)?|nicht|ohne|verneint)\\b/.test(wholeClause);
+    const postfixHindiNegatedList = /(?:नहीं|नही)(?:\\s+(?:है|हैं))?\\s*$|\\bnahi(?:\\s+(?:hai|hain))?\\s*$/i.test(wholeClause);
+    const explicitBreathingInability = /\\bno (?:puedo|puede) respirar\\b|\\bn[aã]o (?:consigo|consegue|pode) respirar\\b|\\bn['’]arrive pas à respirer\\b|\\bkann nicht atmen\\b|साँस नहीं ले पा|\\bsaans nahi le pa/i.test(wholeClause);
+    const negated = !explicitBreathingInability && (
+      /\\b(no|not|without|denies|denied|never|don'?t have|doesn'?t have|n[aã]o|pas|aucun(?:e)?|ni|nahi|kein(?:e|en|er|es)?|nicht|ohne|verneint)\\b|नहीं|नही/.test(segment)
+      || prefixNegatedList
+      || postfixHindiNegatedList
+    );
     const thirdPartyHistory =
       /\\b(my|his|her|their)\\s+\\w*\\s*(father|mother|dad|mum|mom|brother|sister|friend|husband|wife|son|daughter|uncle|aunt)\\s+(had|has had|used to have)\\b/.test(before)
       || /\\b(family history|history of|hx of|familienanamnese)\\b/.test(before);

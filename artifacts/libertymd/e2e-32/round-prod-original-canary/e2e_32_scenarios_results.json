@@ -1,0 +1,16 @@
+[
+  {
+    "index": 1,
+    "id": "acs_radiating_arm",
+    "title": "Crushing chest pressure radiating to the arm",
+    "category": "emergency",
+    "expected_action": "force_end",
+    "expected_crisis_type": "acs_chest_pain",
+    "observed_state": "emergency_force_end",
+    "passed": true,
+    "duration_ms": 10656,
+    "page_errors": [],
+    "failed_requests": [],
+    "screenshot_filename": "scenario_01_acs_radiating_arm.png"
+  }
+]
