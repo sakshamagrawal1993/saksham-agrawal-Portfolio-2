@@ -58,11 +58,18 @@ export default function LibertyMDPremiumLogo({
     // Once docked, stay docked. Hysteresis stops a small scroll jitter from
     // re-crossing the threshold and re-triggering the travel animation.
     let latchedDocked = false;
+    // Gap for the current breakpoint, published by computeTarget so the docked
+    // correction below uses the same number.
+    let dockGapRef = 14;
 
     // The scroll-driven TARGET at the current scroll position.
     const computeTarget = (): Frame => {
       const scrollY = window.scrollY;
-      const isCompact = window.innerWidth < 640;
+      // 1024, not 640: the one-phase mobile layout renders below `lg`, so the
+      // docking constants must switch at the same place. They previously
+      // switched at 640, leaving 640-1024 on the mobile layout with desktop
+      // scale and gap.
+      const isCompact = window.innerWidth < 1024;
       const viewportHeight = viewportH;
       
       const rootRect = root.getBoundingClientRect();
@@ -84,6 +91,7 @@ export default function LibertyMDPremiumLogo({
 
       // Clean gap between bottom of 3D cross logo and top of "How LibertyMD works" text
       const gapAboveHeadline = isCompact ? 14 : 20;
+      dockGapRef = gapAboveHeadline;
 
       // With transformOrigin: 'top center', targetScreenY is the top of the scaled logo
       const targetScreenY = h2Rect.top - scaledLogoHeight - gapAboveHeadline;
@@ -141,28 +149,43 @@ export default function LibertyMDPremiumLogo({
       };
     }
 
-    // DAMP: fraction of the remaining distance covered per frame.
-    // Higher = snappier/tighter tracking, lower = floatier glide. 0.18 feels premium.
-    const DAMP = 0.18;
     let cur = computeTarget();
     applyStyles(cur);
 
     let rafId = 0;
     const tick = () => {
       const t = computeTarget();
-      if (t.progress >= 1) {
-        // Direct 1:1 sync when arrived to eliminate spring bouncing
-        cur = t;
-      } else {
-        cur = {
-          travel: cur.travel + (t.travel - cur.travel) * DAMP,
-          scale: cur.scale + (t.scale - cur.scale) * DAMP,
-          rotate: cur.rotate + (t.rotate - cur.rotate) * DAMP,
-          ped: cur.ped + (t.ped - cur.ped) * DAMP,
-          progress: t.progress,
-        };
-      }
+      // Track the target exactly. The old per-frame lerp toward the target lagged
+      // roughly five frames behind, which during a fast scroll reads as the cross
+      // bouncing and only settling once scrolling stops. Lenis already smooths the
+      // scroll itself; easing a second time on top of it added the lag without
+      // adding smoothness.
+      cur = t;
       applyStyles(cur);
+
+      // Closed-loop correction, docked only.
+      //
+      // `travelTarget` predicts the docked position from `offsetHeight * scale` and
+      // assumes the moving element's natural top equals the root's top. Neither
+      // holds exactly: the element sits at an offset inside the root, and the
+      // painted height is not the layout height. The residual error put the cross
+      // on top of the heading at some viewport widths.
+      //
+      // Rather than predict harder, measure: translating by d moves the rect by
+      // exactly d, so one correction lands it and it stays landed. Applied only
+      // when docked, so the travel choreography is untouched.
+      if (cur.progress >= 1) {
+        const dockNode = dockHeadlineRef?.current;
+        const h2El = dockNode ? (dockNode.querySelector('h2') || dockNode) : null;
+        if (h2El) {
+          const desiredBottom = h2El.getBoundingClientRect().top - dockGapRef;
+          const error = desiredBottom - moving.getBoundingClientRect().bottom;
+          if (Math.abs(error) > 0.5) {
+            cur = { ...cur, travel: cur.travel + error };
+            applyStyles(cur);
+          }
+        }
+      }
       rafId = requestAnimationFrame(tick);
     };
     rafId = requestAnimationFrame(tick);
