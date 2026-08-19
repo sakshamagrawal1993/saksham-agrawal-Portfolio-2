@@ -18,7 +18,7 @@
   "marketing": {
     "care": {
       "price": "",
-      "priceLead": "Start free. A licensed doctor handoff is planned when the network is live — not a bookable visit yet.",
+      "priceLead": "Empieza gratis. Continúa con un médico colegiado cuando tú decidas.",
       "previewLabel": "Physician review preview",
       "drName": "Physician review preview",
       "pillSchedule": "Structured intake for your visit",
@@ -200,10 +200,10 @@
       "furtherInvestigations": "Estudios adicionales",
       "symptomaticTreatment": "Alivio de síntomas",
       "supportiveTreatment": "Cuidados de apoyo",
+      "showDetail": "Mostrar más",
+      "hideDetail": "Mostrar menos",
       "treatmentGuidance": "Orientación general — no es una receta.",
-      "doctorCta": "Avísame cuando haya médicos disponibles",
-      "showDetail": "Mostrar detalles",
-      "hideDetail": "Ocultar detalles"
+      "doctorCta": "Avísame cuando haya médicos disponibles"
     },
     "teasers": {
       "differential": "{count} consideraciones",
@@ -330,17 +330,17 @@
     }
   },
   "app": {
-    "heroTrustReport": "Free doctor-ready report",
-    "heroTrustReportShort": "Free report",
-    "heroTrustAi": "AI symptom chat — not a clinician",
-    "heroTrustAiShort": "AI — not a clinician",
-    "trustedBy": "Free doctor-ready report",
-    "trustedByShort": "Free report",
-    "hipaaShort": "Private AI chat",
-    "hipaaLong": "Private AI symptom chat",
-    "heroTrustRating": "4.5 out of 5",
+    "heroTrustReport": "Informe gratuito listo para el médico",
+    "heroTrustReportShort": "Informe gratuito",
+    "heroTrustAi": "Chat de síntomas con IA — no es un profesional clínico",
+    "heroTrustAiShort": "IA — no es un profesional clínico",
+    "trustedBy": "Más de 1,000,000 de usuarios confían en nosotros",
+    "trustedByShort": "Más de 1,000,000 de usuarios",
+    "hipaaShort": "Chat privado con IA",
+    "hipaaLong": "Chat privado de síntomas con IA",
+    "heroTrustRating": "4.5 de 5",
     "heroTrustRatingShort": "4.5",
-    "heroTrustHipaa": "HIPAA compliant",
+    "heroTrustHipaa": "Cumple con HIPAA",
     "heroTrustHipaaShort": "HIPAA",
     "phases": [
       {

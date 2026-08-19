@@ -158,7 +158,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     const saved = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_REGION_KEY) : null;
     return (saved as Region) || detectRegion();
   });
-  const [, setLoadedTick] = useState(0); // re-render trigger once a locale chunk arrives
+  const [loadedTick, setLoadedTick] = useState(0); // re-render trigger once a locale chunk arrives
 
   const needsLoad = language !== 'en' && !loadedBundles[language];
 
@@ -197,7 +197,18 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     const base = baseOf(language);
     const baseBundle = base ? loadedBundles[base] : undefined;
     const t = (key: string, vars?: Record<string, string | number>) => {
-      const hit = lookup(bundle, key) ?? lookup(baseBundle, key) ?? lookup(loadedBundles.en, key);
+      const ownHit = lookup(bundle, key);
+      const baseHit = lookup(baseBundle, key);
+      const englishHit = lookup(loadedBundles.en, key);
+      // es-ES is a delta over Spanish. Historical delta entries sometimes
+      // copied the English source value; those are untranslated, not genuine
+      // Peninsular-Spanish overrides, so inherit the Spanish value instead.
+      // Stable English keys are unaffected; this only changes rendered values.
+      const ownHitIsUntranslatedRegionValue = language === 'es-ES'
+        && ownHit !== undefined
+        && baseHit !== undefined
+        && ownHit === englishHit;
+      const hit = (ownHitIsUntranslatedRegionValue ? undefined : ownHit) ?? baseHit ?? englishHit;
       if (hit === undefined) {
         if ((import.meta as any).env?.DEV) console.warn(`[i18n] missing key: ${key}`);
         // AC5: never render raw keys to the user.
@@ -219,8 +230,13 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
       isBeta: (bundle ?? baseBundle) ? (bundle ?? baseBundle)!._meta?.status !== 'approved' : false,
       isLoadingLocale: needsLoad,
     };
+    // `loadedTick` bumps whenever ANY locale chunk lands — including the base
+    // bundle of a region-qualified locale (es-ES → es). Without it the memo kept
+    // a `t` closure whose `baseBundle` was still undefined, so every key missing
+    // from es-ES fell straight past Spanish to English depending on which chunk
+    // won the race in the effect above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [language, region, needsLoad, loadedBundles[language]]);
+  }, [language, region, needsLoad, loadedTick, loadedBundles[language]]);
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }

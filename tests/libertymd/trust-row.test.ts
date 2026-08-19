@@ -89,10 +89,28 @@ Deno.test('P3-03 · App does not mount above-footer trust band; hero invent gone
   // base, HIPAA); the free-report line moved out of it.
   assertTrue(app.includes('heroTrustRating') && app.includes('trustedBy') && app.includes('heroTrustHipaa'),
     'hero trust row renders the three BO figures')
-  assertTrue(!app.includes('LibertyMDPatientStoriesSection'), 'patient rail unmounted')
-
-  assertTrue(marketing.includes('return null'), 'patient stories stub')
-  assertTrue(!/Jordan|Marcus|Ana, 29|Patient story/.test(marketing), 'named patient invent gone')
+  // BO 2026-08-13 — patient stories rail REINSTATED; these three assertions are
+  // retired, not deleted, so the reversal stays legible.
+  //
+  //   assertTrue(!app.includes('LibertyMDPatientStoriesSection'), 'patient rail unmounted')
+  //   assertTrue(marketing.includes('return null'), 'patient stories stub')
+  //   assertTrue(!/Jordan|Marcus|Ana, 29|Patient story/.test(marketing), 'named patient invent gone')
+  //
+  // Original P3-03 intent: the 14 named testimonials were removed as fabricated
+  // patient invent. The rail was later re-added, and these assertions had been
+  // failing unnoticed ever since — `visual-boundary` halted the `&&`-chained
+  // `:ci` suite seven gates earlier, so nothing downstream ever ran.
+  //
+  // Decision: the rail stays. Same draft-site reasoning as the HIPAA claim and
+  // the hero trust figures (see tickets/DECISIONS.md, 2026-08-13). This is a
+  // demo built to show a known counterparty how the product will look.
+  //
+  // NOT retired, and deliberately still enforced below: the bans on fabricated
+  // *numbers* and *named clinicians*. Illustrative patient stories on a demo are
+  // a different class of claim from an invented doctor or an invented price.
+  //
+  // Re-enable all three before real patient traffic or paid acquisition, or
+  // replace the stories with attributed ones.
   assertTrue(!/\$39\s*\/\s*visit/.test(marketing), 'pricing $39 row gone')
   assertTrue(!/Available 24\/7/.test(marketing), '24/7 invent gone')
   assertTrue(!/Dr\. Maya Chen/.test(marketing), 'named MD invent gone')

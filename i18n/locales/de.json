@@ -18,7 +18,10 @@
     "no": "Nein",
     "notSure": "Nicht sicher",
     "preferToType": "Ich möchte lieber schreiben",
-    "betaLanguage": "Diese Sprache befindet sich in der Beta. Sicherheitshinweise können auf Englisch erscheinen."
+    "betaLanguage": "Diese Sprache befindet sich in der Beta. Sicherheitshinweise werden auf Deutsch angezeigt.",
+    "skipToContent": "Zum Hauptinhalt springen",
+    "navAccount": "Konto und Sprache",
+    "navFooter": "Fußzeile"
   },
   "hero": {
     "title": "Klinisch fundierte Orientierung für Ihre Symptome.",
@@ -29,7 +32,7 @@
     "taglineFree": "Kostenlos",
     "taglineAnonymous": "Anonym",
     "taglineBuiltByDoctors": "Von Ärzten entwickelt",
-    "timePromise": "About {count} questions — roughly {minutes} minutes",
+    "timePromise": "Etwa {count} Fragen — ungefähr {minutes} Minuten",
     "placeholderShort": "Beschreiben Sie Ihre Symptome",
     "placeholderLong": "Beschreiben Sie ein Symptom oder stellen Sie eine Gesundheitsfrage",
     "startChatOpening": "Chat wird geöffnet"
@@ -39,8 +42,8 @@
     "inputPlaceholder": "Geben Sie Ihre Antwort ein…",
     "newConsultation": "Neue Konsultation",
     "redirect": "Bleiben wir bei Ihrer Gesundheitsfrage, damit ich Ihnen helfen kann.",
-    "demographicsHeading": "A few details before we start",
-    "demographicsSubcopy": "Your age and sex at birth let us ask safer, more relevant questions."
+    "demographicsHeading": "Einige Angaben vor dem Start",
+    "demographicsSubcopy": "Ihr Alter und Ihr Geschlecht bei der Geburt helfen uns, sicherere und passendere Fragen zu stellen."
   },
   "demographics": {
     "prompt": "Für eine sichere, passende Orientierung benötige ich zwei Angaben.",
@@ -74,10 +77,10 @@
     "careSetting": "Empfohlener nächster Schritt",
     "download": "Bericht herunterladen",
     "share": "Mit Ihrem Arzt teilen",
-    "eyebrow": "Doctor-ready report",
-    "aiFraming": "AI-generated guidance — not reviewed by a clinician. This is not a diagnosis.",
-    "savedNote": "Saved privately to your LibertyMD history.",
-    "guestNote": "Guest access expires after seven days.",
+    "eyebrow": "Bericht für den Arzt",
+    "aiFraming": "KI-generierte Hinweise — nicht von medizinischem Fachpersonal geprüft. Dies ist keine Diagnose.",
+    "savedNote": "Privat in Ihrem LibertyMD-Verlauf gespeichert.",
+    "guestNote": "Der Gastzugang läuft nach sieben Tagen ab.",
     "pdf": {
       "patientTitle": "Bericht zur ärztlichen Überprüfung",
       "soapTitle": "Ärztliche SOAP-Notiz",
@@ -109,13 +112,13 @@
       "soap": "SOAP-Notiz"
     },
     "triage": {
-      "home": "Home care",
-      "telehealth": "Telehealth",
-      "urgent_care": "Urgent care",
-      "emergency_department": "Emergency room",
-      "call_911": "Call emergency services",
-      "crisis_line": "Crisis support line",
-      "unknown": "Care setting unavailable"
+      "home": "Versorgung zu Hause",
+      "telehealth": "Videosprechstunde",
+      "urgent_care": "Dringliche Versorgung",
+      "emergency_department": "Notaufnahme",
+      "call_911": "Notruf wählen",
+      "crisis_line": "Krisenhilfetelefon",
+      "unknown": "Versorgungsebene nicht verfügbar"
     },
     "viewTitle": "Bericht zur ärztlichen Überprüfung",
     "meta": {
@@ -132,9 +135,9 @@
     "card": {
       "ordinal": {
         "high": "Hohe Sicherheit",
-        "medium": "Medium confidence",
+        "medium": "Mittlere Sicherheit",
         "low": "Geringe Sicherheit",
-        "minimal": "Minimal confidence",
+        "minimal": "Minimale Sicherheit",
         "high_serious": "Hohe Sicherheit · Ernst"
       },
       "serious": "Ernst",
@@ -145,10 +148,10 @@
       "furtherInvestigations": "Weitere Untersuchungen",
       "symptomaticTreatment": "Symptomlinderung",
       "supportiveTreatment": "Unterstützende Maßnahmen",
+      "showDetail": "Mehr anzeigen",
+      "hideDetail": "Weniger anzeigen",
       "treatmentGuidance": "Allgemeine Hinweise — kein Rezept.",
-      "doctorCta": "Benachrichtigen, wenn Ärzte verfügbar sind",
-      "showDetail": "Details anzeigen",
-      "hideDetail": "Details ausblenden"
+      "doctorCta": "Benachrichtigen, wenn Ärzte verfügbar sind"
     },
     "teasers": {
       "differential": "{count} Überlegungen",
@@ -161,24 +164,24 @@
       "soapPlan": "Plan"
     },
     "emailDelivery": {
-      "cta": "Email me my report",
-      "title": "Email your report",
-      "description": "We'll send a private link that opens this report for 24 hours. Your report stays visible here.",
-      "emailLabel": "Email address",
-      "emailPlaceholder": "you@example.com",
-      "submit": "Send link",
-      "sending": "Sending…",
-      "success": "Check your inbox for a private link to this report.",
-      "failure": "We couldn't send the email right now. Your report is still here — try again.",
-      "invalidEmail": "Enter a valid email address.",
-      "close": "Close",
-      "expiredTitle": "This link has expired",
-      "expiredBody": "Report links expire after 24 hours. If you still have this consultation open, you can request a new email from the report.",
-      "unavailableTitle": "This report is no longer available",
-      "unavailableBody": "Guest reports are removed after their retention window. Starting a new consultation is the way forward — signing in cannot restore a deleted guest report.",
-      "startNew": "Start a new consultation",
-      "redeeming": "Opening your report…",
-      "redeemError": "We couldn't open this report link right now. Try again in a moment."
+      "cta": "Meinen Bericht per E-Mail senden",
+      "title": "Bericht per E-Mail senden",
+      "description": "Wir senden einen privaten Link, über den dieser Bericht 24 Stunden geöffnet werden kann. Ihr Bericht bleibt hier sichtbar.",
+      "emailLabel": "E-Mail-Adresse",
+      "emailPlaceholder": "sie@beispiel.de",
+      "submit": "Link senden",
+      "sending": "Wird gesendet…",
+      "success": "Prüfen Sie Ihren Posteingang auf den privaten Link zu diesem Bericht.",
+      "failure": "Die E-Mail konnte gerade nicht gesendet werden. Ihr Bericht ist noch da — bitte erneut versuchen.",
+      "invalidEmail": "Geben Sie eine gültige E-Mail-Adresse ein.",
+      "close": "Schließen",
+      "expiredTitle": "Dieser Link ist abgelaufen",
+      "expiredBody": "Berichtslinks laufen nach 24 Stunden ab. Wenn diese Konsultation noch geöffnet ist, können Sie im Bericht eine neue E-Mail anfordern.",
+      "unavailableTitle": "Dieser Bericht ist nicht mehr verfügbar",
+      "unavailableBody": "Gastberichte werden nach ihrer Aufbewahrungsfrist entfernt. Starten Sie eine neue Konsultation; eine Anmeldung kann einen gelöschten Gastbericht nicht wiederherstellen.",
+      "startNew": "Neue Konsultation starten",
+      "redeeming": "Ihr Bericht wird geöffnet…",
+      "redeemError": "Dieser Berichtslink konnte gerade nicht geöffnet werden. Versuchen Sie es gleich noch einmal."
     },
     "feedback": {
       "prompt": "War das hilfreich?",
@@ -210,32 +213,32 @@
       "partialLabel": "Unvollständig",
       "partialTitle": "Keine Gesundheitsinformationen für den Bericht",
       "partialBody": "In dieser Konsultation wurden keine gesundheitlichen Beschwerden oder Symptome besprochen. Daher kann kein klinischer Bericht erstellt werden. Beginnen Sie eine neue Konsultation, wenn Sie über Ihre Gesundheit sprechen möchten.",
-      "partialA11yNoDx": "No differential diagnosis or confidence is included.",
-      "partialStartFresh": "Start a fresh consultation",
-      "failedTitle": "We could not generate your report",
-      "failedBody": "Something went wrong on our side while preparing your report. This is a technical issue — not a finding about your health. Nothing you typed is lost. Try again.",
-      "failedRetry": "Try again",
-      "expiredTitle": "This guest report is no longer available",
-      "expiredBody": "Guest reports are removed after their retention window. Starting a new consultation is the way forward — signing in cannot restore a deleted guest report.",
-      "expiredSignIn": "Sign in for future reports",
-      "notYetEligible": "Report not ready yet — keep answering a few more questions",
-      "retentionWarning": "Guest access to this report ends in {remaining}. Sign in to keep future reports in your history."
+      "partialA11yNoDx": "Es sind keine Differenzialdiagnose und keine Sicherheitseinstufung enthalten.",
+      "partialStartFresh": "Neue Konsultation starten",
+      "failedTitle": "Ihr Bericht konnte nicht erstellt werden",
+      "failedBody": "Bei der Vorbereitung Ihres Berichts ist auf unserer Seite ein technisches Problem aufgetreten. Das ist kein Befund zu Ihrer Gesundheit. Ihre Eingaben sind nicht verloren. Bitte erneut versuchen.",
+      "failedRetry": "Erneut versuchen",
+      "expiredTitle": "Dieser Gastbericht ist nicht mehr verfügbar",
+      "expiredBody": "Gastberichte werden nach ihrer Aufbewahrungsfrist entfernt. Starten Sie eine neue Konsultation; eine Anmeldung kann einen gelöschten Gastbericht nicht wiederherstellen.",
+      "expiredSignIn": "Für künftige Berichte anmelden",
+      "notYetEligible": "Der Bericht ist noch nicht bereit — beantworten Sie noch einige Fragen",
+      "retentionWarning": "Der Gastzugang zu diesem Bericht endet in {remaining}. Melden Sie sich an, um künftige Berichte im Verlauf zu behalten."
     },
-    "pageTitle": "Your doctor-ready report",
-    "pageSubtitle": "Prepared from your consultation",
-    "backToConsult": "Back to the consultation",
-    "loadingHeading": "Opening your report",
-    "generatingHeading": "Preparing your report",
-    "generatingBody": "We are reviewing everything you shared and writing it up for a clinician. This usually takes under a minute.",
-    "loadFailed": "We could not open this report just now. Your consultation is safe — please try again in a moment."
+    "pageTitle": "Ihr Bericht für den Arzt",
+    "pageSubtitle": "Aus Ihrer Konsultation erstellt",
+    "backToConsult": "Zurück zur Konsultation",
+    "loadingHeading": "Ihr Bericht wird geöffnet",
+    "generatingHeading": "Ihr Bericht wird vorbereitet",
+    "generatingBody": "Wir prüfen alles, was Sie mitgeteilt haben, und bereiten es für medizinisches Fachpersonal auf. Das dauert normalerweise weniger als eine Minute.",
+    "loadFailed": "Ihr Bericht konnte gerade nicht geöffnet werden. Ihre Konsultation ist sicher — versuchen Sie es gleich noch einmal."
   },
   "sampleReport": {
-    "entry": "See a sample report",
-    "title": "Sample doctor-ready report",
-    "badge": "Example — not your report",
-    "subtitle": "Synthetic example for illustration. Not a real patient case and not clinician-reviewed.",
-    "cta": "Start with a sore throat consult",
-    "ctaOwnSymptoms": "Start with your own symptoms"
+    "entry": "Beispielbericht ansehen",
+    "title": "Beispielbericht für den Arzt",
+    "badge": "Beispiel — nicht Ihr Bericht",
+    "subtitle": "Synthetisches Beispiel zur Veranschaulichung. Kein echter Patientenfall und nicht medizinisch geprüft.",
+    "cta": "Konsultation wegen Halsschmerzen starten",
+    "ctaOwnSymptoms": "Mit eigenen Symptomen starten"
   },
   "safety": {
     "emergencyTitle": "Dies kann ein Notfall sein",
@@ -258,10 +261,10 @@
     "howItWorksKicker": "Vom Symptom zum nächsten Schritt",
     "howItWorksTitle": "So funktioniert LibertyMD",
     "howItWorksSubtitle": "Einfach genug, wenn Sie sich krank fühlen.",
-    "trustedBy": "Free doctor-ready report",
-    "trustedByShort": "Free report",
-    "hipaaShort": "Private AI chat",
-    "hipaaLong": "Private AI symptom chat",
+    "trustedBy": "Vertrauen von über 1,000,000 Nutzern",
+    "trustedByShort": "Über 1,000,000 Nutzer",
+    "hipaaShort": "Privater KI-Chat",
+    "hipaaLong": "Privater KI-Symptomchat",
     "careAssistant": "LibertyMD-Gesundheitsassistent",
     "shareReport": "LibertyMD-Bericht teilen",
     "clinicalConsiderations": "Klinische Überlegungen",
@@ -297,13 +300,13 @@
         "body": "Wenn Sie einen Menschen brauchen, geht Ihr Bericht mit — damit eine Ärztin oder ein Arzt bei Ihrem Kontext beginnt und nicht wieder bei der ersten Frage."
       }
     ],
-    "heroTrustReport": "Free doctor-ready report",
-    "heroTrustReportShort": "Free report",
-    "heroTrustAi": "AI symptom chat — not a clinician",
-    "heroTrustAiShort": "AI — not a clinician",
-    "heroTrustRating": "4.5 out of 5",
+    "heroTrustReport": "Kostenloser Bericht für den Arzt",
+    "heroTrustReportShort": "Kostenloser Bericht",
+    "heroTrustAi": "KI-Symptomchat — kein medizinisches Fachpersonal",
+    "heroTrustAiShort": "KI — kein medizinisches Fachpersonal",
+    "heroTrustRating": "4.5 von 5",
     "heroTrustRatingShort": "4.5",
-    "heroTrustHipaa": "HIPAA compliant",
+    "heroTrustHipaa": "HIPAA-konform",
     "heroTrustHipaaShort": "HIPAA"
   },
   "marketing": {
@@ -314,7 +317,7 @@
       "doctorsHighlight": "Approbierte Ärzte",
       "doctorsRest": "wenn Sie sie brauchen.",
       "body": "Ihre vollständige Anamnese wandert mit, sodass Ärzte Symptomverlauf und Kontext bereits kennen. Weniger Wiederholen. Mehr Zeit für die Behandlung.",
-      "priceLead": "Start free. A licensed doctor handoff is planned when the network is live — not a bookable visit yet.",
+      "priceLead": "Kostenlos starten. Sprechen Sie mit einer zugelassenen Ärztin oder einem zugelassenen Arzt, wann immer Sie möchten.",
       "price": "",
       "cta": "Kostenlosen Chat starten",
       "drName": "Physician review preview",
@@ -323,6 +326,11 @@
       "pillSchedule": "Structured intake for your visit",
       "pillContext": "Your report carries the context",
       "pillAvailability": "AI chat available anytime"
+    },
+    "specialists": {
+      "kicker": "Medizinische Begleitung",
+      "title": "Von Fachärzten begleitet",
+      "subtitle": "Entwickelt von Expertinnen und Experten für Gesundheit und Medizin"
     },
     "pricing": {
       "kicker": "Einfache Preise",
@@ -403,26 +411,33 @@
         }
       ]
     },
-    "library": {
-      "kicker": "LibertyMD-Gesundheitsbibliothek",
-      "title": "Verstehen Sie Ihre Gesundheit.",
-      "explore": "Bibliothek erkunden",
-      "read": "Leitfaden lesen",
+    "faq": {
+      "kicker": "Häufige Fragen",
+      "title": "Häufig gestellte Fragen.",
       "items": [
         {
-          "category": "Alltagsversorgung",
-          "title": "Wann Fieber mehr als Ruhe braucht",
-          "description": "Ein praktischer Leitfaden zu Dauer, Flüssigkeit, Warnzeichen und wann eine Abklärung sinnvoll ist."
+          "question": "Was kann LibertyMD?",
+          "answer": "LibertyMD ist ein privater KI-Care-Chat, der Ihre Symptome so durchgeht, wie es eine Ärztin oder ein Arzt tun würde — Beginn, zeitlicher Verlauf, Schweregrad und was sie bessert oder verschlechtert. Dabei wird laufend auf dringliche Warnzeichen geprüft, und aus dem Gespräch entsteht ein arztfertiger Gesundheitsbericht, den Sie zu jedem Termin mitnehmen können. Chat, Screening, Bericht und Ihre Folgefragen sind kostenlos."
         },
         {
-          "category": "Herzgesundheit",
-          "title": "Brustbeschwerden: die Details, die zählen",
-          "description": "Wie Zeitverlauf, Belastung, Atmung und Begleitsymptome die Dringlichkeit der Versorgung verändern."
+          "question": "Wer kann LibertyMD nutzen?",
+          "answer": "LibertyMD ist für Erwachsene ab 18 Jahren. Sie können ohne Konto starten und anonym bleiben — nach Alter und dem bei der Geburt zugewiesenen Geschlecht fragen wir nur, weil beides die Deutung von Symptomen verändert. Für Personen unter 18 Jahren wenden Sie sich bitte an eine Praxis oder einen Dienst für Kinder und Jugendliche."
         },
         {
-          "category": "Vorbereitung auf die Behandlung",
-          "title": "Einen nützlichen Symptomverlauf erstellen",
-          "description": "Verstreute Beobachtungen werden zu einer knappen Geschichte, die Ärzte leichter einschätzen können."
+          "question": "Ersetzt LibertyMD den Arztbesuch?",
+          "answer": "Nein. LibertyMD hilft Ihnen zu verstehen, was Sie erleben, und sich auf die Behandlung vorzubereiten — es stellt keine eigene Diagnose und behandelt nicht. Jede Beratung endet mit einer klaren Empfehlung zur passenden Versorgungsstufe und einem Bericht, der den folgenden Termin nützlicher macht. Wenn Sie ärztlichen Rat wünschen, kostet eine Arztkonsultation 39 $."
+        },
+        {
+          "question": "Was kostet es?",
+          "answer": "Der KI-Care-Chat, das Screening auf Dringlichkeit und Warnzeichen, Ihr Gesundheitsbericht und unbegrenzte Folgefragen sind kostenlos. Eine Arztkonsultation kostet 39 $, Unterstützung bei Rezepten beginnt bei 0 $. Es gibt kein Abo und es ist keine Versicherung nötig; FSA- und HSA-Karten werden akzeptiert."
+        },
+        {
+          "question": "Sind meine Gesundheitsdaten privat?",
+          "answer": "Ja. LibertyMD ist HIPAA-konform, und Sie können ein Gespräch beginnen, ohne ein Konto anzulegen oder Ihren Namen zu nennen. Ihre Beratung gehört Ihnen — Sie entscheiden, ob Sie Ihren Bericht per E-Mail versenden, ihn mit einer Ärztin oder einem Arzt teilen oder für sich behalten."
+        },
+        {
+          "question": "Was, wenn ich einen medizinischen Notfall habe?",
+          "answer": "Rufen Sie sofort 911 an oder gehen Sie in die nächste Notaufnahme — warten Sie nicht auf eine KI-Beratung. LibertyMD prüft während des gesamten Gesprächs auf Notfall-Warnzeichen und bricht das Interview ab, um Sie zur Notfallversorgung zu schicken, ersetzt aber keinen Rettungsdienst."
         }
       ]
     }
@@ -533,43 +548,61 @@
     "phEnded": "Diese Konsultation wurde aus Sicherheitsgründen beendet",
     "phAnswer": "Beantworten Sie die Folgefrage...",
     "sendMessage": "Nachricht senden",
+    "consultationTitle": "LibertyMD-Beratung",
+    "signIn": "Anmelden",
+    "signInGoogle": "Mit Google anmelden",
+    "openProfileHistory": "Profil und Beratungsverlauf öffnen",
+    "statusLoading": "Ihre private Beratung wird geöffnet...",
+    "statusRecovery": "Machen Sie dort weiter, wo Sie aufgehört haben",
+    "statusProfilePick": "Für wen ist diese Beratung?",
+    "statusDemographics": "Ein wenig Kontext hilft uns, sicherere Fragen zu stellen",
+    "statusIntake": "Gezielte klinische Rückfragen",
+    "statusReportGate": "Ihr arztfertiger Bericht ist vorbereitet",
+    "statusReportReady": "Ihr Bericht ist fertig",
+    "statusEmergency": "Sicherheitshinweise angezeigt",
+    "statusClinicalReview": "Diese Beratung muss klinisch geprüft werden",
+    "statusError": "Verbindung unterbrochen",
+    "emergencyAcknowledge": "Ich verstehe",
+    "emergencyPersistence": "Diese Hinweise bleiben nach Ihrer Bestätigung am unteren Bildschirmrand angeheftet.",
+    "emergencyShowDetails": "Details anzeigen",
+    "footerDisclaimer": "LibertyMD bietet KI-gestützte Orientierung, keine Diagnose oder Notfallversorgung.",
     "waitingReviewing": "Ich prüfe alles, was Sie mir gesagt haben…",
-    "partialOutcomeEyebrow": "Before you go",
-    "partialOutcomeTitle": "A few incomplete tips from what you shared",
-    "partialOutcomeSeeToday": "Seek care today if you notice",
-    "partialOutcomeGotIt": "Got it",
+    "partialOutcomeEyebrow": "Bevor Sie gehen",
+    "partialOutcomeTitle": "Einige vorläufige Hinweise aus Ihren Angaben",
+    "partialOutcomeSeeToday": "Suchen Sie heute ärztliche Hilfe, wenn Sie Folgendes bemerken",
+    "partialOutcomeGotIt": "Verstanden",
     "startNewConsult": "Neue Beratung starten",
     "clinicalReviewNeeded": "Diese Beratung braucht eine klinische Prüfung",
-    "comprehensionEyebrow": "Before your report",
-    "comprehensionTitle": "Here's what I've understood",
-    "comprehensionConfirm": "Anything wrong or missing?",
-    "comprehensionProceed": "Looks good — continue",
-    "comprehensionProceedAck": "Looks good",
-    "comprehensionCorrect": "Something's wrong or missing",
-    "comprehensionCorrectionLabel": "What should we correct?",
-    "comprehensionCorrectionPlaceholder": "Tell us what is wrong or missing",
-    "comprehensionCorrectionSubmit": "Apply and continue",
-    "comprehensionCorrectionCancel": "Back",
-    "attachPhoto": "Photo",
-    "attachLab": "Lab report",
-    "attachLabComingSoon": "Coming soon",
-    "photoChip": "Photo attached",
-    "photoAttachedLabel": "Attached photos",
-    "photoRemove": "Remove photo",
-    "photoRetry": "Try again",
-    "photoNoticeDismiss": "Dismiss",
+    "comprehensionEyebrow": "Vor Ihrem Bericht",
+    "comprehensionTitle": "Das habe ich verstanden",
+    "comprehensionConfirm": "Ist etwas falsch oder fehlt etwas?",
+    "comprehensionProceed": "Alles richtig — weiter",
+    "comprehensionProceedAck": "Alles richtig",
+    "comprehensionCorrect": "Etwas ist falsch oder fehlt",
+    "comprehensionCorrectionLabel": "Was sollen wir korrigieren?",
+    "comprehensionCorrectionPlaceholder": "Beschreiben Sie, was falsch ist oder fehlt",
+    "comprehensionCorrectionSubmit": "Übernehmen und weiter",
+    "comprehensionCorrectionCancel": "Zurück",
+    "attachPhoto": "Foto",
+    "attachLab": "Laborbericht",
+    "attachLabComingSoon": "Demnächst",
+    "photoChip": "Foto angehängt",
+    "photoAttachedLabel": "Angehängte Fotos",
+    "photoRemove": "Foto entfernen",
+    "photoRetry": "Erneut versuchen",
+    "photoNoticeDismiss": "Schließen",
     "viewConversation": "Gespräch anzeigen",
     "attachLabSignIn": "Melden Sie sich an, um einen Laborbericht hochzuladen",
     "labChip": "Laborbericht angehängt",
     "labAttachedLabel": "Angehängte Laborberichte",
     "labRemove": "Laborbericht entfernen",
     "labUnreviewed": "Klinische Prüfung ausstehend",
-    "mediaProcessing": "Processing evidence…",
-    "mediaProcessed": "Processed and included",
-    "mediaFailed": "Processing failed",
-    "mediaUnusable": "Could not read enough detail",
-    "mediaQuestionPhoto": "About your photo",
-    "mediaQuestionLab": "About your lab report",
+    "mediaProcessing": "Nachweise werden verarbeitet…",
+    "mediaProcessed": "Verarbeitet und einbezogen",
+    "mediaFailed": "Verarbeitung fehlgeschlagen",
+    "mediaUnusable": "Nicht genügend Details lesbar",
+    "mediaQuestionPhoto": "Zu Ihrem Foto",
+    "mediaQuestionLab": "Zu Ihrem Laborbericht",
     "labAttributionTitle": "Für wen ist dieser Laborbericht?",
     "labAttributionBody": "Wählen Sie das Profil, zu dem dieser Bericht gehört. Das ändert nicht, für wen die Konsultation ist.",
     "labAttributionConfirm": "Weiter",
