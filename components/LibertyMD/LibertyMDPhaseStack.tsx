@@ -659,7 +659,12 @@ export function LibertyMDPhaseStack({
 
   return (
     <div ref={wrapperRef} className="relative" style={{ height: `${PIN_VIEWPORTS * 100}vh` }}>
-      <div className="libertymd-phase-stack-pane libertymd-content-shell sticky top-0 mx-auto flex h-screen flex-col justify-center gap-6 lg:gap-10">
+      {/* `h-[100svh]`, not `h-screen`. 100vh is the LARGE viewport: on a phone it
+          includes the area under the collapsible address bar, so the pane resized
+          every time that bar hid or showed. With `justify-center` that re-centred
+          the heading mid-scroll, and the hero cross — which docks to the heading —
+          bounced with it. The hero already uses 100svh; this matches it. */}
+      <div className="libertymd-phase-stack-pane libertymd-content-shell sticky top-0 mx-auto flex h-[100svh] flex-col justify-center gap-6 lg:gap-10">
         {header}
         {/* Below `lg` the stack is pushed half off the right edge and the copy owns the left,
             showing one phase at a time. From `lg` the stack is centred with two phases either

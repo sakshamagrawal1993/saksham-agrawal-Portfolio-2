@@ -44,11 +44,26 @@ export default function LibertyMDPremiumLogo({
 
     type Frame = { travel: number; scale: number; rotate: number; ped: number; progress: number };
 
+    // Viewport height is read ONCE per layout, not per frame. On a phone the
+    // collapsing address bar changes window.innerHeight mid-scroll, which moved
+    // `landingScroll` under us and made `progress` jitter across its 1.0
+    // threshold — and the two branches either side of that threshold produce very
+    // different transforms, so the cross snapped between them. Measured on a
+    // production recording: swings of up to 450px between adjacent frames.
+    let viewportH = window.innerHeight;
+    const syncViewport = () => { viewportH = window.innerHeight; };
+    window.addEventListener('resize', syncViewport);
+    window.addEventListener('orientationchange', syncViewport);
+
+    // Once docked, stay docked. Hysteresis stops a small scroll jitter from
+    // re-crossing the threshold and re-triggering the travel animation.
+    let latchedDocked = false;
+
     // The scroll-driven TARGET at the current scroll position.
     const computeTarget = (): Frame => {
       const scrollY = window.scrollY;
       const isCompact = window.innerWidth < 640;
-      const viewportHeight = window.innerHeight;
+      const viewportHeight = viewportH;
       
       const rootRect = root.getBoundingClientRect();
       const rootDocumentTop = rootRect.top + scrollY;
@@ -78,7 +93,13 @@ export default function LibertyMDPremiumLogo({
       const triggerScroll = rootDocumentTop;
       const landingScroll = Math.max(triggerScroll + 1, h2Rect.top + scrollY - viewportHeight * 0.65);
 
-      const rawProgress = Math.min(1, Math.max(0, (scrollY - triggerScroll) / (landingScroll - triggerScroll)));
+      let rawProgress = Math.min(1, Math.max(0, (scrollY - triggerScroll) / (landingScroll - triggerScroll)));
+      // Latch: once we have arrived, only a decisive scroll back up (below 0.92)
+      // releases it. Without this, progress hovering at ~0.99/1.0 flipped the
+      // damped/undamped branch every frame.
+      if (rawProgress >= 1) latchedDocked = true;
+      else if (latchedDocked && rawProgress > 0.92) rawProgress = 1;
+      else if (rawProgress <= 0.92) latchedDocked = false;
       const easedProgress = rawProgress ** 3 * (rawProgress * (rawProgress * 6 - 15) + 10);
       const transferProgress = Math.min(1, rawProgress + Math.sin(Math.PI * rawProgress) * 0.24);
 
@@ -104,9 +125,20 @@ export default function LibertyMDPremiumLogo({
     };
 
     // Reduced motion: snap to target, no animation loop.
+    const removeViewportListeners = () => {
+      window.removeEventListener('resize', syncViewport);
+      window.removeEventListener('orientationchange', syncViewport);
+    };
+
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       applyStyles(computeTarget());
-      return;
+      // Still snap to the target on resize, and still clean up on unmount.
+      const snap = () => { syncViewport(); applyStyles(computeTarget()); };
+      window.addEventListener('resize', snap);
+      return () => {
+        window.removeEventListener('resize', snap);
+        removeViewportListeners();
+      };
     }
 
     // DAMP: fraction of the remaining distance covered per frame.
@@ -134,7 +166,10 @@ export default function LibertyMDPremiumLogo({
       rafId = requestAnimationFrame(tick);
     };
     rafId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafId);
+    return () => {
+      cancelAnimationFrame(rafId);
+      removeViewportListeners();
+    };
   }, [active, dockHeadlineRef]);
 
   return (
