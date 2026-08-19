@@ -1,0 +1,15 @@
+{
+  "round": "preflight-en",
+  "base_url": "http://127.0.0.1:5173/liberty-md",
+  "started_cases": 1,
+  "expected_cases": 1,
+  "passed": 0,
+  "failed": 1,
+  "by_locale": {
+    "en": {
+      "passed": 0,
+      "total": 1
+    }
+  },
+  "numeric_contract": "Input digits and decimal values match the English fixture exactly."
+}

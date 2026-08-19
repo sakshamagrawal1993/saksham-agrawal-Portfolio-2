@@ -1,5 +1,5 @@
 {
-  "pattern_set_version": "1.2.0",
+  "pattern_set_version": "1.3.0",
   "positives": [
     {
       "id": "acs_clause_boundary",
@@ -108,6 +108,36 @@
       "message": "Meine Sauerstoffsättigung liegt bei 88 Prozent. Ich ringe nach Luft und kann keinen ganzen Satz sprechen.",
       "crisis_type": "respiratory_distress",
       "care_setting": "call_911"
+    },
+    {
+      "id": "es_acs_radiating_arm",
+      "message": "Tengo una presión opresiva en el pecho que se extiende al brazo izquierdo, con sudoración y náuseas.",
+      "crisis_type": "acs_chest_pain",
+      "care_setting": "call_911"
+    },
+    {
+      "id": "pt_acs_radiating_arm",
+      "message": "Tenho uma pressão esmagadora no peito que se espalha para o braço esquerdo, com suor e náusea.",
+      "crisis_type": "acs_chest_pain",
+      "care_setting": "call_911"
+    },
+    {
+      "id": "hi_acs_radiating_arm",
+      "message": "मेरे सीने में कुचलने जैसा दबाव है जो बाएँ हाथ तक फैल रहा है, साथ में पसीना और मतली है।",
+      "crisis_type": "acs_chest_pain",
+      "care_setting": "call_911"
+    },
+    {
+      "id": "hi_latn_acs_radiating_arm",
+      "message": "Mere chest mein crushing pressure hai jo left arm tak fail raha hai, saath mein sweating aur nausea hai.",
+      "crisis_type": "acs_chest_pain",
+      "care_setting": "call_911"
+    },
+    {
+      "id": "fr_acs_radiating_arm",
+      "message": "J’ai une pression écrasante dans la poitrine qui s’étend au bras gauche, avec des sueurs et des nausées.",
+      "crisis_type": "acs_chest_pain",
+      "care_setting": "call_911"
     }
   ],
   "negatives": [
@@ -164,7 +194,22 @@
     { "id": "de_seasonal_allergy", "message": "Meine Augen jucken und ich niese wegen Pollen, ohne Schwellung im Mund oder Hals." },
     { "id": "de_resolved_stress_tightness", "message": "Bei Stress war die Brust kurz eng, aber das ist vorbei und ich atme normal." },
     { "id": "de_negated_throat_swelling", "message": "Mein Hals ist nicht geschwollen, ich kann normal schlucken und atmen." },
-    { "id": "de_low_fever", "message": "Seit gestern habe ich leichtes Fieber und eine laufende Nase, sonst geht es mir gut." }
+    { "id": "de_low_fever", "message": "Seit gestern habe ich leichtes Fieber und eine laufende Nase, sonst geht es mir gut." },
+    { "id": "es_negated_chest", "message": "Tengo fiebre baja y cansancio, sin dolor de pecho ni dificultad para respirar." },
+    { "id": "es_seasonal_allergy", "message": "Me pican los ojos y estornudo, pero no tengo la garganta cerrada ni hinchazón." },
+    { "id": "es_negated_si", "message": "Me he sentido decaída, pero no tengo pensamientos de hacerme daño." },
+    { "id": "pt_negated_chest", "message": "Tenho febre baixa e cansaço, sem dor no peito e sem dificuldade para respirar." },
+    { "id": "pt_seasonal_allergy", "message": "Meus olhos coçam e estou espirrando, mas não tenho aperto na garganta nem inchaço." },
+    { "id": "pt_negated_si", "message": "Tenho me sentido para baixo, mas não penso em me machucar." },
+    { "id": "hi_negated_chest", "message": "मुझे हल्का बुखार और थकान है, सीने में दर्द या साँस लेने में परेशानी नहीं है।" },
+    { "id": "hi_seasonal_allergy", "message": "मेरी आँखों में खुजली है और छींक आ रही है, लेकिन गला कसना या सूजन नहीं है।" },
+    { "id": "hi_negated_si", "message": "मैं उदास महसूस कर रहा/रही हूँ, लेकिन खुद को नुकसान पहुँचाने का कोई विचार नहीं है।" },
+    { "id": "hi_latn_negated_chest", "message": "Mujhe low fever aur fatigue hai, chest pain ya breathing problem nahi hai." },
+    { "id": "hi_latn_seasonal_allergy", "message": "Meri eyes itchy hain aur sneezing ho rahi hai, lekin throat tightness ya swelling nahi hai." },
+    { "id": "hi_latn_negated_si", "message": "Main low feel kar raha/rahi hoon, lekin khud ko harm karne ke thoughts nahi hain." },
+    { "id": "fr_negated_chest", "message": "J’ai une légère fièvre et de la fatigue, sans douleur thoracique ni difficulté à respirer." },
+    { "id": "fr_seasonal_allergy", "message": "Mes yeux me démangent et j’éternue, mais je n’ai ni gorge serrée ni gonflement." },
+    { "id": "fr_negated_si", "message": "Je me sens déprimé, mais je n’ai aucune pensée de me faire du mal." }
   ],
   "normalizer_downgrades": [
     {

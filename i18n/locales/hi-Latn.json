@@ -2,23 +2,27 @@
   "_meta": {
     "status": "approved",
     "version": "1",
-    "source": "human",
-    "approved_by": "saksham (hinglish bundle)",
-    "approved_at": "2026-08-09"
+    "source": "mixed",
+    "approved_by": "saksham — 155 human-authored keys (2026-08-09) + 336 machine-authored keys reviewed and approved 2026-08-13",
+    "approved_at": "2026-08-13",
+    "note": "155 keys human-authored 2026-08-09. 336 keys machine-authored 2026-08-13 to complete the bundle — hi-Latn cannot fall back to `hi` because that bundle is Devanagari. Clinical + safety strings reviewed and approved by the business owner 2026-08-13."
   },
   "common": {
     "startChat": "Chat shuru karein",
     "send": "Bhejein",
     "back": "Wapas",
     "retry": "Fir se koshish karein",
-    "loading": "Loading…",
-    "cancel": "Cancel",
+    "loading": "Load ho raha hai…",
+    "cancel": "Radd karein",
     "close": "Band karein",
     "yes": "Haan",
     "no": "Nahi",
     "notSure": "Pata nahi",
     "preferToType": "Type karna chahunga/chahungi",
-    "betaLanguage": "Yeh language beta me hai."
+    "betaLanguage": "Yeh language beta me hai. Safety messages Hinglish mein dikhaye jaate hain.",
+    "skipToContent": "Main content par jaayein",
+    "navAccount": "Account aur language",
+    "navFooter": "Neeche ka hissa"
   },
   "hero": {
     "title": "Aapke symptoms ke liye clinically informed guidance.",
@@ -46,62 +50,46 @@
     "prompt": "Safe aur sahi guidance ke liye mujhe do details chahiye.",
     "ageLabel": "Aapki age",
     "sexLabel": "Birth ke time sex",
-    "sexFemale": "Female",
-    "sexMale": "Male",
-    "sexIntersex": "Intersex",
+    "sexFemale": "Mahila",
+    "sexMale": "Purush",
+    "sexIntersex": "Intersex vyakti",
     "sexPreferNot": "Nahi batana chahte",
     "continue": "Aage badhein"
   },
   "reportGate": {
     "title": "Aapki report ready hai",
     "headline": "Yeh consultation mat khoiye",
-    "body": "Is report ko 7 dino se aage rakhne ke liye Google se sign in karein.",
+    "body": "Is report ko saat dino se aage rakhne ke liye Google se sign in karein.",
     "google": "Google se continue karein",
     "skip": "Guest ke roop me continue karein",
     "skipNote": "Guest reports 7 dino tak available rehti hain.",
-    "benefitKeep": "7 days ke baad bhi rakhein"
+    "benefitKeep": "7 days ke baad bhi rakhein",
+    "benefitHistory": "Apni history dekhein",
+    "benefitFamily": "Family profiles add karein"
   },
   "report": {
     "headerTitle": "Physician Ready Report",
-    "meta": {
-      "patientName": "Patient Name:",
-      "gender": "Gender:",
-      "age": "Age:",
-      "date": "Date:",
-      "refNo": "Ref No.:",
-      "anonymous": "Anonymous patient",
-      "notSpecified": "Bataya nahi gaya",
-      "page": "Page",
-      "pdfFooter": "AI-generated clinical summary — ye diagnosis nahi hai · Licensed doctor review ke liye"
-    },
     "title": "Aapki Health Report",
-    "subtitle": "Clinician ke liye taiyaar ki gayi summary",
-    "summaryHeading": "Patient Summary",
-    "assessmentHeading": "Assessment & Plan",
-    "differentialHeading": "Differential Diagnosis",
-    "soapHeading": "SOAP Note",
-    "redFlagsHeading": "Red Flags to Watch",
-    "nextStepHeading": "Next Steps",
     "likely": "Probable causes",
-    "evidence": "Supporting evidence",
+    "evidence": "Samarthan karne wale saboot",
     "uncertainty": "Jo abhi uncertain hai",
     "warningSigns": "Warning signs jinpar dhyan dein",
     "selfCare": "Self care",
     "careSetting": "Suggested next step",
     "download": "Report download karein",
     "share": "Apne doctor ke saath share karein",
-    "eyebrow": "Doctor-ready report",
+    "eyebrow": "Doctor ko dikhane ke liye taiyaar report",
     "aiFraming": "AI-generated guidance — kisi doctor dwara review nahi kiya gaya. Ye koi diagnosis nahi hai.",
     "savedNote": "Aapki LibertyMD history mein privately save kar diya gaya hai.",
-    "guestNote": "Guest access 7 dino ke baad expire ho jayega.",
+    "guestNote": "Guest access saat dino ke baad expire ho jayega.",
     "pdf": {
       "patientTitle": "Doctor Review ke liye Report",
       "soapTitle": "Doctor SOAP Note",
-      "summaryHeading": "Summary",
+      "summaryHeading": "Saaransh",
       "aiGenerated": "AI-generated — ye diagnosis nahi hai.",
       "noClinicianReview": "Kisi licensed doctor ne is document ko review nahi kiya hai.",
-      "generatedLabel": "Generated",
-      "plan": "Plan",
+      "generatedLabel": "Taiyaar ki gayi",
+      "plan": "Yojana",
       "chooserLabel": "Chune konsi report download karni hai",
       "choicePatient": "Patient Summary",
       "choiceSoap": "Doctor SOAP",
@@ -111,7 +99,7 @@
       "error": "PDF prepare nahi ho saki. Ye technical issue hai.",
       "retry": "Fir se koshish karein",
       "downloadSoapReady": "Doctor SOAP PDF Download karein",
-      "readyPatient": "Patient summary PDF ready",
+      "readyPatient": "Patient summary PDF taiyaar hai",
       "readySoap": "Doctor SOAP PDF ready"
     },
     "sections": {
@@ -124,6 +112,16 @@
       "redFlags": "Red Flags to Watch",
       "soap": "SOAP Note"
     },
+    "teasers": {
+      "differential": "{count} possibilities",
+      "assessmentAndPlanItems": "Yojana ke {count} points",
+      "assessmentChip": "Mulyankan",
+      "redFlags": "{count} red flags",
+      "soapSubjective": "Bataye gaye symptoms",
+      "soapObjective": "Dekhe gaye facts",
+      "soapAssessment": "Mulyankan",
+      "soapPlan": "Yojana"
+    },
     "triage": {
       "home": "Ghar par dekhbhal (Home Care)",
       "telehealth": "Telehealth (Online Doctor)",
@@ -131,42 +129,89 @@
       "emergency_department": "Emergency Room",
       "call_911": "Emergency Service ko call karein",
       "crisis_line": "Helpline",
-      "unknown": "Care setting unavailable"
+      "unknown": "Care setting available nahi hai"
     },
-    "viewTitle": "Doctor review ke liye report",
     "card": {
       "ordinal": {
-        "high": "High confidence",
-        "medium": "Medium confidence",
-        "low": "Low confidence",
-        "minimal": "Minimal confidence",
-        "high_serious": "High confidence · Serious"
+        "high": "Bahut zyada bharosa",
+        "medium": "Madhyam bharosa",
+        "low": "Kam bharosa",
+        "minimal": "Bahut kam bharosa",
+        "high_serious": "Bahut zyada bharosa · Gambhir"
       },
       "serious": "Gambhir (Serious)",
       "clinicalReviewRequired": "Doctor review required",
       "aboutCondition": "Is condition ke baare mein",
       "whyConsidered": "Isko kyun consider kiya gaya",
-      "clinicalAssessment": "Clinical assessment",
+      "clinicalAssessment": "Clinical mulyankan",
       "furtherInvestigations": "Extra investigations",
       "symptomaticTreatment": "Symptoms se rahat",
       "supportiveTreatment": "Supportive care",
+      "showDetail": "Aur dekhein",
+      "hideDetail": "Kam dekhein",
       "treatmentGuidance": "Kewal general guidance — ye prescription nahi hai.",
-      "doctorCta": "Doctor available hone par mujhe notify karein",
-      "showDetail": "Details dekhein",
-      "hideDetail": "Details chupayein"
+      "doctorCta": "Doctor available hone par mujhe notify karein"
     },
-    "teasers": {
-      "differential": "{count} possibilities",
-      "assessmentAndPlanItems": "{count} plan items",
-      "assessmentChip": "Assessment",
-      "redFlags": "{count} red flags",
-      "soapSubjective": "Subjective",
-      "soapObjective": "Objective",
-      "soapAssessment": "Assessment",
-      "soapPlan": "Plan"
+    "viewTitle": "Doctor review ke liye report",
+    "meta": {
+      "patientName": "Patient Name:",
+      "gender": "Ling:",
+      "age": "Umar:",
+      "date": "Tareekh:",
+      "refNo": "Ref No.:",
+      "anonymous": "Anonymous patient",
+      "notSpecified": "Bataya nahi gaya",
+      "page": "Panna",
+      "pdfFooter": "AI-generated clinical summary — ye diagnosis nahi hai · Licensed doctor review ke liye"
+    },
+    "emailDelivery": {
+      "cta": "Mujhe meri report email karein",
+      "title": "Apni report email karein",
+      "description": "Hum ek private link bhejenge jo yeh report 24 ghante tak kholega. Aapki report yahan dikhti rahegi.",
+      "emailLabel": "Email ka pata",
+      "emailPlaceholder": "you@example.com",
+      "submit": "Link bhejein",
+      "sending": "Bheja ja raha hai…",
+      "success": "Is report ke private link ke liye apna inbox dekhein.",
+      "failure": "Hum abhi email nahi bhej paaye. Aapki report yahin hai — fir se koshish karein.",
+      "invalidEmail": "Ek valid email address daalein.",
+      "close": "Band karein",
+      "expiredTitle": "Yeh link expire ho gaya hai",
+      "expiredBody": "Report links 24 ghante baad expire ho jaate hain. Agar yeh consultation abhi bhi khuli hai, to aap report se naya email mangwa sakte hain.",
+      "unavailableTitle": "Yeh report ab available nahi hai",
+      "unavailableBody": "Guest reports apne retention window ke baad hata di jaati hain. Aage badhne ka tareeka hai naya consultation shuru karna — sign in karne se deleted guest report wapas nahi aati.",
+      "startNew": "Naya consultation shuru karein",
+      "redeeming": "Aapki report khul rahi hai…",
+      "redeemError": "Hum abhi yeh report link nahi khol paaye. Thodi der baad koshish karein."
+    },
+    "feedback": {
+      "prompt": "Kya yeh helpful tha?",
+      "yes": "Haan",
+      "no": "Nahi",
+      "commentOptional": "Kya missing tha? (optional)",
+      "thanks": "Aapke feedback ke liye dhanyavaad.",
+      "error": "Hum aapka feedback save nahi kar paaye. Aapki report abhi bhi available hai — fir se koshish karein.",
+      "retry": "Fir se koshish karein"
+    },
+    "doctor": {
+      "ctaWaitlist": "Doctors available hone par mujhe notify karein",
+      "ctaBooking": "Licensed doctor ke saath aage badhein",
+      "networkComing": "LibertyMD par licensed doctor network aa raha hai. Yeh report handoff ke liye taiyaar rahegi.",
+      "notifyInvite": "Waitlist join karein, visits khulne par hum aapko notify karenge. Tab tak pricing ya availability ka koi daava nahi.",
+      "bookingTitle": "Licensed doctor ke saath aage badhein",
+      "bookingBody": "Jab booking live hogi, aap yahan se yeh report kisi LibertyMD doctor ko de sakenge.",
+      "emailOptional": "Notification ke liye email (optional)",
+      "emailPlaceholder": "you@example.com",
+      "join": "Mujhe notify karein",
+      "joinAck": "Aap list me hain. Doctors available hone par hum sampark karenge.",
+      "joinError": "Hum abhi aapki request save nahi kar paaye. Aapki report yahin hai — fir se koshish karein.",
+      "retry": "Fir se koshish karein",
+      "claimPrice": "Visit ki keemat: {price}",
+      "claimAvailability": "Uplabdhata: {availability}",
+      "claimRefund": "Refund niyam: {refund}"
     },
     "lifecycle": {
-      "partialLabel": "Incomplete",
+      "partialLabel": "Adhoora",
       "partialTitle": "Yeh report incomplete hai",
       "partialBody": "Is consultation me koi health concern discuss nahi hua. Naya consultation shuru karein jab aap ready hon.",
       "partialA11yNoDx": "Koi differential diagnosis nahi hai.",
@@ -177,8 +222,16 @@
       "expiredTitle": "Yeh guest report ab available nahi hai",
       "expiredBody": "Guest report ki window khatam ho gayi hai.",
       "expiredSignIn": "Future reports ke liye Sign In karein",
-      "notYetEligible": "Report abhi ready nahi hai — kuch aur sawaalo ke jawaab dein"
-    }
+      "notYetEligible": "Report abhi ready nahi hai — kuch aur sawaalo ke jawaab dein",
+      "retentionWarning": "Is report ka guest access {remaining} me khatm ho jaayega. Aage ki reports history me rakhne ke liye sign in karein."
+    },
+    "pageTitle": "Doctor review ke liye report",
+    "pageSubtitle": "",
+    "backToConsult": "Consultation par wapas",
+    "loadingHeading": "Aapki report khul rahi hai",
+    "generatingHeading": "Aapki report taiyaar ho rahi hai",
+    "generatingBody": "Aapne jo bataya hai hum sab review kar rahe hain aur clinician ke liye likh rahe hain. Isme aam taur par ek minute se kam lagta hai.",
+    "loadFailed": "Hum abhi yeh report nahi khol paaye. Aapka consultation surakshit hai — kripya thodi der baad koshish karein."
   },
   "sampleReport": {
     "entry": "Sample report dekhein",
@@ -187,5 +240,474 @@
     "subtitle": "Sirf samjhane ke liye synthetic example. Yeh kisi real patient ka case nahi hai aur kisi clinician ne review nahi kiya hai.",
     "cta": "Sore throat consult shuru karein",
     "ctaOwnSymptoms": "Apne symptoms ke saath shuru karein"
+  },
+  "safety": {
+    "emergencyTitle": "Yeh emergency ho sakti hai",
+    "highRiskTitle": "Kripya dhyaan se padhein",
+    "reviewTitle": "Ise kisi clinician ko dekhna chahiye",
+    "disclaimer": "LibertyMD ek informational service hai aur professional medical advice, diagnosis ya treatment ka vikalp nahi hai."
+  },
+  "menu": {
+    "profile": "Profile",
+    "history": "Mere consultations",
+    "signOut": "Sign out",
+    "signIn": "Sign in"
+  },
+  "errors": {
+    "generic": "Kuch galat ho gaya. Aapki baatcheet surakshit hai.",
+    "offline": "Aap offline lag rahe hain. Jaari rakhne ke liye dobara connect karein.",
+    "retryMessage": "Apna last message fir se bhejne ke liye tap karein."
+  },
+  "app": {
+    "howItWorksKicker": "Symptom se agle kadam tak",
+    "howItWorksTitle": "LibertyMD kaise kaam karta hai",
+    "howItWorksSubtitle": "Itna simple ki tabiyat theek na ho tab bhi use kar sakein.",
+    "trustedBy": "1,000,000+ users ka bharosa",
+    "trustedByShort": "1,000,000+ users",
+    "hipaaShort": "Private AI baatcheet",
+    "hipaaLong": "Private AI symptoms baatcheet",
+    "careAssistant": "LibertyMD care assistant",
+    "shareReport": "LibertyMD Report share karein",
+    "clinicalConsiderations": "Clinical considerations",
+    "carePlan": "Care Plan",
+    "redFlags": "Red Flags",
+    "soapNote": "SOAP Note",
+    "handoffKicker": "Doctor network",
+    "handoffTitle": "Licensed doctors available hone par notify paayein.",
+    "availableIn": "{wait} me available",
+    "doctorReview": "AI report review karke agle kadam bata sakte hain, {price} me.",
+    "humanCareKicker": "Human care",
+    "humanCareTitle": "Doctor ka dhyaan, built-in.",
+    "humanCareSubtitle": "Har triage is tarah banaya gaya hai ki licensed physician ko saaf handoff ho sake.",
+    "phases": [
+      {
+        "title": "Apne symptoms bataiye",
+        "eyebrow": "Aaram se shuru karein",
+        "body": "LibertyMD ko bataiye aapko kya mehsoos ho raha hai, kab shuru hua, aur sabse zyada kis baat ki chinta hai. Medical shabd jaanna zaroori nahi hai."
+      },
+      {
+        "title": "Focused Follow-up",
+        "eyebrow": "Sirf jo zaroori hai",
+        "body": "Timing, severity aur history ke chhote sawaal — har ek aapke pichhle jawaab se chuna gaya, aur beech-beech me warning signs bhi check hote rehte hain."
+      },
+      {
+        "title": "Doctor Ready Report",
+        "eyebrow": "Context share karne ke liye taiyaar",
+        "body": "Aapke jawaab ek structured summary ban jaate hain: symptom timeline, safety guidance, agle kadam, aur doctor-ready SOAP note."
+      },
+      {
+        "title": "Doctor Consultation",
+        "eyebrow": "Handoff, dobara shuruaat nahi",
+        "body": "Jab aapko kisi insaan ki zaroorat ho, aapki report aapke saath jaati hai — taaki licensed physician aapke context se shuru kare, pehle sawaal se nahi."
+      }
+    ],
+    "heroTrustReport": "Doctor ko dikhane layak free report",
+    "heroTrustReportShort": "Free report taiyaar",
+    "heroTrustAi": "AI symptom chat — clinician nahi",
+    "heroTrustAiShort": "AI — clinician nahi",
+    "heroTrustRating": "5 me se 4.5",
+    "heroTrustRatingShort": "4.5",
+    "heroTrustHipaa": "HIPAA ke mutabik",
+    "heroTrustHipaaShort": "HIPAA"
+  },
+  "marketing": {
+    "care": {
+      "kicker": "Ek continuous care story",
+      "title": "Urgent aur primary care, dobara shuru kiye bina.",
+      "aiLine": "AI jo hamesha available hai.",
+      "doctorsHighlight": "Licensed doctors",
+      "doctorsRest": "jab aapko zaroorat ho.",
+      "body": "Aapka poora intake aapke saath chalta hai, isliye physician ke paas symptom history aur context pehle se hota hai. Khud ko dohraane me kam waqt. Care par zyada dhyaan.",
+      "priceLead": "Free shuru karein. Jab aap chaahein, licensed doctor ke saath aage badhein.",
+      "price": "",
+      "cta": "Free chat shuru karein",
+      "drName": "Physician review preview",
+      "drRole": "Aapka LibertyMD intake review ho raha hai",
+      "previewLabel": "Physician review preview",
+      "pillSchedule": "Aapki visit ke liye structured intake",
+      "pillContext": "Aapki report context saath le jaati hai",
+      "pillAvailability": "AI chat kabhi bhi available"
+    },
+    "specialists": {
+      "kicker": "Medical guidance",
+      "title": "Specialists ke margdarshan me",
+      "subtitle": "Health aur medicine ke experts dwara design kiya gaya"
+    },
+    "pricing": {
+      "kicker": "Simple pricing",
+      "title": "Aisi care jo cost ke baare me saaf rahe.",
+      "body": "Ek free private chat se shuru karein. Licensed online doctor tak tabhi badhein jab aap chaahein.",
+      "nationwide": "Poore desh me available",
+      "insurance": "Insurance supported",
+      "cta": "Free chat shuru karein"
+    },
+    "stories": {
+      "kicker": "LibertyMD stories",
+      "title": "Ek saaf baatcheet aage kya hota hai woh badal sakti hai.",
+      "body": "Sample patient stories jo dikhaati hain ki structured health baatcheet agle kadam se pehle kaise clarity de sakti hai.",
+      "play": "Patient stories chalayein",
+      "pause": "Patient stories rokein",
+      "prev": "Pichhli patient story",
+      "next": "Agli patient story",
+      "items": [
+        {
+          "category": "Visit ki taiyaari",
+          "title": "Main jaanta tha ki kya batana hai.",
+          "quote": "LibertyMD ne timeline aur warning signs organize kar diye, isliye appointment un details se shuru hui jo maayne rakhti thi."
+        },
+        {
+          "category": "Mann ki shanti",
+          "title": "Agla kadam aakhirkar saaf ho gaya.",
+          "quote": "Baatcheet ne alag kar diya ki ghar par kya monitor kar sakta hoon aur kin symptoms ke liye urgent care chahiye."
+        },
+        {
+          "category": "Symptoms samajhna",
+          "title": "Doctor ke liye behtar sawaal the.",
+          "quote": "Dozen bhar pages padhne ke bajaye, mere paas ek chhoti report aur focused sawaalon ki list thi."
+        },
+        {
+          "category": "Urgency pehchanna",
+          "title": "Warning signs samajhna aasaan ho gaya.",
+          "quote": "Safety sawaal shaant aur seedhe the. Main samajh gaya ki same-day care kyun zaroori hai aur clinician ko kya batana hai."
+        },
+        {
+          "category": "Follow-up",
+          "title": "Dobara shuru kiye bina aage badh saka.",
+          "quote": "Meri timeline, medications aur agle kadam saath rahe, isliye follow-up baatcheet kaafi kam bikhri hui thi."
+        },
+        {
+          "category": "Fever sambhalna",
+          "title": "Raat bhar kya dekhna hai, pata tha.",
+          "quote": "Plan ne hydration, temperature aur un badlaavon ke liye practical checkpoints diye jinke baad madad leni thi."
+        },
+        {
+          "category": "Medication ke sawaal",
+          "title": "Baatcheet ne mere options simple kar diye.",
+          "quote": "Main bata saka ki maine kya try kiya hai aur samajh saka ki pharmacist aur doctor se kya poochhna hai."
+        },
+        {
+          "category": "Chot ke baad",
+          "title": "Sujan ke baare me andaza lagana band ho gaya.",
+          "quote": "LibertyMD ne chot ko saaf tarike se batane me madad ki aur samjhaya ki examination ya imaging kab sahi rahegi."
+        },
+        {
+          "category": "Parivaar ki dekhbhaal",
+          "title": "Faisla lete waqt zyada shaant tha.",
+          "quote": "Sawaalon ne samajhne me madad ki ki kya badla hai aur meri maa ko aage kis tarah ki care chahiye."
+        },
+        {
+          "category": "Baar-baar hone waale symptoms",
+          "title": "Pattern aakhirkar dikhne laga.",
+          "quote": "Timing aur triggers ek saath dekhkar lambi baatcheet ke liye kaafi behtar shuruaat mili."
+        },
+        {
+          "category": "Doosri raay",
+          "title": "Agla kadam chunne se pehle soch saka.",
+          "quote": "Summary ne meri chintaon ke liye shabd diye, bina situation ko zaroorat se zyada darawna banaye."
+        },
+        {
+          "category": "Follow-up ki taiyaari",
+          "title": "Koi zaroori baat chhooti nahi.",
+          "quote": "Symptom ke badlaav, sawaal aur agle kadam — sab ek jagah the jo main follow-up me cover karna chahta tha."
+        }
+      ]
+    },
+    "faq": {
+      "kicker": "Aam sawaal",
+      "title": "Aksar poochhe jaane waale sawaal.",
+      "items": [
+        {
+          "question": "LibertyMD kya kar sakta hai?",
+          "answer": "LibertyMD ek private AI care chat hai jo aapke symptoms par usi tarah kaam karta hai jaise ek clinician karega — onset, timing, severity, aur kis cheez se aaram ya takleef badhti hai. Chalte-chalte urgent red flags check karta hai, fir poori baatcheet ko ek doctor-ready health report me badal deta hai jise aap kisi bhi appointment me le ja sakte hain. Chat, screening, report aur aapke follow-up sawaal — sab free hain."
+        },
+        {
+          "question": "LibertyMD kaun use kar sakta hai?",
+          "answer": "LibertyMD 18 saal se upar ke adults ke liye hai. Aap bina account ke shuru kar sakte hain aur anonymous reh sakte hain — hum age aur sex assigned at birth sirf isliye poochhte hain kyunki inse symptoms ka matlab badal jaata hai. 18 saal se kam umar ke liye kripya aise clinician ya service ka upyog karein jo bachchon aur kishoron ki dekhbhaal karti ho."
+        },
+        {
+          "question": "Kya LibertyMD doctor se milne ka vikalp hai?",
+          "answer": "Nahi. LibertyMD aapko samajhne me madad karta hai ki aap kya mehsoos kar rahe hain aur care ke liye taiyaari karta hai — yeh khud se diagnosis ya treatment nahi karta. Har consult ke ant me care ke sahi level ki saaf sifarish milti hai, saath me ek report jo aage ki appointment ko zyada useful banati hai. Jab aap clinician ko shaamil karna chaahein, doctor consultation $39 ka hai."
+        },
+        {
+          "question": "Iski keemat kitni hai?",
+          "answer": "AI care chat, urgency aur red-flag screening, aapki health report, aur unlimited follow-up sawaal free hain. Doctor consultation $39 ka hai, aur prescription support $0 se shuru hota hai. Koi subscription nahi aur insurance zaroori nahi, aur FSA aur HSA cards accept kiye jaate hain."
+        },
+        {
+          "question": "Kya meri health information private hai?",
+          "answer": "Haan. LibertyMD HIPAA compliant hai, aur aap bina account banaye ya naam diye baatcheet shuru kar sakte hain. Aapka consult aapka hi rehta hai — aap tay karte hain ki report email karni hai, kisi clinician ke saath share karni hai, ya apne paas hi rakhni hai."
+        },
+        {
+          "question": "Agar mujhe medical emergency ho to?",
+          "answer": "911 par call karein ya abhi nazdeeki emergency room jaayein — AI consult ka intezaar na karein. LibertyMD poori baatcheet me emergency red flags check karta hai aur milne par interview rok kar aapko emergency care lene ko kahega, lekin yeh emergency services ka vikalp nahi hai."
+        }
+      ]
+    }
+  },
+  "footer": {
+    "clinicalCare": "Clinical Care",
+    "symptomChecker": "Symptom Checker",
+    "urgentCare": "Urgent Care Specialist",
+    "primaryTelehealth": "Primary Telehealth",
+    "refills": "Prescription Refills",
+    "privacyGdpr": "GDPR Privacy Policy",
+    "hipaa": "HIPAA Compliance",
+    "company": "Company",
+    "about": "LibertyMD ke baare me",
+    "careers": "Careers",
+    "reviewers": "Medical Reviewers",
+    "conditions": "Conditions",
+    "respiratory": "Respiratory Care",
+    "cardiovascular": "Cardiovascular",
+    "allConditions": "Saari Conditions",
+    "research": "Research",
+    "blog": "Clinical Blog",
+    "partnerships": "Partnerships",
+    "becomePartner": "Partner banein",
+    "euHealth": "EU Health Systems",
+    "helpPrivacy": "Help & Privacy",
+    "faqs": "FAQs",
+    "team": "Team",
+    "neurology": "Neurology & Migraine",
+    "usInsurance": "US Insurance Network"
+  },
+  "careControls": {
+    "agePlaceholder": "Age (18+)",
+    "adultsOnlyNotice": "LibertyMD adults (18+) ke liye hai. 18 saal se kam umar ke liye kripya aise clinician ya service ka upyog karein jo bachchon aur kishoron ki dekhbhaal karti ho.",
+    "sexLegend": "Sex assigned at birth",
+    "female": "Female",
+    "male": "Male",
+    "mergeNotice": "Us Google account me pehle se LibertyMD history hai. Is consultation ko surakshit tarike se merge karne ke liye sign in karein.",
+    "mergeOutcomeMatchedSelf": "Yeh visit aapki maujuda profile me save ho gayi.",
+    "mergeOutcomeDistinctProfile": "Yeh guest visit alag profile ke roop me save hui (\"Saved from guest visit\").",
+    "mergeOutcomeFailed": "Hum is visit ko link nahi kar paaye. Koi clinical data move nahi hua — kripya fir se koshish karein.",
+    "mergeOutcomeAcknowledge": "Theek hai",
+    "signInMerge": "Sign in karke merge karein",
+    "skipOnce": "Skip karke ek baar dekhein",
+    "privateDefault": "Default roop se private. Guest reports saat din baad expire ho jaati hain.",
+    "yourLibertyMD": "Aapka LibertyMD",
+    "historyHeading": "Consultation history",
+    "historyLoading": "History load ho rahi hai…",
+    "historyLoadingEscape": "Band karke aage badhein",
+    "historyGroupHeading": "{{label}}",
+    "historyRetentionRemaining": "Guest copy {{remaining}} me expire hogi",
+    "emptyHistory": "Aapke poore hue consultations yahan dikhenge.",
+    "emptyHistoryCta": "Consult jaari rakhein",
+    "historySingleHint": "Is visit ko dobara kholne ke liye tap karein.",
+    "profileAtLimit": "Aapke paas pehle se maximum active profiles hain. Nayi jodne se pehle ek hataayein.",
+    "profileAtLimitHint": "Nayi jodne ke liye ek profile hataayein.",
+    "privateGuest": "Private guest",
+    "careForSomeoneElse": "Kisi aur ke liye care",
+    "profileOfferEyebrow": "Family profiles",
+    "profileOfferTitle": "Link karne ke baad kisi aur ke liye care karein",
+    "profileOfferBody": "Google link karein taaki aap jinki dekhbhaal karte hain unke profiles jod sakein aur har consult sahi history me rahe. Aap is consult ko guest ke roop me bhi jaari rakh sakte hain.",
+    "profileOfferGoogle": "Google ke saath jaari rakhein",
+    "profileOfferDismiss": "Abhi nahi",
+    "whoIsThisFor": "Yeh kiske liye hai?",
+    "someoneElse": "Koi aur",
+    "someoneElseTitle": "Kisi aur ko add karein",
+    "someoneElseBody": "Ek chhota label, age (18+), aur sex assigned at birth daalein.",
+    "displayLabel": "Naam ya label",
+    "someoneElseCancel": "Wapas",
+    "someoneElseContinue": "Jaari rakhein",
+    "intersex": "Intersex",
+    "preferNotToSay": "Batana nahi chahta/chahti",
+    "profilesHeading": "Profiles",
+    "profilesLoading": "Profiles load ho rahi hain…",
+    "profilesEmpty": "Abhi koi active profile nahi hai.",
+    "profileAdd": "Add karein",
+    "profileAddTitle": "Ek profile add karein",
+    "profileEditTitle": "Profile edit karein",
+    "profileEdit": "Profile edit karein",
+    "profileRemove": "Profile hataayein",
+    "profileSelfFallback": "Main",
+    "profileRelationshipSelf": "Aap",
+    "profileRelationshipOther": "Koi aur",
+    "profileAge": "Age {age}",
+    "profileFormCancel": "Cancel",
+    "profileFormSave": "Save karein",
+    "profileLoadError": "Profiles load nahi ho paayin. Kripya fir se koshish karein.",
+    "profileSaveError": "Yeh profile save nahi ho paayi. Kripya fir se koshish karein.",
+    "profileDeleteError": "Yeh profile hataayi nahi ja saki. Kripya fir se koshish karein.",
+    "profileDeleteTitle": "Yeh profile hataayein?",
+    "profileDeleteBody": "“{label}” ab naye consultations ke liye nahi dikhegi. Purani consultation history rahegi.",
+    "profileDeleteConfirm": "Profile hataayein",
+    "profileDeleteCancel": "Profile rakhein"
+  },
+  "chatx": {
+    "newChat": "Nayi chat",
+    "viewConversation": "Baatcheet dekhein",
+    "privateConsult": "Private AI care consultation",
+    "emergencyNow": "Abhi emergency care lein",
+    "assessment": "Assessment aur agle kadam",
+    "carePlan": "Care plan",
+    "redFlags": "Red flags",
+    "soap": "SOAP note",
+    "clinical": "Clinical considerations",
+    "phOpening": "Consultation khul raha hai...",
+    "phDemo": "Jaari rakhne ke liye upar age aur sex daalein",
+    "phReportGate": "Chunein ki report kaise dekhni hai",
+    "phReportReady": "Aapki report upar taiyaar hai",
+    "phEnded": "Safety ke liye yeh consultation khatm ho gaya hai",
+    "phAnswer": "Follow-up sawaal ka jawaab dein...",
+    "sendMessage": "Message bhejein",
+    "consultationTitle": "LibertyMD Salah-mashwara",
+    "signIn": "Sign in karein",
+    "signInGoogle": "Google se sign in karein",
+    "openProfileHistory": "Profile aur consultation history kholein",
+    "statusLoading": "Aapki private consultation khul rahi hai...",
+    "statusRecovery": "Jahan chhoda tha wahin se jaari rakhein",
+    "statusProfilePick": "Yeh consultation kis ke liye hai?",
+    "statusDemographics": "Thodi si jaankari humein zyada safe sawaal poochhne mein madad karti hai",
+    "statusIntake": "Zaroori clinical follow-up",
+    "statusReportGate": "Aapki doctor-ready report taiyaar hai",
+    "statusReportReady": "Aapki report taiyaar hai",
+    "statusEmergency": "Safety guidance dikha di gayi hai",
+    "statusClinicalReview": "Is consultation ko clinical review ki zaroorat hai",
+    "statusError": "Connection toot gaya",
+    "emergencyAcknowledge": "Main samajh gaya/gayi",
+    "emergencyPersistence": "Aapke acknowledge karne ke baad bhi yeh guidance screen ke neeche pinned rahegi.",
+    "emergencyShowDetails": "Details dikhayein",
+    "footerDisclaimer": "LibertyMD AI guidance deta hai, diagnosis ya emergency service nahi.",
+    "waitingReviewing": "Aapne jo bataya hai sab review kar raha hoon…",
+    "partialOutcomeEyebrow": "Jaane se pehle",
+    "partialOutcomeTitle": "Aapne jo bataya usse kuch adhoore tips",
+    "partialOutcomeSeeToday": "Aaj hi care lein agar aapko dikhe",
+    "partialOutcomeGotIt": "Theek hai",
+    "startNewConsult": "Naya consult shuru karein",
+    "clinicalReviewNeeded": "Is consultation ko clinical review chahiye",
+    "comprehensionEyebrow": "Aapki report se pehle",
+    "comprehensionTitle": "Maine yeh samjha hai",
+    "comprehensionConfirm": "Kuch galat ya chhoot gaya hai?",
+    "comprehensionProceed": "Sab theek hai — jaari rakhein",
+    "comprehensionProceedAck": "Sab theek hai",
+    "comprehensionCorrect": "Kuch galat ya chhoot gaya hai",
+    "comprehensionCorrectionLabel": "Hum kya theek karein?",
+    "comprehensionCorrectionPlaceholder": "Bataiye kya galat hai ya chhoot gaya hai",
+    "comprehensionCorrectionSubmit": "Apply karke jaari rakhein",
+    "comprehensionCorrectionCancel": "Wapas",
+    "attachPhoto": "Photo",
+    "attachLab": "Lab report",
+    "attachLabComingSoon": "Jald aa raha hai",
+    "attachLabSignIn": "Lab report upload karne ke liye sign in karein",
+    "photoChip": "Photo attached",
+    "photoAttachedLabel": "Attached photos",
+    "photoRemove": "Photo hataayein",
+    "photoRetry": "Fir se koshish karein",
+    "photoNoticeDismiss": "Hataayein",
+    "labChip": "Lab report attached",
+    "labAttachedLabel": "Attached lab reports",
+    "labRemove": "Lab report hataayein",
+    "labUnreviewed": "Clinical review baaki hai",
+    "mediaProcessing": "Evidence process ho raha hai…",
+    "mediaProcessed": "Process hokar shaamil kiya gaya",
+    "mediaFailed": "Processing fail ho gayi",
+    "mediaUnusable": "Itni detail nahi padh paaye",
+    "mediaQuestionPhoto": "Aapki photo ke baare me",
+    "mediaQuestionLab": "Aapki lab report ke baare me",
+    "labAttributionTitle": "Yeh lab report kiske liye hai?",
+    "labAttributionBody": "Woh profile chunein jiski yeh report hai. Isse yeh nahi badalta ki consultation kiske liye hai.",
+    "labAttributionConfirm": "Jaari rakhein",
+    "labAttributionCancel": "Cancel",
+    "labAttributionEmpty": "Koi active profile available nahi hai. Apne account se ek profile add karein, fir koshish karein.",
+    "labAttributionSelf": "Main",
+    "labAttributionProfile": "Profile"
+  },
+  "followup": {
+    "checkin": {
+      "home": "Home",
+      "loading": "Aapka check-in record ho raha hai…",
+      "thanksTitle": "Check-in karne ke liye shukriya",
+      "thanksBody": "Achha laga ki aapne bataya. Apna dhyaan rakhein.",
+      "worseTitle": "Chaliye aapki care jaari rakhte hain",
+      "worseBody": "Aapne jo pehle bataya hai wahan se aage badhenge — dobara likhne ki zaroorat nahi.",
+      "worseCta": "Consultation jaari rakhein",
+      "expiredTitle": "Yeh check-in link expire ho gaya hai",
+      "expiredBody": "Aap LibertyMD se kabhi bhi naya consultation shuru kar sakte hain.",
+      "unavailableTitle": "Yeh check-in ab available nahi hai",
+      "unavailableBody": "Hum pichhle consultation se dobara shuru nahi kar paaye. Naye sire se shuru karna hi aage ka raasta hai.",
+      "startNew": "Naya consultation shuru karein",
+      "error": "Hum abhi aapka check-in record nahi kar paaye. Thodi der baad koshish karein.",
+      "doctorQuestion": "Kya aap doctor se mile?",
+      "doctorYes": "Haan",
+      "doctorNo": "Nahi",
+      "doctorNotYet": "Abhi nahi",
+      "doctorSkip": "Skip",
+      "matchQuestion": "Kya doctor ka assessment aapki LibertyMD report se motey taur par milta tha?",
+      "matchHint": "Optional product feedback — isse LibertyMD behtar banta hai. Yeh koi clinical daava nahi hai.",
+      "matchYes": "Haan",
+      "matchNo": "Nahi",
+      "matchUnsure": "Pata nahi",
+      "matchSkip": "Skip"
+    },
+    "unsubscribe": {
+      "home": "Home",
+      "loading": "Aapki preference update ho rahi hai…",
+      "title": "Aap unsubscribe ho gaye hain",
+      "body": "Aapko aage LibertyMD check-in emails nahi milengi.",
+      "expiredTitle": "Yeh unsubscribe link expire ho gaya hai",
+      "expiredBody": "Agar aapko abhi bhi check-in emails mil rahi hain, to kisi recent message se naya unsubscribe link kholein.",
+      "error": "Hum abhi aapki preference update nahi kar paaye. Thodi der baad koshish karein."
+    }
+  },
+  "trust": {
+    "kicker": "LibertyMD kya hai",
+    "title": "Shuru karne se pehle imaandaar guidance",
+    "aiNotClinicianTitle": "AI — clinician nahi",
+    "aiNotClinicianBody": "LibertyMD ek AI symptom-assessment tool hai jo doctor-ready report taiyaar karta hai. Yeh licensed physician nahi hai aur diagnosis ya treatment ka vikalp nahi hai.",
+    "emergencyTitle": "Emergency ke liye emergency care chahiye",
+    "emergencyBody": "Agar aapke symptoms emergency ho sakte hain, to 911 par call karein ya abhi ER jaayein. AI consult ka intezaar na karein.",
+    "processProof": "Free doctor-ready report — upar hero me sample dekhein",
+    "certHonesty": "Hum is page par HIPAA ya LegitScript certification ka daava nahi karte.",
+    "adultsNote": "LibertyMD adults 18+ ke liye hai."
+  },
+  "keywordLanding": {
+    "sore-throat": {
+      "title": "Gale me kharaash ke liye guidance.",
+      "subtitle": "Bataiye aap kya mehsoos kar rahe hain aur free doctor-ready report paayein."
+    },
+    "cough": {
+      "title": "Khaansi ki samasya ke liye guidance.",
+      "subtitle": "Bataiye aap kya mehsoos kar rahe hain aur free doctor-ready report paayein."
+    },
+    "fever": {
+      "title": "Bukhaar ki samasya ke liye guidance.",
+      "subtitle": "Bataiye aap kya mehsoos kar rahe hain aur free doctor-ready report paayein."
+    },
+    "headache": {
+      "title": "Sir dard ki samasya ke liye guidance.",
+      "subtitle": "Bataiye aap kya mehsoos kar rahe hain aur free doctor-ready report paayein."
+    },
+    "stomach-pain": {
+      "title": "Pet dard ke liye guidance.",
+      "subtitle": "Bataiye aap kya mehsoos kar rahe hain aur free doctor-ready report paayein."
+    },
+    "rash": {
+      "title": "Rash ya skin ki samasya ke liye guidance.",
+      "subtitle": "Bataiye aap kya mehsoos kar rahe hain aur free doctor-ready report paayein."
+    },
+    "sinus-congestion": {
+      "title": "Sinus congestion ke liye guidance.",
+      "subtitle": "Bataiye aap kya mehsoos kar rahe hain aur free doctor-ready report paayein."
+    },
+    "back-pain": {
+      "title": "Kamar dard ke liye guidance.",
+      "subtitle": "Bataiye aap kya mehsoos kar rahe hain aur free doctor-ready report paayein."
+    },
+    "allergy-itch": {
+      "title": "Allergy ya khujli ki samasya ke liye guidance.",
+      "subtitle": "Bataiye aap kya mehsoos kar rahe hain aur free doctor-ready report paayein."
+    },
+    "urinary-discomfort": {
+      "title": "Urinary takleef ke liye guidance.",
+      "subtitle": "Bataiye aap kya mehsoos kar rahe hain aur free doctor-ready report paayein."
+    }
+  },
+  "attach": {
+    "title": "Attach karein",
+    "photoTitle": "Photo",
+    "photoHint": "Prabhaavit hisse ki tasveer",
+    "labTitle": "Lab report",
+    "labHint": "Test result ka PDF ya image",
+    "labSignInHint": "Lab report attach karne ke liye sign in karein"
   }
 }

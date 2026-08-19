@@ -7,6 +7,8 @@
  * attached to the consultation's existing optimistic-request boundary.
  */
 import type { InterviewResult, JsonObject } from './types.ts'
+import type { ClinicalFallbackQuestion } from './clinical-copy.ts'
+import { CLINICAL_SLOTS, isClinicalSlotSatisfied, type ClinicalSlot } from './slots.ts'
 
 export const DIAGNOSTIC_CLARIFICATION_KEY = 'diagnostic_clarification'
 
@@ -24,6 +26,7 @@ export interface ClarificationCandidate {
   options: string[]
   purpose: string
   usedBackup: boolean
+  targetSlot: string
 }
 
 export interface ClarificationEligibilityInput {
@@ -167,6 +170,7 @@ function candidateIfNew(
   priorQuestions: string[],
   priorPurposes: string[],
   usedBackup: boolean,
+  targetSlot = 'none',
 ): ClarificationCandidate | null {
   const cleanQuestion = String(question || '').trim()
   if (!cleanQuestion) return null
@@ -177,14 +181,43 @@ function candidateIfNew(
     options: options.map(String).map((item) => item.trim()).filter(Boolean).slice(0, 4),
     purpose: String(purpose || '').trim(),
     usedBackup,
+    targetSlot,
   }
+}
+
+const CLINICAL_SLOT_SET = new Set<string>(CLINICAL_SLOTS)
+
+function unfilledTargetSlot(targetSlot: unknown, filledSlots: JsonObject): ClinicalSlot | null {
+  const slot = String(targetSlot || '').trim()
+  if (!CLINICAL_SLOT_SET.has(slot)) return null
+  return isClinicalSlotSatisfied(slot as ClinicalSlot, filledSlots[slot]) ? null : slot as ClinicalSlot
+}
+
+/**
+ * Clarification is a phase, not a clinical data domain. Older Interview
+ * workflow versions label every clarification question with the phase name,
+ * so map its machine-readable purpose back onto the existing slot vocabulary.
+ */
+function resolveClinicalTargetSlot(question: string, purpose: string, declared: unknown): ClinicalSlot {
+  const declaredSlot = String(declared || '').trim()
+  if (CLINICAL_SLOT_SET.has(declaredSlot)) return declaredSlot as ClinicalSlot
+  const value = normalize(`${purpose} ${question}`)
+  if (/\b(onset|start|began|timing|when|commenc|beginn|inicio|shuru)\b/u.test(value)) return 'onset'
+  if (/\b(duration|how long|days|hours|weeks|dauer|duracion|duree|samay)\b/u.test(value)) return 'duration'
+  if (/\b(severity|severe|intensity|scale|0 to 10|starke|intensidad|intensite|gambhir)\b/u.test(value)) return 'severity'
+  if (/\b(location|where|site|side|body area|ort|ubicacion|localisation|jagah)\b/u.test(value)) return 'location'
+  if (/\b(function|impact|sleep|walking|work|activities|eat|drink|aktivitat|actividad|activite)\b/u.test(value)) return 'functional_impact'
+  if (/\b(red flag|warning sign|breath|chest pain|faint|confusion|stiff neck|oxygen)\b/u.test(value)) return 'red_flag_negatives'
+  if (/\b(history|condition|medicine|medication|allerg|pregnan|vorgeschichte|antecedent)\b/u.test(value)) return 'relevant_history'
+  if (/\b(character|trigger|worse|better|movement|position|pattern|quality|provok|twist|twisting|direction)\b/u.test(value)) return 'character'
+  return 'associated_symptoms'
 }
 
 export function isAdministrativeClosingQuestion(question: string, purpose: string): boolean {
   const value = normalize(`${question} ${purpose}`)
-  return /\b(report|physician review|finali[sz]\p{L}*|conclud\p{L}*|close consultation|closing (?:the )?interview|consultation completed|transition to (?:the )?(?:summary|report)|bericht|informe|rapport|relatorio|relatorio medico)\b/u.test(value)
-    || /\b(?:enough|sufficient|necessary) information\b/u.test(value)
-    || /\b(?:gathered|prepare|generate|review|share|proceed|finish)\p{L}*\b.{0,80}\b(?:summary|report|assessment|healthcare provider)\b/u.test(value)
+  return /\b(report|medical record|physician review|finali[sz]\p{L}*|conclud\p{L}*|close consultation|closing (?:the )?interview|consultation completed|transition to (?:the )?(?:summary|report)|bericht|informe|rapport|relatorio|relatorio medico)\b/u.test(value)
+    || /\b(?:enough|sufficient|necessary) (?:information|details)\b/u.test(value)
+    || /\b(?:gathered|prepare|provide|generate|review|share|proceed|finish)\p{L}*\b.{0,80}\b(?:summary|report|assessment|medical record|healthcare provider)\b/u.test(value)
     || /\b(?:resumen|zusammenfassung|resume|resumo|सारांश|summary)\b.{0,80}\b(?:medico|arzt|medecin|doctor|provider|रिपोर्ट|report)\b/u.test(value)
 }
 
@@ -210,6 +243,7 @@ export function selectDiagnosticClarificationCandidate(
     priorQuestions,
     state.askedPurposes,
     false,
+    resolveClinicalTargetSlot(interview.next_question, interview.question_purpose, interview.target_slot),
   )
   const backup = isAdministrativeClosingQuestion(interview.backup_question, interview.backup_question_purpose)
     ? null
@@ -220,6 +254,7 @@ export function selectDiagnosticClarificationCandidate(
     priorQuestions,
     state.askedPurposes,
     true,
+    resolveClinicalTargetSlot(interview.backup_question, interview.backup_question_purpose, 'none'),
   )
   return primary || backup
 }
@@ -249,6 +284,7 @@ export function selectDifferentialClarificationCandidate(
       priorQuestions,
       state.askedPurposes,
       true,
+      resolveClinicalTargetSlot(discriminator, condition ? `differentiate ${condition}` : '', 'none'),
     )
     if (candidate) return candidate
   }
@@ -263,13 +299,16 @@ export function selectDifferentialClarificationCandidate(
 export function selectNonDuplicateInterviewCandidate(
   interview: InterviewResult,
   history: Array<{ role?: unknown; content?: unknown }>,
-  fallbackQuestions: string | string[] = '',
+  fallbackQuestions: string | Array<string | ClinicalFallbackQuestion> = '',
+  filledSlots: JsonObject = {},
 ): ClarificationCandidate | null {
   const priorQuestions = history
     .filter((message) => message.role === 'assistant')
     .map((message) => String(message.content || '').trim())
     .filter(Boolean)
-  const primary = isAdministrativeClosingQuestion(interview.next_question, interview.question_purpose)
+  const primaryTargetSlot = unfilledTargetSlot(interview.target_slot, filledSlots)
+  const primaryTargetsFilledSlot = CLINICAL_SLOT_SET.has(String(interview.target_slot || '').trim()) && !primaryTargetSlot
+  const primary = primaryTargetsFilledSlot || isAdministrativeClosingQuestion(interview.next_question, interview.question_purpose)
     ? null
     : candidateIfNew(
       interview.next_question,
@@ -278,6 +317,7 @@ export function selectNonDuplicateInterviewCandidate(
       priorQuestions,
       [],
       false,
+      primaryTargetSlot || interview.target_slot || 'none',
     )
   const backup = isAdministrativeClosingQuestion(interview.backup_question, interview.backup_question_purpose)
     ? null
@@ -288,14 +328,16 @@ export function selectNonDuplicateInterviewCandidate(
       priorQuestions,
       [],
       true,
+      'none',
     )
   if (primary || backup) return primary || backup
-  return selectNonDuplicateFallbackCandidate(fallbackQuestions, history)
+  return selectNonDuplicateFallbackCandidate(fallbackQuestions, history, filledSlots)
 }
 
 export function selectNonDuplicateFallbackCandidate(
-  fallbackQuestions: string | string[],
+  fallbackQuestions: string | Array<string | ClinicalFallbackQuestion>,
   history: Array<{ role?: unknown; content?: unknown }>,
+  filledSlots: JsonObject = {},
 ): ClarificationCandidate | null {
   const priorQuestions = history
     .filter((message) => message.role === 'assistant')
@@ -303,13 +345,17 @@ export function selectNonDuplicateFallbackCandidate(
     .filter(Boolean)
   const localFallbacks = Array.isArray(fallbackQuestions) ? fallbackQuestions : [fallbackQuestions]
   for (const fallbackQuestion of localFallbacks) {
+    const question = typeof fallbackQuestion === 'string' ? fallbackQuestion : fallbackQuestion.question
+    const targetSlot = typeof fallbackQuestion === 'string' ? 'none' : fallbackQuestion.targetSlot
+    if (CLINICAL_SLOT_SET.has(targetSlot) && isClinicalSlotSatisfied(targetSlot as ClinicalSlot, filledSlots[targetSlot])) continue
     const fallback = candidateIfNew(
-      fallbackQuestion,
+      question,
       [],
       'new clinical detail not already discussed',
       priorQuestions,
       [],
       true,
+      targetSlot,
     )
     if (fallback) return fallback
   }

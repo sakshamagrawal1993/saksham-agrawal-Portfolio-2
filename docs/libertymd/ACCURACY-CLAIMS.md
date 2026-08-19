@@ -22,9 +22,54 @@
 Mount none — no numeric accuracy claim.
 ```
 
-**P3-03 honour:** trust band / hero trust strip mount none — no diagnostic % / Pulse / Jivi / corpus sens-spec on those surfaces.
+**P3-03 honour:** trust band / hero trust strip mount **no diagnostic-accuracy figure** — no diagnostic % / Pulse / Jivi / corpus sens-spec on those surfaces. *(Amended 2026-08-13 — was “mount none”; see the carve-out below.)*
 
 Do **not** leave a “pending number” in approved copy. If a publishable LibertyMD-scoped methodology appears later → **follow-up ticket** (not a silent amend of this file’s approved set mid-flight).
+
+---
+
+## Amendment · 2026-08-13 — hero trust figures are out of scope of this file
+
+**Business-owner decision, recorded in `tickets/DECISIONS.md` (2026-08-13 · Hero trust figures retained).**
+
+This document governs **diagnostic-accuracy claims** — sensitivity, specificity, “X% accurate”,
+corpus scores, and anything a reader would take as a statement about how correct the triage is.
+For those the verdict above is **unchanged: `no-ship`, approved set 0.**
+
+It does **not** govern non-diagnostic trust chrome. The following three hero figures are
+**approved for the draft site** and are explicitly out of this file’s scope:
+
+| Surface | i18n key | Status |
+|---|---|---|
+| Install base — “Trusted by 1,000,000+ users” | `app.trustedBy` / `app.trustedByShort` | **Approved** |
+| Rating — “4.5 out of 5” | `app.heroTrustRating` / `app.heroTrustRatingShort` | **Approved** |
+| “HIPAA compliant” | `app.heroTrustHipaa` / `app.heroTrustHipaaShort` | **Approved** (see the HIPAA decision, same date) |
+
+### Why this amendment exists
+
+The previous wording — *“trust band / hero trust strip mount none”* — read as a blanket ban on the
+surface rather than a ban on diagnostic percentages appearing on it. That put this file in direct
+contradiction with a **shipped gate**, `tests/libertymd/trust-row.test.ts` (P3-03), which asserts:
+
+```js
+assertTrue(app.includes('heroTrustRating') && app.includes('trustedBy') && app.includes('heroTrustHipaa'),
+  'hero trust row renders the three BO figures')
+```
+
+One artifact required the three figures; this one forbade them. Two independent QA passes
+(P5-02, P5-03) escalated it as a defect. The business owner resolved it in favour of the gate.
+
+### Conditions that survive this amendment
+
+1. **No hardcoded numerals in TSX.** The gate also asserts `!/>4\.5</` and `!/>1,000,000/` against
+   the app source. Both figures must resolve from i18n so a correction is a one-place edit.
+2. **Diagnostic-accuracy figures remain `no-ship`** on every surface, including this one.
+3. **Draft-site scope.** This carve-out was granted for a demo shown to a known counterparty.
+   `docs/libertymd/AD-PLATFORM-POLICY.md` still gates paid destinations on destination honesty;
+   that gate is not lifted here.
+4. **Substantiation is still owed before real traffic.** “Approved to display” is not the same as
+   “sourced”. Neither figure currently has a methodology behind it, and this amendment does not
+   create one.
 
 ---
 

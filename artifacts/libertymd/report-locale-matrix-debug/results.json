@@ -1,0 +1,7 @@
+[
+  {
+    "locale": "en",
+    "passed": false,
+    "error": "en: false-positive emergency during report journey (e31d710d-daf6-48a7-af0e-9fdc32877092; state=undefined; crisis=respiratory_distress; source=edge_deterministic)"
+  }
+]

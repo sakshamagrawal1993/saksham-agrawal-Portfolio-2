@@ -59,6 +59,7 @@ Deno.test('diagnostic clarification chooses the primary when it is new', () => {
   const selected = selectDiagnosticClarificationCandidate(interview(), [], state)
   assertEquals(selected?.question, 'Does twisting or changing direction worsen the pain?')
   assertEquals(selected?.usedBackup, false)
+  assertEquals(selected?.targetSlot, 'character')
 })
 
 Deno.test('diagnostic clarification chooses backup without another model call when primary repeats', () => {
@@ -72,6 +73,7 @@ Deno.test('diagnostic clarification chooses backup without another model call wh
   const selected = selectDiagnosticClarificationCandidate(interview(), [], state)
   assertEquals(selected?.question, 'Did you recently increase your running distance?')
   assertEquals(selected?.usedBackup, true)
+  assertEquals(selected?.targetSlot, 'associated_symptoms')
 })
 
 Deno.test('diagnostic clarification refuses both candidates when transcript already answered them', () => {
@@ -109,6 +111,10 @@ Deno.test('administrative closing detector catches summary prose that is not a p
     [
       'I have enough information. Please review the summary below for your doctor.',
       'Transition to final report summary.',
+    ],
+    [
+      'I have enough details to provide a summary for your medical record.',
+      'The clarification phase is exhausted.',
     ],
   ]
   for (const [question, purpose] of leakedClosings) {
@@ -240,6 +246,17 @@ Deno.test('post-clarification fallback also advances past transcript repeats', (
     { role: 'assistant', content: 'Was hat sich seit Beginn der Symptome verändert?' },
   ])
   assertEquals(selected?.question, 'Wie stark ist das Hauptsymptom jetzt auf einer Skala von 0 bis 10?')
+})
+
+Deno.test('slot-aware fallback skips severity after severity is already filled', () => {
+  const selected = selectNonDuplicateFallbackCandidate([
+    { question: 'How severe is the main symptom now, from 0 to 10?', targetSlot: 'severity' },
+    { question: 'Are there any other symptoms you have not mentioned yet?', targetSlot: 'associated_symptoms' },
+  ], [], {
+    severity: '7/10',
+  })
+  assertEquals(selected?.question, 'Are there any other symptoms you have not mentioned yet?')
+  assertEquals(selected?.targetSlot, 'associated_symptoms')
 })
 
 Deno.test('diagnostic clarification state is bounded and preserves unrelated workflow versions', () => {

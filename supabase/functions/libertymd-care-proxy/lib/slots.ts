@@ -25,6 +25,8 @@ export const CLINICAL_SLOTS = [
   'pregnancy_status',
 ] as const
 
+export type ClinicalSlot = (typeof CLINICAL_SLOTS)[number]
+
 export const CORE_SLOTS = [
   'onset',
   'duration',
@@ -53,6 +55,44 @@ const TIMING_SLOTS = ['onset', 'duration'] as const
 const TIMING_PATTERN_ONLY = /\b(comes?\s+and\s+goes?|on\s+and\s+off|intermittent(?:ly)?|constant(?:ly)?|va\s+y\s+viene|intermitente|constante|aata\s+jaata|kabhi\s+kabhi|lagatar|va\s+et\s+vient|kommt\s+und\s+geht|zeitweise|vai\s+e\s+volta)\b/i
 const EXPLICIT_TIMING_ANCHOR = /(?:\d|\b(today|yesterday|tomorrow|ago|since|for|started|began|last\s+(?:night|week|month|year)|hoy|ayer|desde|durante|empez[oó]|comenz[oó]|aaj|kal|parso|se|shuru|aujourd'hui|hier|depuis|pendant|commenc[ée]|heute|gestern|seit|begann|hoje|ontem|h[aá]|come[çc]ou)\b)/i
 const UNCERTAIN_TIMING = /\b(unknown|uncertain|unsure|not sure|cannot reliably|contradict|unclear|unspecified|maybe yes|maybe no)\b/i
+
+const EXPLICIT_NEGATIVE_FINDING = /\b(no|none|without|den(?:y|ies|ied)|absent|negative|normal|sin|nada|ningun[oa]?|non|rien|aucun(?:e)?|sans|nein|kein(?:e|en|er|es)?|ohne|nahi|nahin|koi\s+nahi|kuch\s+nahi|nao|não|nenhum(?:a)?|sem)\b|नहीं|नही|कोई\s+नहीं/iu
+
+export function hasClinicalValue(value: unknown): boolean {
+  if (value === undefined || value === null) return false
+  if (typeof value === 'string') {
+    const text = value.trim()
+    return Boolean(text) && !UNCERTAIN_TIMING.test(text)
+  }
+  if (Array.isArray(value)) return value.some(hasClinicalValue)
+  return true
+}
+
+export function hasExplicitNegativeFinding(value: unknown): boolean {
+  if (!hasClinicalValue(value)) return false
+  if (Array.isArray(value)) return value.some(hasExplicitNegativeFinding)
+  return EXPLICIT_NEGATIVE_FINDING.test(String(value).trim())
+}
+
+export function isClinicalSlotSatisfied(slot: ClinicalSlot, value: unknown): boolean {
+  if (slot === 'onset' || slot === 'duration') return isUsableTimingSlotValue(value)
+  if (slot === 'red_flag_negatives') return hasExplicitNegativeFinding(value)
+  return hasClinicalValue(value)
+}
+
+function canonicalizeNegativeFinding(value: unknown): unknown {
+  const canonicalize = (item: unknown): string => {
+    const text = String(item || '').trim()
+    if (!text || EXPLICIT_NEGATIVE_FINDING.test(text)) return text
+    // The Interview contract has already classified this field as a denied
+    // warning sign. Preserve that semantics explicitly so the evidence gate
+    // does not later reinterpret a bare label as a positive symptom.
+    return `no ${text}`
+  }
+  return Array.isArray(value)
+    ? value.map(canonicalize).filter(Boolean)
+    : canonicalize(value)
+}
 
 function hasStoredSlotValue(value: unknown): boolean {
   if (value === undefined || value === null) return false
@@ -86,9 +126,15 @@ export function isUsableTimingSlotValue(value: unknown): boolean {
 export function mergeClinicalSlotUpdates(
   existingSlots: JsonObject,
   proposedUpdates: unknown,
-  options: { allowTimingOverwrite?: boolean } = {},
+  options: { allowTimingOverwrite?: boolean; sourceText?: string } = {},
 ): { slots: JsonObject; appliedUpdates: JsonObject } {
   const appliedUpdates = sanitizeSlotUpdates(proposedUpdates)
+  if (
+    appliedUpdates.red_flag_negatives !== undefined
+    && hasExplicitNegativeFinding(options.sourceText)
+  ) {
+    appliedUpdates.red_flag_negatives = canonicalizeNegativeFinding(appliedUpdates.red_flag_negatives)
+  }
   for (const slot of TIMING_SLOTS) {
     if (!isUsableTimingSlotValue(appliedUpdates[slot])) {
       delete appliedUpdates[slot]
@@ -106,15 +152,14 @@ export function mergeClinicalSlotUpdates(
 }
 
 export function calculateMissingSlots(slots: JsonObject) {
-  const hasOnset = slots.onset != null && String(slots.onset).trim() !== ''
-  const hasDuration = slots.duration != null && String(slots.duration).trim() !== ''
+  const hasOnset = isUsableTimingSlotValue(slots.onset)
+  const hasDuration = isUsableTimingSlotValue(slots.duration)
 
   return CORE_SLOTS.filter((slot) => {
     // If onset is filled, consider duration satisfied (and vice versa) to prevent duplicate duration questions
     if (slot === 'duration' && (hasDuration || hasOnset)) return false
     if (slot === 'onset' && (hasOnset || hasDuration)) return false
 
-    const value = slots[slot]
-    return value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)
+    return !isClinicalSlotSatisfied(slot as ClinicalSlot, slots[slot])
   })
 }

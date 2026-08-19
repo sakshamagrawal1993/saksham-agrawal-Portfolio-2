@@ -1,0 +1,43 @@
+{
+  "round": "2-final",
+  "base_url": "https://saksham-experiments.com/liberty-md",
+  "started_cases": 256,
+  "expected_cases": 256,
+  "passed": 255,
+  "failed": 1,
+  "by_locale": {
+    "en": {
+      "passed": 32,
+      "total": 32
+    },
+    "es": {
+      "passed": 32,
+      "total": 32
+    },
+    "es-ES": {
+      "passed": 32,
+      "total": 32
+    },
+    "pt": {
+      "passed": 32,
+      "total": 32
+    },
+    "hi": {
+      "passed": 32,
+      "total": 32
+    },
+    "hi-Latn": {
+      "passed": 32,
+      "total": 32
+    },
+    "fr": {
+      "passed": 32,
+      "total": 32
+    },
+    "de": {
+      "passed": 31,
+      "total": 32
+    }
+  },
+  "numeric_contract": "Input digits and decimal values match the English fixture exactly."
+}

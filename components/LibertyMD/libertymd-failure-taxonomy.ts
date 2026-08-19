@@ -525,7 +525,7 @@ export interface ClassifiedProfileManagementFailure {
 }
 
 export function classifyProfileManagementFailure(
-  status: number | undefined,
+  _status: number | undefined,
   body: Record<string, unknown> | null | undefined,
 ): ClassifiedProfileManagementFailure {
   const rawCode = body && typeof body.code === 'string' ? body.code : '';

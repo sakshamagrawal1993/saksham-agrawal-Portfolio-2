@@ -406,37 +406,47 @@ export async function handleStartConsultation(ctx: ProxyContext, payload: Reques
     await appendSkipReaffirmConsent(ctx, consultation.id, patient.id)
   }
 
-  // P1-01 Q1A — obtain first interview question only after emergency short-circuit.
-  const history = await getHistory(ctx, consultation.id)
-  const interviewTiming = await timed(() => runInterview(
-    history,
-    patientPayload(patient),
-    slots,
-    willSkip ? calculateMissingSlots(slots) : CORE_SLOTS,
-    null,
-    1,
-    postGuardStatus,
-    consultation.id,
-    correlationId,
-    clinicalLanguage,
-  ))
-  const interview = interviewTiming.value
-
-  let nextQuestion = fallbackEntryQuestion(clinicalLanguage)
+  // Only skip-eligible returning patients need an interview question in this
+  // response. A gated user sees the demographics-only card, and
+  // save_demographics runs Interview with the completed patient context. The
+  // old path ran that same 25 s inference here, hid its answer, then ran it
+  // again after demographics—making initial consultation creation needlessly
+  // slow and seeding an unanswered question into history.
+  let interviewMs = 0
+  let nextQuestion = ''
   let options: string[] = []
-  let targetSlot = FALLBACK_TARGET_SLOT
-  if (!isInterviewHoldingSource(interview.source) && cleanMessage(interview.next_question)) {
-    nextQuestion = interview.next_question
-    options = Array.isArray(interview.options) ? interview.options.map(String).filter(Boolean).slice(0, 4) : []
-    const slot = String(interview.target_slot || '').trim()
-    targetSlot = slot && slot !== 'none' ? slot : FALLBACK_TARGET_SLOT
-  } else if (isInterviewHoldingSource(interview.source)) {
-    const errorClass: InferenceErrorClass = interview.source === 'breaker_open' ? 'breaker_open' : 'unavailable'
-    await emitInferenceFailed(ctx, consultation.id, {
-      stage: 'interview',
-      error_class: errorClass,
-      outcome: 'holding',
-    })
+  let targetSlot: string | null = null
+  if (willSkip) {
+    const history = await getHistory(ctx, consultation.id)
+    const interviewTiming = await timed(() => runInterview(
+      history,
+      patientPayload(patient),
+      slots,
+      calculateMissingSlots(slots),
+      null,
+      1,
+      postGuardStatus,
+      consultation.id,
+      correlationId,
+      clinicalLanguage,
+    ))
+    interviewMs = interviewTiming.ms
+    const interview = interviewTiming.value
+    nextQuestion = fallbackEntryQuestion(clinicalLanguage)
+    targetSlot = FALLBACK_TARGET_SLOT
+    if (!isInterviewHoldingSource(interview.source) && cleanMessage(interview.next_question)) {
+      nextQuestion = interview.next_question
+      options = Array.isArray(interview.options) ? interview.options.map(String).filter(Boolean).slice(0, 4) : []
+      const slot = String(interview.target_slot || '').trim()
+      targetSlot = slot && slot !== 'none' ? slot : FALLBACK_TARGET_SLOT
+    } else if (isInterviewHoldingSource(interview.source)) {
+      const errorClass: InferenceErrorClass = interview.source === 'breaker_open' ? 'breaker_open' : 'unavailable'
+      await emitInferenceFailed(ctx, consultation.id, {
+        stage: 'interview',
+        error_class: errorClass,
+        outcome: 'holding',
+      })
+    }
   }
 
   // Use the selected patient's first name for the greeting, not the auth user's name.
@@ -456,14 +466,15 @@ export async function handleStartConsultation(ctx: ProxyContext, payload: Reques
       message_type: willSkip ? 'normal' : 'demographics',
       metadata: { safety_status: guardrail.status },
     }),
-    // Persist the staged entry question so resume can restore the unified control
-    // without changing getHistory's select list (consultations.ts out of manifest).
-    addMessage(ctx, consultation.id, 'assistant', nextQuestion, {
+    // Skip-eligible patients see this immediately. Gated users receive their
+    // first question from save_demographics, so no hidden unanswered question
+    // is persisted into the clinical history.
+    ...(willSkip ? [addMessage(ctx, consultation.id, 'assistant', nextQuestion, {
       message_type: 'normal',
       options,
       target_slot: targetSlot,
-      metadata: { entry_question: true, safety_status: guardrail.status, demographics_skipped: willSkip },
-    }),
+      metadata: { entry_question: true, safety_status: guardrail.status, demographics_skipped: true },
+    })] : []),
     updateConsultation({
       status: postGuardStatus,
       safety_state: { ...guardrail.raw, status: guardrail.status, risk_level: guardrail.risk_level },
@@ -474,13 +485,16 @@ export async function handleStartConsultation(ctx: ProxyContext, payload: Reques
     }),
   ]))
 
-  // P1-15 S3 — first interview question served on start.
-  await addProductEvent(ctx, 'question_served', consultation.id, {
-    turn_index: 1,
-    target_slot: targetSlot,
-    had_options: options.length > 0,
-    was_repeat: false,
-  })
+  // P1-15 S3 — only a question actually shown on start is "served". The
+  // demographics-gated path emits this event from save_demographics instead.
+  if (willSkip && targetSlot) {
+    await addProductEvent(ctx, 'question_served', consultation.id, {
+      turn_index: 1,
+      target_slot: targetSlot,
+      had_options: options.length > 0,
+      was_repeat: false,
+    })
+  }
 
   return jsonResponse({
     consultation_id: consultation.id,
@@ -506,13 +520,13 @@ export async function handleStartConsultation(ctx: ProxyContext, payload: Reques
         - patientTiming.ms
         - Math.max(guardrailTiming.ms, consultationTiming.ms)
         - initialPersistenceTiming.ms
-        - interviewTiming.ms
+        - interviewMs
         - assistantPersistenceTiming.ms),
       patient_lookup_ms: patientTiming.ms,
       guardrail_ms: guardrailTiming.ms,
       consultation_insert_ms: consultationTiming.ms,
       initial_persistence_ms: initialPersistenceTiming.ms,
-      interview_ms: interviewTiming.ms,
+      interview_ms: interviewMs,
       assistant_persistence_ms: assistantPersistenceTiming.ms,
       total_ms: Math.round(performance.now() - requestStartedAt),
     },

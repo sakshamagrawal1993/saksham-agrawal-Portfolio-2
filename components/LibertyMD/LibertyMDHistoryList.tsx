@@ -135,20 +135,24 @@ function LibertyMDHistoryRow({ item, onSelect }: HistoryRowProps) {
 }
 
 interface LibertyMDHistoryListProps {
-  history: LibertyMDHistoryItem[];
-  loading: boolean;
+  history?: LibertyMDHistoryItem[] | null;
+  loading?: boolean;
   onSelectConsultation: (id: string) => void;
   /** P4-10 — empty (+ loading escape) next action; typically closes AccountDrawer. */
   onContinue?: () => void;
 }
 
 export function LibertyMDHistoryList({
-  history,
-  loading,
+  history: rawHistory,
+  loading = false,
   onSelectConsultation,
   onContinue,
 }: LibertyMDHistoryListProps) {
   const { t } = useI18n();
+  // A caller that forgets `history` must degrade to the empty state, not throw:
+  // this renders inside AccountDrawer, and an uncaught render error there takes
+  // the whole app down to a blank page.
+  const history = Array.isArray(rawHistory) ? rawHistory : [];
 
   if (loading) {
     return (

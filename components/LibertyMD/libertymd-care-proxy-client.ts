@@ -184,22 +184,22 @@ export interface LibertyMDPatientListItem {
 
 export function normalizePatientList(raw: unknown): LibertyMDPatientListItem[] {
   if (!Array.isArray(raw)) return [];
-  return raw
-    .map((item) => {
-      if (!item || typeof item !== 'object') return null;
-      const row = item as Record<string, unknown>;
-      const id = typeof row.id === 'string' ? row.id.trim() : '';
-      if (!id) return null;
-      return {
-        id,
-        relationship: typeof row.relationship === 'string' ? row.relationship : 'self',
-        display_label: typeof row.display_label === 'string' ? row.display_label : null,
-        has_age: Boolean(row.has_age),
-        has_sex: Boolean(row.has_sex),
-        is_complete: Boolean(row.is_complete),
-      } satisfies LibertyMDPatientListItem;
-    })
-    .filter((item): item is LibertyMDPatientListItem => Boolean(item));
+  // flatMap avoids a null-filtering type predicate (TS2677 when optionals differ).
+  return raw.flatMap((item) => {
+    if (!item || typeof item !== 'object') return [];
+    const row = item as Record<string, unknown>;
+    const id = typeof row.id === 'string' ? row.id.trim() : '';
+    if (!id) return [];
+    const normalized: LibertyMDPatientListItem = {
+      id,
+      relationship: typeof row.relationship === 'string' ? row.relationship : 'self',
+      display_label: typeof row.display_label === 'string' ? row.display_label : null,
+      has_age: Boolean(row.has_age),
+      has_sex: Boolean(row.has_sex),
+      is_complete: Boolean(row.is_complete),
+    };
+    return [normalized];
+  });
 }
 
 /** P4-03 — enriched history summary row (never includes report_data). */
@@ -221,31 +221,31 @@ export interface LibertyMDHistorySummaryItem {
 
 export function normalizeHistorySummary(raw: unknown): LibertyMDHistorySummaryItem[] {
   if (!Array.isArray(raw)) return [];
-  return raw
-    .map((item) => {
-      if (!item || typeof item !== 'object') return null;
-      const row = item as Record<string, unknown>;
-      const id = typeof row.id === 'string' ? row.id.trim() : '';
-      if (!id) return null;
-      return {
-        id,
-        status: typeof row.status === 'string' ? row.status : '',
-        chief_complaint: typeof row.chief_complaint === 'string' ? row.chief_complaint : null,
-        created_at: typeof row.created_at === 'string' ? row.created_at : '',
-        patient_id: typeof row.patient_id === 'string' ? row.patient_id : null,
-        patient_display_label:
-          typeof row.patient_display_label === 'string' ? row.patient_display_label : null,
-        headline: typeof row.headline === 'string' ? row.headline : null,
-        triage_tier: typeof row.triage_tier === 'string' ? row.triage_tier : null,
-        retention_expires_at:
-          typeof row.retention_expires_at === 'string' ? row.retention_expires_at : null,
-        turn_count: typeof row.turn_count === 'number' ? row.turn_count : null,
-        report_gate: typeof row.report_gate === 'string' ? row.report_gate : null,
-        updated_at: typeof row.updated_at === 'string' ? row.updated_at : null,
-        completed_at: typeof row.completed_at === 'string' ? row.completed_at : null,
-      } satisfies LibertyMDHistorySummaryItem;
-    })
-    .filter((item): item is LibertyMDHistorySummaryItem => Boolean(item));
+  // flatMap avoids a null-filtering type predicate (TS2677 when optionals differ).
+  return raw.flatMap((item) => {
+    if (!item || typeof item !== 'object') return [];
+    const row = item as Record<string, unknown>;
+    const id = typeof row.id === 'string' ? row.id.trim() : '';
+    if (!id) return [];
+    const normalized: LibertyMDHistorySummaryItem = {
+      id,
+      status: typeof row.status === 'string' ? row.status : '',
+      chief_complaint: typeof row.chief_complaint === 'string' ? row.chief_complaint : null,
+      created_at: typeof row.created_at === 'string' ? row.created_at : '',
+      patient_id: typeof row.patient_id === 'string' ? row.patient_id : null,
+      patient_display_label:
+        typeof row.patient_display_label === 'string' ? row.patient_display_label : null,
+      headline: typeof row.headline === 'string' ? row.headline : null,
+      triage_tier: typeof row.triage_tier === 'string' ? row.triage_tier : null,
+      retention_expires_at:
+        typeof row.retention_expires_at === 'string' ? row.retention_expires_at : null,
+      turn_count: typeof row.turn_count === 'number' ? row.turn_count : null,
+      report_gate: typeof row.report_gate === 'string' ? row.report_gate : null,
+      updated_at: typeof row.updated_at === 'string' ? row.updated_at : null,
+      completed_at: typeof row.completed_at === 'string' ? row.completed_at : null,
+    };
+    return [normalized];
+  });
 }
 
 /** Minimal typed body for `create_patient` (P1-04). */

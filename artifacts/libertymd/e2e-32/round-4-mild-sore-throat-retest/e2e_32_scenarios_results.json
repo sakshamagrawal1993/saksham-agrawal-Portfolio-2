@@ -1,0 +1,16 @@
+[
+  {
+    "index": 1,
+    "id": "mild_sore_throat",
+    "title": "Mild sore throat",
+    "category": "non_emergency",
+    "expected_action": "continue",
+    "expected_crisis_type": null,
+    "observed_state": "demographics_required",
+    "passed": true,
+    "duration_ms": 13814,
+    "page_errors": [],
+    "failed_requests": [],
+    "screenshot_filename": "scenario_01_mild_sore_throat.png"
+  }
+]

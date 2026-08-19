@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Fingerprint, ShieldCheck } from 'lucide-react';
 import { useUnityCardStore } from '../../../store/unityCardStore';

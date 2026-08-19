@@ -377,9 +377,13 @@ export function LibertyMDDemographicsPrompt({
                 type="button"
                 aria-pressed={active}
                 onClick={() => onSexChange(value)}
+                // BO 2026-08-13 — the selected sex reads as a filled Trust Blue
+                // pill. It previously sat white-on-blue-50, which against the
+                // focus ring looked like an amber validation state rather than
+                // a selection.
                 className={`inline-flex items-center justify-center gap-2 rounded-md text-sm font-bold transition ${
                   active
-                    ? 'bg-white text-libertymd-ink shadow-sm'
+                    ? 'bg-libertymd-blue-600 text-white shadow-sm'
                     : 'text-libertymd-slate-500 hover:text-libertymd-slate-700'
                 }`}
               >
@@ -409,8 +413,15 @@ export function LibertyMDDemographicsPrompt({
           onChange={(event) => onConsentChange?.(event.target.checked)}
           className="mt-0.5 h-4 w-4 shrink-0 rounded border-libertymd-slate-300 text-libertymd-blue-600 focus:ring-libertymd-blue-600"
         />
+        {/*
+          BO 2026-08-13 — the "AI guidance, not emergency care" sentence was
+          removed from the consent line. It is not dropped from the product: the
+          consult footer carries it on every turn ("LibertyMD provides AI
+          guidance, not a diagnosis or emergency service"), so this was the
+          second copy of the same disclaimer inside one card.
+        */}
         <span>
-          I agree to the LibertyMD Terms of Service and Privacy Policy. This is AI guidance, not emergency care.
+          I agree to the LibertyMD Terms of Service and Privacy Policy.
         </span>
       </label>
 
@@ -586,8 +597,9 @@ export function LibertyMDSomeoneElseCreateSheet({
                 aria-pressed={active}
                 disabled={loading}
                 onClick={() => setSex(value)}
+                // Selection styling matches the demographics card above.
                 className={`inline-flex items-center justify-center rounded-md text-sm font-bold transition ${
-                  active ? 'bg-white text-libertymd-ink shadow-sm' : 'text-libertymd-slate-500'
+                  active ? 'bg-libertymd-blue-600 text-white shadow-sm' : 'text-libertymd-slate-500'
                 }`}
               >
                 {value === 'female' ? t('careControls.female') : t('careControls.male')}
@@ -924,8 +936,8 @@ interface AccountDrawerProps {
   avatarUrl?: string | null;
   age?: number | null;
   sexAtBirth?: string | null;
-  history: LibertyMDHistoryItem[];
-  loading: boolean;
+  history?: LibertyMDHistoryItem[] | null;
+  loading?: boolean;
   onClose: () => void;
   onSelectConsultation: (id: string) => void;
   /** P1-04 Q2C primary — anonymous add-profile → capability offer path. */
@@ -949,8 +961,8 @@ export function LibertyMDAccountDrawer({
   avatarUrl,
   age,
   sexAtBirth,
-  history,
-  loading,
+  history = [],
+  loading = false,
   onClose,
   onSelectConsultation,
   onCareForSomeoneElse,

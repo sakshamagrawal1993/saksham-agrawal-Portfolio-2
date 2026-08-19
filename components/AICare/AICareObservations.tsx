@@ -88,7 +88,6 @@ export const AICareObservations: React.FC = () => {
     const [diagnoses, setDiagnoses] = useState<DiagnosisItem[]>([]);
     const [report, setReport] = useState<ReportData>({});
     const [profileLabel, setProfileLabel] = useState<string | null>(null);
-    const [sessionStatus, setSessionStatus] = useState<string | null>(null);
     const [emergencyMessage, setEmergencyMessage] = useState<string | null>(null);
     const [sessionId, setSessionId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
@@ -144,8 +143,6 @@ export const AICareObservations: React.FC = () => {
                             .join(' · '),
                     );
                 }
-
-                if (chatSession?.status) setSessionStatus(chatSession.status);
 
                 if (chatSession?.status === 'emergency_stopped') {
                     const { data: alert } = await supabase

@@ -104,8 +104,8 @@ import {
 } from '../lib/comprehension-check.ts'
 import {
   comprehensionBridgeMessage,
+  continueFallbackCandidates,
   continueFallbackQuestion,
-  continueFallbackQuestions,
   reportGateMessage,
 } from '../lib/clinical-copy.ts'
 import { calculateMissingSlots, mergeClinicalSlotUpdates } from '../lib/slots.ts'
@@ -117,9 +117,10 @@ import {
 import { addProductEvent, emitInferenceFailed, scoreBucket, type InferenceErrorClass } from '../lib/telemetry.ts'
 import {
   composeWarmMidPathRedirect,
-  OFF_TOPIC_STOP_BODY,
+  offTopicStopBody,
   selectLastClinicalAsk,
 } from '../lib/off-topic-recovery.ts'
+import { dispatchDiagnosisGuidance } from '../lib/diagnosis-guidance.ts'
 import {
   ensureReportInserted,
   finalizeFromExistingReport,
@@ -613,7 +614,11 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
     if (isInterviewHoldingSource(interview.source)) return holdingState(consultation, 'interview', currentVersion, requestId)
 
     const deterministicRelevance = classifyResponseRelevance(message)
+    // A model-only off-topic label must not override an explicitly clinical
+    // multilingual patient answer. That false label used to replay the same
+    // question during otherwise valid non-English consultations.
     const isNonClinical = !activeMediaFollowup
+      && deterministicRelevance !== 'clinical'
       && (deterministicRelevance === 'off_topic' || interview.input_relevance === 'off_topic')
     const nonClinicalResponseCount = (consultation.non_clinical_response_count || 0) + (isNonClinical ? 1 : 0)
     const consecutiveNonClinicalResponseCount = isNonClinical
@@ -622,7 +627,7 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
     const { slots, appliedUpdates } = mergeClinicalSlotUpdates(
       consultation.filled_slots,
       interview.slot_updates,
-      { allowTimingOverwrite: comprehensionCorrection },
+      { allowTimingOverwrite: comprehensionCorrection, sourceText: message },
     )
     const provisionalEvidence = assessClinicalEvidence(slots)
 
@@ -656,8 +661,11 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
       )
       // P1-10: warm mid-path / plain terminal stop (off-topic branch only). Thresholds unchanged.
       const messageText = limitConsultationMessage(shouldStop
-        ? OFF_TOPIC_STOP_BODY
-        : composeWarmMidPathRedirect(clinicalAsk.content || cleanMessage(interview.next_question)))
+        ? offTopicStopBody(clinicalLanguage)
+        : composeWarmMidPathRedirect(
+          clinicalAsk.content || cleanMessage(interview.next_question),
+          clinicalLanguage,
+        ))
 
       await addMessage(ctx, consultation, 'assistant', messageText, {
         // P0-13 AC3: this was `'question'`, which is not one of the six values
@@ -704,7 +712,10 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
       })
     }
 
-    const missingSlots = interview.missing_slots.length ? interview.missing_slots : calculateMissingSlots(slots)
+    // The proxy owns the persisted slot state. A model-provided missing list can
+    // lag the just-applied updates or use weaker value semantics, so derive this
+    // from the same canonical validators that guard report readiness.
+    const missingSlots = calculateMissingSlots(slots)
     const evidence = assessClinicalEvidence(slots)
 
     // File-specific context stays in the normal transcript. It gets priority
@@ -816,12 +827,14 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
         const nonDuplicateCandidate = selectNonDuplicateInterviewCandidate(
           interview,
           history,
-          evidence.sufficient ? [] : continueFallbackQuestions(clinicalLanguage),
+          evidence.sufficient ? [] : continueFallbackCandidates(clinicalLanguage),
+          slots,
         )
         if (nonDuplicateCandidate) {
           interview.next_question = nonDuplicateCandidate.question
           interview.options = nonDuplicateCandidate.options
           interview.question_purpose = nonDuplicateCandidate.purpose
+          interview.target_slot = nonDuplicateCandidate.targetSlot
         } else {
           // Every available candidate has already been asked and the minimum
           // physician-review fallback set is exhausted. Do not repeat a question
@@ -904,7 +917,7 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
       interview.next_question = clarificationCandidate.question
       interview.options = clarificationCandidate.options
       interview.ready_for_report = false
-      interview.target_slot = 'diagnostic_clarification'
+      interview.target_slot = clarificationCandidate.targetSlot
       workflowVersionsForTurn = withDiagnosticClarificationQuestion(
         workflowVersionsForTurn,
         clarificationStateAtStart,
@@ -937,6 +950,7 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
       interview.next_question = ''
       interview.options = []
       interview.target_slot = 'none'
+      questionCandidatesExhausted = true
     } else if (
       clarificationEnabled
       && !clarificationStateAtStart.completed
@@ -963,17 +977,19 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
     if (
       !interview.next_question
       && !servingDiagnosticClarification
+      && !readDiagnosticClarificationState(workflowVersionsForTurn).completed
       && (!evidence.sufficient || differentialState.redFlagsOutstanding.length > 0)
     ) {
       const postClarificationFallback = selectNonDuplicateFallbackCandidate(
-        continueFallbackQuestions(clinicalLanguage),
+        continueFallbackCandidates(clinicalLanguage),
         history,
+        slots,
       )
       if (postClarificationFallback) {
         interview.next_question = postClarificationFallback.question
         interview.options = []
         interview.question_purpose = postClarificationFallback.purpose
-        interview.target_slot = 'none'
+        interview.target_slot = postClarificationFallback.targetSlot
         questionCandidatesExhausted = false
       } else {
         questionCandidatesExhausted = true
@@ -1266,6 +1282,25 @@ export async function handleSendMessage(ctx: ProxyContext, payload: RequestPaylo
         evidence_bucket: scoreBucket(evidence.score),
         is_anonymous: isAnonymous,
       })
+
+      // P5-GUIDE — dispatch per-diagnosis guidance and do NOT await it. This is
+      // the insert site the normal consult actually takes (the one in
+      // generate-report only fires on the repair/regenerate path), so the hook
+      // has to exist in both places or guidance never runs for a real consult.
+      if (storedReport.id) {
+        try {
+          await dispatchDiagnosisGuidance(ctx, {
+            reportId: storedReport.id,
+            consultationId: consultation.id,
+            reportData: diagnosis.raw,
+            language: String(consultation.language || 'en'),
+            clinicalContext: diagnosis.raw?.clinical_context,
+          })
+        } catch (guidanceError) {
+          // Never fatal: the report is persisted and is about to be returned.
+          console.error('Unable to dispatch LibertyMD diagnosis guidance', guidanceError)
+        }
+      }
 
       // P2-02 Q3 soft gate: return report_data for anonymous complete — never withhold
       // content. access_status stays `withheld` until release; P2-06 owns gate chrome.

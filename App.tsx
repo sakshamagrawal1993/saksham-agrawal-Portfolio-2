@@ -76,15 +76,15 @@ const LibertyMDLoadingFallback = () => (
   <div
     role="status"
     aria-live="polite"
-    className="flex min-h-[100svh] flex-col items-center justify-center bg-[#f4f8fd] px-6 text-center font-sans text-[#17325f]"
+    className="flex min-h-[100svh] flex-col items-center justify-center bg-[image:var(--libertymd-surface-wash)] px-6 text-center font-sans text-libertymd-navy"
   >
-    <div className="relative mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#2563eb] text-4xl font-light text-white shadow-[0_16px_40px_rgba(37,99,235,0.28)]">
+    <div className="relative mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-libertymd-blue-600 text-4xl font-light text-white shadow-[0_16px_40px_rgba(37,99,235,0.28)]">
       <span aria-hidden="true">+</span>
-      <span className="absolute -inset-2 -z-10 animate-pulse rounded-3xl bg-[#2563eb]/15" aria-hidden="true" />
+      <span className="absolute -inset-2 -z-10 animate-pulse rounded-3xl bg-libertymd-blue-600/15" aria-hidden="true" />
     </div>
-    <p className="font-serif text-2xl font-semibold text-[#0f274a]">LibertyMD</p>
-    <p className="mt-2 text-sm font-medium text-[#526784]">Opening your private care experience…</p>
-    <span className="mt-5 h-6 w-6 animate-spin rounded-full border-2 border-[#b9caf0] border-t-[#2563eb]" aria-hidden="true" />
+    <p className="font-serif text-2xl font-semibold text-libertymd-slate-900">LibertyMD</p>
+    <p className="mt-2 text-sm font-medium text-libertymd-slate-muted">Opening your private care experience…</p>
+    <span className="mt-5 h-6 w-6 animate-spin rounded-full border-2 border-libertymd-mist border-t-libertymd-blue-600" aria-hidden="true" />
   </div>
 );
 

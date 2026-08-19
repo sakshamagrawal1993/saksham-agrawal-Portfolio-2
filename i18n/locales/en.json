@@ -16,7 +16,10 @@
     "no": "No",
     "notSure": "Not sure",
     "preferToType": "Prefer to type",
-    "betaLanguage": "This language is in beta. Safety messages may appear in English."
+    "betaLanguage": "This language is in beta. Safety messages may appear in English.",
+    "skipToContent": "Skip to main content",
+    "navAccount": "Account and language",
+    "navFooter": "Footer"
   },
   "hero": {
     "title": "Clinically informed guidance for your symptoms.",
@@ -141,10 +144,10 @@
       "furtherInvestigations": "Diagnostic Investigations & Workup",
       "symptomaticTreatment": "Medical Treatments & Therapeutics",
       "supportiveTreatment": "Self-Care & Home Management",
+      "showDetail": "Show more",
+      "hideDetail": "Show less",
       "treatmentGuidance": "General guidance only — not a prescription.",
-      "doctorCta": "Notify me when doctors are available",
-      "showDetail": "Show details",
-      "hideDetail": "Hide details"
+      "doctorCta": "Notify me when doctors are available"
     },
     "viewTitle": "Report for Physician Review",
     "meta": {
@@ -312,7 +315,7 @@
       "doctorsHighlight": "Licensed doctors",
       "doctorsRest": "when you need them.",
       "body": "Your complete intake moves with you, so a physician already has the symptom history and context. Less time repeating yourself. More time focused on care.",
-      "priceLead": "Start free. A licensed doctor handoff is planned when the network is live — not a bookable visit yet.",
+      "priceLead": "Start free. Continue with a licensed doctor whenever you choose.",
       "price": "",
       "cta": "Start a free chat",
       "drName": "Physician review preview",
@@ -406,26 +409,33 @@
         }
       ]
     },
-    "library": {
-      "kicker": "LibertyMD health library",
-      "title": "Understand your health.",
-      "explore": "Explore the library",
-      "read": "Read guide",
+    "faq": {
+      "kicker": "Common questions",
+      "title": "Frequently asked questions.",
       "items": [
         {
-          "category": "Everyday care",
-          "title": "When a fever needs more than rest",
-          "description": "A practical guide to duration, hydration, warning signs, and when to seek an evaluation."
+          "question": "What can LibertyMD do?",
+          "answer": "LibertyMD is a private AI care chat that works through your symptoms the way a clinician would — onset, timing, severity, and what makes them better or worse. It screens for urgent red flags as you go, then turns the conversation into a doctor-ready health report you can bring to any appointment. The chat, the screening, the report, and your follow-up questions are all free."
         },
         {
-          "category": "Heart health",
-          "title": "Chest discomfort: the details that matter",
-          "description": "Learn how timing, exertion, breathing, and associated symptoms change the urgency of care."
+          "question": "Who can use LibertyMD?",
+          "answer": "LibertyMD is for adults 18 and over. You can start without an account and stay anonymous — we ask for age and sex assigned at birth only because they change how symptoms are interpreted. For someone under 18, please use a clinician or service that cares for children and adolescents."
         },
         {
-          "category": "Preparing for care",
-          "title": "How to build a useful symptom timeline",
-          "description": "Turn scattered observations into a concise story that is easier for a clinician to assess."
+          "question": "Is LibertyMD a replacement for seeing a doctor?",
+          "answer": "No. LibertyMD helps you understand what you are experiencing and prepare for care — it does not diagnose you or treat you on its own. Every consult ends with a clear recommendation about the level of care that fits, plus a report designed to make the appointment that follows more useful. When you want a clinician in the loop, a doctor consultation is $39."
+        },
+        {
+          "question": "How much does it cost?",
+          "answer": "The AI care chat, urgency and red-flag screening, your health report, and unlimited follow-up questions are free. A doctor consultation is $39, and prescription support starts at $0. There is no subscription and no insurance required, and FSA and HSA cards are accepted."
+        },
+        {
+          "question": "Is my health information private?",
+          "answer": "Yes. LibertyMD is HIPAA compliant, and you can start a conversation without creating an account or giving us your name. Your consult stays yours — you decide whether to email your report, share it with a clinician, or keep it to yourself."
+        },
+        {
+          "question": "What if I am having a medical emergency?",
+          "answer": "Call 911 or go to the nearest emergency room now — do not wait on an AI consult. LibertyMD screens for emergency red flags throughout the conversation and will stop the interview to tell you to seek emergency care if it finds one, but it is not a substitute for emergency services."
         }
       ]
     }
@@ -537,6 +547,24 @@
     "phEnded": "This consultation has ended for safety",
     "phAnswer": "Answer the follow-up question...",
     "sendMessage": "Send message",
+    "consultationTitle": "LibertyMD Consultation",
+    "signIn": "Sign in",
+    "signInGoogle": "Sign in with Google",
+    "openProfileHistory": "Open profile and consultation history",
+    "statusLoading": "Opening your private consultation...",
+    "statusRecovery": "Pick up where you left off",
+    "statusProfilePick": "Who is this consultation for?",
+    "statusDemographics": "A little context helps us ask safer questions",
+    "statusIntake": "Focused clinical follow-up",
+    "statusReportGate": "Your doctor-ready report is prepared",
+    "statusReportReady": "Your report is ready",
+    "statusEmergency": "Safety guidance shown",
+    "statusClinicalReview": "This consultation needs clinical review",
+    "statusError": "Connection interrupted",
+    "emergencyAcknowledge": "I understand",
+    "emergencyPersistence": "This guidance stays pinned to the bottom of the screen after you acknowledge it.",
+    "emergencyShowDetails": "Show details",
+    "footerDisclaimer": "LibertyMD provides AI guidance, not a diagnosis or emergency service.",
     "waitingReviewing": "Reviewing everything you've told me…",
     "partialOutcomeEyebrow": "Before you go",
     "partialOutcomeTitle": "A few incomplete tips from what you shared",

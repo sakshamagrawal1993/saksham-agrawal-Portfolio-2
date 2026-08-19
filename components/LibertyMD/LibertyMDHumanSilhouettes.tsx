@@ -1,5 +1,3 @@
-import React from 'react';
-
 interface LibertyMDHumanSilhouettesProps {
   onSelectSymptom?: (symptom: string) => void;
 }

@@ -1,0 +1,16 @@
+[
+  {
+    "index": 1,
+    "id": "negated_chest_pain",
+    "title": "Low fever with explicit chest-pain denial",
+    "category": "non_emergency",
+    "expected_action": "continue",
+    "observed_state": "error",
+    "passed": false,
+    "duration_ms": 54226,
+    "error": "Waiting failed: 45000ms exceeded",
+    "page_errors": [],
+    "failed_requests": [],
+    "screenshot_filename": "scenario_01_negated_chest_pain_error.png"
+  }
+]

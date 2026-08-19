@@ -2296,10 +2296,6 @@ function AgentAlgoSections({
 
   const readString = (key: string, fallback = '') => typeof payload[key] === 'string' ? String(payload[key]) : fallback;
 
-  const _readLines = (key: string, fallback: string[]) =>
-    Array.isArray(payload[key]) ? (payload[key] as unknown[]).map((item) => String(item)).join('\n') : fallback.join('\n');
-  const _toLines = (value: string) => value.split('\n').map((item) => item.trim()).filter(Boolean);
-
   // Structured rule groups: n8n payload (entryConditions/exitConditions) wins,
   // then the local planner's plan; the free-text boxes are only a fallback.
   type StructuredRule = { connector?: string; negate?: boolean; left: string; operator: string; right: string };
@@ -2319,7 +2315,6 @@ function AgentAlgoSections({
     if (draft.plan?.legs?.length) return draft.plan.legs as unknown as AnyLeg[];
     return null;
   })();
-  const _riskBox = (payload.risk && typeof payload.risk === 'object' ? payload.risk : payload.globalTargets) as AnyLeg | undefined;
 
   return (
     <div className="agent-algo-sections">
@@ -2415,7 +2410,7 @@ function AgentAlgoSections({
           />
           
           <h4 style={{marginTop: 12, fontSize: 13, textTransform: 'uppercase', color: 'var(--muted)'}}>Configured Indicators</h4>
-          {Array.isArray(payload.indicators) ? payload.indicators.map((ind: any, i) => {
+          {Array.isArray(payload.indicators) ? payload.indicators.map((ind: any, i: number) => {
             if (typeof ind === 'string') return <div key={i} className="agent-market-card">{ind}</div>;
             return (
               <div key={i} className="agent-market-card" style={{padding: 12}}>

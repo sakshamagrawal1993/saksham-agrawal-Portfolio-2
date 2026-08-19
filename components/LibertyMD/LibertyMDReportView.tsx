@@ -3,7 +3,7 @@
  * P2-03 — customer-priority hierarchy (triage + next-step dominate type scale);
  *         order regression; footerSlot body placement when ATF threatened.
  * P2-04 — per-diagnosis detail cards inside differential (ordinal / serious / waitlist CTA).
- * P2-05 — condensed sticky triage twin + section disclosure persistence + teasers.
+ * P2-05 — section disclosure persistence + teasers.
  * P2-09 — client PDF delivery-actions slot (Download → chooser; gesture-safe Both).
  * P3-02 — `variant="sample"` hides PDF/delivery-actions + guest/saved note and
  *         suppresses real-report analytics (landing sample shell owns its own emit).
@@ -41,7 +41,6 @@ import {
   newlyReachedScrollBuckets,
   readReportSections,
   reportScrollDepthPct,
-  shouldEnableReportSticky,
   writeReportSections,
   type LibertyMdNormalizedReport,
   type ReportScrollBucket,
@@ -75,6 +74,12 @@ export type LibertyMDReportViewProps = {
    * real-report analytics. Landing sample shell owns `sample_report_viewed`.
    */
   variant?: LibertyMDReportViewVariant
+  /**
+   * P5-GUIDE — the async per-diagnosis guidance run is still in flight, so the
+   * cards render a skeleton where their guidance will land. The consultation-
+   * level Recommended Action Plan is unaffected and renders immediately.
+   */
+  guidancePending?: boolean
   /** Consult transcript scroller (Q5) — not a nested report scroller. */
   scrollParentRef?: RefObject<HTMLElement | null>
   /** Opaque consult id for section expansion persistence (P2-05). */
@@ -210,6 +215,7 @@ export function LibertyMDReportView({
   report,
   saved,
   variant = 'default',
+  guidancePending = false,
   scrollParentRef,
   consultationId,
   footerSlot,
@@ -220,13 +226,11 @@ export function LibertyMDReportView({
   const { t } = useI18n()
   const isSample = variant === 'sample'
   const rootRef = useRef<HTMLElement | null>(null)
-  const stickyRef = useRef<HTMLDivElement | null>(null)
   const emittedBucketsRef = useRef<Set<ReportScrollBucket>>(new Set())
   const readyLinksRef = useRef<PdfReadyLink[]>([])
   const [sectionOpen, setSectionOpen] = useState<Record<ReportSectionId, boolean>>(() =>
     initialSectionOpen(consultationId),
   )
-  const [stickyEnabled, setStickyEnabled] = useState(false)
   const [chooserOpen, setChooserOpen] = useState(false)
   // PDF generation starts only from the user's download action. This keeps the
   // clinical report interactive and avoids doing heavy client work speculatively.
@@ -256,63 +260,10 @@ export function LibertyMDReportView({
     && (report.soap.subjective || report.soap.objective || report.soap.assessment || report.soap.plan),
   )
   const showRedFlags = report.redFlags.length > 0
-  const showStickyContent = showTriage || Boolean(report.nextStep)
-
   // Restore when consultationId arrives/changes (optional prop).
   useEffect(() => {
     setSectionOpen(initialSectionOpen(consultationId))
   }, [consultationId])
-
-  // AC5 · short-viewport gate from scroller clientHeight (fallback: window).
-  useEffect(() => {
-    const measure = () => {
-      const scroller = scrollParentRef?.current
-      const height = scroller?.clientHeight
-        ?? (typeof window !== 'undefined' ? window.innerHeight : 0)
-      setStickyEnabled(showStickyContent && shouldEnableReportSticky(height))
-    }
-    measure()
-    const scroller = scrollParentRef?.current
-    window.addEventListener('resize', measure)
-    let ro: ResizeObserver | null = null
-    if (scroller && typeof ResizeObserver !== 'undefined') {
-      ro = new ResizeObserver(measure)
-      ro.observe(scroller)
-    }
-    return () => {
-      window.removeEventListener('resize', measure)
-      ro?.disconnect()
-    }
-  }, [scrollParentRef, showStickyContent])
-
-  // AC2 · body clearance from measured sticky height when enabled.
-  useEffect(() => {
-    if (!stickyEnabled) {
-      const scroller = scrollParentRef?.current
-      if (scroller) scroller.style.scrollPaddingTop = ''
-      return
-    }
-    const el = stickyRef.current
-    const scroller = scrollParentRef?.current
-    if (!el) return
-
-    const apply = () => {
-      const h = el.offsetHeight
-      if (scroller) {
-        scroller.style.scrollPaddingTop = h > 0 ? `${h}px` : ''
-      }
-    }
-    apply()
-    let ro: ResizeObserver | null = null
-    if (typeof ResizeObserver !== 'undefined') {
-      ro = new ResizeObserver(apply)
-      ro.observe(el)
-    }
-    return () => {
-      ro?.disconnect()
-      if (scroller) scroller.style.scrollPaddingTop = ''
-    }
-  }, [stickyEnabled, scrollParentRef, showTriage, report.nextStep])
 
   useEffect(() => {
     // P3-02 — sample shell owns `sample_report_viewed`; never emit real-consult scroll depth.
@@ -652,6 +603,7 @@ export function LibertyMDReportView({
                     triageTier={report.triageTier}
                     prominence={handoffProminence}
                     sessionKey={consultationId}
+                    guidancePending={guidancePending}
                   />
                 </li>
               ))}

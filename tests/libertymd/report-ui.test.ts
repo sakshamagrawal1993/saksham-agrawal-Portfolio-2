@@ -13,10 +13,12 @@ import {
 } from '../../components/LibertyMD/libertymd-analytics.ts'
 import {
   clearReportSections,
+  isDifferentialSerious,
   isEmergencyTriageTier,
-  LIBERTYMD_REPORT_STICKY_MIN_SCROLLER_PX,
   mapCareSettingToTriage,
+  formatClinicalBullets,
   mapDifferentialOrdinal,
+  mergeDiagnosisGuidance,
   mergeReportSectionOpen,
   newlyReachedScrollBuckets,
   normalizeReportData,
@@ -25,7 +27,6 @@ import {
   readReportSections,
   reportSectionsKey,
   reportScrollDepthPct,
-  shouldEnableReportSticky,
   writeReportSections,
   type ReportScrollBucket,
 } from '../../components/LibertyMD/libertymd-report.ts'
@@ -392,10 +393,11 @@ Deno.test('P2-03 AC2 · Q1 type/token hierarchy roles (ATF UNTESTABLE)', async (
     'Recommended Action Plan section present',
   )
 
-  // Headline demoted to body (not text-2xl / text-3xl / subsection+)
+  // The clinical session headline is rendered with body typography. The
+  // document's branded title is intentionally allowed to use display sizing.
   assertTrue(view.includes('libertymd-type-body'), 'headline uses type-body')
-  assertEquals(view.includes('text-2xl'), false, 'headline must not use text-2xl')
-  assertEquals(view.includes('text-3xl'), false, 'headline must not use text-3xl')
+  assertTrue(view.includes('data-libertymd-report-session-summary'), 'session headline is scoped')
+  assertTrue(view.includes('renderFormattedSessionSummary(report.headline)'), 'headline uses body formatter')
   assertEquals(view.includes('libertymd-type-subsection-title'), false, 'no subsection for triage/headline')
   assertEquals(view.includes('libertymd-type-section-title'), false, 'no section-title on report')
   assertEquals(view.includes('libertymd-type-display'), false, 'no display on report')
@@ -595,6 +597,13 @@ Deno.test('P2-04 AC1/AC2/AC3/Q7 · full+serious / reason-only / name-only mapper
   assertEquals(nameOnly.differentials[0].isSerious, undefined)
 })
 
+Deno.test('P2-04 seriousness · moderate review urgency is not a serious-condition label', () => {
+  assertEquals(isDifferentialSerious({ emergency: 'moderate' }), false)
+  assertEquals(isDifferentialSerious({ severity: 'moderate' }), false)
+  assertEquals(isDifferentialSerious({ emergency: 'high' }), true)
+  assertEquals(isDifferentialSerious({ is_serious: true }), true)
+})
+
 Deno.test('P2-04 AC5/Q6 · dosing lines omitted; guidance framing in card source', async () => {
   assertEquals(
     JSON.stringify(omitDosingLines(['Acetaminophen 500 mg every 6 hours', 'Saline rinses as needed'])),
@@ -606,8 +615,20 @@ Deno.test('P2-04 AC5/Q6 · dosing lines omitted; guidance framing in card source
   assertEquals(tx.includes('Saline rinses as needed'), true)
   assertTrue(view.differentials[0].supportiveTreatment?.includes('Rest and fluids'))
 
+  // The consultation-level Recommended Action Plan states the guidance once.
+  const reportView = await Deno.readTextFile(VIEW)
+  assertTrue(reportView.includes('report.card.supportiveTreatment'), 'guidance framing i18n')
+  assertTrue(reportView.includes('report.card.symptomaticTreatment'), 'symptom relief framing i18n')
+  assertTrue(reportView.includes('report.card.furtherInvestigations'), 'investigations framing i18n')
+
+  // P5-GUIDE — the disclosure carries per-condition guidance from the async
+  // workflow, not the consult-wide plan that made all three cards identical.
   const card = await Deno.readTextFile(CARD)
-  assertTrue(card.includes('report.card.supportiveTreatment'), 'guidance framing i18n')
+  assertTrue(card.includes('data-diagnosis-detail-toggle'), 'per-card disclosure retained')
+  assertTrue(card.includes('report.card.showDetail'), 'localized show-more label')
+  assertTrue(card.includes('data-diagnosis-guidance'), 'per-diagnosis guidance block')
+  assertTrue(card.includes('data-diagnosis-guidance-skeleton'), 'pending skeleton')
+  assertTrue(card.includes('guidancePending'), 'card accepts pending flag')
 })
 
 Deno.test('P2-04 AC6 · report renders at most the required three differentials', () => {
@@ -651,7 +672,7 @@ Deno.test('P2-04 AC1–AC5 · shared card chrome + waitlist CTA + badge pair', a
   assertTrue(card.includes("'serious-lower-band'"), 'serious + lower-band pair')
   assertTrue(card.includes('LibertyMDDoctorHandoffCta'), 'card uses shared doctor handoff CTA')
   assertTrue(handoffCta.includes('data-diagnosis-doctor-cta'), 'per-card doctor CTA marker on shared CTA')
-  assertTrue(card.includes('useState(false)'), 'detail default collapsed')
+  assertTrue(card.includes('useState(false)'), 'per-card guidance defaults collapsed')
   assertEquals(card.includes('emitReportSectionExpanded'), false, 'no nested expand telemetry')
   assertEquals(card.includes('trackLibertyMd'), false, 'no hand-typed Mixpanel on card')
 
@@ -754,33 +775,11 @@ function memoryStorage(): {
   }
 }
 
-Deno.test('P2-05 AC5 · shouldEnableReportSticky height gate', () => {
-  assertEquals(LIBERTYMD_REPORT_STICKY_MIN_SCROLLER_PX, 500)
-  assertEquals(shouldEnableReportSticky(499), false)
-  assertEquals(shouldEnableReportSticky(500), true)
-  assertEquals(shouldEnableReportSticky(720), true)
-  assertEquals(shouldEnableReportSticky(Number.NaN), false)
-})
-
-Deno.test('P2-05 AC1/AC2 · sticky twin + overflow path + clearance + no fixed', async () => {
+Deno.test('P2-05 · removed sticky triage twin does not leave dead UI wiring', async () => {
   const view = await Deno.readTextFile(VIEW)
-  assertTrue(view.includes('data-libertymd-report-sticky'), 'sticky twin marker')
-  assertTrue(view.includes('sticky top-0'), 'position sticky class')
-  assertTrue(view.includes('data-libertymd-report-sticky-clearance'), 'clearance marker')
-  assertTrue(view.includes('shouldEnableReportSticky'), 'height gate wired')
-  assertTrue(view.includes('scrollPaddingTop'), 'scroll-padding clearance')
-  assertTrue(view.includes('aria-hidden="true"'), 'sticky decorative a11y')
-  assertTrue(view.includes('line-clamp-2'), 'next-step clamp')
-  // Overflow trap fixed: report root must not clip sticky path
-  const rootClassMatch = view.match(/data-libertymd-report[\s\S]*?className="([^"]+)"/)
-  assertTrue(rootClassMatch, 'report root className')
-  assertEquals(
-    rootClassMatch![1].includes('overflow-hidden'),
-    false,
-    'report root must not overflow-hidden (sticky trap)',
-  )
-  assertEquals(view.includes('position: fixed') || view.includes('fixed top-0'), false, 'no fixed sticky')
-  // Physical stick geometry = UNTESTABLE without viewport harness
+  assertEquals(view.includes('data-libertymd-report-sticky'), false, 'removed twin stays removed')
+  assertEquals(view.includes('shouldEnableReportSticky'), false, 'no obsolete height gate')
+  assertEquals(view.includes('scrollPaddingTop'), false, 'no obsolete clearance mutation')
 })
 
 Deno.test('P2-05 AC3 · collapsed teasers + i18n chrome', async () => {
@@ -864,7 +863,7 @@ Deno.test('P2-05 R2 · Chat/App pass consultationId; soft-gate absent from Repor
   assertTrue(chat.includes('consultationId={consultationId'), 'Chat passes consultationId')
   assertTrue(app.includes('consultationId={sessionId'), 'App passes consultationId')
   assertEquals(view.includes('soft-gate') || view.includes('softGate') || view.includes('soft_gate'), false)
-  assertTrue(card.includes('useState(false)'), 'card detailOpen stays ephemeral')
+  assertTrue(card.includes('useState(false)'), 'card disclosure state stays ephemeral')
   assertEquals(card.includes('report-sections'), false, 'no card section persistence')
 })
 
@@ -1285,4 +1284,119 @@ Deno.test('P3-02 AC1/AC6/AC12 · landing entry + freetext CTA; chips preserved',
   const shell = await Deno.readTextFile(SAMPLE_SHELL)
   assertTrue(shell.includes('URI_MUNDANE_SAMPLE_COMPLAINT'), 'sore-throat aligned complaint')
   assertTrue(shell.includes('LibertyMDOverlaySheet'), 'OverlaySheet host')
+})
+
+// ─── P5-GUIDE · async per-diagnosis guidance ─────────────────────────────────
+
+Deno.test('P5-GUIDE · four guidance surfaces: consult plan unchanged + one per differential', async () => {
+  const view = await Deno.readTextFile(VIEW)
+  // Surface 1 — the Recommended Action Plan is untouched by this feature.
+  assertTrue(view.includes("t('report.sections.assessmentAndPlan')"), 'consult-level plan still rendered')
+  assertTrue(view.includes('assessment_and_plan') || view.includes('assessmentAndPlan'), 'plan source intact')
+  // Surfaces 2-4 — guidance is per card, and pending state is threaded down.
+  assertTrue(view.includes('guidancePending={guidancePending}'), 'pending flag reaches the card')
+})
+
+Deno.test('P5-GUIDE · guidance merges by canonical name, never by display name', () => {
+  const differentials = normalizeReportData(MUNDANE_FULL_REPORT_DATA).differentials
+  assertTrue(differentials.length > 0, 'fixture has differentials')
+  assertTrue(
+    differentials.every((d) => typeof d.canonicalName === 'string' && d.canonicalName.length > 0),
+    'every differential carries a canonical join key',
+  )
+
+  const guidance = differentials.map((d, index) => ({
+    full_name: d.canonicalName,
+    supportive_treatment: [`supportive-${index}`],
+    symptomatic_treatment: [`symptomatic-${index}`],
+    further_investigations: [`investigation-${index}`],
+  }))
+  const merged = mergeDiagnosisGuidance(differentials, guidance)
+  merged.forEach((item, index) => {
+    assertEquals(item.supportiveTreatment?.[0], `supportive-${index}`)
+    assertEquals(item.furtherInvestigations?.[0], `investigation-${index}`)
+  })
+
+  // Reversing the payload must NOT reverse the attachment: the join is by name.
+  const reversedMerge = mergeDiagnosisGuidance(differentials, [...guidance].reverse())
+  reversedMerge.forEach((item, index) => {
+    assertEquals(item.supportiveTreatment?.[0], `supportive-${index}`, 'name join survives reordering')
+  })
+})
+
+Deno.test('P5-GUIDE · unmatched names dropped; dosing stripped; empty payload is a no-op', () => {
+  const differentials = normalizeReportData(MUNDANE_FULL_REPORT_DATA).differentials
+
+  // A block naming a condition the report never reported must not be attached
+  // to some other card — wrong attribution here is a clinical error.
+  const unmatched = mergeDiagnosisGuidance(differentials, [
+    { full_name: 'Condition that was never reported', supportive_treatment: ['leak'] },
+  ])
+  assertEquals(
+    unmatched.some((d) => d.supportiveTreatment?.includes('leak')),
+    false,
+    'unmatched guidance never attaches',
+  )
+
+  const dosed = mergeDiagnosisGuidance(differentials, [{
+    full_name: differentials[0].canonicalName,
+    symptomatic_treatment: ['Acetaminophen 500 mg every 6 hours', 'Throat lozenges'],
+  }])
+  const tx = dosed[0].symptomaticTreatment || []
+  assertEquals(tx.some((line) => /500\s*mg/i.test(line)), false, 'dosing stripped at the render boundary')
+  assertEquals(tx.includes('Throat lozenges'), true, 'non-dosing line kept')
+
+  assertEquals(
+    JSON.stringify(mergeDiagnosisGuidance(differentials, [])),
+    JSON.stringify(differentials),
+    'empty guidance leaves the report untouched',
+  )
+})
+
+Deno.test('P5-GUIDE · client polls only while pending and gives up on a timeout', async () => {
+  const page = await Deno.readTextFile(REPORT_PAGE)
+  assertTrue(page.includes("guidanceStatus !== 'pending'"), 'poll gated on pending')
+  assertTrue(page.includes('GUIDANCE_POLL_TIMEOUT_MS'), 'poll has a timeout')
+  assertTrue(page.includes("setGuidanceStatus('failed')"), 'timeout drops the skeleton')
+  assertTrue(page.includes('mergeDiagnosisGuidance'), 'page merges guidance into the report')
+  // The guidance poll must not be able to re-enter report generation.
+  assertEquals(
+    page.includes("action: 'generate_report'") && page.includes('GUIDANCE_POLL_INTERVAL_MS'),
+    true,
+    'generation and guidance polls coexist as separate loops',
+  )
+})
+
+Deno.test('P5-GUIDE · formatClinicalBullets invents nothing when there is no data', () => {
+  // Regression: this returned a canned list of clinical advice for empty input,
+  // so every diagnosis card on every report showed the same fabricated
+  // guidance ("Do a test for Covid 19", "Avoid contact with ppl outside", a
+  // CBC and a pulse-oximetry order) as though it had been generated for that
+  // patient. Omit-not-stub: no data means no bullets.
+  for (const category of ['selfCare', 'medical', 'diagnostic'] as const) {
+    assertEquals(formatClinicalBullets(undefined, category).length, 0, `${category} empty on undefined`)
+    assertEquals(formatClinicalBullets([], category).length, 0, `${category} empty on []`)
+  }
+  // Real input still formats: strips list markers and caps at 10 words / 4 items.
+  const formatted = formatClinicalBullets(
+    ['1. Rest and drink fluids', '- Use throat lozenges', '• Saline nasal spray', 'Fourth', 'Fifth dropped'],
+    'selfCare',
+  )
+  assertEquals(formatted.length, 4, 'caps at four bullets')
+  assertEquals(formatted[0], 'Rest and drink fluids', 'numeric marker stripped')
+  assertEquals(formatted[1], 'Use throat lozenges', 'dash marker stripped')
+  assertEquals(formatted[2], 'Saline nasal spray', 'bullet marker stripped')
+})
+
+Deno.test('P5-GUIDE · no invented clinical strings remain in the mapper', async () => {
+  const mapper = await Deno.readTextFile(MAPPER)
+  for (const invented of [
+    'Do a test for Covid 19',
+    'Avoid contact with ppl outside',
+    'Complete Blood Count (CBC) with Differential',
+    'Pulse Oximetry & Respiratory Rate Evaluation',
+    'Over-the-counter antipyretics or analgesics for fever',
+  ]) {
+    assertEquals(mapper.includes(invented), false, `mapper must not hardcode: ${invented}`)
+  }
 })

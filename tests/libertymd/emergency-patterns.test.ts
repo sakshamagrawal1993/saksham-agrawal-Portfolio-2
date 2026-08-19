@@ -4,6 +4,8 @@ import {
 } from '../../supabase/functions/libertymd-care-proxy/emergency-patterns.ts'
 import { detectDeterministicEmergency } from '../../supabase/functions/libertymd-care-proxy/clinical-policy.ts'
 import CASES from './emergency-pattern-cases.json' with { type: 'json' }
+import CLINICAL_CASES from './clinical-scenarios.v0.1.json' with { type: 'json' }
+import I18N_CASES from './clinical-scenarios.i18n.v0.1.json' with { type: 'json' }
 
 declare const Deno: { test: (name: string, fn: () => unknown | Promise<unknown>) => void }
 
@@ -71,6 +73,22 @@ Deno.test('P0-14a negative corpus is at least three times the positive corpus an
   assert(CASES.negatives.length >= 3 * CASES.positives.length, 'Negatives must be at least three times positives')
   for (const testCase of CASES.negatives) {
     assertEquals(detectDeterministicEmergency(testCase.message), null, `Expected no match for ${testCase.id}`)
+  }
+})
+
+Deno.test('P0-14a multilingual 32-case translations preserve every emergency decision', () => {
+  for (const [locale, bundle] of Object.entries(I18N_CASES.locales)) {
+    for (const scenario of CLINICAL_CASES.scenarios) {
+      const message = bundle.messages[scenario.id as keyof typeof bundle.messages]
+      assert(message, `${locale}/${scenario.id}: translated message`)
+      const result = detectDeterministicEmergency(message)
+      if (scenario.expected.emergency_action === 'force_end') {
+        assert(result, `${locale}/${scenario.id}: expected deterministic force_end`)
+        assertEquals(result.crisisType, scenario.expected.crisis_type, `${locale}/${scenario.id}: crisis type`)
+      } else {
+        assertEquals(result, null, `${locale}/${scenario.id}: expected deterministic continue`)
+      }
+    }
   }
 })
 

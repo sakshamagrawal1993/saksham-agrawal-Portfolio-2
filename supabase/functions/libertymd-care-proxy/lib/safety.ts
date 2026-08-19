@@ -463,7 +463,12 @@ export async function runGuardrail(
       revokeStageSuccessAsFailure('guardrail')
       return guardrailTransportFailureResult('malformed_payload') satisfies GuardrailResult
     }
-    const screenedRaw = enforceCardioRespiratoryEmergencySpecificity(webhookRaw, message, history)
+    const screenedRaw = enforceCardioRespiratoryEmergencySpecificity(
+      webhookRaw,
+      message,
+      history,
+      resolveOpts?.language,
+    )
     const forceEnd = Boolean(screenedRaw.force_end || screenedRaw.is_emergency || screenedRaw.status === 'force_end')
     const requestedStatus: GuardrailResult['status'] = forceEnd
       ? 'force_end'

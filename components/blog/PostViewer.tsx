@@ -5,7 +5,6 @@ import {
   isMarkdownTableRow,
   isMarkdownTableSeparator,
   looksLikeHtmlContent,
-  markdownInlineFormat,
   markdownTableRowsToHtml,
   markdownToHtml,
 } from '../../lib/markdownToHtml';

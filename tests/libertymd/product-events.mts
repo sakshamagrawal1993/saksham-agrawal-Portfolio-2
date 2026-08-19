@@ -170,7 +170,8 @@ Deno.test('P1-15 AC5 · consultation_started emits before inference_failed on fa
     assertTrue(failedAt >= 0, 'inference_failed present')
     assertTrue(startedAt < failedAt, 'consultation_started before inference_failed')
     assertTrue(names.includes('guardrail_evaluated'), 'guardrail_evaluated')
-    assertTrue(names.includes('question_served'), 'question_served on start')
+    assertEquals(names.includes('question_served'), false, 'gated start has not served a question yet')
+    assertEquals(fetchLog.calls.some((call) => call.url === INTERVIEW_WEBHOOK), false, 'gated start skips Interview')
     const guardrail = productEventRows(ops).find((row) => row.event_name === 'guardrail_evaluated')
     assertEquals(guardrail!.properties?.shadow_llm_status, 'disabled', 'P1-16 AC2 shadow_llm_status')
     for (const row of productEventRows(ops)) {
@@ -181,7 +182,7 @@ Deno.test('P1-15 AC5 · consultation_started emits before inference_failed on fa
   }
 })
 
-Deno.test('P1-15 AC1 · start emits question_served with PHI-free slot id', async () => {
+Deno.test('P1-15 AC1 · gated start defers question_served until demographics', async () => {
   const fetchLog = stubFetch((url) => {
     if (url === INTERVIEW_WEBHOOK) return interviewPass()
     if (url === GUARDRAIL_WEBHOOK) return guardrailPass()
@@ -194,12 +195,8 @@ Deno.test('P1-15 AC1 · start emits question_served with PHI-free slot id', asyn
       message: 'I have had a mild headache for two days',
     })
     const served = productEventRows(ops).find((row) => row.event_name === 'question_served')
-    assertTrue(served, 'question_served emitted')
-    assertEquals(served!.properties?.turn_index, 1)
-    assertEquals(served!.properties?.target_slot, 'onset')
-    assertEquals(served!.properties?.was_repeat, false)
-    assertEquals(typeof served!.properties?.had_options, 'boolean')
-    assertNoForbiddenKeys(served!.properties, 'question_served')
+    assertEquals(Boolean(served), false, 'no question is shown before demographics')
+    assertEquals(fetchLog.calls.some((call) => call.url === INTERVIEW_WEBHOOK), false, 'no duplicate Interview call')
   } finally {
     fetchLog.restore()
   }

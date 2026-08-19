@@ -16,6 +16,43 @@ export const WARM_MID_PATH_PREFACE =
 export const OFF_TOPIC_STOP_BODY =
   "We couldn't continue this consult because the recent answers weren't about your health concern. Start a new consult when you're ready to share your symptoms, or talk with a licensed clinician."
 
+const OFF_TOPIC_COPY: Record<string, { preface: string; stop: string }> = {
+  en: { preface: WARM_MID_PATH_PREFACE, stop: OFF_TOPIC_STOP_BODY },
+  es: {
+    preface: 'Mantengámonos centrados en su salud para poder ayudarle. Responda sobre sus síntomas.',
+    stop: 'No pudimos continuar esta consulta porque las respuestas recientes no se referían a su problema de salud. Inicie una nueva consulta cuando esté listo para describir sus síntomas o hable con un profesional sanitario autorizado.',
+  },
+  pt: {
+    preface: 'Vamos manter o foco na sua saúde para eu poder ajudar. Responda sobre os seus sintomas.',
+    stop: 'Não foi possível continuar esta consulta porque as respostas recentes não eram sobre o seu problema de saúde. Inicie uma nova consulta quando estiver pronto para descrever os seus sintomas ou fale com um profissional de saúde habilitado.',
+  },
+  hi: {
+    preface: 'आपकी मदद के लिए हम आपके स्वास्थ्य पर ध्यान रखें। कृपया अपने लक्षणों के बारे में उत्तर दें।',
+    stop: 'हम यह परामर्श जारी नहीं रख सके क्योंकि हाल के उत्तर आपकी स्वास्थ्य समस्या के बारे में नहीं थे। जब आप अपने लक्षण बताने के लिए तैयार हों तब नया परामर्श शुरू करें या किसी लाइसेंस प्राप्त चिकित्सक से बात करें।',
+  },
+  'hi-Latn': {
+    preface: 'Aapki madad ke liye hum aapki health par focus rakhein. Kripya apne symptoms ke baare mein jawab dein.',
+    stop: 'Hum yeh consultation jaari nahi rakh sake kyunki haal ke jawab aapki health concern ke baare mein nahi the. Jab aap symptoms share karne ke liye taiyaar hon tab nayi consultation shuru karein ya licensed clinician se baat karein.',
+  },
+  fr: {
+    preface: 'Restons concentrés sur votre santé afin que je puisse vous aider. Répondez au sujet de vos symptômes.',
+    stop: 'Nous n’avons pas pu poursuivre cette consultation, car les réponses récentes ne concernaient pas votre problème de santé. Commencez une nouvelle consultation lorsque vous serez prêt à décrire vos symptômes ou parlez à un professionnel de santé agréé.',
+  },
+  de: {
+    preface: 'Bleiben wir bei Ihrem Gesundheitsproblem, damit ich Ihnen helfen kann. Antworten Sie bitte zu Ihren Symptomen.',
+    stop: 'Wir konnten diese Beratung nicht fortsetzen, weil sich die letzten Antworten nicht auf Ihr Gesundheitsproblem bezogen. Beginnen Sie eine neue Beratung, wenn Sie Ihre Symptome schildern möchten, oder wenden Sie sich an eine zugelassene medizinische Fachkraft.',
+  },
+}
+
+function copyFor(language: string | undefined) {
+  const normalized = language === 'es-ES' ? 'es' : String(language || 'en')
+  return OFF_TOPIC_COPY[normalized] || OFF_TOPIC_COPY.en
+}
+
+export function offTopicStopBody(language = 'en'): string {
+  return copyFor(language).stop
+}
+
 /** Legacy cold mid-path prefix (pre-P1-10) — skip when selecting the named ask. */
 const LEGACY_COLD_REDIRECT_PREFIX = 'I need a health-related answer to continue safely.'
 
@@ -39,7 +76,7 @@ function asCleanText(value: unknown): string {
 export function isOffTopicRedirectContent(content: unknown): boolean {
   const text = asCleanText(content)
   if (!text) return false
-  if (text.startsWith(WARM_MID_PATH_PREFACE)) return true
+  if (Object.values(OFF_TOPIC_COPY).some(({ preface }) => text.startsWith(preface))) return true
   if (text.startsWith(LEGACY_COLD_REDIRECT_PREFIX)) return true
   return false
 }
@@ -74,8 +111,9 @@ export function selectLastClinicalAsk(
 }
 
 /** Compose mid-path warm redirect: `{preface} {namedAsk}`. */
-export function composeWarmMidPathRedirect(namedAsk: string): string {
+export function composeWarmMidPathRedirect(namedAsk: string, language = 'en'): string {
+  const preface = copyFor(language).preface
   const ask = asCleanText(namedAsk)
-  if (!ask) return WARM_MID_PATH_PREFACE
-  return `${WARM_MID_PATH_PREFACE} ${ask}`
+  if (!ask) return preface
+  return `${preface} ${ask}`
 }

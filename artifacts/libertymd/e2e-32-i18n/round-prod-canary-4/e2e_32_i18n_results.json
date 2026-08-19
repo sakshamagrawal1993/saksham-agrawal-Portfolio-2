@@ -1,0 +1,22 @@
+[
+  {
+    "case_index": 1,
+    "locale": "en",
+    "clinical_locale": "en",
+    "scenario_id": "acs_radiating_arm",
+    "category": "emergency",
+    "expected_action": "force_end",
+    "expected_crisis_type": "acs_chest_pain",
+    "expected_emergency_number": "911",
+    "observed_state": "emergency_force_end",
+    "localized_heading_present": true,
+    "no_english_fallback": true,
+    "numeric_input_tokens_preserved": true,
+    "emergency_number_present": false,
+    "passed": false,
+    "duration_ms": 5739,
+    "page_errors": [],
+    "failed_requests": [],
+    "screenshot_filename": "001_en_acs_radiating_arm.png"
+  }
+]

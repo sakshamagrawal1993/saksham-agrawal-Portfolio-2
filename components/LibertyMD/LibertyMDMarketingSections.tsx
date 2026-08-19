@@ -7,21 +7,15 @@ import {
   type TouchEvent as ReactTouchEvent,
 } from 'react';
 import { useI18n } from '../../i18n';
-import { motion, useReducedMotion, useScroll, useTransform } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion, useScroll, useTransform } from 'framer-motion';
 import {
   ArrowRight,
-  BookOpen,
   CalendarClock,
   Check,
-  ChevronLeft,
-  ChevronRight,
   CircleDollarSign,
   Clock3,
   Globe2,
   HeartPulse,
-  Pause,
-  Play,
-  Quote,
   ShieldCheck,
   Sparkles,
 } from 'lucide-react';
@@ -39,27 +33,6 @@ const phoneImages = {
   patientRight: homepagePhoto('photo-1494790108377-be9c29b29330'),
   caller: homepagePhoto('photo-1507003211169-0a1dd7228f2d'),
 };
-
-const healthArticles = [
-  {
-    category: 'Everyday care',
-    title: 'When a fever needs more than rest',
-    description: 'A practical guide to duration, hydration, warning signs, and when to seek an evaluation.',
-    image: homepagePhoto('photo-1505751172876-fa1923c5c528'),
-  },
-  {
-    category: 'Heart health',
-    title: 'Chest discomfort: the details that matter',
-    description: 'Learn how timing, exertion, breathing, and associated symptoms change the urgency of care.',
-    image: homepagePhoto('photo-1532938911079-1b06ac7ceec7'),
-  },
-  {
-    category: 'Preparing for care',
-    title: 'How to build a useful symptom timeline',
-    description: 'Turn scattered observations into a concise story that is easier for a clinician to assess.',
-    image: homepagePhoto('photo-1576091160399-112ba8d25d1d'),
-  },
-];
 
 interface MarketingSectionProps {
   onStartChat: () => void;
@@ -309,7 +282,7 @@ export function LibertyMDSpecialistsSection() {
 
                 {/* Badges Stack with Exact Pill Curves from Screenshot */}
                 <div className="w-full flex flex-col items-center gap-2 mt-auto">
-                  <span className="w-full rounded-[14px] bg-[#EEF1F4] px-3 py-2 text-[11px] font-semibold text-[#475569] leading-tight text-center">
+                  <span className="w-full rounded-[14px] bg-[#EEF1F4] px-3 py-2 text-[11px] font-semibold text-libertymd-slate-600 leading-tight text-center">
                     {doc.institution}
                   </span>
                   <span className="inline-flex items-center rounded-full bg-[#E5F3EB] px-3.5 py-1 text-[11px] font-bold text-[#2D6A4F]">
@@ -436,7 +409,7 @@ export function LibertyMDPricingSection({ onStartChat }: MarketingSectionProps) 
   } as CSSProperties;
 
   return (
-    <section className="libertymd-page-gutter libertymd-section-spacing relative overflow-hidden bg-gradient-to-b from-[#F0F5F2] via-[#EFF6FF] to-[#FAF8F5] text-center">
+    <section className="libertymd-page-gutter libertymd-section-spacing relative overflow-hidden bg-gradient-to-b from-[#F0F5F2] via-libertymd-blue-50 to-[#FAF8F5] text-center">
       <div className="libertymd-content-shell grid items-center gap-[var(--libertymd-layout-gap)] lg:grid-cols-[minmax(19rem,0.74fr)_minmax(32rem,1.26fr)]">
         <div>
           <p className="text-xs font-bold uppercase text-libertymd-blue-600">{t('marketing.pricing.kicker')}</p>
@@ -764,40 +737,135 @@ export function LibertyMDPatientStoriesSection() {
   );
 }
 
-export function LibertyMDHealthLibrarySection() {
-  const { t } = useI18n();
-  const articles = healthArticles.map((a, i) => ({
-    ...a,
-    category: t(`marketing.library.items.${i}.category`),
-    title: t(`marketing.library.items.${i}.title`),
-    description: t(`marketing.library.items.${i}.description`),
-  }));
-  return (
-    <section className="libertymd-page-gutter libertymd-section-spacing relative overflow-hidden bg-gradient-to-b from-[#FAF8F5] via-white to-[#EFF6FF] text-center">
-      <div className="libertymd-content-shell flex flex-col items-center gap-5 border-b border-libertymd-slate-200/60 pb-8">
-        <div className="text-center">
-          <p className="text-xs font-bold uppercase text-libertymd-blue-600">{t('marketing.library.kicker')}</p>
-          <h2 className="mt-3 font-serif text-4xl font-semibold text-libertymd-ink sm:text-5xl">{t('marketing.library.title')}</h2>
-        </div>
-        <button type="button" className="inline-flex items-center gap-2 text-sm font-bold text-libertymd-blue-600 hover:text-libertymd-ink">
-          {t('marketing.library.explore')} <BookOpen className="h-4 w-4" />
-        </button>
-      </div>
+/** Number of `marketing.faq.items[*]` entries authored in the locale bundles. */
+const FAQ_ITEM_COUNT = 6;
 
-      <div className="libertymd-content-shell mt-10 grid gap-[clamp(2rem,3.5vw,4rem)] md:grid-cols-3">
-        {articles.map((article) => (
-          <article key={article.title} className="group text-center">
-            <div className="aspect-[4/3] overflow-hidden rounded-lg bg-libertymd-slate-200">
-              <img src={article.image} alt="" className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" />
-            </div>
-            <p className="mt-5 text-xs font-bold uppercase text-libertymd-blue-600">{article.category}</p>
-            <h3 className="mt-3 text-xl font-black leading-snug text-libertymd-ink">{article.title}</h3>
-            <p className="mt-3 text-sm leading-7 text-libertymd-slate-muted">{article.description}</p>
-            <button type="button" className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-libertymd-blue-600 group-hover:text-libertymd-ink">
-              {t('marketing.library.read')} <ArrowRight className="h-4 w-4" />
-            </button>
-          </article>
-        ))}
+/**
+ * Plus mark that becomes a minus. The whole glyph rotates a half turn on open (so the
+ * motion reads as a deliberate flip rather than a bar blinking out) while the vertical
+ * stroke collapses to nothing underneath it.
+ */
+function LibertyMDFaqToggleIcon({ isOpen }: { isOpen: boolean }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-libertymd-green-sage transition-all duration-300 ease-out group-hover:bg-libertymd-mist ${
+        isOpen ? 'rotate-180' : 'rotate-0'
+      }`}
+    >
+      <span className="absolute h-0.5 w-3 rounded-full bg-libertymd-ink" />
+      <span
+        className={`absolute h-3 w-0.5 rounded-full bg-libertymd-ink transition-transform duration-300 ease-out ${
+          isOpen ? 'scale-y-0' : 'scale-y-100'
+        }`}
+      />
+    </span>
+  );
+}
+
+function LibertyMDFaqRow({
+  question,
+  answer,
+  index,
+  isOpen,
+  onToggle,
+}: {
+  question: string;
+  answer: string;
+  index: number;
+  isOpen: boolean;
+  onToggle: () => void;
+}) {
+  const reduceMotion = useReducedMotion();
+  const panelId = `libertymd-faq-panel-${index}`;
+  const buttonId = `libertymd-faq-question-${index}`;
+
+  return (
+    <li className="text-left">
+      <h3>
+        <button
+          type="button"
+          id={buttonId}
+          aria-expanded={isOpen}
+          aria-controls={panelId}
+          onClick={onToggle}
+          className="group flex w-full items-center justify-between gap-6 rounded-lg py-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-libertymd-blue-600 focus-visible:ring-offset-4 focus-visible:ring-offset-transparent"
+        >
+          <span className="text-lg font-bold leading-snug text-libertymd-ink transition-colors group-hover:text-libertymd-blue-700 sm:text-xl">
+            {question}
+          </span>
+          <LibertyMDFaqToggleIcon isOpen={isOpen} />
+        </button>
+      </h3>
+
+      <AnimatePresence initial={false}>
+        {isOpen && (
+          <motion.div
+            key="panel"
+            id={panelId}
+            role="region"
+            aria-labelledby={buttonId}
+            initial={reduceMotion ? false : { height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={reduceMotion ? undefined : { height: 0, opacity: 0 }}
+            transition={reduceMotion ? { duration: 0 } : { height: { duration: 0.34, ease: [0.22, 1, 0.36, 1] }, opacity: { duration: 0.22 } }}
+            className="overflow-hidden"
+          >
+            <p className="max-w-3xl pr-14 pt-4 text-sm leading-7 text-libertymd-slate-muted sm:text-base">
+              {answer}
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Hairline rule under every row, so the list reads as one continuous column. */}
+      <span aria-hidden="true" className="mt-6 block h-px w-full bg-libertymd-slate-300/70" />
+    </li>
+  );
+}
+
+export function LibertyMDFaqSection() {
+  const { t } = useI18n();
+  // Single-open accordion: opening one row closes the previous, so the list never
+  // pushes the section's own heading off screen while someone is reading.
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+
+  const items = Array.from({ length: FAQ_ITEM_COUNT }, (_, index) => ({
+    question: t(`marketing.faq.items.${index}.question`),
+    answer: t(`marketing.faq.items.${index}.answer`),
+  })).filter((item) => item.question && item.answer);
+
+  if (items.length === 0) return null;
+
+  return (
+    <section
+      data-faq-section=""
+      className="libertymd-page-gutter libertymd-section-spacing relative overflow-hidden bg-gradient-to-b from-[#FAF8F5] via-white to-libertymd-blue-50"
+    >
+      {/* Narrower than `libertymd-content-shell` (88rem) on purpose: past ~64rem the
+          toggle drifts so far from its question that the pair stops reading as one row. */}
+      <div className="mx-auto w-full max-w-5xl">
+        <div className="text-center">
+          <p className="text-xs font-bold uppercase tracking-widest text-libertymd-blue-600">
+            {t('marketing.faq.kicker')}
+          </p>
+          <h2 className="mt-3 font-serif text-4xl font-semibold leading-tight text-libertymd-ink sm:text-5xl">
+            {t('marketing.faq.title')}
+          </h2>
+        </div>
+
+        <ul className="mt-12 flex flex-col gap-6">
+          {items.map((item, index) => (
+            <LibertyMDFaqRow
+              key={item.question}
+              question={item.question}
+              answer={item.answer}
+              index={index}
+              isOpen={openIndex === index}
+              onToggle={() => setOpenIndex((current) => (current === index ? null : index))}
+            />
+          ))}
+        </ul>
       </div>
     </section>
   );

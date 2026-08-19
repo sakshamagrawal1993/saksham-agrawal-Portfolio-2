@@ -18,8 +18,10 @@ import {
   detectDeterministicEmergency,
 } from '../../supabase/functions/libertymd-care-proxy/clinical-policy.ts'
 import { EMERGENCY_PATTERN_SET_VERSION } from '../../supabase/functions/libertymd-care-proxy/emergency-patterns.ts'
-import { mergeClinicalSlotUpdates } from '../../supabase/functions/libertymd-care-proxy/lib/slots.ts'
+import { enforceCardioRespiratoryEmergencySpecificity } from '../../supabase/functions/libertymd-care-proxy/lib/emergency-specificity.ts'
+import { calculateMissingSlots, mergeClinicalSlotUpdates } from '../../supabase/functions/libertymd-care-proxy/lib/slots.ts'
 import { LIBERTYMD_VALIDATION_CASES } from '../../scripts/libertymd-validation-cases.ts'
+import I18N_CASES from './clinical-scenarios.i18n.v0.1.json' with { type: 'json' }
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message)
@@ -80,6 +82,125 @@ Deno.test('positive associated symptoms misfiled as red-flag negatives do not co
   assert(!evidence.sufficient, 'Unanswered safety coverage cannot be sufficient')
 })
 
+Deno.test('interview negative labels are canonicalized before evidence and missing-slot checks', () => {
+  const result = mergeClinicalSlotUpdates({
+    chief_complaint: 'fever and body aches',
+    onset: 'four days ago',
+    severity: 'moderate',
+    associated_symptoms: ['cough'],
+    relevant_history: 'none',
+  }, {
+    red_flag_negatives: ['shortness of breath', 'difficulty breathing'],
+  }, {
+    sourceText: 'No shortness of breath or difficulty breathing.',
+  })
+
+  assertEquals(
+    JSON.stringify(result.slots.red_flag_negatives),
+    JSON.stringify(['no shortness of breath', 'no difficulty breathing']),
+    'Denied warning signs keep explicit negative semantics',
+  )
+  assert(assessClinicalEvidence(result.slots).sufficient, 'Canonicalized safety negatives satisfy the evidence gate')
+  assert(!calculateMissingSlots(result.slots).includes('red_flag_negatives'), 'Missing-slot logic matches evidence semantics')
+})
+
+Deno.test('bare positive symptoms misfiled as negatives remain fail-cautious during merge', () => {
+  const result = mergeClinicalSlotUpdates({}, {
+    red_flag_negatives: ['sore throat', 'cough'],
+  }, {
+    sourceText: 'I also have a sore throat and cough.',
+  })
+  assert(
+    !assessClinicalEvidence(result.slots).present.includes('red_flag_negatives'),
+    'Positive source text must not be rewritten as a denied warning sign',
+  )
+})
+
+Deno.test('LLM cannot force-end a closed wrist injury without immediate limb-threat evidence', () => {
+  const result = enforceCardioRespiratoryEmergencySpecificity({
+    status: 'force_end',
+    force_end: true,
+    is_emergency: true,
+    crisis_type: 'other_emergency',
+  }, 'I fell on my outstretched hand and my wrist looks deformed, with tingling in my fingers.', [])
+  assertEquals(result.status, 'high_risk_continue', 'Closed extremity injury should continue with urgent guidance')
+  assertEquals(result.force_end, false, 'Closed extremity injury should not terminally force-end')
+  assertEquals(result.care_setting, 'urgent_care', 'Closed extremity injury should retain urgent in-person routing')
+})
+
+Deno.test('LLM cannot force-end translated closed wrist injuries and keeps guidance localized', () => {
+  const englishFallback = 'This injury needs prompt in-person assessment. I can continue gathering details to help you decide the safest next step.'
+  for (const locale of ['es', 'pt', 'hi', 'hi-Latn', 'fr', 'de'] as const) {
+    const message = I18N_CASES.locales[locale].messages.wrist_deformity_tingling
+    const result = enforceCardioRespiratoryEmergencySpecificity({
+      status: 'force_end',
+      force_end: true,
+      is_emergency: true,
+      crisis_type: 'other_emergency',
+    }, message, [], locale)
+    assertEquals(result.status, 'high_risk_continue', `${locale}: closed extremity injury should continue`)
+    assertEquals(result.force_end, false, `${locale}: closed extremity injury should not force-end`)
+    assert(String(result.message || '') !== englishFallback, `${locale}: downgraded guidance must not fall back to English`)
+  }
+})
+
+Deno.test('translated immediate limb threats remain force-end', () => {
+  const threats: Record<string, string> = {
+    es: 'Tengo una fractura abierta en la muñeca y sangrado incontrolable.',
+    pt: 'Tenho uma fratura exposta no punho e sangramento incontrolável.',
+    hi: 'मेरी कलाई में खुला फ्रैक्चर है और अनियंत्रित खून बह रहा है।',
+    'hi-Latn': 'Meri wrist mein khula fracture hai aur khoon band nahi ho raha.',
+    fr: 'J’ai une fracture ouverte du poignet et un saignement incontrôlable.',
+    de: 'Ich habe eine offene Fraktur am Handgelenk und eine unkontrollierte Blutung.',
+  }
+  for (const [locale, message] of Object.entries(threats)) {
+    const result = enforceCardioRespiratoryEmergencySpecificity({
+      status: 'force_end',
+      force_end: true,
+      is_emergency: true,
+      crisis_type: 'other_emergency',
+    }, message, [], locale)
+    assertEquals(result.force_end, true, `${locale}: immediate limb threat must retain force-end`)
+  }
+})
+
+Deno.test('post-flight calf swelling continues urgently in every language unless PE signs are present', () => {
+  const messages: Record<string, string> = {
+    en: 'My left calf has been swollen and tender since I got off a long flight yesterday.',
+    ...Object.fromEntries((['es', 'pt', 'hi', 'hi-Latn', 'fr', 'de'] as const).map((locale) => [
+      locale,
+      I18N_CASES.locales[locale].messages.dvt_calf_post_flight,
+    ])),
+  }
+  for (const [locale, message] of Object.entries(messages)) {
+    const result = enforceCardioRespiratoryEmergencySpecificity({
+      status: 'force_end', force_end: true, is_emergency: true, crisis_type: 'other_emergency',
+    }, message, [], locale)
+    assertEquals(result.status, 'high_risk_continue', `${locale}: isolated suspected DVT should continue urgently`)
+    assertEquals(result.force_end, false, `${locale}: isolated suspected DVT should not force-end`)
+  }
+
+  for (const [locale, message] of Object.entries({
+    en: `${messages.en} I also have chest pain and shortness of breath.`,
+    de: `${messages.de} Zusätzlich habe ich Brustschmerzen und Atemnot.`,
+  })) {
+    const result = enforceCardioRespiratoryEmergencySpecificity({
+      status: 'force_end', force_end: true, is_emergency: true, crisis_type: 'other_emergency',
+    }, message, [], locale)
+    assertEquals(result.force_end, true, `${locale}: suspected PE signs must retain force-end`)
+  }
+})
+
+Deno.test('LLM force-end remains intact for an open fracture with uncontrolled bleeding', () => {
+  const result = enforceCardioRespiratoryEmergencySpecificity({
+    status: 'force_end',
+    force_end: true,
+    is_emergency: true,
+    crisis_type: 'other_emergency',
+  }, 'I injured my wrist, bone is sticking out and the bleeding will not stop.', [])
+  assertEquals(result.force_end, true, 'Immediate limb-threat evidence must retain force-end')
+})
+
 Deno.test('a missing timing field may be filled without replacing its established peer', () => {
   const result = mergeClinicalSlotUpdates(
     { onset: 'four days ago' },
@@ -129,6 +250,21 @@ Deno.test('Heart Attack fixture force-ends before model inference', () => {
 Deno.test('negated emergency terms do not false-positive', () => {
   const result = detectDeterministicEmergency('Mild sore throat with no chest pain and no trouble breathing.')
   assertEquals(result, null, 'Negated emergency terms should continue')
+})
+
+Deno.test('long multilingual negated warning-sign lists do not force-end', () => {
+  const messages = [
+    'No breathing difficulty, chest pain, fainting, blue lips, confusion, stiff neck, severe headache, rash or persistent vomiting.',
+    'No tengo dificultad para respirar, dolor en el pecho, desmayo, labios azules, confusión, rigidez de cuello, dolor de cabeza intenso, sarpullido ni vómitos persistentes.',
+    'Não tenho dificuldade para respirar, dor no peito, desmaio, lábios azuis, confusão, rigidez no pescoço, dor de cabeça intensa, erupção cutânea nem vómitos persistentes.',
+    'साँस की तकलीफ, सीने में दर्द, बेहोशी, नीले होंठ, भ्रम, गर्दन अकड़ना, तेज सिरदर्द, चकत्ते या लगातार उल्टी नहीं है।',
+    'Saans ki dikkat, chest pain, behoshi, neele hont, confusion, gardan akadna, severe headache, rash ya lagataar vomiting nahi hai.',
+    'Je n’ai ni difficulté à respirer, ni douleur thoracique, ni évanouissement, ni lèvres bleues, ni confusion, ni raideur de nuque, ni mal de tête intense, ni éruption cutanée, ni vomissements persistants.',
+    'Keine Atemnot, Brustschmerzen, Ohnmacht, blauen Lippen, Verwirrtheit, Nackensteife, starken Kopfschmerzen, kein Ausschlag und kein anhaltendes Erbrechen.',
+  ]
+  for (const message of messages) {
+    assertEquals(detectDeterministicEmergency(message), null, `Negated list should remain non-emergency: ${message}`)
+  }
 })
 
 Deno.test('jaw pain with sweating or nausea force-ends', () => {

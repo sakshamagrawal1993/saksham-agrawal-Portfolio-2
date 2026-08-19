@@ -1,5 +1,19 @@
 /** Short deterministic journey copy used when no model-authored text is available. */
 import { asClinicalLanguage, type ClinicalLanguage } from './journey-locale.ts'
+import type { ClinicalSlot } from './slots.ts'
+
+export interface ClinicalFallbackQuestion {
+  question: string
+  targetSlot: ClinicalSlot
+}
+
+const CONTINUE_FALLBACK_TARGETS: ClinicalSlot[] = [
+  'functional_impact',
+  'severity',
+  'character',
+  'associated_symptoms',
+  'relevant_history',
+]
 
 type JourneyCopy = {
   acknowledgement: string
@@ -166,6 +180,13 @@ export function continueFallbackQuestion(language: unknown): string {
 
 export function continueFallbackQuestions(language: unknown): string[] {
   return [...COPY[asClinicalLanguage(language)].continueFallbacks]
+}
+
+export function continueFallbackCandidates(language: unknown): ClinicalFallbackQuestion[] {
+  return COPY[asClinicalLanguage(language)].continueFallbacks.map((question, index) => ({
+    question,
+    targetSlot: CONTINUE_FALLBACK_TARGETS[index] || 'associated_symptoms',
+  }))
 }
 
 export function reportGateMessage(language: unknown, isAnonymous: boolean): string {

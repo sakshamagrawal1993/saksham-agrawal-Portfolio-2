@@ -8,6 +8,7 @@ import {
   WARM_MID_PATH_PREFACE,
   OFF_TOPIC_STOP_BODY,
   composeWarmMidPathRedirect,
+  offTopicStopBody,
   selectLastClinicalAsk,
 } from '../../supabase/functions/libertymd-care-proxy/lib/off-topic-recovery.ts'
 
@@ -77,6 +78,16 @@ Deno.test('AC1: warm mid-path preface + compose; banned substrings absent', () =
   }
 })
 
+Deno.test('AC1: off-topic recovery copy follows the clinical language', () => {
+  const spanish = composeWarmMidPathRedirect('¿Cuándo comenzaron los síntomas?', 'es')
+  if (!spanish.startsWith('Mantengámonos centrados')) throw new Error('Spanish preface missing')
+  if (spanish.includes("Let's stay focused")) throw new Error('English preface leaked into Spanish')
+  const hindiStop = offTopicStopBody('hi')
+  if (!/[ऀ-ॿ]/.test(hindiStop)) throw new Error('Hindi terminal copy is not Devanagari')
+  const regionalSpanish = offTopicStopBody('es-ES')
+  if (!regionalSpanish.startsWith('No pudimos continuar')) throw new Error('es-ES did not inherit Spanish stop copy')
+})
+
 Deno.test('AC1 Q6A: selectLastClinicalAsk skips prior off-topic redirects', () => {
   const clinical = 'Where is the pain located?'
   const redirect = composeWarmMidPathRedirect(clinical)
@@ -126,8 +137,8 @@ Deno.test('AC2/AC3: send-message uses warm bodies; thresholds still >= 3 / >= 5'
   if (!send.includes("from '../lib/off-topic-recovery.ts'")) {
     throw new Error('send-message must import off-topic-recovery helper')
   }
-  if (!send.includes('composeWarmMidPathRedirect') || !send.includes('OFF_TOPIC_STOP_BODY')) {
-    throw new Error('send-message must use warm mid-path + OFF_TOPIC_STOP_BODY')
+  if (!send.includes('composeWarmMidPathRedirect') || !send.includes('offTopicStopBody')) {
+    throw new Error('send-message must use localized warm mid-path + stop copy')
   }
   if (!send.includes('selectLastClinicalAsk')) {
     throw new Error('send-message must use Q6A selectLastClinicalAsk')

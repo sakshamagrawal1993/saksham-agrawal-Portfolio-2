@@ -72,6 +72,12 @@ export const INTERVIEW_WEBHOOK = envOr(`${N8N_BASE}/libertymd-interview`, () => 
 export const DIAGNOSIS_WEBHOOK = envOr(`${N8N_BASE}/libertymd-diagnosis`, () => Deno.env.get('LIBERTYMD_DIAGNOSIS_WEBHOOK'))
 /** P5-DDX — async mini-differential. Off the critical path; never blocks a turn. */
 export const DIFFERENTIAL_WEBHOOK = envOr(`${N8N_BASE}/libertymd-differential`, () => Deno.env.get('LIBERTYMD_DIFFERENTIAL_WEBHOOK'))
+/**
+ * P5-GUIDE — per-diagnosis guidance. Dispatched AFTER the report row is written
+ * and served, never awaited by the report path. A failure here costs the cards
+ * their guidance and nothing else.
+ */
+export const DIAGNOSIS_GUIDANCE_WEBHOOK = envOr(`${N8N_BASE}/libertymd-diagnosis-guidance`, () => Deno.env.get('LIBERTYMD_DIAGNOSIS_GUIDANCE_WEBHOOK'))
 /** Zero-retention media analysis: bytes exist only for this request. */
 export const PHOTO_ANALYSIS_WEBHOOK = envOr(`${N8N_BASE}/libertymd-photo-analysis`, () => Deno.env.get('LIBERTYMD_PHOTO_ANALYSIS_WEBHOOK'))
 export const LAB_ANALYSIS_WEBHOOK = envOr(`${N8N_BASE}/libertymd-lab-analysis`, () => Deno.env.get('LIBERTYMD_LAB_ANALYSIS_WEBHOOK'))
@@ -138,6 +144,10 @@ export const N8N_TIMEOUT_MS = {
   // P5-DDX — detached, so a slow run costs nothing user-visible. Bounded anyway
   // so a hung request cannot pin an isolate open behind the response.
   differential: envInt('LIBERTYMD_N8N_TIMEOUT_DIFFERENTIAL_MS', 20_000, 1_000, 60_000),
+  // P5-GUIDE — detached like the mini-differential. Three condition blocks cost
+  // more than one differential pass, so the budget is wider, but still bounded
+  // so a hung run cannot pin an isolate open behind an already-sent response.
+  diagnosisGuidance: envInt('LIBERTYMD_N8N_TIMEOUT_DIAGNOSIS_GUIDANCE_MS', 45_000, 1_000, 60_000),
   photoAnalysis: envInt('LIBERTYMD_N8N_TIMEOUT_PHOTO_ANALYSIS_MS', 90_000, 5_000, 120_000),
   labAnalysis: envInt('LIBERTYMD_N8N_TIMEOUT_LAB_ANALYSIS_MS', 120_000, 5_000, 120_000),
 } as const
@@ -205,6 +215,18 @@ export const GUARDRAIL_SHADOW_TIMEOUT_MS = envInt(
  */
 export function isSpeculativeDiagnosisEnabled(): boolean {
   return envBool('LIBERTYMD_SPECULATIVE_DIAGNOSIS', false)
+}
+
+/**
+ * P5-GUIDE — per-diagnosis guidance.
+ *
+ * Default **off**. When off: no guidance webhook call, guidance stays 'idle',
+ * the client never polls for it, and the report renders exactly as it does
+ * today with only the consultation-level Recommended Action Plan. Read at call
+ * time so a secret flip + isolate refresh enables it without a redeploy.
+ */
+export function isDiagnosisGuidanceEnabled(): boolean {
+  return envBool('LIBERTYMD_DIAGNOSIS_GUIDANCE', false)
 }
 
 /**

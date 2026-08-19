@@ -16,6 +16,7 @@ import {
   saveDiagnosticRun,
 } from '../lib/consultations.ts'
 import { isComprehensionCompleted } from '../lib/comprehension-check.ts'
+import { dispatchDiagnosisGuidance } from '../lib/diagnosis-guidance.ts'
 import { jsonResponse } from '../lib/errors.ts'
 import {
   listMediaEvidence,
@@ -213,6 +214,25 @@ export async function handleGenerateReport(ctx: ProxyContext, payload: RequestPa
         evidence_bucket: scoreBucket(evidence.score),
         is_anonymous: ctx.isAnonymous,
       })
+    }
+    // P5-GUIDE — per-diagnosis guidance is dispatched here and NOT awaited. The
+    // report returns at the same speed it always has; the guidance run lands
+    // afterwards and the client hydrates the cards on a later poll. Only fires
+    // on a freshly materialized report: a re-serve already has its guidance, or
+    // already failed to get any.
+    if (materializedCompleteReport && report.id) {
+      try {
+        await dispatchDiagnosisGuidance(ctx, {
+          reportId: report.id,
+          consultationId: consultation.id,
+          reportData: reportInput.reportData,
+          language: String(consultation.language || 'en'),
+          clinicalContext: diagnosis.raw?.clinical_context,
+        })
+      } catch (guidanceError) {
+        // Never fatal: the report is composed and persisted at this point.
+        console.error('Unable to dispatch LibertyMD diagnosis guidance', guidanceError)
+      }
     }
     return finalizeFromExistingReport(ctx, consultation, report, {
       turnCount: consultation.turn_count,

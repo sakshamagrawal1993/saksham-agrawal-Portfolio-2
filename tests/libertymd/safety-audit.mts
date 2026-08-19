@@ -635,7 +635,7 @@ Deno.test('P0-14b AC6 · capped-turn still screens before closeAtTurnCap', async
   }
 })
 
-Deno.test('P1-01 · non-emergency start returns first question and persists target_slot', async () => {
+Deno.test('P1-01 · demographics-gated start defers its first interview question', async () => {
   const fetchLog = stubFetch((url) => {
     if (url === INTERVIEW_WEBHOOK) return interviewPass()
     if (url === GUARDRAIL_WEBHOOK) {
@@ -661,30 +661,30 @@ Deno.test('P1-01 · non-emergency start returns first question and persists targ
       state?: string
       next_question?: string
       options?: string[]
-      target_slot?: string
+      target_slot?: string | null
       acknowledgement?: string
     }
     assertEquals(body.emergency, undefined, 'not emergency')
     assertEquals(body.state, 'awaiting_demographics', 'still awaiting demographics')
-    assertEquals(body.next_question, 'When did this start?', 'first interview question')
-    assertEquals(body.target_slot, 'onset', 'target_slot from interview')
-    assertTrue(Array.isArray(body.options) && body.options.length > 0, 'options present')
+    assertEquals(body.next_question, '', 'question waits for completed demographics')
+    assertEquals(body.target_slot, null, 'no unanswered target slot is staged')
+    assertEquals(Array.isArray(body.options) ? body.options.length : -1, 0, 'no hidden options')
     assertTrue(
       !String(body.acknowledgement || '').toLowerCase().includes('biological sex'),
       'ack must not be the old long demographics ask',
     )
     const consultUpdates = opsFor(ops, 'libertymd_consultations', 'update')
-      .map((op) => op.payload as { target_slot?: string; status?: string })
+      .map((op) => op.payload as { target_slot?: string | null; status?: string })
     assertTrue(
-      consultUpdates.some((row) => row.target_slot === 'onset'),
-      'target_slot persisted on consultation',
+      consultUpdates.some((row) => row.target_slot === null),
+      'no target_slot is persisted before a question is served',
     )
     assertTrue(
       !consultUpdates.some((row) => row.status === 'interviewing'),
       'abandon remains awaiting_demographics until save',
     )
     const interviewCalls = fetchLog.calls.filter((call) => call.url === INTERVIEW_WEBHOOK)
-    assertEquals(interviewCalls.length, 1, 'interview called once on non-emergency start')
+    assertEquals(interviewCalls.length, 0, 'interview is deferred until demographics save')
   } finally {
     fetchLog.restore()
   }

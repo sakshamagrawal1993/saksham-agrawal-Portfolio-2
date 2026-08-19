@@ -1,0 +1,43 @@
+{
+  "round": "wrist-specificity-post-fix",
+  "base_url": "https://saksham-experiments.com/liberty-md",
+  "started_cases": 8,
+  "expected_cases": 8,
+  "passed": 8,
+  "failed": 0,
+  "by_locale": {
+    "en": {
+      "passed": 1,
+      "total": 1
+    },
+    "es": {
+      "passed": 1,
+      "total": 1
+    },
+    "es-ES": {
+      "passed": 1,
+      "total": 1
+    },
+    "pt": {
+      "passed": 1,
+      "total": 1
+    },
+    "hi": {
+      "passed": 1,
+      "total": 1
+    },
+    "hi-Latn": {
+      "passed": 1,
+      "total": 1
+    },
+    "fr": {
+      "passed": 1,
+      "total": 1
+    },
+    "de": {
+      "passed": 1,
+      "total": 1
+    }
+  },
+  "numeric_contract": "Input digits and decimal values match the English fixture exactly."
+}

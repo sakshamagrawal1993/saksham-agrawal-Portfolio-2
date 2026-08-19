@@ -1,0 +1,232 @@
+[
+  {
+    "case_index": 1,
+    "locale": "en",
+    "clinical_locale": "en",
+    "scenario_id": "acs_radiating_arm",
+    "category": "emergency",
+    "expected_action": "force_end",
+    "expected_crisis_type": "acs_chest_pain",
+    "observed_state": "error",
+    "passed": false,
+    "duration_ms": 47321,
+    "error": "Navigation timeout of 45000 ms exceeded",
+    "page_errors": [],
+    "failed_requests": [
+      {
+        "url": "https://saksham-experiments.com/assets/index-CG1a5vsM.js",
+        "error": "net::ERR_TIMED_OUT"
+      },
+      {
+        "url": "https://saksham-experiments.com/assets/vendor-react-LL5taaTd.js",
+        "error": "net::ERR_TIMED_OUT"
+      },
+      {
+        "url": "https://saksham-experiments.com/assets/vendor-utils-BNCQ0kR5.js",
+        "error": "net::ERR_TIMED_OUT"
+      },
+      {
+        "url": "https://saksham-experiments.com/assets/three-vendor-Ml0nddQA.js",
+        "error": "net::ERR_TIMED_OUT"
+      },
+      {
+        "url": "https://saksham-experiments.com/assets/vendor-supabase-C5REzbh9.js",
+        "error": "net::ERR_TIMED_OUT"
+      },
+      {
+        "url": "https://saksham-experiments.com/assets/index-CBtNLYq2.css",
+        "error": "net::ERR_TIMED_OUT"
+      }
+    ],
+    "screenshot_filename": "001_en_acs_radiating_arm_error.png"
+  },
+  {
+    "case_index": 2,
+    "locale": "es",
+    "clinical_locale": "es",
+    "scenario_id": "acs_radiating_arm",
+    "category": "emergency",
+    "expected_action": "force_end",
+    "expected_crisis_type": "acs_chest_pain",
+    "baseline_emergency_numbers": [
+      "112"
+    ],
+    "observed_emergency_numbers": [
+      "112"
+    ],
+    "observed_state": "emergency_force_end",
+    "localized_heading_present": true,
+    "no_english_fallback": true,
+    "localized_required_chrome": true,
+    "missing_required_chrome": [],
+    "numeric_input_tokens_preserved": true,
+    "emergency_number_present": true,
+    "passed": true,
+    "duration_ms": 6141,
+    "page_errors": [],
+    "failed_requests": [],
+    "screenshot_filename": null
+  },
+  {
+    "case_index": 3,
+    "locale": "es-ES",
+    "clinical_locale": "es",
+    "scenario_id": "acs_radiating_arm",
+    "category": "emergency",
+    "expected_action": "force_end",
+    "expected_crisis_type": "acs_chest_pain",
+    "baseline_emergency_numbers": [
+      "112"
+    ],
+    "observed_emergency_numbers": [
+      "112"
+    ],
+    "observed_state": "emergency_force_end",
+    "localized_heading_present": true,
+    "no_english_fallback": true,
+    "localized_required_chrome": true,
+    "missing_required_chrome": [],
+    "numeric_input_tokens_preserved": true,
+    "emergency_number_present": true,
+    "passed": true,
+    "duration_ms": 3781,
+    "page_errors": [],
+    "failed_requests": [],
+    "screenshot_filename": null
+  },
+  {
+    "case_index": 4,
+    "locale": "pt",
+    "clinical_locale": "pt",
+    "scenario_id": "acs_radiating_arm",
+    "category": "emergency",
+    "expected_action": "force_end",
+    "expected_crisis_type": "acs_chest_pain",
+    "baseline_emergency_numbers": [
+      "112"
+    ],
+    "observed_emergency_numbers": [
+      "112"
+    ],
+    "observed_state": "emergency_force_end",
+    "localized_heading_present": true,
+    "no_english_fallback": true,
+    "localized_required_chrome": true,
+    "missing_required_chrome": [],
+    "numeric_input_tokens_preserved": true,
+    "emergency_number_present": true,
+    "passed": true,
+    "duration_ms": 2793,
+    "page_errors": [],
+    "failed_requests": [],
+    "screenshot_filename": null
+  },
+  {
+    "case_index": 5,
+    "locale": "hi",
+    "clinical_locale": "hi",
+    "scenario_id": "acs_radiating_arm",
+    "category": "emergency",
+    "expected_action": "force_end",
+    "expected_crisis_type": "acs_chest_pain",
+    "baseline_emergency_numbers": [
+      "112"
+    ],
+    "observed_emergency_numbers": [
+      "112"
+    ],
+    "observed_state": "emergency_force_end",
+    "localized_heading_present": true,
+    "no_english_fallback": true,
+    "localized_required_chrome": true,
+    "missing_required_chrome": [],
+    "numeric_input_tokens_preserved": true,
+    "emergency_number_present": true,
+    "passed": true,
+    "duration_ms": 3134,
+    "page_errors": [],
+    "failed_requests": [],
+    "screenshot_filename": null
+  },
+  {
+    "case_index": 6,
+    "locale": "hi-Latn",
+    "clinical_locale": "hi-Latn",
+    "scenario_id": "acs_radiating_arm",
+    "category": "emergency",
+    "expected_action": "force_end",
+    "expected_crisis_type": "acs_chest_pain",
+    "baseline_emergency_numbers": [
+      "112"
+    ],
+    "observed_emergency_numbers": [
+      "112"
+    ],
+    "observed_state": "emergency_force_end",
+    "localized_heading_present": true,
+    "no_english_fallback": true,
+    "localized_required_chrome": true,
+    "missing_required_chrome": [],
+    "numeric_input_tokens_preserved": true,
+    "emergency_number_present": true,
+    "passed": true,
+    "duration_ms": 2961,
+    "page_errors": [],
+    "failed_requests": [],
+    "screenshot_filename": null
+  },
+  {
+    "case_index": 7,
+    "locale": "fr",
+    "clinical_locale": "fr",
+    "scenario_id": "acs_radiating_arm",
+    "category": "emergency",
+    "expected_action": "force_end",
+    "expected_crisis_type": "acs_chest_pain",
+    "baseline_emergency_numbers": [
+      "112"
+    ],
+    "observed_emergency_numbers": [
+      "112"
+    ],
+    "observed_state": "emergency_force_end",
+    "localized_heading_present": true,
+    "no_english_fallback": true,
+    "localized_required_chrome": true,
+    "missing_required_chrome": [],
+    "numeric_input_tokens_preserved": true,
+    "emergency_number_present": true,
+    "passed": true,
+    "duration_ms": 2714,
+    "page_errors": [],
+    "failed_requests": [],
+    "screenshot_filename": null
+  },
+  {
+    "case_index": 8,
+    "locale": "de",
+    "clinical_locale": "de",
+    "scenario_id": "acs_radiating_arm",
+    "category": "emergency",
+    "expected_action": "force_end",
+    "expected_crisis_type": "acs_chest_pain",
+    "baseline_emergency_numbers": [
+      "112"
+    ],
+    "observed_emergency_numbers": [
+      "112"
+    ],
+    "observed_state": "emergency_force_end",
+    "localized_heading_present": true,
+    "no_english_fallback": true,
+    "localized_required_chrome": true,
+    "missing_required_chrome": [],
+    "numeric_input_tokens_preserved": true,
+    "emergency_number_present": true,
+    "passed": true,
+    "duration_ms": 2429,
+    "page_errors": [],
+    "failed_requests": [],
+    "screenshot_filename": null
+  }
+]

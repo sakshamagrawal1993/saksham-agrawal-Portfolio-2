@@ -1,0 +1,80 @@
+[
+  {
+    "locale": "es-ES",
+    "clinical_locale": "es",
+    "consultation_id": "ff4e6162-53c1-48ec-ab41-f70222a67406",
+    "status": "report_pending_auth",
+    "turns": 9,
+    "questions": 9,
+    "report_complete": true,
+    "diagnosis_guidance_status": "ready",
+    "diagnosis_guidance_blocks": 3,
+    "duration_ms": 103853,
+    "passed": true
+  },
+  {
+    "locale": "pt",
+    "clinical_locale": "pt",
+    "consultation_id": "f41388e5-7111-4526-a6da-5f772ae3b5c9",
+    "status": "report_pending_auth",
+    "turns": 6,
+    "questions": 6,
+    "report_complete": true,
+    "diagnosis_guidance_status": "ready",
+    "diagnosis_guidance_blocks": 3,
+    "duration_ms": 82533,
+    "passed": true
+  },
+  {
+    "locale": "hi",
+    "clinical_locale": "hi",
+    "consultation_id": "9dc4c3c8-c2c1-4688-bf3e-d06f4dbe3e97",
+    "status": "report_pending_auth",
+    "turns": 5,
+    "questions": 5,
+    "report_complete": true,
+    "diagnosis_guidance_status": "ready",
+    "diagnosis_guidance_blocks": 3,
+    "duration_ms": 76002,
+    "passed": true
+  },
+  {
+    "locale": "hi-Latn",
+    "clinical_locale": "hi-Latn",
+    "consultation_id": "acbdf801-5e9d-4687-82aa-23093930cd1e",
+    "status": "report_pending_auth",
+    "turns": 5,
+    "questions": 5,
+    "report_complete": true,
+    "diagnosis_guidance_status": "ready",
+    "diagnosis_guidance_blocks": 3,
+    "duration_ms": 82338,
+    "passed": true
+  },
+  {
+    "locale": "fr",
+    "clinical_locale": "fr",
+    "consultation_id": "be7912c8-f755-427b-829c-8b37508e0420",
+    "status": "report_pending_auth",
+    "turns": 4,
+    "questions": 4,
+    "report_complete": true,
+    "diagnosis_guidance_status": "ready",
+    "diagnosis_guidance_blocks": 3,
+    "duration_ms": 75503,
+    "passed": true
+  },
+  {
+    "locale": "de",
+    "clinical_locale": "de",
+    "consultation_id": "5fd9fb5c-3b8f-42d5-abc9-bdaa9a59ffa1",
+    "status": "report_pending_auth",
+    "turns": 5,
+    "questions": 5,
+    "report_complete": true,
+    "diagnosis_guidance_status": "ready",
+    "diagnosis_guidance_blocks": 3,
+    "duration_ms": 78995,
+    "passed": true
+  }
+]

@@ -24,18 +24,36 @@ import {
 import LibertyMDLanguageSwitcher from './LibertyMDLanguageSwitcher'
 import LibertyMDFooterRibbon from './LibertyMDFooterRibbon'
 import { LibertyMDAccountDrawer, LibertyMDReportGate } from './LibertyMDCareControls'
+import { normalizeHistorySummary } from './libertymd-care-proxy-client'
+import type { LibertyMDHistoryItem } from './LibertyMDHistoryList'
 import { isSoftGateDismissed, markSoftGateDismissed } from './libertymd-soft-gate'
 import {
   formatRetentionRemaining,
   isRetentionExpired,
   type ReportLifecycleState,
 } from './libertymd-report-lifecycle'
-import { normalizeReportData, type LibertyMdNormalizedReport } from './libertymd-report'
+import {
+  mergeDiagnosisGuidance,
+  normalizeReportData,
+  type LibertyMdGuidanceStatus,
+  type LibertyMdNormalizedReport,
+} from './libertymd-report'
 
 /** How often to re-poll while the report is still being generated. */
 const POLL_INTERVAL_MS = 3_000
 /** Polling timeout: 2 minutes (120,000 ms) before auto-triggering report generation retry. */
 const POLL_TIMEOUT_MS = 120_000
+/**
+ * P5-GUIDE — cadence for the guidance-only poll. Slower than the generation
+ * poll: nothing is blocked on it, the report is already on screen, and the
+ * guidance run takes tens of seconds.
+ */
+const GUIDANCE_POLL_INTERVAL_MS = 4_000
+/**
+ * Stop polling for guidance after this long and drop the skeleton. A run that
+ * never writes a terminal state must not leave the cards shimmering forever.
+ */
+const GUIDANCE_POLL_TIMEOUT_MS = 90_000
 /** Maximum allowed report regenerations per consultation. */
 const MAX_REGENERATIONS_PER_CONSULTATION = 2
 
@@ -66,7 +84,15 @@ export default function LibertyMDReportPage() {
   const [user, setUser] = useState<User | null>(null)
   const [identityStatus, setIdentityStatus] = useState<IdentityStatus>('loading')
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [guidance, setGuidance] = useState<unknown[]>([])
+  const [guidanceStatus, setGuidanceStatus] = useState<LibertyMdGuidanceStatus>('idle')
+  const [history, setHistory] = useState<LibertyMDHistoryItem[]>([])
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false)
   const isAnonymous = identityStatus === 'anonymous'
+  // The drawer's history panel is linked-only. While identity is still
+  // resolving we have no history to show and no way to fetch it, so the
+  // drawer keeps the guest panel until the proxy confirms a linked account.
+  const isLinked = identityStatus === 'linked'
   const startedAtRef = useRef<number>(Date.now())
   const cancelledRef = useRef(false)
   const consecutiveErrorsRef = useRef(0)
@@ -124,6 +150,12 @@ export default function LibertyMDReportPage() {
     }
 
     consecutiveErrorsRef.current = 0
+    // P5-GUIDE — guidance rides alongside the report. Recorded on every load so
+    // a reload mid-flight resumes the skeleton instead of restarting the run.
+    if (data?.diagnosis_guidance_status) {
+      setGuidance(Array.isArray(data.diagnosis_guidance) ? data.diagnosis_guidance : [])
+      setGuidanceStatus(String(data.diagnosis_guidance_status) as LibertyMdGuidanceStatus)
+    }
     if (typeof data?.is_anonymous === 'boolean') {
       // Authoritative on every page load: derived from the JWT by the proxy,
       // independent of client hydration timing or page-local state.
@@ -181,6 +213,85 @@ export default function LibertyMDReportPage() {
     setState({ kind: 'generating' })
     return 'pending'
   }, [consultationId, navigate, t, ensureIdentity])
+
+  /**
+   * P5-GUIDE — guidance-only poll, entirely separate from the generation poll.
+   *
+   * The report is already painted by the time this runs; it exists solely to
+   * swap each card's skeleton for its guidance. It re-reads `get_consultation`
+   * rather than a dedicated endpoint so the report body, retention state and
+   * guidance can never drift apart. Runs only while `pending`, and gives up
+   * after GUIDANCE_POLL_TIMEOUT_MS so a run that never lands drops the skeleton
+   * instead of shimmering forever.
+   */
+  useEffect(() => {
+    if (guidanceStatus !== 'pending') return
+    if (state.kind !== 'ready') return
+    let cancelled = false
+    let timer: number | undefined
+    const startedAt = Date.now()
+
+    const poll = async () => {
+      if (cancelled) return
+      if (Date.now() - startedAt > GUIDANCE_POLL_TIMEOUT_MS) {
+        setGuidanceStatus('failed')
+        return
+      }
+      try {
+        const { data, error } = await supabase.functions.invoke('libertymd-care-proxy', {
+          body: { action: 'get_consultation', consultation_id: consultationId },
+        })
+        if (cancelled) return
+        if (!error && data?.diagnosis_guidance_status) {
+          const next = String(data.diagnosis_guidance_status) as LibertyMdGuidanceStatus
+          setGuidance(Array.isArray(data.diagnosis_guidance) ? data.diagnosis_guidance : [])
+          setGuidanceStatus(next)
+          if (next !== 'pending') return
+        }
+      } catch {
+        // Transient: keep polling until the timeout decides.
+      }
+      if (!cancelled) timer = window.setTimeout(poll, GUIDANCE_POLL_INTERVAL_MS)
+    }
+
+    timer = window.setTimeout(poll, GUIDANCE_POLL_INTERVAL_MS)
+    return () => {
+      cancelled = true
+      if (timer) window.clearTimeout(timer)
+    }
+  }, [guidanceStatus, state.kind, consultationId])
+
+  /**
+   * P5-REPORT — consultation history for the header drawer. Linked-only, same
+   * `get_history` contract the consult surfaces use. Anonymous sessions get the
+   * guest panel instead, so there is nothing to fetch for them.
+   */
+  useEffect(() => {
+    if (!isLinked) {
+      setHistory([])
+      setIsHistoryLoading(false)
+      return
+    }
+    let cancelled = false
+    setIsHistoryLoading(true)
+    void (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('libertymd-care-proxy', {
+          body: { action: 'get_history' },
+        })
+        if (cancelled) return
+        if (error) throw error
+        setHistory(normalizeHistorySummary(data?.history))
+      } catch (historyError) {
+        if (!cancelled) console.error('Unable to load LibertyMD history', historyError)
+      } finally {
+        if (!cancelled) setIsHistoryLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [isLinked])
 
   const triggerReload = useCallback(() => {
     consecutiveErrorsRef.current = 0
@@ -400,7 +511,12 @@ export default function LibertyMDReportPage() {
               />
             ) : null}
             <LibertyMDReportView
-              report={state.report}
+              report={
+                guidance.length
+                  ? { ...state.report, differentials: mergeDiagnosisGuidance(state.report.differentials, guidance) }
+                  : state.report
+              }
+              guidancePending={guidanceStatus === 'pending'}
               saved={state.saved}
               consultationId={consultationId}
               retentionExpiresAt={state.retentionExpiresAt}
@@ -448,7 +564,9 @@ export default function LibertyMDReportPage() {
 
       <LibertyMDAccountDrawer
         open={isMenuOpen}
-        isAnonymous={isAnonymous}
+        isAnonymous={!isLinked}
+        history={history}
+        loading={isHistoryLoading}
         displayName={user?.user_metadata?.full_name || user?.email}
         email={user?.email}
         avatarUrl={user?.user_metadata?.avatar_url}

@@ -1,4 +1,3 @@
-import React from 'react';
 import { motion } from 'framer-motion';
 import { Sparkles, ArrowRight, Gift } from 'lucide-react';
 import StepIllustration from '../StepIllustration';

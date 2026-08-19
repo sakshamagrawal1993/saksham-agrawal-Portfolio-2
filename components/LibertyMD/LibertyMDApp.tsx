@@ -25,14 +25,13 @@ import { PatientOathEmblem } from './LibertyMDFooterBadges';
 import LibertyMDPremiumLogo from './LibertyMDPremiumLogo';
 import LibertyMDParticleWaveSeparator from './LibertyMDParticleWaveSeparator';
 import {
-  LibertyMDHealthLibrarySection,
+  LibertyMDFaqSection,
   LibertyMDPatientStoriesSection,
   LibertyMDPhoneCareSection,
   LibertyMDPricingSection,
   LibertyMDSpecialistsSection,
 } from './LibertyMDMarketingSections';
 import { LibertyMDPhaseStack } from './LibertyMDPhaseStack';
-import { LibertyMDScrollFilmSection } from './LibertyMDScrollFilmSection';
 import { LibertyMDProgressIndicator } from './LibertyMDProgressIndicator';
 import { LibertyMDReportView } from './LibertyMDReportView';
 import { LibertyMDSampleReport } from './LibertyMDSampleReport';
@@ -159,9 +158,6 @@ interface LibertyMDProfile {
   age?: number | null;
   sex_at_birth?: string | null;
 }
-
-const EMERGENCY_ACKNOWLEDGE_LABEL = 'I understand';
-const EMERGENCY_PERSISTENCE_NOTE = 'This guidance stays pinned to the bottom of the screen after you acknowledge it.';
 
 function crisisTypeFromSafetyPayload(payload: unknown): string | null {
   if (!payload || typeof payload !== 'object') return null
@@ -982,7 +978,15 @@ export default function LibertyMDApp() {
           'var(--libertymd-surface-wash)',
       }}
     >
-      <main>
+      {/* App.tsx already wraps every route in <main>; a second one here made the
+          document expose two "main" landmarks and left "skip to main" ambiguous. */}
+      <a
+        href="#libertymd-main"
+        className="sr-only rounded-lg bg-libertymd-blue-600 font-semibold text-white focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:px-4 focus:py-3 focus:outline-none focus:ring-2 focus:ring-libertymd-blue-700 focus:ring-offset-2"
+      >
+        {t('common.skipToContent')}
+      </a>
+      <>
         <section className="libertymd-page-gutter relative z-10 flex min-h-[100svh] flex-col overflow-visible">
           <div className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(247,250,255,0.9)_54%,rgba(240,248,243,0.96)_100%)]" />
 
@@ -1001,25 +1005,35 @@ export default function LibertyMDApp() {
               LibertyMD
             </a>
 
-            <div className="flex items-center gap-2 text-sm font-semibold text-libertymd-slate-700 sm:gap-3">
+            {/* Deliberately NOT <nav>. This cluster is three buttons — language menu,
+                Google sign-in, profile drawer — and contains no links; the header's one
+                real navigation link (the wordmark) sits outside it. A navigation landmark
+                here would be permanently empty of navigable elements. `group` names the
+                cluster for AT without claiming navigation and without the roving-tabindex
+                contract that `toolbar` would imply. */}
+            <div
+              role="group"
+              aria-label={t('common.navAccount')}
+              className="flex items-center gap-2 text-sm font-semibold text-libertymd-slate-700 sm:gap-3"
+            >
               {!isAnonymous && greetingName && <span className="hidden sm:inline">Hi, {greetingName}</span>}
               <LibertyMDLanguageSwitcher />
               {isAnonymous && (
                 <button
                   id="libertymd-homepage-signin-btn"
                   type="button"
-                  aria-label="Sign in with Google"
+                  aria-label={t('chatx.signInGoogle')}
                   disabled={isAuthBusy}
                   onClick={() => { void startGoogleSignIn(); }}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-libertymd-blue-600/30 bg-libertymd-blue-600/5 px-2.5 py-1.5 text-xs font-semibold text-libertymd-blue-600 transition-colors hover:bg-libertymd-blue-600 hover:text-white sm:px-4 sm:text-sm"
+                  className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-full border border-libertymd-blue-600/30 bg-libertymd-blue-600/5 px-2.5 py-1.5 text-xs font-semibold text-libertymd-blue-600 transition-colors hover:bg-libertymd-blue-600 hover:text-white sm:px-4 sm:text-sm"
                 >
                   <LogIn className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
-                  <span className="hidden sm:inline">Sign in</span>
+                  <span className="hidden sm:inline">{t('chatx.signIn')}</span>
                 </button>
               )}
               <button
                 type="button"
-                aria-label="Open profile and consultation history"
+                aria-label={t('chatx.openProfileHistory')}
                 onClick={() => {
                   setIsMenuOpen(true);
                   if (!isAnonymous) void refreshHistory();
@@ -1031,7 +1045,11 @@ export default function LibertyMDApp() {
             </div>
           </header>
 
-          <div className="libertymd-hero-content libertymd-shell flex flex-1 flex-col items-center justify-center pb-8 text-center sm:pb-0 [@media(max-height:700px)]:pb-0">
+          <div
+            id="libertymd-main"
+            tabIndex={-1}
+            className="libertymd-hero-content libertymd-shell flex flex-1 flex-col items-center justify-center pb-8 text-center outline-none sm:pb-0 [@media(max-height:700px)]:pb-0"
+          >
             <style>
               {`
                 @keyframes libertymd-proof-reveal {
@@ -1649,9 +1667,9 @@ export default function LibertyMDApp() {
 
         <LibertyMDPatientStoriesSection />
 
-        <LibertyMDHealthLibrarySection />
+        <LibertyMDFaqSection />
 
-      </main>
+      </>
 
       {phase === 'report_gate' && isReportGateOpen && !guestExpired && (
         <LibertyMDReportGate
@@ -1691,8 +1709,8 @@ export default function LibertyMDApp() {
           heading={emergencyHeading}
           message={emergencyDetail}
           standingInstruction={emergencyStandingInstruction}
-          acknowledgeLabel={EMERGENCY_ACKNOWLEDGE_LABEL}
-          persistenceNote={EMERGENCY_PERSISTENCE_NOTE}
+          acknowledgeLabel={t('chatx.emergencyAcknowledge')}
+          persistenceNote={t('chatx.emergencyPersistence')}
           onAcknowledge={() => setIsEmergencyAcknowledged(true)}
         />
       )}
@@ -1752,7 +1770,10 @@ export default function LibertyMDApp() {
         <div className="relative z-10 max-w-7xl mx-auto px-6 sm:px-10 pt-16 w-full">
           <div className="flex flex-col lg:flex-row justify-between items-start gap-12">
             {/* Left Columns */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-8 text-xs font-medium text-libertymd-slate-700">
+            <nav
+              aria-label={t('common.navFooter')}
+              className="grid grid-cols-2 sm:grid-cols-4 gap-8 text-xs font-medium text-libertymd-slate-700"
+            >
               <div className="space-y-4">
                 <p className="font-semibold text-sm text-libertymd-slate-900">{t('footer.clinicalCare')}</p>
                 <ul className="space-y-2.5">
@@ -1804,7 +1825,7 @@ export default function LibertyMDApp() {
                   <li className="hover:text-libertymd-blue-600 cursor-pointer">{t('footer.usInsurance')}</li>
                 </ul>
               </div>
-            </div>
+            </nav>
 
             {/* Right Side: CARIN / HIPAA / LegitScript Badges using real image URLs */}
             <div className="flex items-center gap-6 shrink-0 self-start">

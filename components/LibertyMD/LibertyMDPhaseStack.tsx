@@ -193,8 +193,6 @@ const floorVeilPath = (scale = 1.18) => {
   );
 };
 
-const floorPedestalPath = (cy: number, scale = 1.18, depth = 64) => floorVeilPath(scale);
-
 /**
  * Projects an upright glyph drawn around the origin onto a plate's face: unit x runs down-right
  * and unit y down-left, squashed by the same RY/RX the plates use.

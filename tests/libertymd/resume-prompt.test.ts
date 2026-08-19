@@ -172,11 +172,31 @@ Deno.test('P1-13 AC3 · no abandoned/recovery in patient-visible resume chrome (
   }
   assert(!prompt.includes('Consultation paused'), 'paused framing banned on prompt')
 
+  // UPDATED 2026-08-19 — statusCopy now holds i18n KEYS, not literals. The strip
+  // copy moved from this TSX into the locale bundles, so asserting the literal in
+  // source was checking the wrong file. Intent is unchanged and still enforced:
+  // the resume strip must read as an invitation, never as "abandoned",
+  // "recovery" or "paused". Now resolved through en.json, which also catches the
+  // key going missing or being reworded badly.
   const stripMatch = chat.match(/recovery_required:\s*'([^']+)'/)
   assert(stripMatch, 'statusCopy.recovery_required must exist')
-  assert(!banned.test(stripMatch![1]), `strip must not say abandoned/recovery: ${stripMatch![1]}`)
-  assert(!/paused/i.test(stripMatch![1]), `strip must drop paused framing: ${stripMatch![1]}`)
-  assert(stripMatch![1].includes('Pick up where you left off'), 'strip invitation-aligned')
+  const stripRef = stripMatch![1]
+  assert(
+    stripRef.startsWith('chatx.'),
+    `recovery_required must reference an i18n key, got: ${stripRef}`,
+  )
+  const en = JSON.parse(
+    await Deno.readTextFile(new URL('../../i18n/locales/en.json', import.meta.url)),
+  ) as Record<string, Record<string, string>>
+  const [ns, key] = stripRef.split('.')
+  const stripCopy = en[ns]?.[key]
+  assert(
+    typeof stripCopy === 'string' && stripCopy.length > 0,
+    `${stripRef} must resolve in en.json, got: ${String(stripCopy)}`,
+  )
+  assert(!banned.test(stripCopy), `strip must not say abandoned/recovery: ${stripCopy}`)
+  assert(!/paused/i.test(stripCopy), `strip must drop paused framing: ${stripCopy}`)
+  assert(stripCopy.includes('Pick up where you left off'), 'strip invitation-aligned')
 })
 
 Deno.test('P1-13 · Chat retains chief_complaint and passes into resume continuation', async () => {
