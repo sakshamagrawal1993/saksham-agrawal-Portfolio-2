@@ -215,16 +215,56 @@ const doctorAdvisors = [
   },
 ];
 
+const SPECIALIST_ROTATE_MS = 2000;
+
 export function LibertyMDSpecialistsSection() {
   const { t } = useI18n();
+  const reduceMotion = useReducedMotion();
   const [activeQuoteIndex, setActiveQuoteIndex] = useState(0);
+  // P5-09 — autoplay stops for good on the first manual interaction. Resuming on
+  // touchend (what the stories rail does) fights the user's own momentum scroll.
+  const [autoplayStopped, setAutoplayStopped] = useState(false);
+  const railRef = useRef<HTMLDivElement | null>(null);
+  const suppressScrollSync = useRef(false);
 
   useEffect(() => {
+    if (autoplayStopped || reduceMotion) return;
     const timer = setInterval(() => {
       setActiveQuoteIndex((prev) => (prev + 1) % doctorAdvisors.length);
-    }, 2000);
+    }, SPECIALIST_ROTATE_MS);
     return () => clearInterval(timer);
-  }, []);
+  }, [autoplayStopped, reduceMotion]);
+
+  // Drive the rail from the active index. Only meaningful at the mobile breakpoint,
+  // where the cards are a scroller; the lg grid has nothing to scroll.
+  useEffect(() => {
+    const rail = railRef.current;
+    if (!rail || rail.scrollWidth <= rail.clientWidth) return;
+    const card = rail.children[activeQuoteIndex] as HTMLElement | undefined;
+    if (!card) return;
+    suppressScrollSync.current = true;
+    rail.scrollTo({
+      left: card.offsetLeft - (rail.clientWidth - card.clientWidth) / 2,
+      behavior: reduceMotion ? 'auto' : 'smooth',
+    });
+    const id = setTimeout(() => { suppressScrollSync.current = false; }, 600);
+    return () => clearTimeout(id);
+  }, [activeQuoteIndex, reduceMotion]);
+
+  // A manual drag updates the active card so the quote and dots follow the finger.
+  const handleRailScroll = () => {
+    const rail = railRef.current;
+    if (!rail || suppressScrollSync.current) return;
+    const centre = rail.scrollLeft + rail.clientWidth / 2;
+    let nearest = 0;
+    let best = Infinity;
+    for (let i = 0; i < rail.children.length; i++) {
+      const c = rail.children[i] as HTMLElement;
+      const d = Math.abs(c.offsetLeft + c.clientWidth / 2 - centre);
+      if (d < best) { best = d; nearest = i; }
+    }
+    setActiveQuoteIndex(nearest);
+  };
 
   const activeDoc = doctorAdvisors[activeQuoteIndex];
 
@@ -244,15 +284,22 @@ export function LibertyMDSpecialistsSection() {
           </p>
         </div>
 
-        {/* Doctor Cards Grid (Static - No Mouse Hover Effects) */}
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5 items-stretch">
+        {/* P5-09 — mobile: one-card snap rail, draggable. lg+: the original 5-up grid. */}
+        <div
+          ref={railRef}
+          onScroll={handleRailScroll}
+          onPointerDown={() => setAutoplayStopped(true)}
+          onTouchStart={() => setAutoplayStopped(true)}
+          className="flex snap-x snap-mandatory gap-5 overflow-x-auto overscroll-x-contain no-scrollbar pb-2 items-stretch lg:grid lg:grid-cols-5 lg:overflow-visible lg:pb-0"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
           {doctorAdvisors.map((doc, idx) => {
             const isActive = idx === activeQuoteIndex;
             return (
               <div
                 key={doc.name}
                 onClick={() => setActiveQuoteIndex(idx)}
-                className={`flex flex-col justify-between items-center rounded-[28px] border bg-[#FCFCFA] p-4 sm:p-5 text-center transition-all duration-500 cursor-pointer ${
+                className={`flex w-[85%] shrink-0 snap-center flex-col justify-between items-center rounded-[28px] border bg-[#FCFCFA] p-4 sm:p-5 text-center transition-all duration-500 cursor-pointer lg:w-auto lg:shrink lg:snap-align-none ${
                   isActive
                     ? 'border-libertymd-blue-500/80 ring-2 ring-libertymd-blue-500/15 shadow-[0_8px_24px_rgba(37,99,235,0.08)]'
                     : 'border-libertymd-slate-200/70 shadow-[0_4px_20px_rgba(0,0,0,0.025)]'
@@ -290,6 +337,39 @@ export function LibertyMDSpecialistsSection() {
                   </span>
                 </div>
               </div>
+            );
+          })}
+        </div>
+
+        {/* P5-09 — position feedback: dots, with the active one carrying a fill bar
+            that tracks the rotation interval. Mobile only; the lg grid shows all
+            five cards at once, so a position indicator would be noise. Buttons,
+            not divs — same amount of code, and they work. */}
+        <div className="mt-5 flex items-center justify-center gap-2 lg:hidden">
+          {doctorAdvisors.map((doc, idx) => {
+            const isActive = idx === activeQuoteIndex;
+            return (
+              <button
+                key={doc.name}
+                type="button"
+                aria-label={doc.name}
+                aria-current={isActive ? 'true' : undefined}
+                onClick={() => { setAutoplayStopped(true); setActiveQuoteIndex(idx); }}
+                className={`h-2 rounded-full transition-all duration-300 ${
+                  isActive
+                    ? 'w-8 bg-libertymd-slate-200 overflow-hidden'
+                    : 'w-2 bg-libertymd-slate-300 hover:bg-libertymd-slate-400'
+                }`}
+              >
+                {isActive && (
+                  <span
+                    key={activeQuoteIndex}
+                    className={`block h-full rounded-full bg-libertymd-blue-600 ${
+                      autoplayStopped || reduceMotion ? 'w-full' : 'libertymd-dot-fill'
+                    }`}
+                  />
+                )}
+              </button>
             );
           })}
         </div>

@@ -978,3 +978,22 @@
 .libertymd-care-orb--report {
   box-shadow: 0 5px 14px rgba(36, 106, 143, 0.22), inset 0 0 0 1px rgba(13, 118, 110, 0.1);
 }
+
+
+/* P5-09 — specialists rail position indicator. The active dot's bar fills across
+   the rotation interval so the dots read as progress, not just position. */
+@keyframes libertymd-dot-fill {
+  from { width: 0%; }
+  to   { width: 100%; }
+}
+
+.libertymd-dot-fill {
+  animation: libertymd-dot-fill 2000ms linear forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .libertymd-dot-fill {
+    animation: none;
+    width: 100%;
+  }
+}
