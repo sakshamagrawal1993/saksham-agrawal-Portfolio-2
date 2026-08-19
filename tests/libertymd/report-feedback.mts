@@ -216,11 +216,26 @@ Deno.test('P2-10 T1 · Lexicon closed-client + no PRODUCT_EVENT_NAMES widen; HAN
 Deno.test('P2-10 AC1/AC4/R1 · UI source contracts: yes/no, optional comment, ack, not footerSlot/delivery', async () => {
   const ui = await Deno.readTextFile(FEEDBACK_UI)
   const view = await Deno.readTextFile(VIEW)
-  assertTrue(/data-libertymd-report-feedback-yes/.test(ui), 'yes control')
-  assertTrue(/data-libertymd-report-feedback-no/.test(ui), 'no control')
+  // UPDATED 2026-08-19 — the binary yes/no was replaced by a 0-10 likelihood
+  // scale in 1ee203d, and the single-line input by a bounded textarea. The old
+  // assertions below asserted the pre-1ee203d design and had been failing on
+  // main ever since, invisible because `:ci` is an && chain that halted at
+  // visual-boundary (gate 45) long before this gate (58).
+  //
+  // Retired, kept for provenance:
+  //   assertTrue(/data-libertymd-report-feedback-yes/.test(ui), 'yes control')
+  //   assertTrue(/data-libertymd-report-feedback-no/.test(ui), 'no control')
+  //   assertTrue(/type="text"/.test(ui) && !/textarea/i.test(ui), 'single-line input')
+  //
+  // Replaced with the CURRENT contract, so the gate still fails if the rating
+  // surface or its helpful-derivation is removed. Deleting outright would have
+  // left a live clinical surface with no source contract at all.
+  assertTrue(/data-libertymd-feedback-score/.test(ui), 'likelihood scale rendered')
+  assertTrue(/aria-pressed/.test(ui), 'scale buttons expose selected state')
+  assertTrue(/selectedRating\s*>=\s*7/.test(ui), 'helpful derived from rating threshold')
   assertTrue(/data-libertymd-report-feedback-comment/.test(ui), 'optional comment')
   assertTrue(/data-libertymd-report-feedback="thanks"/.test(ui), 'inline ack')
-  assertTrue(/type="text"/.test(ui) && !/textarea/i.test(ui), 'single-line input')
+  assertTrue(/REPORT_FEEDBACK_COMMENT_MAX/.test(ui), 'comment length is bounded')
   assertTrue(/emitFeedbackSubmitted/.test(ui), 'Mixpanel emit on success path')
   assertTrue(/submitReportFeedbackBody/.test(ui), 'typed proxy body')
   assertTrue(/functions\.invoke\('libertymd-care-proxy'/.test(ui), 'proxy invoke only')
