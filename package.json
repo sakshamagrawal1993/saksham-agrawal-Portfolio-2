@@ -93,7 +93,11 @@
     "test:libertymd:history-drawer": "deno test --no-config --no-check --allow-env --allow-read tests/libertymd/history-drawer.mts",
     "test:libertymd:keyword-content": "deno test --no-config --no-check --allow-read --sloppy-imports tests/libertymd/keyword-content-map.test.ts",
     "test:libertymd:differential": "deno test --no-config --no-check --allow-env tests/libertymd/differential-orchestration.mts",
-    "test:libertymd:diagnostic-clarification": "deno test --no-config --no-check tests/libertymd/diagnostic-clarification.test.ts"
+    "test:libertymd:diagnostic-clarification": "deno test --no-config --no-check tests/libertymd/diagnostic-clarification.test.ts",
+    "test:libertymd:guidance-locales": "node scripts/libertymd-diagnosis-guidance-locale-smoke.mjs",
+    "test:libertymd:report-locales": "node scripts/libertymd-report-locale-matrix.mjs",
+    "test:libertymd:i18n": "node scripts/i18n-check.mjs && deno test --no-config --no-check --allow-read tests/libertymd/i18n-substrate.test.ts",
+    "test:libertymd:e2e-32-i18n": "node scripts/e2e_32_clinical_scenarios_i18n_frontend.mjs"
   },
   "dependencies": {
     "@google/genai": "^1.43.0",

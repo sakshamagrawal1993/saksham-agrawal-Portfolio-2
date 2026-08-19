@@ -102,6 +102,11 @@ const WORKFLOW_APPROVED_MODELS = {
   diagnosis: new Set([
     'gpt-5.6-luna', // BO 2026-07-31 — quality; Gemini not allowed
   ]),
+  // P5-GUIDE — clinical content, so it tracks the diagnosis tier, not the
+  // cheap guardrail/interview tier.
+  diagnosisGuidance: new Set([
+    'gpt-5.6-luna',
+  ]),
 }
 
 /** Reads the model id across every node shape n8n has used for LLM nodes. */
@@ -134,6 +139,7 @@ if (definitionsDir) {
     ['guardrail', 'libertymd-guardrail-workflow__9qeE6tUcEY74OYV8.json'],
     ['interview', 'libertymd-interview-workflow__hqT6SFsmdRy1kWKa.json'],
     ['diagnosis', 'libertymd-diagnosis-workflow__vljapWQv5ug7pFA9.json'],
+    ['diagnosisGuidance', 'libertymd-diagnosis-guidance-workflow__tyzFHJu7lHgRIB2s.json'],
   ]
   for (const [name, file] of expected) {
     const workflow = JSON.parse(await fs.readFile(path.join(definitionsDir, file), 'utf8'))

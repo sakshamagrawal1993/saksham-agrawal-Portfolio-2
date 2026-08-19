@@ -314,3 +314,38 @@ Deno.test('P4-03 CARE documents AC3 surface table + report-first', async () => {
   assertTrue(care.includes('Report-first reopen'), 'report-first documented')
   assertTrue(care.includes('**no** new PRODUCT_EVENT / Mixpanel / Lexicon names'), 'no telemetry lock')
 })
+
+/**
+ * Regression — the report page opened the AccountDrawer without `history` /
+ * `loading`. For a linked account the drawer takes the history branch, and
+ * `history.length` on `undefined` threw during render, unmounting the whole
+ * React tree: the app went blank to the `#F5F2EB` body background ("yellow
+ * screen") instead of opening the side menu.
+ */
+Deno.test('Report page drawer: passes history + loading; HistoryList tolerates neither', async () => {
+  const report = await Deno.readTextFile(
+    new URL('../../components/LibertyMD/LibertyMDReportPage.tsx', import.meta.url),
+  )
+  const drawerProps = report.slice(
+    report.indexOf('<LibertyMDAccountDrawer'),
+    report.indexOf('/>', report.indexOf('<LibertyMDAccountDrawer')),
+  )
+  assertTrue(drawerProps.length > 0, 'report page renders the AccountDrawer')
+  assertTrue(drawerProps.includes('history={'), 'drawer receives history')
+  assertTrue(drawerProps.includes('loading={'), 'drawer receives loading')
+  assertTrue(
+    report.includes("action: 'get_history'"),
+    'report page fetches history from the care proxy',
+  )
+  // The history branch is linked-only; `identityStatus` starts at 'loading',
+  // so the guest panel must cover every not-yet-linked state.
+  assertTrue(drawerProps.includes('isAnonymous={!isLinked}'), 'guest panel unless linked')
+
+  const list = await Deno.readTextFile(
+    new URL('../../components/LibertyMD/LibertyMDHistoryList.tsx', import.meta.url),
+  )
+  assertTrue(
+    list.includes('Array.isArray(rawHistory) ? rawHistory : []'),
+    'HistoryList degrades to empty instead of throwing on a missing history prop',
+  )
+})

@@ -66,6 +66,13 @@ export type LibertyMdDifferentialItem = {
   furtherInvestigations?: string[]
   symptomaticTreatment?: string[]
   supportiveTreatment?: string[]
+  /**
+   * P5-GUIDE — canonical clinical English `full_name`. Never rendered: `name`
+   * is the patient-facing (translated) label. This exists purely as the join
+   * key for async per-diagnosis guidance, which arrives after the report and
+   * has to be attached to the right condition across locales.
+   */
+  canonicalName?: string
 }
 
 export type LibertyMdSoapNote = {
@@ -105,8 +112,11 @@ export type LibertyMdNormalizedReport = {
 const DOSING_LINE_RE =
   /\b\d+(\.\d+)?\s*(mg|mcg|µg|ug|g|ml|mL)\b|\b\d+\s*(tablet|capsule|puff|drop)s?\b|\b(take|dose)\s+\d+\b/i
 
-const SERIOUS_ENUM = new Set(['moderate', 'high', 'critical', 'serious'])
-const EMERGENCY_SERIOUS = new Set(['moderate', 'high', 'critical'])
+// "Moderate" is a review-urgency level, not proof that the condition itself is
+// serious. Only explicit serious/high/critical signals earn the patient-facing
+// Serious Condition badge; report-level triage communicates outpatient timing.
+const SERIOUS_ENUM = new Set(['high', 'critical', 'serious'])
+const EMERGENCY_SERIOUS = new Set(['high', 'critical'])
 
 function asOptionalText(value: unknown): string | undefined {
   if (typeof value === 'string') {
@@ -250,6 +260,80 @@ export function omitDosingLines(lines: readonly string[]): string[] {
   return lines.filter((line) => !DOSING_LINE_RE.test(line))
 }
 
+/**
+ * P5-GUIDE — async per-diagnosis guidance status, as reported by the proxy.
+ *
+ * `pending` is the only value that should keep the client polling. `idle` means
+ * the feature is off (or there was nothing to describe) and no guidance is ever
+ * coming, so the cards must render finished rather than skeletal.
+ */
+export type LibertyMdGuidanceStatus = 'idle' | 'pending' | 'ready' | 'failed'
+
+export type LibertyMdDiagnosisGuidance = {
+  full_name: string
+  supportive_treatment?: string[]
+  symptomatic_treatment?: string[]
+  further_investigations?: string[]
+}
+
+/**
+ * P5-GUIDE — fold async guidance onto already-rendered differentials.
+ *
+ * Deliberately separate from `normalizeReportData`: the report body is complete
+ * and correct before guidance exists, and re-normalizing the whole report every
+ * time a poll lands would rebuild sections that never changed. This merges by
+ * `full_name`, the canonical-English join key both workflows preserve, and
+ * falls back to positional order only when the report kept no canonical name to
+ * match on.
+ *
+ * Guidance never overwrites a differential that already carries its own slots,
+ * and dosing is stripped a third time here — the workflow and the proxy each
+ * strip it too, but this is the only pass that runs on what we are about to
+ * paint.
+ */
+export function mergeDiagnosisGuidance(
+  differentials: readonly LibertyMdDifferentialItem[],
+  guidance: unknown,
+): LibertyMdDifferentialItem[] {
+  const rows = Array.isArray(guidance) ? guidance : []
+  if (!rows.length) return [...differentials]
+
+  const byName = new Map<string, Record<string, unknown>>()
+  const ordered: Record<string, unknown>[] = []
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue
+    const record = row as Record<string, unknown>
+    ordered.push(record)
+    const name = asOptionalText(record.full_name)
+    if (name) byName.set(name.toLowerCase(), record)
+  }
+
+  return differentials.map((item, index) => {
+    const canonical = asOptionalText(item.canonicalName)
+    const match = (canonical && byName.get(canonical.toLowerCase()))
+      // Positional fallback only when there is no name to join on, and only
+      // while the two lists line up — a mismatched length means we cannot say
+      // which block belongs to which condition, and a wrong attribution here is
+      // a clinical error, not a cosmetic one.
+      || (!canonical && ordered.length === differentials.length ? ordered[index] : undefined)
+    if (!match) return item
+
+    const supportiveTreatment = omitDosingLines(listFrom(match.supportive_treatment))
+    const symptomaticTreatment = omitDosingLines(listFrom(match.symptomatic_treatment))
+    const furtherInvestigations = omitDosingLines(listFrom(match.further_investigations))
+    if (!supportiveTreatment.length && !symptomaticTreatment.length && !furtherInvestigations.length) {
+      return item
+    }
+
+    return {
+      ...item,
+      ...(item.supportiveTreatment?.length ? {} : supportiveTreatment.length ? { supportiveTreatment } : {}),
+      ...(item.symptomaticTreatment?.length ? {} : symptomaticTreatment.length ? { symptomaticTreatment } : {}),
+      ...(item.furtherInvestigations?.length ? {} : furtherInvestigations.length ? { furtherInvestigations } : {}),
+    }
+  })
+}
+
 function pickAliasList(record: Record<string, unknown>, keys: readonly string[]): string[] {
   for (const key of keys) {
     if (!(key in record) || record[key] == null) continue
@@ -326,8 +410,10 @@ function normalizeDifferentials(data: Record<string, unknown>): LibertyMdDiffere
       'supportive',
       'supportive_care',
     ])
+    const canonicalName = asOptionalText(record.full_name)
     out.push({
       name,
+      ...(canonicalName ? { canonicalName } : {}),
       ...(description ? { description } : {}),
       ...(reason ? { reason } : {}),
       ...(ordinal ? { ordinal } : {}),
@@ -364,40 +450,30 @@ export function formatThirdPersonPatientSummary(text: string | undefined): strin
     .replace(/\byour health\b/gi, "the patient's health")
 }
 
+/**
+ * Format clinical bullets for display. Empty in \u2192 empty out.
+ *
+ * BO 2026-08-13 \u2014 this used to return a hardcoded list of self-care advice,
+ * drug classes and lab orders whenever `items` was empty. Because nothing ever
+ * populated the per-differential slots, EVERY card on EVERY report rendered
+ * that same invented list as though it had been generated for that patient and
+ * that condition. That is fabricated clinical content on a physician-review
+ * document, and it contradicts the omit-not-stub rule this module is built on
+ * (see `normalizeReportData`: "never invents clinical fallbacks").
+ *
+ * There is no fallback now. A card with no guidance renders no guidance, which
+ * is what P5-GUIDE's async per-diagnosis run exists to fill honestly.
+ */
 export function formatClinicalBullets(
   items: string[] | undefined,
-  category: 'selfCare' | 'medical' | 'diagnostic',
+  _category: 'selfCare' | 'medical' | 'diagnostic',
 ): string[] {
-  if (items && items.length > 0) {
-    return items.slice(0, 4).map((rawItem) => {
-      const clean = rawItem.trim().replace(/^(\d+[\.\)]\s*|[-*\u2022]\s*)/, '').trim()
-      const words = clean.split(/\s+/)
-      return words.length > 10 ? words.slice(0, 10).join(' ') : clean
-    })
-  }
-
-  if (category === 'selfCare') {
-    return [
-      'Arrange an evaluation with a licensed clinician',
-      'Do a test for Covid 19',
-      'Avoid contact with ppl outside',
-      'Stay at home',
-    ]
-  }
-
-  if (category === 'medical') {
-    return [
-      'Over-the-counter antipyretics or analgesics for fever',
-      'Targeted prescription therapeutics following clinician evaluation',
-      'Symptomatic cough and throat lozenges',
-    ]
-  }
-
-  return [
-    'Rapid COVID-19 and Influenza Antigen Test',
-    'Complete Blood Count (CBC) with Differential',
-    'Pulse Oximetry & Respiratory Rate Evaluation',
-  ]
+  if (!items || items.length === 0) return []
+  return items.slice(0, 4).map((rawItem) => {
+    const clean = rawItem.trim().replace(/^(\d+[\.\)]\s*|[-*\u2022]\s*)/, '').trim()
+    const words = clean.split(/\s+/)
+    return words.length > 10 ? words.slice(0, 10).join(' ') : clean
+  })
 }
 
 export function synthesizeSessionSummary(
@@ -544,10 +620,7 @@ export function isReportSectionId(value: unknown): value is ReportSectionId {
   return typeof value === 'string' && (REPORT_SECTION_IDS as readonly string[]).includes(value)
 }
 
-// ─── P2-05 · Sticky gate + section expansion persistence (booleans only) ──────
-
-/** Disable sticky when consult scroller clientHeight is below this (CSS px). */
-export const LIBERTYMD_REPORT_STICKY_MIN_SCROLLER_PX = 500
+// ─── P2-05 · Section expansion persistence (booleans only) ───────────────────
 
 export const REPORT_SECTIONS_PREFIX = 'libertymd:report-sections:'
 
@@ -569,13 +642,6 @@ export const DEFAULT_REPORT_SECTION_OPEN: Record<ReportSectionId, boolean> = {
 
 export function reportSectionsKey(consultationId: string): string {
   return `${REPORT_SECTIONS_PREFIX}${consultationId}`
-}
-
-/** AC5 · pure height gate — scroller clientHeight (or window fallback upstream). */
-export function shouldEnableReportSticky(clientHeight: number): boolean {
-  const h = Number(clientHeight)
-  if (!Number.isFinite(h)) return false
-  return h >= LIBERTYMD_REPORT_STICKY_MIN_SCROLLER_PX
 }
 
 export function mergeReportSectionOpen(

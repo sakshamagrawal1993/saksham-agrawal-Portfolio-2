@@ -41,7 +41,7 @@ export async function handleGetConsultation(ctx: ProxyContext, payload: RequestP
   // (NULL retention never omits — saved/linked).
   const { data: report } = await ctx.db
     .from('libertymd_reports')
-    .select('report_data,confidence_score,access_status,retention_expires_at')
+    .select('report_data,confidence_score,access_status,retention_expires_at,diagnosis_guidance,diagnosis_guidance_status')
     .eq('consultation_id', consultation.id)
     .eq('user_id', ctx.user.id)
     .in('access_status', ['saved', 'guest_released', 'withheld'])
@@ -138,6 +138,16 @@ export async function handleGetConsultation(ctx: ProxyContext, payload: RequestP
     report_omitted_reason: lifecycle.report_omitted_reason,
     report_incomplete: reportIncomplete,
     media_evidence: mediaEvidence,
+  }
+  // P5-GUIDE — per-diagnosis guidance rides alongside the report but never
+  // gates it. Only surfaced once the report body itself is being served, so a
+  // withheld/expired report cannot leak clinical guidance about its
+  // differentials. `pending` is the client's signal to keep polling.
+  if (lifecycle.report != null) {
+    response.diagnosis_guidance = Array.isArray(report?.diagnosis_guidance)
+      ? report.diagnosis_guidance
+      : []
+    response.diagnosis_guidance_status = String(report?.diagnosis_guidance_status || 'idle')
   }
   if (terminalSafety?.crisis_type) {
     response.crisis_type = terminalSafety.crisis_type
