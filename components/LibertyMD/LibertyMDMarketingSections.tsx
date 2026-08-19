@@ -290,7 +290,7 @@ export function LibertyMDSpecialistsSection() {
           onScroll={handleRailScroll}
           onPointerDown={() => setAutoplayStopped(true)}
           onTouchStart={() => setAutoplayStopped(true)}
-          className="flex snap-x snap-mandatory gap-5 overflow-x-auto overscroll-x-contain no-scrollbar pb-2 items-stretch lg:grid lg:grid-cols-5 lg:overflow-visible lg:pb-0"
+          className="flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain no-scrollbar pb-2 items-stretch lg:grid lg:grid-cols-5 lg:gap-5 lg:overflow-visible lg:pb-0"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
           {doctorAdvisors.map((doc, idx) => {
@@ -299,10 +299,10 @@ export function LibertyMDSpecialistsSection() {
               <div
                 key={doc.name}
                 onClick={() => setActiveQuoteIndex(idx)}
-                className={`flex w-[85%] shrink-0 snap-center flex-col justify-between items-center rounded-[28px] border bg-[#FCFCFA] p-4 sm:p-5 text-center transition-all duration-500 cursor-pointer lg:w-auto lg:shrink lg:snap-align-none ${
+                className={`flex w-[64%] shrink-0 snap-center flex-col justify-between items-center rounded-[28px] border bg-[#FCFCFA] p-4 sm:p-5 text-center transition-all duration-500 cursor-pointer sm:w-[46%] lg:w-auto lg:shrink lg:snap-align-none ${
                   isActive
-                    ? 'border-libertymd-blue-500/80 ring-2 ring-libertymd-blue-500/15 shadow-[0_8px_24px_rgba(37,99,235,0.08)]'
-                    : 'border-libertymd-slate-200/70 shadow-[0_4px_20px_rgba(0,0,0,0.025)]'
+                    ? 'border-libertymd-blue-500/80 ring-2 ring-libertymd-blue-500/15 shadow-[0_8px_24px_rgba(37,99,235,0.08)] opacity-100'
+                    : 'border-libertymd-slate-200/70 shadow-[0_4px_20px_rgba(0,0,0,0.025)] opacity-60 lg:opacity-100'
                 }`}
               >
                 {/* Top Doctor Headshot */}
