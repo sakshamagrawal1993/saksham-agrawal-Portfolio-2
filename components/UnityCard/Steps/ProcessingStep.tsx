@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useUnityCardStore } from '../../../store/unityCardStore';
 import { CheckCircle2, Loader2, Sparkles } from 'lucide-react';

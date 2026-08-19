@@ -86,25 +86,6 @@ const IconRedeem = () => (
   </svg>
 );
 
-const IconLounge = () => (
-  <svg viewBox="0 0 40 40" className="w-8 h-8" fill="none">
-    <rect width="40" height="40" rx="10" fill="#FFF3E0" />
-    <path d="M8 28h24M10 28V18a2 2 0 012-2h16a2 2 0 012 2v10" stroke="#F57C00" strokeWidth="2" fill="none"/>
-    <rect x="14" y="22" width="4" height="6" rx="1" stroke="#F57C00" strokeWidth="1.5" fill="none"/>
-    <rect x="22" y="22" width="4" height="6" rx="1" stroke="#F57C00" strokeWidth="1.5" fill="none"/>
-    <path d="M16 16v-2M20 16v-3M24 16v-2" stroke="#F57C00" strokeWidth="1.5" strokeLinecap="round"/>
-  </svg>
-);
-
-const IconVisits = () => (
-  <svg viewBox="0 0 40 40" className="w-8 h-8" fill="none">
-    <rect width="40" height="40" rx="10" fill="#FFF3E0" />
-    <circle cx="20" cy="16" r="5" stroke="#F57C00" strokeWidth="2" fill="none"/>
-    <path d="M10 32c0-6 4-9 10-9s10 3 10 9" stroke="#F57C00" strokeWidth="2" fill="none" strokeLinecap="round"/>
-    <path d="M25 22l2 3 4-4" stroke="#4CAF50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-  </svg>
-);
-
 // ─── Highlight Card Component ─────────────────────────────────────────────────
 
 function HighlightCard({

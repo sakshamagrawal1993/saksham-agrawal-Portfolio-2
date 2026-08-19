@@ -20,7 +20,6 @@ export const SessionsScreen: React.FC = () => {
   const setSessions = useMindCoachStore((s) => s.setSessions);
   const setMessages = useMindCoachStore((s) => s.setMessages);
   const setActiveTab = useMindCoachStore((s) => s.setActiveTab);
-  const currentPhase = useMindCoachStore((s) => s.currentPhaseNumber());
   const [starting, setStarting] = useState(false);
   const [showProposal, setShowProposal] = useState(false);
 

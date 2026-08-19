@@ -1,16 +1,19 @@
-import React from 'react';
+import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useUnityCardStore } from '../../store/unityCardStore';
-import { CreditCard, ShoppingBag, ArrowRightLeft, Info, Zap, Send, Plus, Bell, MoreHorizontal, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { ShoppingBag, Zap, Send, Plus, Bell, MoreHorizontal, ArrowDownLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function UnityCardDashboard() {
   const { creditLimit, pan } = useUnityCardStore();
   const navigate = useNavigate();
 
-  // If someone lands here without completing onboarding
+  // Guard: incomplete onboarding → landing. Must not call navigate during render.
+  useEffect(() => {
+    if (!creditLimit) navigate('/unity-card', { replace: true });
+  }, [creditLimit, navigate]);
+
   if (!creditLimit) {
-    navigate('/unity-card');
     return null;
   }
 

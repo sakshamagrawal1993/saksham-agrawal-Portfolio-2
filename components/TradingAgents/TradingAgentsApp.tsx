@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Play, TrendingUp, TrendingDown, Activity, Search, LayoutDashboard, Terminal, Zap, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Play, TrendingUp, TrendingDown, Activity, Search, Terminal, Zap, ChevronDown } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import {
   AgentLog,
@@ -1208,7 +1208,7 @@ export default function TradingAgentsApp({ onBack }: TradingAgentsAppProps) {
 
         ws = new WebSocket(`wss://ws.finnhub.io?token=${data.token}`);
         
-        ws.addEventListener('open', function (event) {
+        ws.addEventListener('open', function () {
           setWsStatus('connected');
           // Subscribe to all 50 tickers
           TOP_50_US.forEach(t => {

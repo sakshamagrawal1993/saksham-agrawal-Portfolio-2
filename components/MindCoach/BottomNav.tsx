@@ -27,7 +27,6 @@ export const BottomNav: React.FC = () => {
   const setActiveSession = useMindCoachStore((s) => s.setActiveSession);
   const setSessions = useMindCoachStore((s) => s.setSessions);
   const setMessages = useMindCoachStore((s) => s.setMessages);
-  const currentPhase = useMindCoachStore((s) => s.currentPhaseNumber());
   const phase = useMindCoachStore((s) => s.journey?.current_phase ?? 1);
   const [showMore, setShowMore] = useState(false);
   const [openingTalk, setOpeningTalk] = useState(false);

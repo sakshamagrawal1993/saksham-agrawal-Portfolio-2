@@ -1,5 +1,3 @@
-import React from 'react';
-
 export function CarinAccreditedBadge({ className = "w-20 h-20" }: { className?: string }) {
   return (
     <div className={`relative flex items-center justify-center select-none ${className}`} title="CARIN Alliance Code of Conduct Accredited">
